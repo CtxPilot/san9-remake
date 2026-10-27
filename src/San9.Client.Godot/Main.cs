@@ -15,6 +15,7 @@ public partial class Main : Node
     private SceneTransitionOverlay _transition = null!;
     private bool _switching;
     private ClientOptions _options = null!;
+    private ClientDirectories _directories = null!;
     private readonly CancellationTokenSource _startup = new();
     public override void _ExitTree()
     {
@@ -39,11 +40,11 @@ public partial class Main : Node
         var ui = GetNode<Control>("%UiRoot");
         try
         {
-            string contentRoot = OS.HasFeature("editor")
-                ? Path.Combine(ProjectSettings.GlobalizePath("res://"), "../../local/generated/content")
-                : Path.Combine(Path.GetDirectoryName(OS.GetExecutablePath())!, "content");
-            var options = ClientOptions.Parse(OS.GetCmdlineUserArgs(), contentRoot);
+            _directories = ClientDirectories.Resolve(OS.HasFeature("template"), OS.GetName(), OS.GetExecutablePath(),
+                ProjectSettings.GlobalizePath("res://"), ProjectSettings.GlobalizePath("user://"), OS.GetSystemDir(OS.SystemDir.Documents));
+            var options = ClientOptions.Parse(OS.GetCmdlineUserArgs(), _directories.ContentRoot);
             _options = options;
+            _directories = _directories.ApplyOverrides(options);
             if (options.PackageRoot is null && options.ScenarioId is null)
             {
                 if (options.RequiresWorldVerification || options.TextSmoke)
@@ -58,12 +59,23 @@ public partial class Main : Node
         {
             if (token.IsCancellationRequested) return;
             GD.PushError($"客户端内容加载失败：{e}");
-            ui.AddChild(new Label { Text = $"内容加载失败：{e.Message}\n请运行 San9.Tools import-client。", Position = new(24, 120), Size = new(970, 300), AutowrapMode = TextServer.AutowrapMode.WordSmart });
+            string? contentRoot = _options?.PackageRoot ?? _directories?.ContentRoot;
+            ui.AddChild(new Label { Text = $"内容加载失败：{e.Message}\n\n内容目录：{contentRoot}\n请自行转换内容，放入内容目录后重新启动。", Position = new(24, 120), Size = new(970, 300), AutowrapMode = TextServer.AutowrapMode.WordSmart });
+            if (contentRoot is not null)
+            {
+                var open = new Button { Text = "打开内容目录", Position = new(24, 440), Size = new(192, 48) };
+                open.Pressed += () =>
+                {
+                    try { ClientFolderAccess.Open(contentRoot); }
+                    catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+                    { open.Text = "打开失败"; open.TooltipText = error.Message; }
+                };
+                ui.AddChild(open);
+            }
             if (OS.GetCmdlineUserArgs().Contains("--map-quit")) GetTree().Quit(1);
         }
     }
-    private ClientDataPaths DataPaths => new(_options.UserDataRoot is null && OS.HasFeature("template"), OS.GetName(),
-        OS.GetExecutablePath(), _options.UserDataRoot ?? ProjectSettings.GlobalizePath("user://"));
+    private ClientDataPaths DataPaths => _directories.UserData;
 
     public override void _Input(InputEvent input)
     {

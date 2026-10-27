@@ -47,11 +47,14 @@
 
 ## 用户数据目录
 
-客户端启动时由 `ClientDataPaths` 统一选择用户数据根目录，存档、设置与玩家档案共用该目录：
+客户端启动时由 `ClientDirectories` 统一选择内容与用户数据根目录，`ClientDataPaths` 提供存档、设置与玩家档案在用户数据目录下的路径：
 
 - Windows／Linux 导出版（包括 Debug 导出）：可执行文件所在目录下的 `userdata/`，与启动工作目录无关。
-- 编辑器运行（包括使用编辑器二进制启动项目）、移动端、macOS 及其他平台：Godot 的 `user://`，经 `ProjectSettings.GlobalizePath` 转为绝对路径。
+- macOS 导出版（包括 Debug 导出）：系统“文稿”目录下的 `San9Remake/userdata/`，通常为 `~/Documents/San9Remake/userdata/`；同级 `content/` 由玩家自行放入转换内容，不随程序发布。
+- 编辑器运行（包括使用编辑器二进制启动项目）、移动端及其他平台：Godot 的 `user://`，经 `ProjectSettings.GlobalizePath` 转为绝对路径。
 
 相对根目录的文件布局为 `user-settings.json`、`profile.json`、`saves/quick.save.json` 和 `saves/slots/`；手动与自动栏位共用最后一个目录。玩家档案当前仅提供路径和存储基础，尚未接入启动流程。
+
+macOS 使用固定目录，不增加首次引导或路径配置；需要其他位置时沿用 `--content-root` 与 `--user-data-root`，仅覆盖本次启动。
 
 启动选址不创建目录或文件；各存储在实际写入时按需创建目录。Windows／Linux 导出版需要放在当前用户可写的位置，写入失败沿用对应功能的失败处理，不自动切换目录。不自动迁移或查找旧 `user://` 文件；需要保留旧数据时，手动把原目录中的对应文件和 `saves/` 复制到新的 `userdata/`。

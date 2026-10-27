@@ -32,7 +32,8 @@ public partial class StartMenuPreview : Node
             token.ThrowIfCancellationRequested();
             opening.Menu.Validate(textures.Assets); opening.Selection.Validate(textures.Assets);
             var service = new TextureService(); service.Initialize(textures, PackageFiles.Resolve(root, catalog.Textures)); AddChild(service);
-            var paths = DataPaths ?? new ClientDataPaths(OS.HasFeature("template"), OS.GetName(), OS.GetExecutablePath(), ProjectSettings.GlobalizePath("user://"));
+            var paths = DataPaths ?? ClientDirectories.Resolve(OS.HasFeature("template"), OS.GetName(),
+                OS.GetExecutablePath(), ProjectSettings.GlobalizePath("res://"), ProjectSettings.GlobalizePath("user://"), OS.GetSystemDir(OS.SystemDir.Documents)).UserData;
             var settings = new UserSettingsSession(new UserSettingsStore(paths.Settings));
             try { settings.Load(); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or System.Text.DecoderFallbackException or InvalidDataException) { }

@@ -17,8 +17,10 @@ public sealed class ClientDataPathsTests
     {
         string install = Path.Combine(Path.GetTempPath(), "san9-install");
         string user = Path.Combine(Path.GetTempPath(), "san9-user");
-        var paths = new ClientDataPaths(exported, platform, Path.Combine(install, "San9"), user);
-        string expected = portable ? Path.Combine(install, "userdata") : user;
+        string documents = Path.Combine(Path.GetTempPath(), "san9-documents");
+        var paths = ClientDirectories.Resolve(exported, platform, Path.Combine(install, "San9"), install, user, documents).UserData;
+        string expected = exported && platform == "macOS" ? Path.Combine(documents, "San9Remake", "userdata")
+            : portable ? Path.Combine(install, "userdata") : user;
 
         Assert.Equal(expected, paths.Root);
         Assert.Equal(Path.Combine(expected, "user-settings.json"), paths.Settings);

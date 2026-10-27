@@ -9,10 +9,10 @@ public sealed class ClientDataPaths
     public string QuickSave => Path.Combine(Root, "saves", "quick.save.json");
     public string SaveSlots => Path.Combine(Root, "saves", "slots");
 
-    public ClientDataPaths(bool isExportTemplate, string platform, string executablePath, string userDataDirectory)
+    public ClientDataPaths(string root)
     {
-        Root = Path.GetFullPath(isExportTemplate && platform is "Windows" or "Linux"
-            ? Path.Combine(Path.GetDirectoryName(executablePath)!, "userdata")
-            : userDataDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        if (!Path.IsPathFullyQualified(root)) throw new ArgumentException("An absolute filesystem path is required.", nameof(root));
+        Root = Path.GetFullPath(root);
     }
 }
