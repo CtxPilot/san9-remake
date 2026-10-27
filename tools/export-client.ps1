@@ -54,7 +54,14 @@ function Invoke-Godot([string[]] $Arguments, [string] $LogName) {
 
 Push-Location $repoRoot
 try {
-    Invoke-Godot @('--import') 'import'
+    # ThemeDB loads the project's global font before the editor can import assets.
+    # Bootstrap imports without that runtime dependency, then export with the real theme.
+    $projectFile = Join-Path $projectRoot 'project.godot'
+    $originalProject = [IO.File]::ReadAllBytes($projectFile)
+    $importProject = [Text.Encoding]::UTF8.GetString($originalProject) -replace '(?m)^theme/custom_font=.*\r?\n?', ''
+    [IO.File]::WriteAllText($projectFile, $importProject, [Text.UTF8Encoding]::new($false))
+    try { Invoke-Godot @('--import') 'import' }
+    finally { [IO.File]::WriteAllBytes($projectFile, $originalProject) }
     $output = Join-Path $outputRoot $target.File
     Invoke-Godot @('--export-release', ('"' + $target.Preset + '"'), ('"' + $output + '"')) 'export'
     if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { throw "Godot did not produce $output." }
