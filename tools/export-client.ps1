@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('windows', 'linux', 'macos')]
+    [string] $Platform = 'windows',
     [string] $GodotPath
 )
 
@@ -7,12 +9,17 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $projectRoot = Join-Path $repoRoot 'src/San9.Client.Godot'
-$outputRoot = Join-Path $repoRoot 'local/generated/export/windows-x64'
-$template = Join-Path $repoRoot 'private/template/windows_release_x86_64.exe'
+$target = @{
+    windows = @{ Preset = 'Windows Desktop'; Directory = 'windows-x64'; File = 'San9.exe'; Template = 'windows_release_x86_64.exe' }
+    linux = @{ Preset = 'Linux'; Directory = 'linux-x64'; File = 'San9.x86_64'; Template = 'linux_release.x86_64' }
+    macos = @{ Preset = 'macOS'; Directory = 'macos-arm64'; File = 'San9.zip'; Template = 'macos_release.arm64.mono.zip' }
+}[$Platform]
+$outputRoot = Join-Path $repoRoot "local/generated/export/$($target.Directory)"
+$template = Join-Path $repoRoot "local/generated/release-tools/templates/4.7.2-slim.2/$($target.Template)"
 
 if (-not $GodotPath) {
     $editor = Get-Command 'Godot*_mono_win64.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (-not $editor) { throw 'Pass -GodotPath with the Godot 4.7.2 .NET executable.' }
+    if (-not $editor) { throw 'Pass -GodotPath with the Godot 4.7.2 .NET executable returned by tools/setup-release.ps1.' }
     $GodotPath = $editor.Source
 }
 $GodotPath = (Resolve-Path -LiteralPath $GodotPath).Path
@@ -26,8 +33,15 @@ function Invoke-Godot([string[]] $Arguments, [string] $LogName) {
     $stdout = Join-Path $outputRoot "$LogName.log"
     $stderr = Join-Path $outputRoot "$LogName.errors.log"
     $commandArguments = @('--headless', '--path', ('"' + $projectRoot + '"')) + $Arguments
-    $process = Start-Process -FilePath $GodotPath -ArgumentList $commandArguments -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    $startOptions = @{
+        FilePath = $GodotPath
+        ArgumentList = $commandArguments
+        PassThru = $true
+        RedirectStandardOutput = $stdout
+        RedirectStandardError = $stderr
+    }
+    if ($IsWindows) { $startOptions.WindowStyle = 'Hidden' }
+    $process = Start-Process @startOptions
     # Wait for the editor, not its reusable MSBuild worker processes.
     $process.WaitForExit()
     Get-Content -LiteralPath $stdout -Encoding utf8 | Write-Host
@@ -41,11 +55,12 @@ function Invoke-Godot([string[]] $Arguments, [string] $LogName) {
 Push-Location $repoRoot
 try {
     Invoke-Godot @('--import') 'import'
-    Invoke-Godot @('--export-release', '"Windows Desktop"', ('"' + (Join-Path $outputRoot 'San9.exe') + '"')) 'export'
-    if (-not (Test-Path -LiteralPath (Join-Path $outputRoot 'San9.exe') -PathType Leaf)) { throw 'Godot did not produce San9.exe.' }
+    $output = Join-Path $outputRoot $target.File
+    Invoke-Godot @('--export-release', ('"' + $target.Preset + '"'), ('"' + $output + '"')) 'export'
+    if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { throw "Godot did not produce $output." }
 
-    Write-Host "Exported: $(Join-Path $outputRoot 'San9.exe')"
-    Write-Host 'San9.exe includes the PCK and .NET build outputs. Converted content is not copied.'
+    Write-Host "Exported: $output"
+    Write-Host 'The export includes the project and .NET publish outputs. Converted content is not copied.'
 } finally {
     Pop-Location
 }

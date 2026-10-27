@@ -1,0 +1,173 @@
+name: Desktop release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag, e.g. v0.1.0 or v0.1.0-rc.1 (existing tags build that exact commit)'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.version.outputs.commit }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve release version and commit
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:REQUESTED_VERSION
+          if ($version -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') {
+            throw 'Use a version such as v0.1.0 or v0.1.0-rc.1.'
+          }
+          $existing = git tag --list $version
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect repository tags.' }
+          if ($existing) {
+            $commit = git rev-parse --verify "refs/tags/${version}^{commit}"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the release tag commit.' }
+          } else {
+            if ($env:GITHUB_EVENT_NAME -ne 'workflow_dispatch') { throw 'The pushed tag could not be resolved.' }
+            $commit = $env:GITHUB_SHA
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "commit=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+  build:
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-2022
+            target: windows-x64
+          - platform: linux
+            runner: ubuntu-22.04
+            target: linux-x64
+          - platform: macos
+            runner: macos-15
+            target: macos-arm64
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      EXPORT_PLATFORM: ${{ matrix.platform }}
+      EXPORT_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Download pinned editor, templates and font
+        id: tools
+        run: |
+          $godotPath = ./tools/setup-release.ps1 -Platform $env:EXPORT_PLATFORM
+          "godot-path=$godotPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Set application version
+        run: |
+          $path = 'src/San9.Client.Godot/project.godot'
+          $numericVersion = $env:RELEASE_VERSION -replace '^v', '' -replace '-.*$', ''
+          $project = Get-Content -LiteralPath $path -Raw -Encoding utf8
+          $project = $project -replace '(?m)^\[application\]\r?$', "[application]`n`nconfig/version=`"$numericVersion`""
+          [IO.File]::WriteAllText((Join-Path $PWD $path), $project, [Text.UTF8Encoding]::new($false))
+      - name: Export release
+        env:
+          GODOT_PATH: ${{ steps.tools.outputs.godot-path }}
+        run: ./tools/export-client.ps1 -Platform $env:EXPORT_PLATFORM -GodotPath $env:GODOT_PATH
+      - name: Package executable and notices
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = Join-Path $PWD "local/generated/export/$env:EXPORT_TARGET"
+          $assets = Join-Path $PWD 'local/generated/release-assets'
+          New-Item -ItemType Directory -Path $assets -Force | Out-Null
+          Copy-Item -LiteralPath 'src/San9.Client.Godot/assets/OFL.txt' -Destination $output
+          Copy-Item -Path 'local/generated/release-tools/licenses/*.txt' -Destination $output
+          $name = "San9-$env:RELEASE_VERSION-$env:EXPORT_TARGET"
+          switch ($env:EXPORT_PLATFORM) {
+            windows {
+              Compress-Archive -Path "$output/San9.exe", "$output/OFL.txt", "$output/GODOT-LICENSE.txt", "$output/GODOT-COPYRIGHT.txt" -DestinationPath "$assets/$name.zip"
+            }
+            linux {
+              & chmod +x "$output/San9.x86_64"
+              if ($LASTEXITCODE -ne 0) { throw 'Setting game executable permission failed.' }
+              & tar -czf "$assets/$name.tar.gz" -C $output San9.x86_64 OFL.txt GODOT-LICENSE.txt GODOT-COPYRIGHT.txt
+              if ($LASTEXITCODE -ne 0) { throw 'Linux packaging failed.' }
+            }
+            macos {
+              Copy-Item -LiteralPath "$output/San9.zip" -Destination "$assets/$name.zip"
+              & zip -j "$assets/$name.zip" "$output/OFL.txt" "$output/GODOT-LICENSE.txt" "$output/GODOT-COPYRIGHT.txt"
+              if ($LASTEXITCODE -ne 0) { throw 'macOS packaging failed.' }
+            }
+          }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ matrix.target }}
+          path: local/generated/release-assets/*
+          if-no-files-found: error
+          compression-level: 0
+      - name: Upload export logs
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: logs-${{ matrix.target }}
+          path: local/generated/export/${{ matrix.target }}/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish all three packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packages = @(Get-ChildItem -LiteralPath release-assets -File)
+          if ($packages.Count -ne 3) { throw 'Expected exactly three release packages.' }
+          $files = @($packages.FullName)
+          & gh release view $env:RELEASE_VERSION --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            & gh release upload $env:RELEASE_VERSION @files --repo $env:GITHUB_REPOSITORY --clobber
+          } else {
+            $options = @('--repo', $env:GITHUB_REPOSITORY, '--target', $env:RELEASE_COMMIT, '--title', $env:RELEASE_VERSION, '--generate-notes')
+            if ($env:RELEASE_VERSION.Contains('-')) { $options += '--prerelease' }
+            & gh release create $env:RELEASE_VERSION @files @options
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publication failed.' }
