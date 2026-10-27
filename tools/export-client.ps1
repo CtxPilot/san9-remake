@@ -10,9 +10,9 @@ Set-StrictMode -Version Latest
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $projectRoot = Join-Path $repoRoot 'src/San9.Client.Godot'
 $target = @{
-    windows = @{ Preset = 'Windows Desktop'; Directory = 'windows-x64'; File = 'San9.exe'; Template = 'windows_release_x86_64.exe' }
-    linux = @{ Preset = 'Linux'; Directory = 'linux-x64'; File = 'San9.x86_64'; Template = 'linux_release.x86_64' }
-    macos = @{ Preset = 'macOS'; Directory = 'macos-arm64'; File = 'San9.zip'; Template = 'macos_release.arm64.mono.zip' }
+    windows = @{ Preset = 'Windows Desktop'; Directory = 'windows-x64'; File = 'San9R.exe'; Template = 'windows_release_x86_64.exe' }
+    linux = @{ Preset = 'Linux'; Directory = 'linux-x64'; File = 'San9R.x86_64'; Template = 'linux_release.x86_64' }
+    macos = @{ Preset = 'macOS'; Directory = 'macos-arm64'; File = 'San9R.zip'; Template = 'macos_release.arm64.mono.zip' }
 }[$Platform]
 $outputRoot = Join-Path $repoRoot "local/generated/export/$($target.Directory)"
 $template = Join-Path $repoRoot "local/generated/release-tools/templates/4.7.2-slim.2/$($target.Template)"

@@ -108,19 +108,19 @@ jobs:
           New-Item -ItemType Directory -Path $assets -Force | Out-Null
           Copy-Item -LiteralPath 'src/San9.Client.Godot/assets/OFL.txt' -Destination $output
           Copy-Item -Path 'local/generated/release-tools/licenses/*.txt' -Destination $output
-          $name = "San9-$env:RELEASE_VERSION-$env:EXPORT_TARGET"
+          $name = "San9R-$env:RELEASE_VERSION-$env:EXPORT_TARGET"
           switch ($env:EXPORT_PLATFORM) {
             windows {
-              Compress-Archive -Path "$output/San9.exe", "$output/OFL.txt", "$output/GODOT-LICENSE.txt", "$output/GODOT-COPYRIGHT.txt" -DestinationPath "$assets/$name.zip"
+              Compress-Archive -Path "$output/San9R.exe", "$output/OFL.txt", "$output/GODOT-LICENSE.txt", "$output/GODOT-COPYRIGHT.txt" -DestinationPath "$assets/$name.zip"
             }
             linux {
-              & chmod +x "$output/San9.x86_64"
+              & chmod +x "$output/San9R.x86_64"
               if ($LASTEXITCODE -ne 0) { throw 'Setting game executable permission failed.' }
-              & tar -czf "$assets/$name.tar.gz" -C $output San9.x86_64 OFL.txt GODOT-LICENSE.txt GODOT-COPYRIGHT.txt
+              & tar -czf "$assets/$name.tar.gz" -C $output San9R.x86_64 OFL.txt GODOT-LICENSE.txt GODOT-COPYRIGHT.txt
               if ($LASTEXITCODE -ne 0) { throw 'Linux packaging failed.' }
             }
             macos {
-              Copy-Item -LiteralPath "$output/San9.zip" -Destination "$assets/$name.zip"
+              Copy-Item -LiteralPath "$output/San9R.zip" -Destination "$assets/$name.zip"
               & zip -j "$assets/$name.zip" "$output/OFL.txt" "$output/GODOT-LICENSE.txt" "$output/GODOT-COPYRIGHT.txt"
               if ($LASTEXITCODE -ne 0) { throw 'macOS packaging failed.' }
             }
