@@ -151,13 +151,7 @@ internal static class PersonnelMissions
     }
 
     internal static bool CanSearch(WorldMutation world, int forceId, int destinationId, PersonnelRulebook rules)
-    {
-        if (!rules.Places.ContainsKey(destinationId) || world.AllSettlements.TryGetValue(destinationId, out var defined) && defined.IsDormant) return false;
-        if (world.Settlements.TryGetValue(destinationId, out var target) && target.OwnerId is int owner)
-            return owner == forceId;
-        return !rules.RegionCities.TryGetValue(destinationId, out int cityId) ||
-            world.Settlements.TryGetValue(cityId, out var city) && (city.OwnerId is null || city.OwnerId == forceId);
-    }
+        => rules.CanSearch(world.AllSettlements, forceId, destinationId);
 
     internal static CommandRejection StartMove(WorldMutation world, CommandContext context, MoveOfficersCommand command,
         PersonnelRulebook rules, MilitaryRulebook? military, List<DomainEvent> events)

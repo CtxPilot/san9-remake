@@ -102,8 +102,8 @@ public static class StrategicContext
             if (outlook?.Food.Sufficient == false) { Add("food-shortage"); return Finish(); }
             if (outlook?.Money.Sufficient == false) { Add("money-shortage"); return Finish(); }
         }
-        bool EligiblePlace(int id) => owned.Any(s => s.Id == id) || !world.Settlements.Any(s => s.Id == id &&
-            (s.OwnerId is not null || s.IsDormant || s.IsDestroyed));
+        var settlements = world.Settlements.ToDictionary(s => s.Id);
+        bool EligiblePlace(int id) => view.Rules.Personnel.CanSearch(settlements, force.Id, id);
         int accuracy = Math.Min(100,60 + Math.Max(0,intelligence - 70) + Math.Max(0,intelligence - 90));
         bool Accurate(int place) => new StableRandom(StableRandom.DeriveSeed(world.Simulation.InitialSeed,
             FormattableString.Invariant($"strategic-clue-accuracy:{place}"))).NextUInt64() % 100 < (ulong)accuracy;

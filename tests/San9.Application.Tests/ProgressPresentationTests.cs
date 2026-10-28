@@ -300,6 +300,56 @@ public sealed class ProgressPresentationTests
     }
 
     [Theory]
+    [InlineData(1, false, null, true)]
+    [InlineData(null, false, null, true)]
+    [InlineData(2, false, null, false)]
+    [InlineData(1, true, null, true)]
+    [InlineData(null, true, null, true)]
+    [InlineData(2, true, null, false)]
+    [InlineData(2, true, 1, true)]
+    [InlineData(1, true, 2, false)]
+    public void HiddenCluesRespectCurrentCityAndIndependentBuildingOwnership(int? cityOwner, bool built, int? placeOwner, bool expected)
+    {
+        var (definition, initial) = HiddenOfficerEntry(100);
+        const int place = 4;
+        var position = new WorldPosition(57, 7);
+        definition = definition with
+        {
+            UnbuiltPlaces = built ? [] : [new(place, position)],
+            Settlements = built ? definition.Settlements.Append(definition.Settlements[0] with
+                { Id = place, Kind = SettlementKind.Facility, NameKey = "search-place" }).ToArray() : definition.Settlements,
+            RegionNameKeys = new(definition.RegionNameKeys) { [place] = "search-place" },
+            RegionCityIds = new(definition.RegionCityIds) { [place] = 2 }
+        };
+        foreach (bool treasure in new[] { false, true })
+        {
+            var world = initial with
+            {
+                Officers = initial.Officers.Where(p => p.Status != OfficerStatus.Undiscovered || p.Id == 40 && !treasure)
+                    .Select(p => p.Id == 40 ? p with { SettlementId = built ? place : null, RegionId = built ? null : place } : p).ToImmutableArray(),
+                Settlements = initial.Settlements.Select(s => s.Id == 2 ? s with { OwnerId = cityOwner } : s).ToImmutableArray(),
+                Treasures = treasure ? [new(50, null, TreasureDiscovery.Buried, place)] : []
+            };
+            if (built) world = world with
+            {
+                Settlements = world.Settlements.Append(initial.Settlements[0] with
+                    { Id = place, OwnerId = placeOwner, Kind = SettlementKind.Facility }).ToImmutableArray()
+            };
+            var state = StrategicContext.Prepare(new(definition, world), StrategicContextState.Empty, _ => 0);
+            if (expected)
+            {
+                Assert.Equal(treasure ? "treasure-place" : "person-place", Assert.Single(state.Prompts).Role);
+                Assert.Equal(place, Assert.Single(state.Clues).PlaceId);
+            }
+            else
+            {
+                Assert.Empty(state.Prompts);
+                Assert.Empty(state.Clues);
+            }
+        }
+    }
+
+    [Theory]
     [InlineData(1UL, 70, 0, false)]
     [InlineData(3UL, 70, 0, true)]
     [InlineData(1UL, 100, 5, false)]

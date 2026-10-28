@@ -202,6 +202,15 @@ public sealed class PersonnelRulebook
     private static bool ValidIds(ImmutableArray<int> values) => !values.IsDefault &&
         values.All(id => id >= 0) && values.Distinct().Count() == values.Length;
 
+    /// <summary>Search territory follows the place owner, or its associated city when the place is unoccupied.</summary>
+    public bool CanSearch(IReadOnlyDictionary<int, SettlementState> settlements, int forceId, int destinationId)
+    {
+        if (!Places.ContainsKey(destinationId) || settlements.TryGetValue(destinationId, out var target) && target.IsDormant) return false;
+        if (target?.OwnerId is int owner) return owner == forceId;
+        return !RegionCities.TryGetValue(destinationId, out int cityId) ||
+            settlements.TryGetValue(cityId, out var city) && !city.IsDormant && (city.OwnerId is null || city.OwnerId == forceId);
+    }
+
     public int JourneyDays(int source, int destination, PersonnelJourneyKind kind)
     {
         if (!Enum.IsDefined(kind)) throw new ArgumentOutOfRangeException(nameof(kind));
