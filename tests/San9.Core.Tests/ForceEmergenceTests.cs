@@ -153,6 +153,33 @@ public sealed class ForceEmergenceTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CandidateWinsEqualFounderScoresDespiteLowerSupporterIdentity(bool specialPriority, bool reverseInsertion)
+    {
+        var initial = World().CreateSnapshot();
+        var people = initial.Officers.Select(person => person.Id switch
+        {
+            1 => person with { Id = 20, Ambition = 10, ForceFounderPriority = specialPriority ? 7 : 0 },
+            2 => person with { Ambition = specialPriority ? 15 : 10, ForceFounderPriority = specialPriority ? 7 : 0 },
+            _ => person
+        });
+        var state = WorldState.Create(initial.Clock, 17, initial.Forces, initial.Settlements,
+            reverseInsertion ? people.Reverse() : people, corps: initial.Corps);
+        var world = Due(state);
+        List<DomainEvent> events = [];
+
+        ForceEmergence.Apply(world, Rules(), events);
+
+        var result = Assert.Single(events.OfType<ForceFoundedEvent>());
+        Assert.Equal((1, 20), (result.SettlementId, result.FounderId));
+        Assert.Equal(new[] { 2, 3, 20 }, result.MemberIds);
+        state.Commit(world);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void OnlyDirectOutgoingNeighborsSupplySupporters(bool secondHop)
@@ -240,7 +267,7 @@ public sealed class ForceEmergenceTests
     }
 
     [Fact]
-    public void EqualPrioritiesUseIdentityRatherThanAmbitionAndInitializeOtherServingLoyalty()
+    public void EqualPrioritiesPreserveCandidateOrderRatherThanAmbitionAndInitializeOtherServingLoyalty()
     {
         var initial = World().CreateSnapshot();
         var people = initial.Officers.Concat([

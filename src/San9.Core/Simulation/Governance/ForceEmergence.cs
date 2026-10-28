@@ -11,7 +11,7 @@ internal static class ForceEmergence
     private static IOrderedEnumerable<OfficerState> Order(IEnumerable<OfficerState> people) => people
         .OrderByDescending(p => p.ForceFounderPriority > 0)
         .ThenByDescending(p => p.ForceFounderPriority)
-        .ThenByDescending(p => p.ForceFounderPriority == 0 ? p.Ambition : 0).ThenBy(p => p.Id);
+        .ThenByDescending(p => p.ForceFounderPriority == 0 ? p.Ambition : 0);
 
     internal static void Apply(WorldMutation world, SimulationRules rules, List<DomainEvent> events)
     {
@@ -24,7 +24,7 @@ internal static class ForceEmergence
         }
         bool EmptyCity(int? id) => id is int city && world.Settlements.TryGetValue(city, out var place) &&
             place.Kind == SettlementKind.City && place.OwnerId is null && !place.IsDestroyed && place.CanHostPersons && place.Durability > 0;
-        var free = world.Officers.Values.Where(p => p.Status == OfficerStatus.Free).ToArray();
+        var free = world.Officers.Values.Where(p => p.Status == OfficerStatus.Free).OrderBy(p => p.Id).ToArray();
         foreach (var candidate in Order(free.Where(p => (p.Ambition > 9 || p.ForceFounderPriority > 0) && EmptyCity(City(p)))))
         {
             int city = City(candidate)!.Value;
@@ -32,7 +32,8 @@ internal static class ForceEmergence
             var supporters = free.Where(p => p.Id != candidate.Id && City(p) is int current && cities.Contains(current) &&
                 PersonnelRulebook.AffinityDistance(candidate, p) <= 10).ToArray();
             if (supporters.Length < 2) continue;
-            var members = Order(supporters.Append(candidate)).ToArray();
+            // Stable score sorting keeps the initial candidate ahead of equally scored supporters.
+            var members = Order(supporters.Prepend(candidate)).ToArray();
             int force = ForceCreation.Found(world, city, members[0], members, ForceCreationKind.EmptyCityUprising, rules, events);
             events.Add(new ForceFoundedEvent(world.Clock, force, city, members[0].Id, members.Select(p => p.Id).Order().ToImmutableArray()));
             return;
