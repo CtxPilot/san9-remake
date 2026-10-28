@@ -47,14 +47,12 @@ internal static class TacticSupport
         BattleSource? opponent = null, CombatExchangeDamage? damage = null)
     {
         world.Replace(world.Officers[actor.Id] with { TacticCooldown = tactic.MinimumInterval });
+        bool inspireGarrison = tactic.Effect == TacticEffect.Inspire && source.IsSettlement;
+        var activation = TacticOccurrence.Capture(world, source,
+            new(inspireGarrison ? MilitaryOrderKind.AttackSettlement : MilitaryOrderKind.AttackUnit,
+                null, inspireGarrison ? source.Id : null) { UnitId = inspireGarrison ? null : targets[0] }, tactic, military);
         events.Add(new TacticActivatedEvent(world.Clock, source.Id, source.IsSettlement, targets[0],
-            tactic.Effect == TacticEffect.Inspire && source.IsSettlement, tactic.Id, [new(actor.Id, tactic.Id)], false, 10)
-        {
-            Occurrence = TacticOccurrence.Capture(world, source,
-            new(source.IsSettlement && tactic.Effect == TacticEffect.Inspire ? MilitaryOrderKind.AttackSettlement : MilitaryOrderKind.AttackUnit,
-                null, source.IsSettlement && tactic.Effect == TacticEffect.Inspire ? source.Id : null)
-            { UnitId = source.IsSettlement && tactic.Effect == TacticEffect.Inspire ? null : targets[0] }, tactic, military)
-        });
+            inspireGarrison, tactic.Id, [new(actor.Id, tactic.Id)], false, 10) { Occurrence = activation });
         if (opponent is { } enemy)
             MilitaryCombat.CommitOrdinary(world, source, enemy, damage, military, events);
         int proficiency = actor.TacticProficiencies[tactic.Category!.Value];
@@ -66,7 +64,7 @@ internal static class TacticSupport
                 int previous = source.Morale(world);
                 int morale = Math.Min(100, previous + TacticMath.InspireMorale(proficiency, intelligence, tactic.Power));
                 source.Reward(world, 0, morale - previous);
-                events.Add(new TacticMoraleChangedEvent(world.Clock, source.Id, source.IsSettlement, previous, morale, tactic.Id));
+                events.Add(new TacticMoraleChangedEvent(world.Clock, source.Id, source.IsSettlement, previous, morale, tactic.Id, activation));
             }
             else
             {

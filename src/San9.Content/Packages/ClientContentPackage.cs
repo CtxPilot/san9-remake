@@ -52,7 +52,7 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
             if (!Skin.Roles.ContainsKey(illustration)) throw new InvalidDataException($"Missing event illustration: {illustration}.");
         Presentation.Capture?.ValidateReferences(Scenario.Military?.Facilities.Select(f => f.Id) ?? [], Skin.Roles);
         Presentation.Battle?.Validate(Text, Presentation.Sounds, Scenario.Officers.Select(o => o.State.Id),
-            Scenario.Information.Tactics.Select(t => t.Id), images.DistinctBy(a => a.Id));
+            Scenario.Military?.Tactics.Where(t => Scenario.Information.Tactics.Any(c => c.Id == t.Id)) ?? [], images.DistinctBy(a => a.Id));
         Presentation.MapAudio?.ValidateReferences(Map.Units, Scenario.Information.Ranks.Select(r => r.Id), Map.BuildingTypes.Select(t => t.Id));
         if (Presentation.MapAudio is { } audio && (Scenario.Military?.Facilities.Where(f => f.Buildable)
             .Select(f => f.Id).Except(audio.ConstructionSounds.Keys).Any() ?? false))

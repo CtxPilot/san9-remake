@@ -78,6 +78,7 @@ public sealed record OfficerCapturedEvent(GameClock Clock, int OfficerId, int Ca
 [System.Text.Json.Serialization.JsonDerivedType(typeof(TacticSelectedEvent), "tactic-selected")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(BattleConditionChangedEvent), "battle-condition-changed")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(IntelligenceEffectResolvedEvent), "intelligence-effect-resolved")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(TacticSecondaryPreventedEvent), "tactic-secondary-prevented")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(TacticMoraleChangedEvent), "tactic-morale-changed")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(TacticHealingEvent), "tactic-healing")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(TacticDefectionEvent), "tactic-defection")]

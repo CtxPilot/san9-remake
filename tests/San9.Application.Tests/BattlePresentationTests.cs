@@ -196,16 +196,20 @@ public sealed class BattlePresentationTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DefectionRecordUsesThePlayerReportingSide(bool enemySource)
+    [InlineData(false, 10)]
+    [InlineData(true, 10)]
+    [InlineData(false, 3)]
+    public void DefectionRecordUsesThePlayerReportingSideOnlyForFullEffect(bool enemySource, int effect)
     {
         var (session, texts, content, occurrence) = Fixture(false);
         if (enemySource) occurrence = occurrence with { Source = occurrence.Target, Target = occurrence.Source };
         texts.Messages.Add("defection", new([new MessageLiteral("defection")]));
         content.Battle!.Messages.Add("defection", new("defection", []));
-        var fact = new TacticDefectionEvent(session.Snapshot.Clock, 3, 99, occurrence, 200, 200);
+        content = content with { Battle = content.Battle! with { MapNumbers = new("digits", 12, 20, 125, 8, 4) } };
+        var fact = new TacticDefectionEvent(session.Snapshot.Clock, 3, 99, occurrence, 200, 200, effect);
         var plan = BattlePresentationPlan.Create(session.View, session.View, [fact], session.Messages(texts), texts, content);
+        Assert.Equal(new long[] { 200, -200 }, plan.MapNumbers.Select(c => c.Amount));
+        if (effect < 10) { Assert.Empty(plan.Records); return; }
         var record = Assert.Single(plan.Records).Record;
         Assert.Equal(1, record.ForceColorCode);
         Assert.Equal(MapCoordinates.Cell(occurrence.Target.Position!.Value), record.Location);
@@ -519,6 +523,18 @@ public sealed class BattlePresentationTests
         }));
         var messages = roles.Skip(17).ToDictionary(r => r, r => new DecisionMessageDefinition(r, [], r switch
         { "announcement" or "action" => "actor", "hit" or "united" or "defensive" => "target-commander", _ => "responder" }));
+        foreach (var role in new[] { "failed-report", "secondary-countered" })
+        {
+            texts.Messages[role] = new([new MessageValue(new("property", "person.name", Arguments: [new("binding", "person.0")]))]);
+            messages.Add(role, new(role, new() { ["person.0"] = "responder" }));
+        }
+        messages.Add("secondary-defensive", messages["defensive"] with { Key = "secondary-defensive" });
+        texts.Messages["secondary-defensive"] = new([new MessageLiteral("secondary-defensive")]);
+        foreach (var role in new[] { "morale-increased", "morale-decreased" })
+        {
+            texts.Messages[role] = new([new MessageValue(new("binding", "number.0"))]);
+            common.Add(role, new(role, new() { ["number.0"] = "current" }));
+        }
         texts.Messages["activation-other"] = new([new MessageLiteral("activation-other")]);
         common.Add("activation-other", new("activation-other", []));
         BattleSprite sprite = new("sheet", 8, 100);
@@ -625,6 +641,102 @@ public sealed class BattlePresentationTests
     }
 
     [Theory]
+    [InlineData(0, true, "failed-report")]
+    [InlineData(3, true, "reduced-report")]
+    [InlineData(3, false, null)]
+    [InlineData(10, true, "hit-report")]
+    public void IntelligenceReportsKeepTheirBranchAndNumbersSeparateFromMapEffects(int effect, bool reducedReport, string? expectedReport)
+    {
+        var (session, texts, content, occurrence) = Fixture(false);
+        var messages = content.Battle!.Tactics[99].Messages;
+        if (reducedReport)
+        {
+            messages.Add("reduced-report", new("reduced-report", new() { ["person.0"] = "responder" }));
+            texts.Messages["reduced-report"] = texts.Messages["failed-report"];
+        }
+        messages.Add("hit-report", new("hit-report", new() { ["number.0"] = "damage" }));
+        texts.Messages["hit-report"] = new([new MessageValue(new("binding", "number.0"))]);
+        content = content with { Battle = content.Battle with { MapNumbers = new("digits", 12, 20, 125, 8, 4) } };
+        var clock = session.Snapshot.Clock;
+        List<DomainEvent> facts =
+        [
+            new TacticActivatedEvent(clock, 10, false, 20, false, 99, [new(3, 99)], false, effect) { Occurrence = occurrence },
+            new IntelligenceEffectResolvedEvent(clock, new(10, false), 20, false, 99, effect) { ActorId = 3, Occurrence = occurrence }
+        ];
+        if (effect > 0) facts.Add(new BattleDamageEvent(clock, 10, 20, null, 300, 0, 300, 0, 0)
+        { TacticId = 99, Source = occurrence.Source, Target = occurrence.Target, CalculatedSoldierLoss = 200 });
+        var plan = BattlePresentationPlan.Create(session.View, session.View, facts, session.Messages(texts), texts, content);
+
+        Assert.Equal(effect > 0, plan.Visuals.Any(c => c.IsMapEffect));
+        if (effect > 0) Assert.Equal(-300, Assert.Single(plan.MapNumbers).Amount);
+        else Assert.Empty(plan.MapNumbers);
+        var reports = plan.Records.Where(c => c.Record.Message.Key.EndsWith("-report", StringComparison.Ordinal)).ToArray();
+        if (expectedReport is null) Assert.Empty(reports);
+        else
+        {
+            var report = Assert.Single(reports);
+            Assert.Equal(expectedReport, report.Record.Message.Key);
+            Assert.Equal(effect >= 10 ? "200" : texts.Resolve(session.View.MessageSpeaker(effect == 0 ? 21 : 22).NameKey), report.Record.Message.BbCode);
+            Assert.Equal(MapCoordinates.Cell(occurrence.Target.Position!.Value), report.Record.Location);
+            Assert.Equal(Assert.Single(plan.Messages, c => c.Channel == BattleMessageChannel.Dialogue).Id, report.AfterDialogueId);
+        }
+        Assert.Equal(plan.Records, BattlePresentationPlan.Create(session.View, session.View, facts, session.Messages(texts), texts, content).Records);
+    }
+
+    [Theory]
+    [InlineData(TacticPreventionReason.PassiveCounter)]
+    [InlineData(TacticPreventionReason.Formation)]
+    public void SecondaryPreventionFollowsMainHitWithoutTurningItIntoFailure(TacticPreventionReason reason)
+    {
+        var (session, texts, content, occurrence) = Fixture(false);
+        content = content with { Battle = content.Battle! with { MapNumbers = new("digits", 12, 20, 125, 8, 4) } };
+        var clock = session.Snapshot.Clock;
+        DomainEvent[] facts =
+        [
+            new TacticActivatedEvent(clock, 10, false, 20, false, 99, [new(3, 99)], false, 10) { Occurrence = occurrence },
+            new IntelligenceEffectResolvedEvent(clock, new(10, false), 20, false, 99, 10) { ActorId = 3, Occurrence = occurrence },
+            new BattleDamageEvent(clock, 10, 20, null, 200, 0, 200, 0, 0) { TacticId = 99, Source = occurrence.Source, Target = occurrence.Target },
+            new TacticSecondaryPreventedEvent(clock, 3, 99, occurrence, UnitCondition.Confused, reason, 22)
+        ];
+        var plan = BattlePresentationPlan.Create(session.View, session.View, facts, session.Messages(texts), texts, content);
+        Assert.Single(plan.Visuals, c => c.IsMapEffect);
+        Assert.Equal(-200, Assert.Single(plan.MapNumbers).Amount);
+        Assert.Contains(plan.Values, c => c.TargetId == 20 && c.Soldiers == -200);
+        Assert.Single(plan.Messages, c => c.Message.Message.Key == "hit");
+        Assert.DoesNotContain(plan.Messages, c => c.Message.Message.Key == "failed");
+        Assert.DoesNotContain(plan.Records, c => c.Record.Message.Key == "failed-report");
+        if (reason == TacticPreventionReason.PassiveCounter)
+            Assert.Equal(texts.Resolve(session.View.MessageSpeaker(22).NameKey),
+                Assert.Single(plan.Records, c => c.Record.Message.Key == "secondary-countered").Record.Message.BbCode);
+        else
+        {
+            var speech = Assert.Single(plan.Messages, c => c.Message.Message.Key == "secondary-defensive");
+            Assert.Equal(23, speech.Message.SpeakerId);
+            Assert.Equal(20, speech.Message.MapSpeech!.UnitId);
+            Assert.Equal(0, speech.Message.MapSpeech.DelaySeconds);
+        }
+    }
+
+    [Theory]
+    [InlineData(70, 80, "morale-increased")]
+    [InlineData(70, 60, "morale-decreased")]
+    [InlineData(100, 100, null)]
+    public void TacticMoraleReportsTheFinalValueOnlyWhenItChanged(int previous, int current, string? role)
+    {
+        var (session, texts, content, occurrence) = Fixture(false);
+        var fact = new TacticMoraleChangedEvent(session.Snapshot.Clock, 20, false, previous, current, 99, occurrence);
+        var plan = BattlePresentationPlan.Create(session.View, session.View, [fact], session.Messages(texts), texts, content);
+        if (role is null) Assert.Empty(plan.Records);
+        else
+        {
+            var report = Assert.Single(plan.Records).Record;
+            Assert.Equal(role, report.Message.Key);
+            Assert.Equal(current.ToString(), report.Message.BbCode);
+            Assert.Equal(MapCoordinates.Cell(occurrence.Target.Position!.Value), report.Location);
+        }
+    }
+
+    [Theory]
     [InlineData(UnitCondition.HighSpirits, 22, true, "united", 23)]
     [InlineData(UnitCondition.Normal, 22, true, "counter-confusion", 22)]
     [InlineData(UnitCondition.Normal, null, true, "failed", 21)]
@@ -641,7 +753,9 @@ public sealed class BattlePresentationTests
         var announcement = Assert.Single(plan.Messages, c => c.Channel == BattleMessageChannel.Dialogue);
         Assert.Equal("announcement", announcement.Message.Message.Key);
         Assert.True(Assert.Single(plan.Messages, c => c.Message.Message.Key == "action").Time == announcement.Time);
-        Assert.Equal("activation-own", Assert.Single(plan.Records).Record.Message.Key);
+        Assert.Contains(plan.Records, c => c.Record.Message.Key == "activation-own");
+        var report = Assert.Single(plan.Records, c => c.Record.Message.Key == "failed-report");
+        Assert.Equal(texts.Resolve(session.View.MessageSpeaker(21).NameKey), report.Record.Message.BbCode);
         Assert.DoesNotContain(plan.Messages, c => c.Message.Message.Key.StartsWith("activation", StringComparison.Ordinal));
         Assert.Equal(3, plan.Messages.First().Message.SpeakerId);
         var response = Assert.Single(plan.Messages, c => c.Message.Message.Key == role);
@@ -703,7 +817,8 @@ public sealed class BattlePresentationTests
         Assert.True(Assert.Single(plan.Messages, c => c.Message.Message.Key == "failed").Time >= plan.Visuals[^1].End);
         Assert.Equal(plan.Visuals[^1].End, plan.Duration);
         Assert.Equal(1, Assert.Single(plan.Messages, c => c.Message.Message.Key == "failed").Message.MapSpeech!.DelaySeconds);
-        Assert.Equal("activation-own", Assert.Single(plan.Records).Record.Message.Key);
+        Assert.Contains(plan.Records, c => c.Record.Message.Key == "activation-own");
+        Assert.Single(plan.Records, c => c.Record.Message.Key == "failed-report");
     }
 
     [Theory]

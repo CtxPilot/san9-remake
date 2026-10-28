@@ -102,6 +102,8 @@ internal static class BattlePresentationCompiler
         Report("damage", 10064, ("unit.0", "target"), ("number.0", "damage"));
         Report("defection", 9980, ("unit.0", "target"), ("person.0", "source-commander"));
         Report("healed", 9982, ("person.0", "target-commander"), ("number.0", "damage"));
+        Report("morale-increased", 9955, ("unit.0", "target"), ("number.0", "current"));
+        Report("morale-decreased", 9957, ("unit.0", "target"), ("number.0", "current"));
         common.Add("hit-reaction", Speech(6706, "target-commander", "source-commander"));
         common.Add("block-reaction", Speech(6716, "responder", "actor"));
         common.Add("block-reply", Speech(6725, "actor", "responder"));
@@ -207,7 +209,8 @@ internal static class BattlePresentationCompiler
             (27,11,6816,10817,10839,10848,10830),(25,12,6844,10867,10885,10892,10876),(26,4,6943,11037,11053,11062,11046),
             (30,5,6965,11071,11087,11094,11080),(35,2,6868,10901,10919,10928,10910),(36,0,6893,10937,10955,10964,10946),
             (37,1,6913,10971,10989,10998,10980),(38,3,6928,11005,11023,11032,11014) })
-            tactics.Add(id, new(new()
+        {
+            Dictionary<string, DecisionMessageDefinition> messages = new()
             {
                 ["announcement"] = new($"messages.{announcement}", new()
                 { ["person.0"] = "actor", ["person.1"] = "target-commander", ["tactic.0"] = "tactic", ["force.0"] = "target-force" }, "actor"),
@@ -218,14 +221,25 @@ internal static class BattlePresentationCompiler
                 ["united"] = Speech(10745, "target-commander", "actor"),
                 ["counter-confusion"] = Speech(10754, "responder", "actor"),
                 ["counter-trap"] = Speech(10763, "responder", "actor"),
-                ["defensive"] = Speech(id == 25 ? 10736 : 10729, "target-commander", "actor")
-            }, native(type), null)
+                ["defensive"] = Speech(id == 25 ? 10736 : 10729, "target-commander", "actor"),
+                ["failed-report"] = new("messages.10026", new() { ["person.0"] = "responder" })
+            };
+            if (id != 23) messages.Add("reduced-report", new("messages.10063", new() { ["person.0"] = "responder" }));
+            if (id is 26 or 30 or >= 35)
+                messages.Add("hit-report", new("messages.10064", new() { ["unit.0"] = "target", ["number.0"] = "damage" }));
+            if (id is 25 or 26 or >= 35)
+            {
+                messages.Add("secondary-countered", new($"messages.{(id == 25 ? 10101 : 10100)}", new() { ["person.0"] = "responder" }));
+                messages.Add("secondary-defensive", Speech(id == 25 ? 10736 : 10729, "target-commander", "actor"));
+            }
+            tactics.Add(id, new(messages, native(type), null)
             {
                 UnitedResponse = id == 23,
                 FormationResponse = id == 23,
                 CounterResponse = id == 23 ? "counter-confusion" : id >= 35 ? "counter-trap" : null,
                 Prelude = id is 26 or 30 ? IntelligencePrelude(dynamic(id == 26 ? 17 : 18)) : []
             });
+        }
         return tactics;
     }
 

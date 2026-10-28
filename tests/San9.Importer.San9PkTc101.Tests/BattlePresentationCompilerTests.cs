@@ -65,5 +65,14 @@ public sealed class BattlePresentationCompilerTests
         else Assert.Empty(tactic.Prelude);
         Assert.Equal(tacticId == 25 ? "messages.10736" : "messages.10729", tactic.Messages["defensive"].Key);
         Assert.Equal("target-force", tactics[25].Messages["announcement"].Bindings["force.0"]);
+        Assert.Equal("messages.10026", tactic.Messages["failed-report"].Key);
+        Assert.Equal(tacticId != 23, tactic.Messages.ContainsKey("reduced-report"));
+        if (tacticId != 23) Assert.Equal("messages.10063", tactic.Messages["reduced-report"].Key);
+        Assert.Equal(tacticId is 26 or 30 or >= 35, tactic.Messages.ContainsKey("hit-report"));
+        if (tacticId is 25 or 26 or >= 35)
+        {
+            Assert.Equal(tacticId == 25 ? "messages.10101" : "messages.10100", tactic.Messages["secondary-countered"].Key);
+            Assert.Equal(tacticId == 25 ? "messages.10736" : "messages.10729", tactic.Messages["secondary-defensive"].Key);
+        }
     }
 }

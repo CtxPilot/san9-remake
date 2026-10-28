@@ -151,6 +151,25 @@ public sealed record TacticPresentationDefinition(Dictionary<string, DecisionMes
     public bool FormationResponse { get; init; }
     public string? CounterResponse { get; init; }
     public BattleSprite[] Prelude { get; init; } = [];
+
+    public void ValidateMessages(TacticEffect effect)
+    {
+        string[] baseRoles = Zoom is not null ? ["action"] : Support ? ["announcement", "action", "hit"] :
+            ["announcement", "action", "hit", "reduced", "failed", "failed-report"];
+        string[] resultRoles = effect switch
+        {
+            TacticEffect.Defection => ["reduced-report", "secondary-countered", "secondary-defensive"],
+            TacticEffect.Illusion or TacticEffect.Trap => ["reduced-report", "hit-report", "secondary-countered", "secondary-defensive"],
+            TacticEffect.Sorcery => ["reduced-report", "hit-report"],
+            TacticEffect.Taunt => ["reduced-report"],
+            _ => []
+        };
+        if (baseRoles.Concat(resultRoles).Except(Messages.Keys).Any() ||
+            UnitedResponse && !Messages.ContainsKey("united") ||
+            FormationResponse && !Messages.ContainsKey("defensive") ||
+            CounterResponse is { } counter && !Messages.ContainsKey(counter))
+            throw new InvalidDataException("Incomplete tactic message roles.");
+    }
 }
 
 /// <summary>Author supplied message and resource roles; executable resource numbers are never consumed by the client.</summary>
@@ -168,18 +187,20 @@ public sealed record BattlePresentationDefinition(Dictionary<string, DecisionMes
     [System.Text.Json.Serialization.JsonRequired]
     public DuelPresentationDefinition? Duel { get; init; }
     public void Validate(TextCatalog texts, IReadOnlyDictionary<string, string> sounds,
-        IEnumerable<int> people, IEnumerable<int> tactics, IEnumerable<ImageAsset> images)
+        IEnumerable<int> people, IEnumerable<TacticRule> tactics, IEnumerable<ImageAsset> images)
     {
         var catalog = images.ToDictionary(a => a.Id);
         if (Duel is null) throw new InvalidDataException("Missing duel presentation.");
         Duel.Validate(texts, sounds, people, catalog);
         string[] required = ["activation-own","activation-enemy","activation-other","chain-own","chain-enemy","support","link","blocked","damage",
             "defection","healed","hit-reaction","block-reaction","block-reply","chain-confused","chain-unformed","link-0","link-1","link-2","link-3",
-            "sniping-action","sniping-fatal","sniping-heavy","sniping-light","sniping-own","sniping-enemy"];
+            "sniping-action","sniping-fatal","sniping-heavy","sniping-light","sniping-own","sniping-enemy",
+            "morale-increased","morale-decreased"];
         if (required.Except(Messages.Keys).Any()) throw new InvalidDataException("Incomplete battle message roles.");
-        if (Tactics.Keys.Except(tactics).Any() || !sounds.ContainsKey(HitSound) || !sounds.ContainsKey(BlockSound))
+        var tacticRules = tactics.ToDictionary(t => t.Id);
+        if (Tactics.Keys.Except(tacticRules.Keys).Any() || !sounds.ContainsKey(HitSound) || !sounds.ContainsKey(BlockSound))
             throw new InvalidDataException("Invalid battle presentation references.");
-        string[] roles = ["actor", "source-commander", "target-commander", "responder", "soldier", "source", "target", "tactic", "force", "target-force", "damage", "injury"];
+        string[] roles = ["actor", "source-commander", "target-commander", "responder", "soldier", "source", "target", "tactic", "force", "target-force", "damage", "current", "injury"];
         var definitions = Messages.Values.Concat(Tactics.Values.SelectMany(t => t.Messages.Values)).ToArray();
         if (definitions.Any(m => m.Bindings.Values.Except(roles).Any() || m.Speaker is { } speaker && !roles.Contains(speaker)))
             throw new InvalidDataException("Unknown battle message role.");
@@ -231,14 +252,9 @@ public sealed record BattlePresentationDefinition(Dictionary<string, DecisionMes
                 catalog[numbers.Asset].Height < numbers.GlyphHeight * 2)
                 throw new InvalidDataException("Invalid map number sheet.");
         }
-        foreach (var tactic in Tactics.Values)
+        foreach (var (id, tactic) in Tactics)
         {
-            string[] tacticRoles = tactic.Zoom is not null ? ["action"] : tactic.Support ? ["announcement", "action", "hit"] : ["announcement", "action", "hit", "reduced", "failed"];
-            if (tacticRoles.Except(tactic.Messages.Keys).Any() ||
-                tactic.UnitedResponse && !tactic.Messages.ContainsKey("united") ||
-                tactic.FormationResponse && !tactic.Messages.ContainsKey("defensive") ||
-                tactic.CounterResponse is { } counter && !tactic.Messages.ContainsKey(counter))
-                throw new InvalidDataException("Incomplete tactic message roles.");
+            tactic.ValidateMessages(tacticRules[id].Effect);
             Sprite(tactic.MapEffect);
             foreach (var sprite in tactic.Prelude) Sprite(sprite);
             if (tactic.Zoom is not { } zoom) continue;

@@ -9,9 +9,12 @@ public sealed record IntelligenceEffectResolvedEvent(GameClock Clock, BattleSour
     public TacticOccurrence? Occurrence { get; init; }
 }
 public sealed record TacticMoraleChangedEvent(GameClock Clock, int TargetId, bool TargetIsSettlement, int Previous, int Current,
-    int TacticId) : DomainEvent;
+    int TacticId, TacticOccurrence Occurrence) : DomainEvent;
 public sealed record TacticDefectionEvent(GameClock Clock, int ActorId, int TacticId, TacticOccurrence Occurrence,
-    uint SourceGain, uint TargetLoss) : DomainEvent;
+    uint SourceGain, uint TargetLoss, int Effect) : DomainEvent;
+public enum TacticPreventionReason { PassiveCounter, Formation }
+public sealed record TacticSecondaryPreventedEvent(GameClock Clock, int ActorId, int TacticId,
+    TacticOccurrence Occurrence, UnitCondition Condition, TacticPreventionReason Reason, int? ResponderId) : DomainEvent;
 
 internal static class IntelligenceTactics
 {
@@ -47,16 +50,9 @@ internal static class IntelligenceTactics
     internal static MilitaryOrder Resolve(WorldMutation world, BattleSource source, OfficerState actor, TacticRule tactic, MilitaryOrder primary,
         int primaryEffect, SimulationRules rules, List<DomainEvent> events, bool deferPrimaryDefeat = false)
     {
-        if (primaryEffect == 0)
-        {
-            events.Add(new IntelligenceEffectResolvedEvent(world.Clock, source, primary.UnitId ?? primary.SettlementId!.Value,
-                primary.UnitId is null, tactic.Id, 0)
-            { ActorId = actor.Id, Occurrence = TacticOccurrence.Capture(world, source, primary, tactic, rules.Military!, rules.Treasures) });
-            return primary;
-        }
         var military = rules.Military!;
         var area = MilitaryCombat.TargetArea(world, primary, military);
-        List<MilitaryOrder> targets = [primary];
+        List<MilitaryOrder> targets = [];
         bool SecondaryOpponent(int? owner) => MilitaryDiplomacy.AutomaticEnemy(world, source.Owner(world), owner);
         if (tactic.EffectRadius > 0 && tactic.Effect is TacticEffect.Illusion or TacticEffect.Sorcery)
         {
@@ -71,7 +67,6 @@ internal static class IntelligenceTactics
         }
         HashSet<int> forces = [source.Owner(world)];
         // Area effects finish on the selected primary target, which owns the subsequent chain request.
-        targets.Remove(primary);
         targets.Add(primary);
         List<int> defeatedSettlements = [];
         foreach (var target in targets)
@@ -127,11 +122,12 @@ internal static class IntelligenceTactics
                 BattleLearning.Passive(world, Defenders(world, target), TacticEffect.CounterConfusion, military, events);
                 break;
             case TacticEffect.Taunt:
+                var moraleOccurrence = TacticOccurrence.Capture(world, source, target, tactic, military, rules.Treasures);
                 int current = morale - TacticMath.TauntMoraleLoss(proficiency, intelligence, tactic.Power, effect, morale);
                 if (target.UnitId is int taunted) world.Replace(world.Units[taunted] with { Morale = current });
                 else world.Replace(world.Settlements[target.SettlementId!.Value] with { Morale = current });
                 events.Add(new TacticMoraleChangedEvent(world.Clock, target.UnitId ?? target.SettlementId!.Value,
-                    target.UnitId is null, morale, current, tactic.Id));
+                    target.UnitId is null, morale, current, tactic.Id, moraleOccurrence));
                 break;
             case TacticEffect.Defection:
                 var occurrence = TacticOccurrence.Capture(world, source, target, tactic, military, rules.Treasures);
@@ -155,7 +151,7 @@ internal static class IntelligenceTactics
                     target.UnitId ?? target.SettlementId, accepted, accepted, events);
                 ResourceAccounts.Report(world, new(target.UnitId is null ? ResourceOwnerKind.Settlement : ResourceOwnerKind.Unit,
                     target.UnitId ?? target.SettlementId!.Value), ResourceKind.Soldiers, "tactic-defection", source.Id, -(long)loss, -(long)loss, events);
-                events.Add(new TacticDefectionEvent(world.Clock, actor.Id, tactic.Id, occurrence, accepted, loss));
+                events.Add(new TacticDefectionEvent(world.Clock, actor.Id, tactic.Id, occurrence, accepted, loss, effect));
                 break;
             case TacticEffect.Illusion:
             case TacticEffect.Sorcery:
@@ -163,9 +159,9 @@ internal static class IntelligenceTactics
                 uint damage = tactic.Effect == TacticEffect.Trap ? TacticMath.TrapDamage(proficiency, intelligence, tactic.Power, effect, soldiers) :
                     TacticMath.IllusionDamage(proficiency, intelligence, tactic.Power, effect, soldiers, tactic.Effect == TacticEffect.Sorcery);
                 if (target.UnitId is int damaged)
-                    MilitaryCombat.DamageUnit(world, world.Units[damaged], damage, military.CombatFormation(world.Units[damaged])!, source.Id, events, source.IsSettlement, tactic.Id);
+                    MilitaryCombat.DamageUnit(world, world.Units[damaged], damage, military.CombatFormation(world.Units[damaged])!, source.Id, events, source.IsSettlement, tactic.Id, calculatedSoldierLoss: damage);
                 else MilitaryCombat.DamageSettlement(world, world.Settlements[target.SettlementId!.Value], damage,
-                    military.Place(world.Settlements[target.SettlementId.Value]).Combat!, source.Id, events, attackerIsSettlement: source.IsSettlement, tacticId: tactic.Id);
+                    military.Place(world.Settlements[target.SettlementId.Value]).Combat!, source.Id, events, attackerIsSettlement: source.IsSettlement, tacticId: tactic.Id, calculatedSoldierLoss: damage);
                 break;
             default:
                 throw new InvalidOperationException("Not an offensive intelligence effect.");
@@ -192,12 +188,25 @@ internal static class IntelligenceTactics
         int proficiency = actor.TacticProficiencies[tactic.Category!.Value];
         int chance = (tactic.Effect == TacticEffect.Illusion ? 150 : 130) -
             defenders.Max(p => world.Abilities(p).Intelligence);
-        if (unit.Condition == UnitCondition.HighSpirits ||
-            profile?.BypassesPassiveCounters != true && defenders.Any(p => p.EquippedTacticId is int equipped &&
+        var counter = profile?.BypassesPassiveCounters == true ? null : defenders.FirstOrDefault(p => p.EquippedTacticId is int equipped &&
                 military.Tactics[equipped].Effect == TacticEffect.CounterConfusion &&
-                MilitaryTactics.HasTactic(world, unit.OwnerId, [p.Id], equipped, rules.Treasures))) return;
+                MilitaryTactics.HasTactic(world, unit.OwnerId, [p.Id], equipped, rules.Treasures));
+        var condition = tactic.Effect == TacticEffect.Defection ? UnitCondition.NoFormation : UnitCondition.Confused;
+        void Prevent(TacticPreventionReason reason, int? responder) => events.Add(new TacticSecondaryPreventedEvent(
+            world.Clock, actor.Id, tactic.Id, TacticOccurrence.Capture(world, source, target, tactic, military, rules.Treasures),
+            condition, reason, responder));
+        if (counter is not null)
+        {
+            Prevent(TacticPreventionReason.PassiveCounter, counter.Id);
+            return;
+        }
+        if (unit.Condition == UnitCondition.HighSpirits) return;
         if (!TacticCombat.Roll(world, "military-tactic-secondary", chance)) return;
-        if (TacticCombat.Roll(world, "military-tactic-secondary-formation", profile?.ConfusionResistanceChance ?? 0)) return;
+        if (TacticCombat.Roll(world, "military-tactic-secondary-formation", profile?.ConfusionResistanceChance ?? 0))
+        {
+            Prevent(TacticPreventionReason.Formation, unit.CommanderId);
+            return;
+        }
         int quality = (proficiency + 100) / 250 + 1;
         long executed = EconomyMath.ExecutedAbility(intelligence);
         if (tactic.Effect == TacticEffect.Defection)
