@@ -76,7 +76,7 @@ public static class WorldDiagnostics
         .OrderBy(t => t.Sequence).ThenBy(t => t.OriginSettlementId).ThenBy(t => t.OfficerId).ThenBy(t => t.Id).ToImmutableArray();
 
     private static ImmutableArray<ForceState> NormalizeForces(IReadOnlyList<ForceState> forces) => forces.OrderBy(f => f.Id)
-        .Select(f => f with { AdditionalFormationIds = f.AdditionalFormationIds.Order().ToImmutableArray(),
+        .Select(f => f with { FormationGrants = f.FormationGrants.OrderBy(g => g.FormationId).ToImmutableArray(),
             ProvidedTactics = f.ProvidedTactics.Order().ToImmutableArray() }).ToImmutableArray();
 
     private static ImmutableArray<OfficerState> NormalizeOfficers(IReadOnlyList<OfficerState> officers) => officers.OrderBy(o => o.Id).ToImmutableArray();

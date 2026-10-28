@@ -14,9 +14,11 @@ public sealed class MilitaryContentCompilerTests
     [InlineData(8, 19)]
     [InlineData(0, null)]
     [InlineData(999, null)]
-    public void SourceCountryGrantsOptionalLandAndNavalFormations(int title, int? land)
+    public void SourceCountryGrantsLandAndNavalFormationsOnlyWhileBarbarian(int title, int? land)
     {
-        Assert.Equal(land is int id ? new[] { id, 26 } : [], ScenarioContentCompiler.AdditionalFormations(title));
+        Assert.Equal(land is int id
+            ? new FormationGrant[] { new(id, FormationGrantCondition.Barbarian), new(26, FormationGrantCondition.Barbarian) }
+            : [], ScenarioContentCompiler.FormationGrants(title));
     }
 
     [Fact]

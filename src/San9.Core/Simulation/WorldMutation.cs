@@ -163,7 +163,7 @@ internal sealed partial class WorldMutation : IWorldQuery
     {
         Forces = AllForces.Values.OrderBy(x => x.Id).Select(x => x with
         {
-            AdditionalFormationIds = x.AdditionalFormationIds.Order().ToImmutableArray(),
+            FormationGrants = x.FormationGrants.OrderBy(g => g.FormationId).ToImmutableArray(),
             ProvidedTactics = x.ProvidedTactics.Order().ToImmutableArray(),
         }).ToImmutableArray(),
         Settlements = AllSettlements.Values.OrderBy(x => x.Id).ToImmutableArray(),

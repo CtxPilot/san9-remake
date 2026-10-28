@@ -51,6 +51,8 @@ internal static class MilitaryMovement
 {
     internal static void Validate(WorldSnapshot world, MilitaryRulebook? rules)
     {
+        if (world.Forces.Any(f => f.FormationGrants.Any(g => rules is null || !rules.Formations.ContainsKey(g.FormationId))))
+            throw new ArgumentException("Unknown force formation grant.");
         if (world.Officers.Any(p => p.EquippedTacticId is int id && (rules is null || !rules.Tactics.ContainsKey(id))))
             throw new ArgumentException("Unknown equipped tactic.");
         if (rules is not null && world.Settlements.Any(s => s.IsDestroyed &&

@@ -24,7 +24,7 @@ public sealed record FormationRule(int Id, int MovementBudget, int DeploymentCos
     }
 
     [JsonRequired] public bool IsCommon { get; init; } = true;
-    public bool IsCandidateFor(ForceState force) => IsCommon || force.AdditionalFormationIds.Contains(Id);
+    public bool IsCandidateFor(ForceState force) => IsCommon || force.FormationGrants.Any(g => g.FormationId == Id && g.AppliesTo(force));
 
     [JsonRequired] public FormationTactics? Tactics { get; init; }
     [JsonRequired] public int ConfusionResistanceChance { get; init; }

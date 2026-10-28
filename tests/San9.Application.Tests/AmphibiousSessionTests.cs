@@ -45,7 +45,7 @@ public sealed class AmphibiousSessionTests
         var source = Fixture();
         var definition = source with
         {
-            Forces = source.Forces.Select(f => f with { AdditionalFormationIds = additional ? [100, 101, 300] : [] }).ToArray(),
+            Forces = source.Forces.Select(f => f with { FormationGrants = additional ? [new(100, FormationGrantCondition.Always), new(101, FormationGrantCondition.Always), new(300, FormationGrantCondition.Always)] : [] }).ToArray(),
             Officers = source.Officers.Select(o => o with { State = o.State with { LearnedTactics = learned ? [8000] : [] } }).ToArray(),
             Military = source.Military! with
             {
@@ -76,14 +76,14 @@ public sealed class AmphibiousSessionTests
 
     [Theory]
     [MemberData(nameof(CandidateCases))]
-    public void CandidateSourcesDoNotDependOnIdentityOrForceSelection(bool reform, bool naval, bool additional, bool common, bool learned, bool barbarian)
+    public void UnconditionalGrantsDoNotDependOnIdentityOrForceSelection(bool reform, bool naval, bool additional, bool common, bool learned, bool barbarian)
     {
         var source = Fixture();
         int special = naval ? 300 : 101;
         var definition = source with
         {
             Forces = source.Forces.Select(f => f with { IsBarbarian = barbarian,
-                AdditionalFormationIds = additional ? [special] : [] }).ToArray(),
+                FormationGrants = additional ? [new(special, FormationGrantCondition.Always)] : [] }).ToArray(),
             Officers = source.Officers.Select(o => o with { State = o.State with { LearnedTactics = learned ? [8000] : [] } }).ToArray(),
             Military = source.Military! with { Tactics = [new(8000, 4, TacticEffect.FormationTechnology, 0, 0, 0, false, false, [special])],
                 Formations = source.Military.Formations.Select(f =>
@@ -118,18 +118,113 @@ public sealed class AmphibiousSessionTests
             Assert.Equal(special, naval ? unit.NavalFormationId : unit.FormationId);
             var restored = SaveService.Decode(SaveService.Encode(session), definition);
             StateAssert.Equal(session.Capture(), restored.Capture());
-            Assert.Equal(additional ? new[] { special } : [], restored.Snapshot.Forces.Single().AdditionalFormationIds);
+            Assert.Equal(definition.Forces.Single().FormationGrants.ToArray(), restored.Snapshot.Forces.Single().FormationGrants.ToArray());
         }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void BarbarianGrantsFollowStartupIdentityInCatalogDraftCommandAndRestore(bool selected, bool naval)
+    {
+        var source = Fixture();
+        int special = naval ? 300 : 101;
+        var definition = source with
+        {
+            PlayerForceId = selected ? 1 : null,
+            Forces = source.Forces.Select(f => f with { IsBarbarian = true,
+                FormationGrants = [new(special, FormationGrantCondition.Barbarian)] }).ToArray(),
+            Military = source.Military! with { Formations = source.Military.Formations.Select(f =>
+                f with { IsCommon = f.Id != special }).ToImmutableArray() },
+            Information = source.Information with { Formations = source.Military.Formations
+                .Select(f => new FormationCatalogDefinition(f.Id, $"formation.{f.Id}")).ToArray() }
+        };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, definition.Information.Formations
+            .ToDictionary(f => f.NameKey, f => f.NameKey));
+        var session = GameSession.Start(definition, 42);
+        void CheckAvailability(GameSession current)
+        {
+            Assert.Equal(!selected, current.Snapshot.Forces.Single().IsBarbarian);
+            Assert.Equal(definition.Forces.Single().FormationGrants.ToArray(), current.Snapshot.Forces.Single().FormationGrants.ToArray());
+            var query = new InformationQuery(current, texts);
+            Assert.Equal(!selected, query.Read(naval ? InformationCategory.Ships : InformationCategory.Formations, force: 1)
+                .Rows.Any(row => row.Key.Id == special));
+            if (selected)
+            {
+                var draft = new DeploymentDraft(current.View, 1);
+                Assert.True(draft.SetMembers([1]));
+                Assert.DoesNotContain(draft.Formations(naval), f => f.Id == special);
+                Assert.False(draft.SetFormation(special, naval));
+            }
+        }
+        CheckAvailability(session);
+        var before = session.Capture();
+        var result = session.Execute(new(selected ? "player" : "ai:1"), new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1,
+            [1], 400, naval ? 100 : special, new(MilitaryOrderKind.Move, new(32, 7), null))
+            { NavalFormationId = naval ? special : null });
+        Assert.Equal(!selected, result.Submission.Accepted);
+        if (selected)
+        {
+            Assert.Equal(CommandRejection.FormationUnavailable, result.Submission.Rejection);
+            StateAssert.Equal(before, session.Capture());
+        }
+        else
+        {
+            var unit = Assert.Single(session.Snapshot.Units);
+            Assert.Equal(special, naval ? unit.NavalFormationId : unit.FormationId);
+        }
+        var restored = SaveService.Decode(SaveService.Encode(session), definition);
+        StateAssert.Equal(session.Capture(), restored.Capture());
+        if (selected)
+        {
+            CheckAvailability(restored);
+            Assert.Equal(SessionDisposition.Accepted, restored.HandOverForce(1).Disposition);
+            Assert.False(restored.Snapshot.Forces.Single().IsBarbarian);
+            Assert.False(restored.MilitaryRules!.CanSelectFormation(restored.Snapshot.Forces.Single(), special));
+        }
+        else
+            Assert.True(restored.MilitaryRules!.CanSelectFormation(restored.Snapshot.Forces.Single(), special));
     }
 
     [Theory]
     [InlineData(-1)]
     [InlineData(99999)]
-    public void UnknownAdditionalFormationReferencesAreRejected(int id)
+    public void UnknownFormationGrantReferencesAreRejectedInContentAndSaves(int id)
     {
         var source = Fixture();
-        var invalid = source with { Forces = source.Forces.Select(f => f with { AdditionalFormationIds = [id] }).ToArray() };
+        var invalid = source with { Forces = source.Forces.Select(f => f with { FormationGrants = [new(id, FormationGrantCondition.Always)] }).ToArray() };
         Assert.Throws<InvalidDataException>(() => invalid.Validate());
+        var saved = SaveService.Capture(GameSession.Start(source, 42));
+        saved = saved with { Session = saved.Session with { World = saved.Session.World with
+        {
+            Forces = saved.Session.World.Forces.Select(f => f with
+                { FormationGrants = [new(id, FormationGrantCondition.Always)] }).ToImmutableArray()
+        } } };
+        Assert.Equal(SaveFailure.InvalidState, Assert.Throws<SaveException>(() =>
+            SaveService.Decode(CanonicalJson.Encode(saved), source)).Failure);
+    }
+
+    public static IEnumerable<object[]> InvalidFormationGrants() =>
+    [
+        new object[] { default(ImmutableArray<FormationGrant>) },
+        new object[] { ImmutableArray.Create((FormationGrant)null!) },
+        new object[] { ImmutableArray.Create(new FormationGrant(101, (FormationGrantCondition)99)) },
+        new object[] { ImmutableArray.Create(new FormationGrant(101, FormationGrantCondition.Always),
+            new FormationGrant(101, FormationGrantCondition.Barbarian)) }
+    ];
+
+    [Theory]
+    [MemberData(nameof(InvalidFormationGrants))]
+    public void InvalidFormationGrantsAreRejectedByContentAndWorld(ImmutableArray<FormationGrant> grants)
+    {
+        var source = Fixture();
+        Assert.Throws<InvalidDataException>(() => (source with { Forces = source.Forces.Select(f =>
+            f with { FormationGrants = grants }).ToArray() }).Validate());
+        var session = GameSession.Start(source, 42);
+        Assert.Throws<ArgumentException>(() => WorldState.Restore(session.Snapshot with { Forces = session.Snapshot.Forces
+            .Select(f => f with { FormationGrants = grants }).ToImmutableArray() }));
     }
 
     [Fact]

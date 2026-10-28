@@ -28,7 +28,8 @@ public sealed class FixedUnitFormationTests
     };
 
     private static WorldState World() => WorldState.Create(new(190, 1, 1), 42,
-        [new(1, 100) { AdditionalFormationIds = [501, 502, 601, 602] }],
+        [new(1, 100) { FormationGrants = [new(501, FormationGrantCondition.Always), new(502, FormationGrantCondition.Always),
+            new(601, FormationGrantCondition.Always), new(602, FormationGrantCondition.Always)] }],
         [new(1, 1, 5000, 600, 600, 100, 0, 0, 100, 0, 100), new(2, 1, 100, 600, 600, 100, 0, 0, 100, 0, 100)],
         [new(11, 1, 1, new(80, 80, 80, 80), false)], controls: [new("player", 1, ControllerKind.Player)],
         corps: [new(1, 1, null, new(10000, 100000)) { IsRoot = true }]);

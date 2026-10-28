@@ -21,7 +21,7 @@ public sealed partial class OriginalAiMilitaryTests
         content = content with
         {
             Forces = content.Forces.Select(f => f.Id == 1
-                ? f with { IsBarbarian = barbarian, AdditionalFormationIds = barbarian ? [400] : [] } : f).ToArray(),
+                ? f with { IsBarbarian = barbarian, FormationGrants = barbarian ? [new(400, FormationGrantCondition.Barbarian)] : [] } : f).ToArray(),
             Officers = content.Officers.Select(p => p.State.OwnerId == 1 ? p with
             {
                 State = p.State with

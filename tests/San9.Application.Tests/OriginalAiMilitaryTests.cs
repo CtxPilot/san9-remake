@@ -1854,7 +1854,7 @@ public sealed partial class OriginalAiMilitaryTests
         content = content with
         {
             Forces = content.Forces.Select(f => f.Id == 1 ? f with { IsBarbarian = true,
-                AdditionalFormationIds = available ? [400] : [] } : f).ToArray(),
+                FormationGrants = available ? [new(400, FormationGrantCondition.Barbarian)] : [] } : f).ToArray(),
             Information = content.Information with { Corps = content.Information.Corps.Select(c => c.Id == 1 ? c with { Treasury = new(money, 100000) } : c).ToArray() },
             Military = content.Military! with { Formations = content.Military.Formations.Select(f => f.Id == 400
                 ? f with { IsCommon = !available, DeploymentCost = 600 } : f).ToImmutableArray() }

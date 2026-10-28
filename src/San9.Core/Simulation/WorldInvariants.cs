@@ -37,8 +37,9 @@ internal static class WorldInvariants
             if (force.EventHistory.IsDefault || force.EventHistory.Any(k => string.IsNullOrWhiteSpace(k.Value)) ||
                 !force.EventHistory.Select(k => k.Value).SequenceEqual(force.EventHistory.Select(k => k.Value).Distinct().Order(StringComparer.Ordinal)))
                 throw new ArgumentException("Invalid force event history.");
-            if (force.AdditionalFormationIds.IsDefault || force.AdditionalFormationIds.Any(id => id < 0) || force.AdditionalFormationIds.Distinct().Count() != force.AdditionalFormationIds.Length)
-                throw new ArgumentException("Invalid additional force formations.");
+            if (force.FormationGrants.IsDefault || force.FormationGrants.Any(g => g is null || g.FormationId < 0 || !Enum.IsDefined(g.Condition)) ||
+                force.FormationGrants.Select(g => g.FormationId).Distinct().Count() != force.FormationGrants.Length)
+                throw new ArgumentException("Invalid force formation grants.");
             if (force.Id < 0 || force.Trust is < 0 or > 1000 || force.BaseTrust is < 0 or > 1000 || force.ProvidedTactics.IsDefault || force.ProvidedTactics.Any(t => t < 0) || force.ProvidedTactics.Distinct().Count() != force.ProvidedTactics.Length) throw new ArgumentException("Invalid force.");
         }
         foreach (var settlement in state.AllSettlements.Values)

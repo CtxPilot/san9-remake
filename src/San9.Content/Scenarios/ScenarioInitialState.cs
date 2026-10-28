@@ -5,7 +5,7 @@ namespace San9.Content.Scenarios;
 public sealed record ForceInitialState(int Id, string NameKey, int ColorCode, int Trust)
 {
     [JsonRequired] public long? AutomaticSchedulingKey { get; init; }
-    [JsonRequired] public System.Collections.Immutable.ImmutableArray<int> AdditionalFormationIds { get; init; } = [];
+    [JsonRequired] public System.Collections.Immutable.ImmutableArray<San9.Core.Domain.FormationGrant> FormationGrants { get; init; } = [];
     [JsonRequired] public bool IsDormant { get; init; }
     [JsonRequired] public bool HasDeposedEmperor { get; init; }
     [JsonRequired] public System.Collections.Immutable.ImmutableArray<San9.Core.Simulation.PersistentEventKey> EventHistory { get; init; } = [];
@@ -44,7 +44,7 @@ public sealed record SettlementInitialState(int Id, string NameKey, int? OwnerId
 public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements, Dictionary<int, string> RegionNameKeys, Dictionary<int, int> RegionCityIds)
 {
-    public const int CurrentSchemaVersion = 147;
+    public const int CurrentSchemaVersion = 148;
     [JsonRequired] public int[] FictionalOfficerPlaceIds { get; init; } = [];
     [JsonRequired] public OriginalAiDefinition OriginalAi { get; init; } = OriginalAiDefinition.Default;
     [JsonRequired] public int FoodExchangeRate { get; init; } = 1;
@@ -113,10 +113,11 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
         Information.Validate(this);
         try { Alliance?.Validate(Forces.Where(f => !f.IsDormant && !f.IsBarbarian).Select(f => f.Id).ToHashSet()); }
         catch (ArgumentException error) { throw new InvalidDataException("Invalid initial alliance.", error); }
-        if (Forces.Any(f => f.AdditionalFormationIds.IsDefault || f.AdditionalFormationIds.Any(id => id < 0) ||
-            f.AdditionalFormationIds.Distinct().Count() != f.AdditionalFormationIds.Length ||
-            f.AdditionalFormationIds.Any(id => Military is null || !Military.Formations.Any(rule => rule.Id == id))))
-            throw new InvalidDataException("Invalid additional force formations.");
+        if (Forces.Any(f => f.FormationGrants.IsDefault ||
+            f.FormationGrants.Any(g => g is null || g.FormationId < 0 || !Enum.IsDefined(g.Condition)) ||
+            f.FormationGrants.Select(g => g.FormationId).Distinct().Count() != f.FormationGrants.Length ||
+            f.FormationGrants.Any(g => Military is null || !Military.Formations.Any(rule => rule.Id == g.FormationId))))
+            throw new InvalidDataException("Invalid force formation grants.");
         if (Military is { } military)
         {
             var rules = new San9.Core.Domain.MilitaryRulebook(military);

@@ -1,14 +1,15 @@
 using System.Collections.Immutable;
 using San9.Content.Scenarios;
 using San9.Content.Text;
+using San9.Core.Domain;
 using San9.Importer.San9PkTc101.Text;
 
 namespace San9.Importer.San9PkTc101.Scenarios;
 
 public static class ScenarioContentCompiler
 {
-    public static ImmutableArray<int> AdditionalFormations(int? countryTitleId) => countryTitleId is >= 4 and <= 8
-        ? [countryTitleId.Value + 11, 26] : [];
+    public static ImmutableArray<FormationGrant> FormationGrants(int? countryTitleId) => countryTitleId is >= 4 and <= 8
+        ? [new(countryTitleId.Value + 11, FormationGrantCondition.Barbarian), new(26, FormationGrantCondition.Barbarian)] : [];
 
     public static (ScenarioInitialState Scenario, TextCatalog Text) Compile(byte[] exe, byte[] scenario, byte[] messages, byte[] biographies)
     {
@@ -79,7 +80,7 @@ public static class ScenarioContentCompiler
             if (f.LeaderId is not int leader || leader >= persons.Count) throw new InvalidDataException("Missing force leader.");
             var p = persons[leader];
             string name = text.Person($"force.{id}", p.FamilyNameResourceCode, p.GivenNameResourceCode);
-            return new ForceInitialState(id, name, f.ColorCode, f.Trust) { AdditionalFormationIds = AdditionalFormations(f.CountryTitleId), EventHistory = EventContentCompiler.ForceEventHistory(f), HasDeposedEmperor = f.HasEventHistoryMarker(0), BaseTrust = f.BaseTrust, ProvidedTactics = Enumerable.Range(0, San9ScenarioForceArchive.TacticCount).Where(f.HasTactic).ToImmutableArray(), RankId = f.RankGroupId, CountryTitleId = f.CountryTitleId, IsBarbarian = f.IsBarbarian || f.CountryTitleId is >= 4 and <= 8, LeaderId = leader, FlagGlyph = p.FlagCode < 186 ? p.FlagCode : -1 };
+            return new ForceInitialState(id, name, f.ColorCode, f.Trust) { FormationGrants = FormationGrants(f.CountryTitleId), EventHistory = EventContentCompiler.ForceEventHistory(f), HasDeposedEmperor = f.HasEventHistoryMarker(0), BaseTrust = f.BaseTrust, ProvidedTactics = Enumerable.Range(0, San9ScenarioForceArchive.TacticCount).Where(f.HasTactic).ToImmutableArray(), RankId = f.RankGroupId, CountryTitleId = f.CountryTitleId, IsBarbarian = f.IsBarbarian || f.CountryTitleId is >= 4 and <= 8, LeaderId = leader, FlagGlyph = p.FlagCode < 186 ? p.FlagCode : -1 };
         }).ToArray();
         var officers = OfficerContentCompiler.Compile(persons, settlements, summaries, text, new San9MessageTable(biographies));
         summaries = summaries.Select(f => f with { AutomaticSchedulingKey = f.Id, AdviserId = officers.Where(o => o.State.OwnerId == f.Id && o.State.Status == San9.Core.Domain.OfficerStatus.Strategist)
