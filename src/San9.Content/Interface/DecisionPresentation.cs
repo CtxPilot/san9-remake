@@ -40,6 +40,8 @@ public sealed record DecisionPresentations(Dictionary<string, DecisionPresentati
         foreach (string role in new[] { "gift", "surrender" })
             if (Events.ContainsKey(role) && new[] { role + "-host-favorable", role + "-host-unfavorable" }.Except(Shared.Keys).Any())
                 throw new InvalidDataException($"Incomplete reception messages: {role}.");
+        if (Events.ContainsKey("gift") && new[] { "gift-return-confirmation", "gift-corps-confirmation" }.Except(Shared.Keys).Any())
+            throw new InvalidDataException("Incomplete gift acceptance confirmations.");
         if (People.Any(p => string.IsNullOrWhiteSpace(p.Key) || !ids.Contains(p.Value)))
             throw new InvalidDataException("Invalid decision speaker.");
         if (Subjects.Any(p => string.IsNullOrWhiteSpace(p.Key) || string.IsNullOrWhiteSpace(p.Value)))

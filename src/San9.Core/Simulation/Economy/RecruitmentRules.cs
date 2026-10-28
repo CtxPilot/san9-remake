@@ -54,6 +54,6 @@ internal static class RecruitmentRules
     internal static void ChangeRelation(WorldMutation world, int forceId, int? otherId, int baseLoss, List<DomainEvent> events)
     {
         if (otherId is not int other || other == forceId) return;
-        ForceRelations.Change(world, forceId, other, -baseLoss - (int)(world.NextRandom("personnel-recruit-relations") % 3), events);
+        ForceRelations.Change(world, forceId, other, -baseLoss - (int)(world.NextRandom("personnel-recruit-relations") % 3), null, events);
     }
 }

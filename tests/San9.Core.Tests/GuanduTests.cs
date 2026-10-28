@@ -76,7 +76,7 @@ public sealed class GuanduTests
         switch (failure)
         {
             case "loyalty": world.Replace(world.Officers[23].WithLoyalty(2, 90)); break;
-            case "relation": ForceRelations.Set(world, 1, 2, 20, []); break;
+            case "relation": ForceRelations.Set(world, 1, 2, 20, null, []); break;
             case "soldiers": world.Replace(world.Settlements[4] with { Soldiers = 9998 }); break;
             case "food": world.Replace(ResourceAccounts.Root(world, 2) with { Treasury = ResourceAccounts.Root(world, 2).Treasury with { Food = 0 } }); break;
             case "commander": world.Replace(world.Officers[23] with { IsCommander = true }); break;

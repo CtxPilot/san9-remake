@@ -49,7 +49,7 @@ internal static class CorpsDelegations
             if (!Valid(world, corps, military)) Change(world, corps, new GeneralDelegation(), "target-invalidated", events);
     }
 
-    private static void Change(WorldMutation world, CorpsState corps, CorpsDelegation delegation, string reason, List<DomainEvent> events)
+    internal static void Change(WorldMutation world, CorpsState corps, CorpsDelegation delegation, string reason, List<DomainEvent> events)
     {
         if (corps.Delegation == delegation) return;
         world.Replace(corps with { Delegation = delegation });

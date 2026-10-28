@@ -204,7 +204,7 @@ internal static class UnitStrategies
         else if (mission.Strategy == UnitStrategyKind.Inspire)
             world.Replace(target with { Morale = Math.Max(1, target.Morale - 1 - (int)(world.NextRandom("strategy-inspire-failure-morale") % 5)) });
         else ForceRelations.Change(world, task.ForceId, target.OwnerId,
-            -1 - (int)(world.NextRandom("strategy-hostile-failure-relations") % 3), events);
+            -1 - (int)(world.NextRandom("strategy-hostile-failure-relations") % 3), null, events);
         OfficerTacticGrowth.Increase(world, task.OfficerId, 7, 2, events);
         OfficerTacticGrowth.Increase(world, task.OfficerId, 8, 2, events);
         events.Add(new UnitStrategyResolvedEvent(world.Clock, task.OfficerId, target.Id, mission.Strategy, threshold, roll, success, occurrence)

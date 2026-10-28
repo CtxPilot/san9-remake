@@ -5,7 +5,7 @@ namespace San9.Core.Simulation;
 /// <summary>One canonical unordered pair owns both directions of a diplomatic relationship.</summary>
 internal static class ForceRelations
 {
-    internal static void AdvanceQuarter(WorldMutation world, List<DomainEvent> events)
+    internal static void AdvanceQuarter(WorldMutation world, MilitaryRulebook? military, List<DomainEvent> events)
     {
         if (world.Clock.DayNumber - world.Simulation.Started.DayNumber < 30) return;
         var forces = world.Forces.Values.Where(f => !f.IsEliminated).OrderBy(f => f.Id).ToArray();
@@ -17,8 +17,8 @@ internal static class ForceRelations
                 bool barbarian = a.IsBarbarian || b.IsBarbarian;
                 int value = Get(world, a.Id, b.Id).Value;
                 int step = barbarian ? 4 : 1;
-                if (value > 50) Change(world, a.Id, b.Id, -step, events);
-                else if (value < (barbarian ? 36 : 39)) Change(world, a.Id, b.Id, step, events);
+                if (value > 50) Change(world, a.Id, b.Id, -step, military, events);
+                else if (value < (barbarian ? 36 : 39)) Change(world, a.Id, b.Id, step, military, events);
             }
     }
 
@@ -30,15 +30,25 @@ internal static class ForceRelations
             ? relation : new(Math.Min(first, second), Math.Max(first, second), 0);
     }
 
-    internal static void Set(WorldMutation world, int first, int second, int value, List<DomainEvent> events)
+    internal static void Set(WorldMutation world, int first, int second, int value, MilitaryRulebook? military, List<DomainEvent> events)
     {
         _ = DiplomacyMath.RelationBand(value);
-        var previous = Get(world, first, second);
-        if (previous.Value == value) return;
-        world.SetRelation(previous with { Value = value });
-        events.Add(new ForceRelationChangedEvent(world.Clock, previous.FirstId, previous.SecondId, previous.Value, value));
+        Update(world, first, second, value, military, events);
     }
 
-    internal static void Change(WorldMutation world, int first, int second, int delta, List<DomainEvent> events) =>
-        Set(world, first, second, (int)Math.Clamp((long)Get(world, first, second).Value + delta, 0, 100), events);
+    internal static void Change(WorldMutation world, int first, int second, int delta, MilitaryRulebook? military, List<DomainEvent> events) =>
+        Update(world, first, second, (long)Get(world, first, second).Value + delta, military, events);
+
+    private static void Update(WorldMutation world, int first, int second, long requestedValue, MilitaryRulebook? military, List<DomainEvent> events)
+    {
+        var previous = Get(world, first, second);
+        int value = (int)Math.Clamp(requestedValue, 0, 100);
+        if (previous.Value != value)
+        {
+            world.SetRelation(previous with { Value = value });
+            events.Add(new ForceRelationChangedEvent(world.Clock, previous.FirstId, previous.SecondId, previous.Value, value));
+        }
+        if (requestedValue > previous.Value && !MilitaryDiplomacy.AutomaticEnemy(world, first, second))
+            DiplomaticConflicts.End(world, first, second, military, events);
+    }
 }

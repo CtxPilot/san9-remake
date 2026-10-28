@@ -79,6 +79,19 @@ public sealed class DecisionDraft
         if (Role is "prisoner-return" or "attack-request" && diplomacy?.Offer is { } openingOffer)
             Introduction = [.. Introduction, NegotiationQuote(openingOffer, _context) with { Diplomacy = Meeting }];
         List<ProducedMessage> confirmations = [];
+        if (diplomacy?.GiftReceipt is { } receipt)
+        {
+            if (receipt.ReturningUnitIds.Length > 0)
+            {
+                values["conflict-force"] = Force(diplomacy.RequesterForceId);
+                confirmations.Add(Produce(_presentation.Shared["gift-return-confirmation"]).Message);
+            }
+            foreach (int id in receipt.ClearedCorpsIds)
+            {
+                values["conflict-corps-leader"] = Person(Before.World.Corps.Single(c => c.Id == id).LeaderId!.Value);
+                confirmations.Add(Produce(_presentation.Shared["gift-corps-confirmation"]).Message);
+            }
+        }
         if (session.GetAllianceParticipationPrompt() is { } alliance)
         {
             foreach (var conflict in alliance.PossibleRequestConflicts.Where(c => c.LiableForceId == ForceId))

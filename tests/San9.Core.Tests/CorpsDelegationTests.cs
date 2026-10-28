@@ -80,7 +80,7 @@ public sealed class CorpsDelegationTests
         var result = engine.AdvanceXun();
         Assert.True(Assert.Single(result.Events.OfType<GiftResolvedEvent>()).Accepted);
         var cleared = Assert.Single(result.Events.OfType<CorpsDelegationChangedEvent>());
-        Assert.Equal("target-invalidated", cleared.Reason);
+        Assert.Equal("diplomacy-peace", cleared.Reason);
         Assert.IsType<GeneralDelegation>(engine.Snapshot.Corps.Single(c => c.Id == 20).Delegation);
         Assert.Equal(new GameClock(190, 1, 11), cleared.Clock);
     }
@@ -96,17 +96,17 @@ public sealed class CorpsDelegationTests
     {
         var world = World().BeginMutation();
         world.Replace(world.Corps[20] with { Delegation = Policy(kind) });
+        List<DomainEvent> events = [];
         switch (change)
         {
             case "alliance": world.SetSimulation(world.Simulation with { Alliance = new(3, 1, [1, 2], 10) }); break;
             case "request": AttackRequests.Establish(world, 2, 1, 4, []); break;
-            case "relation": ForceRelations.Set(world, 1, 2, 40, []); break;
+            case "relation": ForceRelations.Set(world, 1, 2, 40, null, events); break;
             case "eliminated": world.Replace(world.Forces[2] with { IsEliminated = true }); break;
             case "destroyed": world.Replace(world.Settlements[3] with { IsDestroyed = true }); break;
             case "missing": world.Replace(world.Corps[20] with { Delegation = kind == 2 ? new DefeatForceDelegation(99) : new CaptureSettlementDelegation(99) }); break;
             case "friendly-owner": world.Replace(world.Settlements[3] with { OwnerId = 1 }); break;
         }
-        List<DomainEvent> events = [];
         CorpsDelegations.Cleanup(world, null, events);
         CorpsDelegations.Cleanup(world, null, events);
         Assert.Single(events.OfType<CorpsDelegationChangedEvent>());

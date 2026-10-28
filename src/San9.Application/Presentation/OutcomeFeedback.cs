@@ -18,7 +18,8 @@ internal static class OutcomeFeedback
             TacticLearnedEvent e => e.Clock, OfficerInjuryWorsenedEvent e => e.Clock, CommanderChangedEvent e => e.Clock,
             UnitCommanderChangedEvent e => e.Clock, CorpsLeaderChangedEvent e => e.Clock, CorpsDissolvedEvent e => e.Clock,
             HighSpiritsExpiredEvent e => e.Clock, OfficerAppearedEvent e => e.Clock, TreasuryCapturedEvent e => e.Clock,
-            PrisonerEscapedEvent e => e.Clock, BattlePersonnelResolvedEvent e => e.Clock, _ => before.World.Clock
+            PrisonerEscapedEvent e => e.Clock, BattlePersonnelResolvedEvent e => e.Clock, DiplomaticConflictsEndedEvent e => e.Clock,
+            _ => before.World.Clock
         };
         List<CommandMessage> messages = [];
         List<MapMessageRecord> records = [];
@@ -65,6 +66,12 @@ internal static class OutcomeFeedback
         void Channel(string role) { if (executionMap) Report(role, sound: content.Feedback[role].Sound); else Prompt(role); }
         switch (fact)
         {
+            case DiplomaticConflictsEndedEvent peace when Player(peace.FirstForceId) || Player(peace.SecondForceId):
+                Force("force", peace.FirstForceId); Force("second-force", peace.SecondForceId);
+                color = Player(peace.FirstForceId) ? peace.FirstForceId : peace.SecondForceId;
+                if (peace.ReturningUnitIds.Length > 0) Channel("diplomacy-units-returned");
+                if (peace.ClearedCorpsIds.Length > 0) Channel("diplomacy-corps-cleared");
+                break;
             case TacticLearnedEvent { Origin: TacticLearningOrigin.Practice } learned:
                 At(learned.Occurrence); Person("actor", learned.OfficerId);
                 values["tactic"] = MessageBinding.Reference(MessageEntityKind.Tactic, learned.TacticId);

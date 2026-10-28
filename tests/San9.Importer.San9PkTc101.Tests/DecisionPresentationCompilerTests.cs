@@ -11,6 +11,17 @@ public sealed class DecisionPresentationCompilerTests
             0, 6000, 0, 0, 0, 0, 0, biography, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             [], 0, 0, [], 0)).ToArray();
         var decisions = DecisionPresentationCompiler.Compile(people);
+        Assert.Equal("messages.6122", decisions.Shared["gift-return-confirmation"].Key);
+        Assert.Equal("conflict-force", decisions.Shared["gift-return-confirmation"].Bindings["force.0"]);
+        Assert.Equal("messages.6123", decisions.Shared["gift-corps-confirmation"].Key);
+        Assert.Equal("conflict-corps-leader", decisions.Shared["gift-corps-confirmation"].Bindings["person.0"]);
+        var progress = ExecutionPresentationCompiler.Compile();
+        foreach (var (role, key) in new[] { ("diplomacy-units-returned", "messages.7447"), ("diplomacy-corps-cleared", "messages.7448") })
+        {
+            Assert.Equal(key, progress.Records[role].Key); Assert.Equal(key, progress.Feedback[role].Key);
+            Assert.Equal("force", progress.Records[role].Bindings["force.0"]);
+            Assert.Equal("second-force", progress.Records[role].Bindings["force.1"]);
+        }
         var volunteers = decisions.Events["volunteers"];
 
         Assert.Equal("messages.8013", volunteers.Prompt.Key);

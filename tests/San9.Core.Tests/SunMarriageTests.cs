@@ -64,7 +64,7 @@ public sealed class SunMarriageTests
         var world = World().BeginMutation(Rules().Abilities);
         switch (condition)
         {
-            case "relation": ForceRelations.Set(world, 1, 2, value, []); break;
+            case "relation": ForceRelations.Set(world, 1, 2, value, null, []); break;
             case "captive": world.Replace(world.Officers[22] with { Status = OfficerStatus.Captive }); break;
             case "ruler": world.Replace(world.Officers[22] with { Status = OfficerStatus.Ruler }); break;
             case "wrong-family": world.Replace(world.Officers[21] with { BloodlineId = 901 }); break;
@@ -154,7 +154,7 @@ public sealed class SunMarriageTests
     {
         var world = World().BeginMutation(Rules().Abilities); List<DomainEvent> events = [];
         foreach (int id in new[] { 11, 22 }) world.Replace(world.Officers[id] with { LearnedTactics = [1, 13] });
-        ForceRelations.Set(world, 1, 2, 100, []);
+        ForceRelations.Set(world, 1, 2, 100, null, []);
         SunMarriage.Apply(world, Rules(Definition() with { LatestDate = new(190, 1, 1) }), events);
         Assert.Single(events.OfType<SunMarriageEvent>()); Assert.Empty(events.OfType<TacticLearnedEvent>());
         Assert.Equal(100, ForceRelations.Get(world, 1, 2).Value); Assert.Single(world.Simulation.ConsumedEventKeys);

@@ -120,7 +120,7 @@ internal static class AlienateStrategies
             OfficerAbilityGrowth.TryIncrease(world, actor.Id, OfficerAbility.Intelligence, "strategy-intelligence-growth", events);
         }
         ForceRelations.Change(world, relationForce, target.OwnerId!.Value,
-            -1 - (int)(world.NextRandom("strategy-alienate-relations") % 3), events);
+            -1 - (int)(world.NextRandom("strategy-alienate-relations") % 3), null, events);
         OfficerTacticGrowth.Increase(world, actor.Id, 7, 2, events);
         OfficerTacticGrowth.Increase(world, actor.Id, 8, 2, events);
         events.Add(new AlienateResolvedEvent(world.Clock, actor.Id, target.Id, threshold, roll, success, loyaltyLoss,

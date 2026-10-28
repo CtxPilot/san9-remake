@@ -116,14 +116,14 @@ public sealed class DiplomacyMathTests
             relations: [new(3, 900, 99)], corps: [new San9.Core.Domain.CorpsState(3, 3, null, new(0, 0)) { IsRoot = true }, new San9.Core.Domain.CorpsState(900, 900, null, new(0, 0)) { IsRoot = true }]);
         var mutation = world.BeginMutation();
         List<DomainEvent> events = [];
-        ForceRelations.Change(mutation, 900, 3, 15, events);
+        ForceRelations.Change(mutation, 900, 3, 15, null, events);
         Assert.Equal(100, ForceRelations.Get(mutation, 3, 900).Value);
-        ForceRelations.Change(mutation, 3, 900, 1, events);
+        ForceRelations.Change(mutation, 3, 900, 1, null, events);
         Assert.Single(events);
-        ForceRelations.Change(mutation, 900, 3, int.MinValue, events);
+        ForceRelations.Change(mutation, 900, 3, int.MinValue, null, events);
         Assert.Equal(0, ForceRelations.Get(mutation, 900, 3).Value);
         Assert.Single(mutation.Relations);
-        Assert.Throws<ArgumentOutOfRangeException>(() => ForceRelations.Set(mutation, 3, 900, 101, events));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ForceRelations.Set(mutation, 3, 900, 101, null, events));
         Assert.Throws<ArgumentException>(() => ForceRelations.Get(mutation, 3, 3));
     }
 }

@@ -125,7 +125,7 @@ internal static class PrisonerReturnDiplomacy
             }
             DiplomacySettlement.Grow(world, task.OfficerId, events);
         }
-        else ForceRelations.Change(world, task.ForceId, mission.TargetForceId, -5, events);
+        else ForceRelations.Change(world, task.ForceId, mission.TargetForceId, -5, null, events);
         events.Add(new PrisonerReturnResolvedEvent(world.Clock, task.Id, mission.PrisonerId, offer, accepted,
             received, accepted ? offer.Money - received : 0));
         PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCommandsConsumed);

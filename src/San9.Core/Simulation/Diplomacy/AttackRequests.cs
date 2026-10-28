@@ -63,7 +63,7 @@ internal static class AttackRequests
     private static void Penalize(WorldMutation world, AttackRequestState request, int liable, AttackRequestEndReason reason, List<DomainEvent> events)
     {
         ForceRelations.Set(world, request.RequestedForceId, request.RequesterForceId,
-            Math.Max(0, MilitaryDiplomacy.Relation(world, request.RequestedForceId, request.RequesterForceId) - 20), events);
+            Math.Max(0, MilitaryDiplomacy.Relation(world, request.RequestedForceId, request.RequesterForceId) - 20), null, events);
         var force = world.Forces[liable];
         world.Replace(force with { BaseTrust = Math.Max(0, force.BaseTrust - 20) });
         foreach (var person in world.Officers.Values.Where(p => p.OwnerId == liable && p.IsServing && p.Status != OfficerStatus.Ruler)

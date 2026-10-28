@@ -97,12 +97,12 @@ internal static class AllianceFormation
         foreach (int member in members)
         {
             AttackRequests.FormAlliance(world, member, target.Id, members.ToHashSet(), events);
-            ForceRelations.Set(world, member, target.Id, DiplomacyMath.AllianceTargetRelation(MilitaryDiplomacy.Relation(world, member, target.Id)), events);
+            ForceRelations.Set(world, member, target.Id, DiplomacyMath.AllianceTargetRelation(MilitaryDiplomacy.Relation(world, member, target.Id)), rules.Military, events);
         }
         for (int first = 0; first < members.Length; first++)
             for (int second = first + 1; second < members.Length; second++)
                 ForceRelations.Set(world, members[first], members[second],
-                    DiplomacyMath.AllianceMemberRelation(MilitaryDiplomacy.Relation(world, members[first], members[second])), events);
+                    DiplomacyMath.AllianceMemberRelation(MilitaryDiplomacy.Relation(world, members[first], members[second])), rules.Military, events);
         events.Add(new AllianceFormedEvent(world.Clock, alliance));
     }
 

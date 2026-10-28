@@ -78,7 +78,7 @@ public sealed class RedCliffsTests
         var world = World().BeginMutation();
         switch (failure)
         {
-            case "relation": ForceRelations.Set(world, 1, 2, 20, []); break;
+            case "relation": ForceRelations.Set(world, 1, 2, 20, null, []); break;
             case "troops": world.Replace(world.Settlements[4] with { Soldiers = 9998 }); break;
             case "player": world.SetSimulation(world.Simulation with { Controls = [new("ai", 1, ControllerKind.Automatic)] }); break;
             case "city-empty": world.Replace(world.Settlements[2] with { OwnerId = null }); break;

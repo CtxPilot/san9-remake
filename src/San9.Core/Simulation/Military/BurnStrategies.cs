@@ -106,7 +106,7 @@ internal static class BurnStrategies
             int injury = Math.Max(actor.Injury, (int)Math.Min(7, actor.Injury + ((long)roll - threshold) / 10));
             OfficerInjuries.Apply(world, actor with { Injury = injury }, events);
             ForceRelations.Change(world, task.ForceId, target.OwnerId!.Value,
-                -1 - (int)(world.NextRandom("strategy-hostile-failure-relations") % 3), events);
+                -1 - (int)(world.NextRandom("strategy-hostile-failure-relations") % 3), null, events);
         }
         OfficerTacticGrowth.Increase(world, actor.Id, 7, 2, events);
         OfficerTacticGrowth.Increase(world, actor.Id, 8, 2, events);

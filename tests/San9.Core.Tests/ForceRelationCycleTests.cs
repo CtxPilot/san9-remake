@@ -30,7 +30,7 @@ public sealed class ForceRelationCycleTests
             world.SetClock(new(190, 4, 1));
             var random = world.Simulation.RandomStreams;
             List<DomainEvent> events = [];
-            ForceRelations.AdvanceQuarter(world, events);
+            ForceRelations.AdvanceQuarter(world, null, events);
             Assert.Equal(after, ForceRelations.Get(world, 101, 205).Value);
             Assert.Equal(after, ForceRelations.Get(world, 205, 101).Value);
             Assert.Equal(before == after ? 0 : 1, events.OfType<ForceRelationChangedEvent>().Count());
@@ -50,7 +50,7 @@ public sealed class ForceRelationCycleTests
         var world = state.BeginMutation();
         world.SetClock(elapsed == 29 ? new(190, 3, 30) : new(190, 4, 1));
         List<DomainEvent> events = [];
-        ForceRelations.AdvanceQuarter(world, events);
+        ForceRelations.AdvanceQuarter(world, null, events);
         Assert.Equal(expected, ForceRelations.Get(world, 1, 2).Value);
         Assert.Equal(elapsed == 29 ? 0 : 3, events.OfType<ForceRelationChangedEvent>().Count());
         Assert.DoesNotContain(world.Relations.Keys, p => p.FirstId >= 4 || p.SecondId >= 4);

@@ -1,6 +1,10 @@
 namespace San9.Core.Simulation;
 
-public sealed record GiftReceiptPreview(uint MoneyBefore, uint MoneyAfter, uint FoodBefore, uint FoodAfter);
+public sealed record GiftReceiptPreview(uint MoneyBefore, uint MoneyAfter, uint FoodBefore, uint FoodAfter)
+{
+    public System.Collections.Immutable.ImmutableArray<int> ReturningUnitIds { get; init; } = [];
+    public System.Collections.Immutable.ImmutableArray<int> ClearedCorpsIds { get; init; } = [];
+}
 
 public sealed partial class SimulationEngine
 {
@@ -9,9 +13,11 @@ public sealed partial class SimulationEngine
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         var world = PreparationWorld();
-        if (world.Simulation.Tasks.SingleOrDefault(t => t.Id == taskId)?.Gift is not { } gift) return null;
+        if (world.Simulation.Tasks.SingleOrDefault(t => t.Id == taskId) is not { Gift: { } gift } task) return null;
         var treasury = ResourceAccounts.Root(world, gift.TargetForceId).Treasury;
+        var conflicts = DiplomaticConflicts.Preview(world, gift.TargetForceId, task.ForceId, _rules.Military);
         return new(treasury.Money, ResourceAccounts.Project(treasury.Money, gift.Offer.Kind == GiftKind.Money ? gift.Offer.Amount : 0),
-            treasury.Food, ResourceAccounts.Project(treasury.Food, gift.Offer.Kind == GiftKind.Food ? gift.Offer.Amount : 0));
+            treasury.Food, ResourceAccounts.Project(treasury.Food, gift.Offer.Kind == GiftKind.Food ? gift.Offer.Amount : 0))
+        { ReturningUnitIds = conflicts.Units, ClearedCorpsIds = conflicts.Corps };
     }
 }

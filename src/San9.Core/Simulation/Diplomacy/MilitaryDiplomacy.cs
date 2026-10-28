@@ -66,7 +66,7 @@ public static class MilitaryDiplomacy
                 Work(world, id, military) || world.Settlements[id].OwnerId is not int other) continue;
             int value = Relation(world, unit.OwnerId, other);
             bool betrayal = world.Simulation.Alliance?.Protects(unit.OwnerId, other) == true;
-            if (value >= 40) ForceRelations.Set(world, unit.OwnerId, other, 35, events);
+            if (value >= 40) ForceRelations.Set(world, unit.OwnerId, other, 35, null, events);
             if (value >= 60) Penalize(world, unit.OwnerId, value >= 80 ? 20 : 10, value >= 80 ? 1 : 2, false, events);
             if (betrayal)
             {
@@ -75,7 +75,7 @@ public static class MilitaryDiplomacy
                 foreach (int member in alliance.MemberForceIds.Where(f => f != unit.OwnerId))
                 {
                     int relation = Relation(world, unit.OwnerId, member);
-                    if (relation > 0) ForceRelations.Set(world, unit.OwnerId, member, Math.Min(35, Math.Max(0, relation - 30)), events);
+                    if (relation > 0) ForceRelations.Set(world, unit.OwnerId, member, Math.Min(35, Math.Max(0, relation - 30)), null, events);
                 }
                 AllianceDiplomacy.Betray(world, unit.OwnerId, events);
             }
@@ -97,6 +97,6 @@ public static class MilitaryDiplomacy
     {
         if (work || defender is not int other || !CanFight(world, attacker, other)) return;
         int value = Relation(world, attacker, other);
-        if (value >= 20) ForceRelations.Set(world, attacker, other, value >= 40 ? 39 : value - 1, events);
+        if (value >= 20) ForceRelations.Set(world, attacker, other, value >= 40 ? 39 : value - 1, null, events);
     }
 }

@@ -45,7 +45,7 @@ internal static class QuarterHistoricalEvents
         world.Replace(ruler with { LifespanTier = ruler.LifespanTier + rulerGain });
         world.Replace(companion with { LifespanTier = companion.LifespanTier + companionGain });
         world.Replace(force with { BaseTrust = force.BaseTrust + trustGain });
-        if (rivalForce is int target) ForceRelations.Change(world, owner, target, -definition.RelationPenalty, events);
+        if (rivalForce is int target) ForceRelations.Change(world, owner, target, -definition.RelationPenalty, null, events);
         world.ConsumeEvent(definition.Candidate(), new("qiao-marriage", EventOutcomeKind.Completed, false, EventResult.Succeeded));
         events.Add(new QiaoMarriageEvent(world.Clock, owner, ruler.Id, companion.Id, rulerGain, companionGain, trustGain, rivalForce));
         return true;

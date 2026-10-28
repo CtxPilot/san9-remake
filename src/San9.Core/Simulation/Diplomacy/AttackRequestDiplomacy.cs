@@ -173,11 +173,11 @@ internal static class AttackRequestDiplomacy
             {
                 AttackRequests.Establish(world, mission.TargetForceId, task.ForceId, mission.TargetSettlementId, events);
                 (received, spent) = DiplomacySettlement.Pay(world, task, mission.TargetForceId, mission.Offer!, rules, "attack-request-compensation", events);
-                ForceRelations.Set(world, task.ForceId, mission.TargetForceId,
-                    DiplomacyMath.AttackRequestAcceptedRelation(MilitaryDiplomacy.Relation(world, task.ForceId, mission.TargetForceId)), events);
+                int relation = MilitaryDiplomacy.Relation(world, task.ForceId, mission.TargetForceId);
+                ForceRelations.Change(world, task.ForceId, mission.TargetForceId, Math.Max(40 - relation, 10), rules.Military, events);
                 DiplomacySettlement.Grow(world, task.OfficerId, events);
             }
-            else ForceRelations.Change(world, task.ForceId, mission.TargetForceId, -5, events);
+            else ForceRelations.Change(world, task.ForceId, mission.TargetForceId, -5, rules.Military, events);
         }
         events.Add(new AttackRequestResolvedEvent(world.Clock, task.Id, mission.TargetForceId, mission.TargetSettlementId,
             mission.Offer, outcome, received, spent));

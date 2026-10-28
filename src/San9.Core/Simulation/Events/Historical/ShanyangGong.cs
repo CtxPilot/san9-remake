@@ -66,7 +66,7 @@ internal static class ShanyangGong
         }
         foreach (var rival in world.Forces.Values.Where(f => f.Id != owner && !f.IsEliminated && f.LeaderId is not null).OrderBy(f => f.Id))
             if (protect ? rival.RankId == rules.Politics.ImperialRankId : world.Officers[rival.LeaderId!.Value].Surname == d.ImperialSurname)
-                ForceRelations.Change(world, owner, rival.Id, -d.RelationPenalty, events);
+                ForceRelations.Change(world, owner, rival.Id, -d.RelationPenalty, null, events);
         var candidate = new EventCandidate(d.ConsumptionKey.Value, EventTrigger.Search, 0, EventConsumption.OnSuccess, d.ConsumptionKey);
         world.ConsumeEvent(candidate, new(candidate.Id, EventOutcomeKind.Completed, false, EventResult.Succeeded));
         events.Add(new ShanyangGongEvent(world.Clock, owner, task.OfficerId, d.EmperorId, protect, world.Forces[owner].CountryTitleId));

@@ -144,7 +144,7 @@ internal static class GossipStrategies
             int current = ForceRelations.Get(world, mission.FirstTargetForceId, mission.SecondTargetForceId).Value;
             relationLoss = StrategyMath.GossipRelationLoss(current);
             ForceRelations.Change(world, mission.FirstTargetForceId, mission.SecondTargetForceId,
-                -relationLoss, events);
+                -relationLoss, null, events);
             int loyaltyChance = Math.Clamp(100 - world.Abilities(target).Intelligence, 0, 100);
             loyaltyGate = world.NextRandom("strategy-gossip-loyalty-gate") % 100 < (ulong)loyaltyChance;
             if (loyaltyGate)
@@ -158,7 +158,7 @@ internal static class GossipStrategies
         else
         {
             relationLoss = 1 + (int)(world.NextRandom("strategy-gossip-failure-relations") % 3);
-            ForceRelations.Change(world, task.ForceId, mission.FirstTargetForceId, -relationLoss, events);
+            ForceRelations.Change(world, task.ForceId, mission.FirstTargetForceId, -relationLoss, null, events);
         }
         OfficerTacticGrowth.Increase(world, actor.Id, 7, 2, events);
         OfficerTacticGrowth.Increase(world, actor.Id, 8, 2, events);

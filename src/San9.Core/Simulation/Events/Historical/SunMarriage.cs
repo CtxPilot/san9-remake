@@ -37,7 +37,7 @@ internal static class SunMarriage
         // The destination and complete eligibility are fixed before any effect is written.
         PersonnelTransitions.RelocateAllegiance(world, bride.Id, recipient, definition.Loyalty, settlement, unit, rules, events,
             "sun-marriage", afterDailyCommands: false);
-        if (recipient != donor.Id) ForceRelations.Change(world, recipient, donor.Id, definition.RelationBonus, events);
+        if (recipient != donor.Id) ForceRelations.Change(world, recipient, donor.Id, definition.RelationBonus, rules.Military, events);
         if (grants)
             foreach (int person in new[] { ruler.Id, bride.Id })
                 foreach (int tactic in definition.GrantedTacticIds) OfficerTacticGrowth.Grant(world, person, tactic, events);

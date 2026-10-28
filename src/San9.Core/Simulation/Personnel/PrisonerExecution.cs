@@ -75,7 +75,7 @@ internal static class PrisonerExecution
             dailyDisposition ? PrisonerExecutionPath.CapturedRulerDisposition : PrisonerExecutionPath.StrategicCommand);
         if (!dailyDisposition && prisoner.OwnerId is int owner && !world.Forces[owner].IsEliminated)
         {
-            ForceRelations.Change(world, executingForceId, owner, -5 - (int)(world.NextRandom("personnel-execution-relations") % 3), events);
+            ForceRelations.Change(world, executingForceId, owner, -5 - (int)(world.NextRandom("personnel-execution-relations") % 3), null, events);
             foreach (var person in world.Officers.Values.Where(p => p.OwnerId == owner).OrderBy(p => p.Id).ToArray())
             {
                 int loss = (prisoner.BloodlineId is not null && person.BloodlineId == prisoner.BloodlineId ? 5 : 0) +

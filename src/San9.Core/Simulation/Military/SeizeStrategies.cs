@@ -162,7 +162,7 @@ internal static class SeizeStrategies
                 (int)Math.Min(7, actor.Injury + ((long)roll - thresholds.Money) / 10));
             OfficerInjuries.Apply(world, actor with { Injury = injury }, events);
             ForceRelations.Change(world, task.ForceId, target.OwnerId!.Value,
-                -1 - (int)(world.NextRandom("strategy-seize-failure-relations") % 3), events);
+                -1 - (int)(world.NextRandom("strategy-seize-failure-relations") % 3), null, events);
             outcome = SeizeOutcomeKind.Failure;
         }
         if (outcome != SeizeOutcomeKind.Failure)

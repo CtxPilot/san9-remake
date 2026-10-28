@@ -22,6 +22,11 @@ internal static class OutcomePresentationCompiler
             Record(role, record, bindings); Prompt(role, prompt, bindings: bindings);
         }
         Record("corps-reorganized", 9991, ("force.0", "force")); Prompt("corps-reorganized", 7182, bindings: [("force.0", "force")]);
+        foreach (var (role, source) in new[] { ("diplomacy-units-returned", 7447), ("diplomacy-corps-cleared", 7448) })
+        {
+            (string, string)[] bindings = [("force.0", "force"), ("force.1", "second-force")];
+            Record(role, source, bindings); Prompt(role, source, bindings: bindings);
+        }
         Record("high-spirits-expired", 10006, ("person.0", "actor"));
         Record("morale-lost", 9957, ("unit.0", "unit"), ("number.0", "current"));
         Record("unit-morale-collapsed", 9983, ("unit.0", "unit"));

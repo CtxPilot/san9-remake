@@ -45,6 +45,8 @@ internal static class DecisionPresentationCompiler
         shared["diplomacy-counteroffer-unfavorable"] = M(7337, "adviser", inputs: [("person.0", "adviser"), ("person.1", "host")]);
         shared["diplomacy-adviser"] = M(7329, "adviser", inputs: [("person.0", "adviser"), ("person.1", "host")]);
         shared["diplomacy-exchanged-prisoner"] = M(6375, sound: increase, inputs: [("person.0", "exchange-person")]);
+        shared["gift-return-confirmation"] = M(6122, inputs: [("force.0", "conflict-force")]);
+        shared["gift-corps-confirmation"] = M(6123, inputs: [("person.0", "conflict-corps-leader")]);
         foreach (var (role, message) in DiplomacyConversationCompiler.Compile()) shared.Add(role, message);
         shared["alliance-responsibility"] = M(6070, inputs: [("force.0", "target-force")]);
         shared["alliance-request-conflict"] = M(9418, inputs: [("force.0", "conflict-force"), ("force.1", "conflict-force")]);

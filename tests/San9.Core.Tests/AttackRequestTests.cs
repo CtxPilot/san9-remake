@@ -115,7 +115,7 @@ public sealed class AttackRequestTests
         AttackRequests.Establish(world, 1, 3, 40, events);
         AttackRequests.Establish(world, 2, 1, 30, events);
         AttackRequests.FormAlliance(world, 1, 3, new HashSet<int> { 1, 2 }, events);
-        ForceRelations.Set(world, 1, 3, DiplomacyMath.AllianceTargetRelation(MilitaryDiplomacy.Relation(world, 1, 3)), events);
+        ForceRelations.Set(world, 1, 3, DiplomacyMath.AllianceTargetRelation(MilitaryDiplomacy.Relation(world, 1, 3)), null, events);
         Assert.Equal(30, MilitaryDiplomacy.Relation(world, 1, 3));
         Assert.Equal(80, world.Forces[1].BaseTrust);
         Assert.Equal(2, Assert.Single(world.Simulation.AttackRequests).RequestedForceId);
@@ -126,7 +126,7 @@ public sealed class AttackRequestTests
     {
         var world = World();
         List<DomainEvent> events = [];
-        ForceRelations.Set(world, 1, 2, 0, events);
+        ForceRelations.Set(world, 1, 2, 0, null, events);
         Assert.True(MilitaryDiplomacy.AutomaticEnemy(world, 1, 2));
         AttackRequests.Establish(world, 1, 2, 30, events);
         Assert.False(MilitaryDiplomacy.AutomaticEnemy(world, 1, 2));

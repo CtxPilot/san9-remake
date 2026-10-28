@@ -121,7 +121,7 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
                     ReturnCargoDeliveredEvent or ReturnCargoLostEvent: PresentFeedback(); break;
                 case TacticLearnedEvent or OfficerInjuryWorsenedEvent or CommanderChangedEvent or UnitCommanderChangedEvent or
                     CorpsLeaderChangedEvent or CorpsDissolvedEvent or HighSpiritsExpiredEvent or OfficerAppearedEvent or
-                    TreasuryCapturedEvent or PrisonerEscapedEvent or BattlePersonnelResolvedEvent: PresentOutcome(); break;
+                    TreasuryCapturedEvent or PrisonerEscapedEvent or BattlePersonnelResolvedEvent or DiplomaticConflictsEndedEvent: PresentOutcome(); break;
                 case TacticMoraleChangedEvent morale: PresentMorale(morale); break;
                 case TacticDefectionEvent defection: PresentDefection(defection); break;
                 case TacticHealingEvent healing: PresentHealing(healing); break;

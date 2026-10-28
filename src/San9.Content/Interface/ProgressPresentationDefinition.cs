@@ -20,7 +20,8 @@ public sealed record ProgressPresentationDefinition(Dictionary<string, DecisionM
         "policy-post-action-avoid-despite-orders", "policy-post-action-return-ordered", "policy-post-action-attack-despite-orders"];
     public static readonly string[] FeedbackRoles = ["ability-grown", "tactic-learned", "injury-worsened", "place-commander-changed",
         "unit-commander-changed", "corps-leader-changed", "corps-reorganized", "appearance-introduction", "appearance-greeting", "appearance-result",
-        "treasury-captured", "prisoner-escape-speech", "prisoner-escape-result", "battle-capture-speech", "battle-capture-dialogue", ReturnUnavailableRole, .. PostActionRoles];
+        "treasury-captured", "prisoner-escape-speech", "prisoner-escape-result", "battle-capture-speech", "battle-capture-dialogue",
+        "diplomacy-units-returned", "diplomacy-corps-cleared", ReturnUnavailableRole, .. PostActionRoles];
     public static readonly string[] MapSpeechRoles = ["policy-construction-aborted", "policy-transport-aborted", "policy-return-target-changed",
         "policy-enter-captured-place", "policy-return-after-action", "policy-attack-unit-after-action", "policy-attack-place-after-action", "unit-defeat", "waypoint-reached", "contact-attack", "contact-defense",
         "contact-attack-strong", "contact-attack-weak", "contact-defense-strong", "contact-defense-weak", "contact-building",
@@ -32,6 +33,7 @@ public sealed record ProgressPresentationDefinition(Dictionary<string, DecisionM
         "morale-gained", "reinforcement-arrived", "tactic-learned", "tactic-learned-other", "injury-worsened", "place-commander-changed",
         "unit-commander-changed", "corps-leader-changed", "corps-reorganized", "high-spirits-expired", "morale-lost", "unit-morale-collapsed",
         "treasury-captured", "treasury-lost", "battle-captured", "battle-persons-lost", "battle-persons-retreated",
+        "diplomacy-units-returned", "diplomacy-corps-cleared",
         "policy-construction-aborted", "policy-transport-aborted", "policy-return-target-changed", "policy-enter-captured-place", "policy-return-after-action",
         "policy-attack-unit-after-action", "policy-attack-place-after-action", "unit-lost", "unit-defeated", "unit-lost-other", "territory-changed-other", "facility-destroyed-other", "settlement-won", "settlement-lost",
         "unit-contact", "settlement-contact", "waypoint-reached",

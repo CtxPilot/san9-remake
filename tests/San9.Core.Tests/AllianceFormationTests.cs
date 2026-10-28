@@ -324,10 +324,10 @@ public sealed class AllianceFormationTests
     {
         var world = WorldState.Create(new(190, 1, 1), 1, [new(1, 0), new(2, 0)], [], [], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(0, 0)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(0, 0)) { IsRoot = true }]).BeginMutation();
         List<DomainEvent> events = [];
-        ForceRelations.Set(world, 2, 1, 0, events);
+        ForceRelations.Set(world, 2, 1, 0, null, events);
         Assert.Empty(events);
         Assert.Empty(world.Relations);
-        ForceRelations.Set(world, 2, 1, 60, events);
+        ForceRelations.Set(world, 2, 1, 60, null, events);
         Assert.Equal(60, ForceRelations.Get(world, 1, 2).Value);
         Assert.Equal((1, 2), Assert.Single(world.Relations).Key);
         Assert.Equal(0, Assert.Single(events.OfType<ForceRelationChangedEvent>()).Previous);
