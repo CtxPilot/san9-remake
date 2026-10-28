@@ -12,6 +12,10 @@ public sealed record BattleZoomProjectile(double Start, double End, double X, do
 public sealed record BattleZoomLocalCue(double Start, double End, BattleLocalEffect Effect, double X, double Y, double Depth);
 public sealed record BattleZoomImpact(double Time, int X, int Y, uint Amount, bool Centered);
 public sealed record BattleZoomSound(double Time, string Role);
+public sealed record BattleZoomLoopSound(double Start, double End, string Role)
+{
+    public float Gain(double elapsed) => (float)Math.Clamp(Math.Min(elapsed - Start, End - elapsed) / .15, 0, 1);
+}
 public sealed record BattleZoomFrame(BattleSprite Sprite, double X, double Y, int Frame, float Opacity = 1, bool Centered = false)
 {
     public double? Depth { get; init; }
@@ -27,6 +31,7 @@ public sealed class BattleZoomPlayback
     public ImmutableArray<BattleZoomProjectile> Projectiles { get; }
     public ImmutableArray<BattleZoomImpact> Impacts { get; }
     public ImmutableArray<BattleZoomSound> Sounds { get; }
+    public ImmutableArray<BattleZoomLoopSound> LoopSounds { get; }
     public double FightStart { get; }
     public double ActionEnd { get; }
     public double FeedbackStart { get; }
@@ -36,6 +41,7 @@ public sealed class BattleZoomPlayback
     private readonly ImmutableArray<int> _combatPhases;
     private readonly ImmutableArray<double> _damageStarts;
     private readonly ImmutableArray<(double Start, double End)> _continuousFire = [];
+    private readonly int _projectileTrailFrames;
     public ImmutableArray<BattleZoomLocalCue> LocalEffects { get; }
     public double FightStop { get; }
 
@@ -53,6 +59,10 @@ public sealed class BattleZoomPlayback
         _combatPhases = Source.Select(_ => next(3)).ToImmutableArray();
         List<BattleZoomShot> shots = []; List<BattleZoomProjectile> projectiles = [];
         List<BattleZoomSound> sounds = []; List<double> waves = [];
+        List<BattleZoomLoopSound> loops = [];
+        _projectileTrailFrames = definition.ProjectileTrail is { } trail
+            ? (int)Math.Ceiling((trail.InitialAlpha - trail.MinimumAlpha) / (double)trail.FadePerFrame) : 0;
+        double projectileTail = Math.Max(0, _projectileTrailFrames - 1) * (definition.Projectile?.FrameMilliseconds ?? 0) / 1000.0;
         void Projectile(double start, double x, double y, BattleZoomMember target, BattleSprite sprite)
         {
             double targetX = target.X + definition.Target.ImpactX, targetY = target.Y + definition.Target.ImpactY;
@@ -75,7 +85,8 @@ public sealed class BattleZoomPlayback
             FightStart = arrivals.Length / 3 == 0 ? 0 : arrivals[arrivals.Length / 3 - 1];
             FightStop = FightStart + action.FightMilliseconds / 1000.0;
             ActionEnd = Source.Select((m, i) => SourceReset(m, i)).DefaultIfEmpty(FightStop).Max();
-            sounds.Add(new(0, definition.AdvanceSound)); sounds.Add(new(FightStart, definition.AttackSound));
+            if (FightStart > 0) loops.Add(new(0, FightStart, definition.AdvanceSound));
+            loops.Add(new(FightStart, ActionEnd, definition.AttackSound));
         }
         else if (action.Kind is BattleZoomActionKind.Volley or BattleZoomActionKind.ContinuousVolley)
         {
@@ -88,15 +99,23 @@ public sealed class BattleZoomPlayback
             var body = definition.Source;
             int count = action.ProjectilesPerMember > 1 ? action.ProjectilesPerMember : body.Projectiles * action.ProjectileMultiplier;
             int batch = action.AlternateGroups ? Math.Max(1, Source.Length / 2) : Math.Max(1, Source.Length);
+            double cycle = (body.Ranged?.Columns ?? body.Idle.Columns) * action.MovementFrameMilliseconds / 1000.0;
+            var groupStarts = new double?[Math.Max(1, groups.Length)];
             for (int round = 0; round < action.Rounds; round++)
             {
-                var candidates = members;
-                if (action.AlternateGroups && groups.Length > 0 && (continuous || round > 0))
-                    candidates = groups[(continuous ? round : round - 1) % groups.Length];
-                int[] selected = [.. candidates];
+                bool grouped = action.AlternateGroups && groups.Length > 0 && (continuous || round > 0);
+                int group = grouped ? (continuous ? round : round - 1) % groups.Length : 0;
+                int[] selected = [.. grouped ? groups[group] : members];
                 for (int i = selected.Length - 1; i > 0; i--)
                 { int other = next(i + 1); (selected[i], selected[other]) = (selected[other], selected[i]); }
                 time += action.IntervalMilliseconds / 1000.0;
+                if (continuous)
+                {
+                    // Pulse spacing is a minimum; a group fires at a complete body-cycle boundary.
+                    if (groupStarts[group] is { } start)
+                        time = Math.Max(time, start + Math.Ceiling((time - start) / cycle - 1e-9) * cycle);
+                    else groupStarts[group] = time;
+                }
                 for (int i = 0; i < selected.Length; i++)
                 {
                     if (!continuous && i > 0 && i % batch == 0) time += action.MovementFrameMilliseconds / 1000.0;
@@ -119,10 +138,9 @@ public sealed class BattleZoomPlayback
                 sounds.Add(new(time + .5, definition.AttackSound));
             }
             FightStart = shots.Select(s => s.Time).DefaultIfEmpty(0).Min();
-            ActionEnd = Math.Max(time + action.RecoveryMilliseconds / 1000.0, projectiles.Select(p => p.End).DefaultIfEmpty(0).Max());
+            ActionEnd = Math.Max(time + action.RecoveryMilliseconds / 1000.0, projectiles.Select(p => p.End + projectileTail).DefaultIfEmpty(0).Max());
             if (body.Ranged is { } ranged)
             {
-                double cycle = ranged.Columns * action.MovementFrameMilliseconds / 1000.0;
                 var firingWindows = Enumerable.Repeat((Start: double.PositiveInfinity, End: double.NegativeInfinity), Source.Length).ToArray();
                 foreach (var firing in shots.GroupBy(s => s.Member))
                 {
@@ -158,8 +176,10 @@ public sealed class BattleZoomPlayback
                             }
                     }
             ActionEnd = waves[^1] + travel + 8 * action.MovementFrameMilliseconds / 1000.0;
-            ActionEnd = Math.Max(ActionEnd, projectiles.Select(p => p.End).DefaultIfEmpty(0).Max());
-            sounds.Add(new(0, definition.AdvanceSound)); sounds.Add(new(0, definition.AttackSound));
+            ActionEnd = Math.Max(ActionEnd, projectiles.Select(p => p.End + projectileTail).DefaultIfEmpty(0).Max());
+            double emissionEnd = Math.Max(waves[^1] + travel, projectiles.Select(p => p.Start).DefaultIfEmpty(0).Max());
+            loops.Add(new(0, emissionEnd, definition.AdvanceSound));
+            loops.Add(new(0, emissionEnd, definition.AttackSound));
         }
         Shots = shots.ToImmutableArray(); Projectiles = projectiles.ToImmutableArray(); _waves = waves.ToImmutableArray();
         FeedbackStart = ActionEnd + interveningDuration;
@@ -187,6 +207,9 @@ public sealed class BattleZoomPlayback
             sounds.Add(new(time, blocked ? blockSound : hitSound));
         }
         Impacts = impacts.ToImmutableArray();
+        if (!blocked && definition.FeedbackAccent is { } accent &&
+            FeedbackStart + accent.DelayMilliseconds / 1000.0 < Impacts[^1].Time)
+            sounds.Add(new(FeedbackStart + accent.DelayMilliseconds / 1000.0, accent.Role));
         _damageStarts = Target.Select(_ =>
         {
             if (blocked) return double.PositiveInfinity;
@@ -201,6 +224,7 @@ public sealed class BattleZoomPlayback
             sounds.AddRange(Numbers.Sounds);
         }
         Sounds = sounds.OrderBy(s => s.Time).ToImmutableArray();
+        LoopSounds = loops.ToImmutableArray();
         Duration = Impacts[^1].Time + Math.Max(definition.Impact.Columns * definition.Impact.FrameMilliseconds,
             definition.Block.Columns * definition.Block.FrameMilliseconds) / 1000.0 + 4;
         Duration = Math.Max(Duration, (Numbers?.End ?? 0) + 4);
@@ -213,10 +237,23 @@ public sealed class BattleZoomPlayback
         if (Definition.Projectile is not { } sprite) yield break;
         foreach (var projectile in Projectiles)
         {
-            if (elapsed < projectile.Start || elapsed >= projectile.End) continue;
-            int index = Math.Clamp((int)((elapsed - projectile.Start) * 1000 / sprite.FrameMilliseconds), 0, projectile.Path.Length - 1);
-            var frame = projectile.Path[index];
-            yield return new(sprite, frame.X, frame.Y, frame.Direction % sprite.Columns, 204 / 256f, true);
+            if (elapsed < projectile.Start) continue;
+            int step = (int)Math.Floor((elapsed - projectile.Start) * 1000 / sprite.FrameMilliseconds + 1e-9);
+            if (Definition.ProjectileTrail is { } trail)
+            {
+                for (int previous = Math.Max(0, step - _projectileTrailFrames + 1); previous <= Math.Min(step, projectile.Path.Length - 2); previous++)
+                {
+                    var old = projectile.Path[previous];
+                    int alpha = trail.InitialAlpha - (step - previous) * trail.FadePerFrame;
+                    yield return new(sprite, old.X, old.Y, old.Direction % sprite.Columns, alpha / 256f, true)
+                    { Depth = old.Y - 1 };
+                }
+            }
+            if (elapsed < projectile.End)
+            {
+                var frame = projectile.Path[Math.Min(step, projectile.Path.Length - 1)];
+                yield return new(sprite, frame.X, frame.Y, frame.Direction % sprite.Columns, 204 / 256f, true);
+            }
         }
     }
 
@@ -404,11 +441,14 @@ public sealed class BattleZoomPlayback
                 if (!guaranteed && next(100) >= effect.Chance) continue;
                 double px = x + origin.X + (effect.Jitter > 0 ? next(effect.Jitter * 2 + 1) - effect.Jitter : 0);
                 double py = y + origin.Y + (effect.Jitter > 0 ? next(effect.Jitter * 2 + 1) - effect.Jitter : 0);
+                if (effect.Spread is { } spread)
+                { px += next(spread.X + 1); py += next(spread.Y + 1); }
                 var prepared = effect;
                 if (effect.Styles.Length > 0)
                 {
                     var style = effect.Styles[next(effect.Styles.Length)];
-                    prepared = effect with { Sprite = effect.Sprite with { Opacity = style.Opacity }, FadePerFrame = style.FadePerFrame };
+                    prepared = effect with { Sprite = effect.Sprite with { Opacity = style.Opacity },
+                        FadePerFrame = style.FadePerFrame, Step = style.Step ?? effect.Step };
                 }
                 int frames = prepared.LifetimeFrames > 0 ? prepared.LifetimeFrames : prepared.Sprite.Columns;
                 cues.Add(new(time, time + frames * prepared.Sprite.FrameMilliseconds / 1000.0, prepared, px, py, depth));

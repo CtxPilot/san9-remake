@@ -6,7 +6,8 @@ internal static class BattleSceneCompiler
 {
     internal static BattleSceneDefinition Compile(Func<int, int, string> asset)
     {
-        BattleSceneLayer Layer(int image, int x, int y) => new(asset(image, image), x, y);
+        BattleSceneLayer Layer(int image, int x, int y) => new(asset(image, image), x, y)
+        { Foreground = image is 56 or 57 };
         List<BattleTerrainAppearance> terrains = [];
         foreach (string season in new[] { "spring", "summer", "autumn", "winter" })
         {
@@ -40,7 +41,7 @@ internal static class BattleSceneCompiler
         var field = new BattleFacilityBackdrop([Layer(55,80,168)], [Layer(54,200,120)], false);
         var fort = new BattleFacilityBackdrop([Layer(53,24,192),Layer(57,120,240),Layer(57,480,420)],
             [Layer(52,144,24),Layer(56,488,56),Layer(56,848,236)],true);
-        return new(terrains.ToArray(),transitions.ToArray(),new()
-        { [0]=city,[1]=field,[2]=city,[3]=field,[4]=fort,[5]=fort,[6]=city });
+        return new(terrains.ToArray(), transitions.ToArray(), BattleFacilityTypes.Groups
+            .ToDictionary(p => p.Key, p => p.Value switch { 0 => field, 1 => city, _ => fort }));
     }
 }

@@ -10,6 +10,22 @@ namespace San9.Application.Tests;
 
 public sealed class BattlePresentationTests
 {
+    [Theory]
+    [InlineData(12, "contact")]
+    [InlineData(67, "separated")]
+    public void AmbienceUsesOccurrenceContactRatherThanTheTacticBody(int targetX, string expected)
+    {
+        var (session, texts, content, occurrence) = Fixture();
+        var tactic = content.Battle!.Tactics[99];
+        content.Battle.Tactics[99] = tactic with { Zoom = tactic.Zoom! with
+            { AmbienceSound = "separated", ContactAmbienceSound = "contact" } };
+        occurrence = occurrence with { Target = occurrence.Target with { Position = new(targetX, 7) } };
+        DomainEvent[] facts = [new TacticActivatedEvent(session.Snapshot.Clock, 10, false, 20, false, 99, [new(3, 99)], false, 10)
+            { Occurrence = occurrence }];
+        var plan = BattlePresentationPlan.Create(session.View, session.View, facts, session.Messages(texts), texts, content);
+        Assert.Equal(expected, Assert.Single(plan.Visuals).Zoom!.AmbienceSound);
+    }
+
     [Fact]
     public void EliminationDemobilizationRemovesTheArmyWithoutACombatDefeatReport()
     {

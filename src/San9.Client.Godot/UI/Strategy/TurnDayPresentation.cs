@@ -142,18 +142,20 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
         DuelDialogueElapsed = 0;
     }
     public double Duration { get; } = Math.Max(battle?.Duration ?? 0, Math.Max(MapMovementCadence.DayMilliseconds / 1000.0, duration ?? 0));
+    public double SkippedSceneTime { get; private set; } = double.NegativeInfinity;
     public void SkipVisual()
     {
         EndSceneFastForward();
+        if (ActiveScene is not { } scene) return;
         var duel = Battle?.Duels.FirstOrDefault(c => IsFactReady(c.FactIndex) && Elapsed >= c.Start && Elapsed < c.End);
         if (duel is not null)
         {
             DuelDialogueElapsed = 0;
             foreach (var message in Battle!.Messages.Where(c => c.SceneId == duel.Id)) _completedDialogues.Add(message.Id);
-            Advance(duel.End - Elapsed); return;
         }
-        var current = Battle?.Visuals.FirstOrDefault(c => IsFactReady(c.FactIndex) && c.Zoom is not null && Elapsed >= (c.EntranceStart ?? c.Start) && Elapsed < c.End);
-        if (current is not null) Advance(current.End - Elapsed);
+        double previous = Elapsed;
+        Advance(scene.End - previous);
+        if (Elapsed > previous) SkippedSceneTime = Elapsed;
     }
     public double Progress => Math.Clamp(Elapsed / Duration, 0, 1);
     public void Advance(double seconds, bool paused = false, double? readingSeconds = null)

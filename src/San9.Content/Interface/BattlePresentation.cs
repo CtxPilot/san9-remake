@@ -22,7 +22,13 @@ public sealed record BattleZoomNumbers(BattleNumberSheet Small, BattleNumberShee
 public sealed record BattleOfficerDisplay(BattleSprite Idle, BattlePoint[] Positions,
     BattlePoint ExtensionStep, BattlePoint FlagOffset, int FlagDirection);
 public sealed record BattleDamageBand(uint? MaximumExclusive, int Bursts);
-public sealed record BattleParticleStyle(float Opacity, int FadePerFrame);
+public sealed record BattleProjectileTrail(int InitialAlpha, int FadePerFrame, int MinimumAlpha);
+public sealed record BattleParticleStyle(float Opacity, int FadePerFrame)
+{
+    [System.Text.Json.Serialization.JsonRequired]
+    public BattlePoint? Step { get; init; }
+}
+public sealed record BattleDelayedSound(string Role, int DelayMilliseconds);
 public sealed record BattleLocalEffect(BattleSprite Sprite, BattlePoint[] Origins, int Chance,
     bool Moving, bool Fighting, int TriggerFrame = -1, int Jitter = 0)
 {
@@ -33,6 +39,8 @@ public sealed record BattleLocalEffect(BattleSprite Sprite, BattlePoint[] Origin
     public BattlePoint Step { get; init; } = new(0, 0);
     public string[] Sounds { get; init; } = [];
     public bool Arrival { get; init; }
+    [System.Text.Json.Serialization.JsonRequired]
+    public BattlePoint? Spread { get; init; }
 }
 public sealed record BattleBodyMotion(BattlePoint[] FightingSteps, BattlePoint DamageStep, int DamageFrameMilliseconds,
     int FightingFrameMilliseconds = 0, int TrailFrames = 0, float TrailOpacity = 0)
@@ -106,6 +114,8 @@ public sealed record BattleZoomDefinition(BattleZoomBody Source, BattleZoomBody 
     [System.Text.Json.Serialization.JsonRequired]
     public string? FeedbackSound { get; init; }
     [System.Text.Json.Serialization.JsonRequired]
+    public BattleDelayedSound? FeedbackAccent { get; init; }
+    [System.Text.Json.Serialization.JsonRequired]
     public BattleZoomNumbers? Numbers { get; init; }
     [System.Text.Json.Serialization.JsonRequired]
     public Dictionary<int, BattlePoint> FacilityNumberPositions { get; init; } = [];
@@ -114,10 +124,14 @@ public sealed record BattleZoomDefinition(BattleZoomBody Source, BattleZoomBody 
     [System.Text.Json.Serialization.JsonRequired]
     public Dictionary<int, BattleOfficerDisplay> FacilityOfficers { get; init; } = [];
     public BattleSprite? Projectile { get; init; }
+    [System.Text.Json.Serialization.JsonRequired]
+    public BattleProjectileTrail? ProjectileTrail { get; init; }
     public BattleSprite? Wave { get; init; }
     public string AdvanceSound { get; init; } = null!;
     public string AttackSound { get; init; } = null!;
     public string AmbienceSound { get; init; } = null!;
+    [System.Text.Json.Serialization.JsonRequired]
+    public string ContactAmbienceSound { get; init; } = null!;
     public Dictionary<int, BattleZoomBody> SourceFormations { get; init; } = [];
     public Dictionary<int, BattleZoomBody> TargetFormations { get; init; } = [];
     public Dictionary<int, BattleZoomBody> FacilitySources { get; init; } = [];
@@ -199,6 +213,7 @@ public sealed record BattlePresentationDefinition(Dictionary<string, DecisionMes
             Sprite(effect.Sprite);
             if (effect.Origins.Length == 0 || effect.Chance is < 0 or > 100 || effect.TriggerFrame < -1 ||
                 effect.RotatedCoverage && effect.Origins.Length is < 2 or > 30 || effect.Styles.Any(s => s.Opacity is <= 0 or > 1 || s.FadePerFrame < 0) ||
+                effect.Spread is { } spread && (spread.X < 0 || spread.Y < 0 || spread.X == int.MaxValue || spread.Y == int.MaxValue) ||
                 effect.Jitter < 0 || effect.LifetimeFrames < 0 || effect.FadePerFrame < 0 || effect.Sounds.Any(s => !sounds.ContainsKey(s)))
                 throw new InvalidDataException("Invalid battle local effect.");
         }
@@ -227,6 +242,11 @@ public sealed record BattlePresentationDefinition(Dictionary<string, DecisionMes
             Sprite(tactic.MapEffect);
             foreach (var sprite in tactic.Prelude) Sprite(sprite);
             if (tactic.Zoom is not { } zoom) continue;
+            if (zoom.ProjectileTrail is { } trail && (zoom.Projectile is null || trail.InitialAlpha is <= 0 or > 255 ||
+                trail.FadePerFrame <= 0 || trail.MinimumAlpha < 0 || trail.MinimumAlpha >= trail.InitialAlpha))
+                throw new InvalidDataException("Invalid battle projectile trail.");
+            if (zoom.FeedbackAccent is { } accent && (accent.DelayMilliseconds < 0 || !sounds.ContainsKey(accent.Role)))
+                throw new InvalidDataException("Invalid delayed battle feedback sound.");
             Image(zoom.SourcePanel); Image(zoom.TargetPanel);
             if (zoom.Numbers is { } digits)
             {
@@ -273,7 +293,7 @@ public sealed record BattlePresentationDefinition(Dictionary<string, DecisionMes
                 emission.ProjectilesPerOrigin <= 0 || emission.FrameInterval <= 0 ||
                 emission.MinimumDelayMilliseconds < 0 || emission.DelayStepMilliseconds < 0))
                 throw new InvalidDataException("Invalid wave projectile emission.");
-            if (new[] { zoom.AdvanceSound, zoom.AttackSound, zoom.AmbienceSound }.Any(s => s is null || !sounds.ContainsKey(s)))
+            if (new[] { zoom.AdvanceSound, zoom.AttackSound, zoom.AmbienceSound, zoom.ContactAmbienceSound }.Any(s => s is null || !sounds.ContainsKey(s)))
                 throw new InvalidDataException("Missing battle zoom sound.");
             foreach (var effect in zoom.DoubleEffect) Sprite(effect);
         }

@@ -126,18 +126,20 @@ internal static class BattlePresentationCompiler
             {
                 Numbers = new(new(Asset("g_zoomin", 144, 101), 20, 28, 15), new(Asset("g_zoomin", 143, 100), 48, 96, 48),
                     new(733, 144), 48, 10, Sound(120), Sound(118), Sound(119), Sound(118)),
-                FacilityNumberPositions = new[] { (0, 0), (1, 1), (2, 0), (3, 1), (4, 2), (5, 2), (6, 0) }
-                    .ToDictionary(p => p.Item1, p => p.Item2 switch { 0 => new BattlePoint(694, 113), 1 => new(644, 204), _ => new(624, 264) }),
+                FacilityNumberPositions = BattleFacilityTypes.Groups
+                    .ToDictionary(p => p.Key, p => p.Value switch { 1 => new BattlePoint(694, 113), 0 => new(644, 204), _ => new(624, 264) }),
                 AdvanceSound = sourceBody.AdvanceSound!,
                 CountrySources = mode <= 2 ? new() { [4] = SourceBody(5, mode), [7] = SourceBody(3, mode), [8] = SourceBody(4, mode) } :
                     mode is >= 3 and <= 5 ? new() { [6] = SourceBody(8, mode) } : [],
                 ImperialSource = mode <= 2 ? SourceBody(6, mode) : null,
                 FeedbackSound = Sound(mode >= 12 ? 95 : 94),
+                FeedbackAccent = new(Sound(92), 1000),
                 Officers = mode < 12 ? Officers(0) : null,
-                FacilityOfficers = new[] { (0, 1), (2, 1), (4, 2), (5, 2), (6, 1) }
-                    .ToDictionary(p => p.Item1, p => p.Item2 == 1 ? Officers(1, -120, -90) : Officers(1, -64, 32)),
+                FacilityOfficers = BattleFacilityTypes.Groups.Where(p => p.Value != 0)
+                    .ToDictionary(p => p.Key, p => p.Value == 1 ? Officers(1, -120, -90) : Officers(1, -64, 32)),
                 AttackSound = sourceBody.AttackSound!,
-                AmbienceSound = Sound(body is 9 or 11 or 12 ? 163 : 162),
+                AmbienceSound = Sound(163),
+                ContactAmbienceSound = Sound(162),
                 Action = BattleFormationCompiler.Action(mode),
                 Wave = mode is 7 or 8 ? new(Asset("g_zoomin", Int(0x664DB4), Raw(0x2635b8 + 9 * 52)), 8, 125) : null,
                 WaveEffects = mode is 7 or 8 ? BattleBodyCompiler.Effects(9, mode,
@@ -146,12 +148,13 @@ internal static class BattlePresentationCompiler
                 DamageBands = [new(2501, 2), new(4500, 3), new(6500, 4), new(9000, 5), new(12500, 6), new(20000, 7), new(null, 8)],
                 Projectile = mode is 6 or 7 or 9 or 12 ? new(Asset("g_zoomin", 120, 77), 16, 64) :
                     mode is 8 or 10 or 11 or 13 ? new(Asset("g_zoomin", 121, 78), 16, mode == 11 ? 32 : 64) : null,
+                ProjectileTrail = mode is 11 or 13 ? new(192, 12, 71) : null,
                 SourceFormations = Enumerable.Range(20, 7).ToDictionary(id => id, id => SourceBody(13 + ShipBody(id), mode)),
                 TargetFormations = Enumerable.Range(20, 7).ToDictionary(id => id, id => Body(19 + ShipBody(id), mode, true)),
-                FacilitySources = new[] { (0, 1), (1, 0), (2, 1), (3, 0), (4, 2), (5, 2), (6, 1) }
-                    .ToDictionary(p => p.Item1, p => SourceBody(mode == 11 ? 12 : 10, mode, p.Item2)),
-                FacilityTargets = new[] { (0, 1), (1, 0), (2, 1), (3, 0), (4, 2), (5, 2), (6, 1) }
-                    .ToDictionary(p => p.Item1, p => Body(18, mode, true, p.Item2))
+                FacilitySources = BattleFacilityTypes.Groups
+                    .ToDictionary(p => p.Key, p => SourceBody(mode == 11 ? 12 : 10, mode, p.Value)),
+                FacilityTargets = BattleFacilityTypes.Groups
+                    .ToDictionary(p => p.Key, p => Body(18, mode, true, p.Value))
             };
             tactics.Add(id, new(new() { ["action"] = Speech(key, "actor", "target-commander") }, null, zoom));
         }

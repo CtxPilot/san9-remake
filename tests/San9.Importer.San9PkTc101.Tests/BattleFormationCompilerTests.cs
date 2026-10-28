@@ -5,6 +5,28 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class BattleFormationCompilerTests
 {
+    [Fact]
+    public void LargeShipAssaultKeepsScatteredSprayAndTwoIndependentSmokeAttempts()
+    {
+        BattleLocalEffect[] Effects(int body, int mode) => BattleBodyCompiler.Effects(body, mode,
+            (image, _, columns, interval, additive) => new(image.ToString(), columns, interval, Additive: additive), i => i.ToString());
+        var assault = Effects(16, 15);
+        var spray = Assert.Single(assault, e => e.Spread is not null);
+        Assert.Equal(12, spray.Origins.Length);
+        Assert.All(spray.Origins, p => Assert.Equal(new(16, -64), p));
+        Assert.Equal(new(128, 80), spray.Spread);
+        Assert.Equal(75, spray.Chance);
+        Assert.Equal(new[] { new BattlePoint(-12, -2), new(-4, 16) }, spray.Styles.Select(s => s.Step));
+        Assert.DoesNotContain(Effects(16, 14), e => e.Spread is not null);
+        foreach (int body in new[] { 14, 16 })
+        {
+            var smoke = Effects(body, 15).Where(e => e.Sprite.Asset == "135").ToArray();
+            Assert.Equal(2, smoke.Length);
+            Assert.All(smoke, e => Assert.Equal(50, e.Chance));
+            Assert.Single(smoke, e => e.Arrival);
+        }
+    }
+
     [Theory]
     [InlineData(0,2,30)]
     [InlineData(1,2,45)]

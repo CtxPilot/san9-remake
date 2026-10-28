@@ -1,6 +1,10 @@
 namespace San9.Content.Interface;
 
-public sealed record BattleSceneLayer(string Asset, int X, int Y);
+public sealed record BattleSceneLayer(string Asset, int X, int Y)
+{
+    [System.Text.Json.Serialization.JsonRequired]
+    public bool Foreground { get; init; }
+}
 public sealed record BattleTerrainAppearance(int[] Terrains, string Season, int MinimumElevation, int MaximumElevation,
     int[]? TextureVariants, string TransitionKind, BattleSceneLayer Source, BattleSceneLayer Target,
     BattleSceneLayer? SourceEdge, BattleSceneLayer? TargetEdge);

@@ -57,6 +57,13 @@ internal static class BattleBodyCompiler
                     mode == 14 ? [new(-9, 108), new(-10, 128), new(118, 45), new(131, 81), new(119, 93), new(83, 110), new(27, 132), new(58, 126), new(100, 116), new(83, 133), new(124, 113)] : [new(0, 53), new(-43, 70), new(-8, 76)];
                 int combatImage = mode == 14 ? 124 : 125;
                 effects.Add(Effect(combatImage, combatImage - 43, 4, 62, points, false, true, 100, 2, 17, 10));
+                if (type == 16 && mode != 14)
+                    effects.Add(Effect(122, 79, 4, 250, Enumerable.Repeat(new BattlePoint(16, -64), 12).ToArray(),
+                        false, true, 75, 2, 5, 36) with
+                    {
+                        Spread = new(128, 80),
+                        Styles = [new(166 / 256f, 36) { Step = new(-12, -2) }, new(166 / 256f, 36) { Step = new(-4, 16) }]
+                    });
             }
         }
         if (type is >= 2 and <= 16 && mode is not (6 or 7 or 8 or 9 or 10 or 11 or 12 or 13))
@@ -65,7 +72,10 @@ internal static class BattleBodyCompiler
             var fire = type switch { 13 => new BattlePoint(53, 20), 14 => new(50, 28), 15 => new(89, 37), 16 => new(152, 46), _ => new(40, -11) };
             var spark = type switch { 13 => new BattlePoint(-14, -26), 14 => new(-17, -18), 15 => new(28, -5), 16 => new(36, 3), _ => new(5, -29) };
             int smokeImage = mode is 2 or 5 ? 136 : 135;
-            effects.Add(Effect(smokeImage, smokeImage - 43, 8, 100, [smoke], false, true, type is 14 or 16 ? 50 : 0, 2, 21, 8, new(0, -2)) with { Jitter = 24, Arrival = true });
+            var smokeEffect = Effect(smokeImage, smokeImage - 43, 8, 100, [smoke], false, true,
+                type is 14 or 16 ? 50 : 0, 2, 21, 8, new(0, -2)) with { Jitter = 24, Arrival = true };
+            effects.Add(smokeEffect);
+            if (type is 14 or 16) effects.Add(smokeEffect with { Arrival = false });
             effects.Add(Effect(137, 94, 8, 25, [fire], false, true, type is 14 or 16 ? 75 : 25, 2) with { Jitter = 32, Sounds = [sound(115), sound(116), sound(117)] });
             effects.Add(Effect(138, 95, 8, 125, [spark], false, true, type is 14 or 16 ? 75 : 25, 2) with { Jitter = 8, Arrival = true });
         }

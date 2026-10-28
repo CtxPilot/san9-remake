@@ -35,20 +35,14 @@ public partial class BattlePresentationView : Control
         QueueRedraw();
         _numberLayer.QueueRedraw();
     }
-    private AudioStreams _streams = null!;
-    private AudioStreamPlayer _ambience = null!;
-    private AudioStreamPlayer _numberRoll = null!;
     private BattleNumberLayer _numberLayer = null!;
-    private readonly HashSet<(string Cue, int Index)> _sounds = [];
-    private string? _ambienceCue;
     private TextureScope? _assets;
     private TextureScope? _flags;
     private readonly List<TextureScope> _portraits = [];
     private TurnDayPresentation? _day;
-    private readonly HashSet<string> _started = [];
-    private readonly HashSet<string> _doubles = [];
     private readonly CanvasItemMaterial _additive = new() { BlendMode = CanvasItemMaterial.BlendModeEnum.Add };
     private readonly List<Sprite2D> _effects = [];
+    private const int FullScreenEffectZIndex = 2;
     private BattleVisualCue? _zoom;
     public void RetryResources() { _duelUi?.RetryFailed(); _assets?.RetryFailed(); _flags?.RetryFailed(); _numberAssets?.RetryFailed(); foreach (var portrait in _portraits) portrait.RetryFailed(); }
     public bool ResourcesReady => _duelUi?.IsReady != false && _assets?.IsReady != false && _flags?.IsReady != false && _portraits.All(p => p.IsReady);
@@ -65,17 +59,16 @@ public partial class BattlePresentationView : Control
             return ResourcesReady;
         }
         _day?.EndSceneFastForward();
+        ResetSceneAudio();
         _assets?.Dispose(); _assets = null; _day = day;
         _flags?.Dispose(); _flags = null;
         _duel = null; _duelSpeechLayout = null; _duelPortraits.Clear(); _duelText?.Hide();
         _duelPanels?.QueueRedraw(); _duelSpeechFrame?.QueueRedraw();
-        _started.Clear(); _sounds.Clear(); _doubles.Clear(); _zoom = null; _entering = false;
+        _zoom = null; _entering = false;
         _publishedNumbers.Clear();
         _publishedMorales.Clear();
         MapAudioGain = SceneAudioGain = 1;
         _transition?.Sample(0);
-        if (_ambience is not null) { _ambience.Stop(); _ambience.Stream = null; _ambienceCue = null; }
-        if (_numberRoll is not null) { _numberRoll.Stop(); _numberRoll.Stream = null; }
         foreach (var portrait in _portraits) portrait.Dispose(); _portraits.Clear();
         foreach (var sprite in _effects) sprite.Hide();
         if (day?.Battle is not { } plan) { QueueRedraw(); return true; }
@@ -131,7 +124,7 @@ public partial class BattlePresentationView : Control
         _entering = entrance is not null && time < entrance!.Start;
         _transition.Sample(entrance is null ? 0 : BattleSceneTransition.Opacity(entranceElapsed));
         MapAudioGain = entrance is null ? 1 : BattleSceneTransition.OutgoingGain(entranceElapsed);
-        SceneAudioGain = _entering ? MapAudioGain : 1;
+        SceneAudioGain = entrance is null ? 1 : _entering ? MapAudioGain : BattleSceneTransition.IncomingGain(entranceElapsed);
         if (_duel is { } activeDuel)
         {
             double age = time - activeDuel.Start;
@@ -142,49 +135,10 @@ public partial class BattlePresentationView : Control
         bool Active(BattleVisualCue cue) => cue.IsMapEffect
             ? day.IsMapEffectPresented(cue.Id) && day.MapEffectElapsed(cue.Id) < cue.End - cue.Start
             : time >= cue.Start && time < cue.End;
-        foreach (var cue in visuals.Where(Active))
-        {
-            if (_started.Add(cue.Id))
-            {
-                if (cue.Effect?.Sound is { } sound) PlaySound?.Invoke(sound);
-            }
-            if (cue.Doubled && cue.Zoom is { } doubledZoom &&
-                BattleReinforcementPlayback.Sample(doubledZoom.DoubleEffect, time - cue.Start) is not null &&
-                _doubles.Add(cue.Id) && doubledZoom.DoubleEffect[0].Sound is { } doubledSound)
-                PlaySound?.Invoke(doubledSound);
-            if (cue.Playback is { } playback)
-                for (int i = 0; i < playback.Sounds.Length; i++)
-                    if (time >= cue.Start + playback.Sounds[i].Time && _sounds.Add((cue.Id, i)))
-                        PlaySound?.Invoke(playback.Sounds[i].Role);
-        }
         _zoom = visuals.FirstOrDefault(c => c.Zoom is not null && time >= c.Start && time < c.End);
-        if (!IsSceneActive)
-            foreach (var cue in mapEffects.Where(c => day.IsMapEffectPresented(c.Id) && day.MapEffectElapsed(c.Id) < c.Sprite.Columns * c.Sprite.FrameMilliseconds / 1000.0))
-                if (_started.Add(cue.Id) && cue.Sprite.Sound is { } role) PlayMapSound?.Invoke(role, Project(cue.Target));
-        if (_zoom is { } current && SoundEnabled())
-        {
-            _ambience.VolumeDb = Mathf.LinearToDb(BattleSceneTransition.IncomingGain(time - (current.EntranceStart ?? current.Start - BattleSceneTransition.DarkenDuration)));
-            if (_ambienceCue != current.Id)
-            { _ambience.Stop(); _ambience.Stream = _streams.Get(current.Zoom!.AmbienceSound, loop: true); _ambienceCue = current.Id; }
-            if (!_ambience.Playing) _ambience.Play();
-        }
-        else if (_duel is { } duel && SoundEnabled())
-        {
-            _ambience.VolumeDb = Mathf.LinearToDb(SceneAudioGain);
-            if (_ambienceCue != duel.Id)
-            { _ambience.Stop(); _ambience.Stream = _streams.Get(duel.Definition.Sounds["ambience"], loop: true); _ambienceCue = duel.Id; }
-            if (!_ambience.Playing) _ambience.Play();
-        }
-        else _ambience.Stop();
-        if (_zoom?.Playback?.Numbers is { } rolling && rolling.IsRolling(time - _zoom.Start) && SoundEnabled() && !IsPaused())
-        {
-            var stream = _streams.Get(rolling.Definition.RollSound, loop: true);
-            if (_numberRoll.Stream != stream) { _numberRoll.Stop(); _numberRoll.Stream = stream; }
-            if (!_numberRoll.Playing) _numberRoll.Play();
-        }
-        else _numberRoll.Stop();
+        UpdateSceneAudio(day, visuals.Where(Active), mapEffects);
         int slot = 0;
-        void Effect(BattleSprite asset, double elapsed, Vector2 point, float opacity = 1, int? frameIndex = null, bool sceneCoordinates = true)
+        void Effect(BattleSprite asset, double elapsed, Vector2 point, float opacity = 1, int? frameIndex = null, bool sceneCoordinates = true, int zIndex = 0)
         {
             if (!_assets!.TryGetReady(asset.Asset, this, out var texture) && (_flags is null || !_flags.TryGetReady(asset.Asset, this, out texture))) return;
             Sprite2D sprite;
@@ -194,7 +148,7 @@ public partial class BattlePresentationView : Control
             sprite.Centered = false; sprite.Position = (sceneCoordinates ? SceneOffset : Vector2.Zero) + point + new Vector2(asset.OffsetX - (asset.Centered ? texture.GetWidth() / asset.Columns / 2f : 0), asset.OffsetY);
             sprite.Modulate = new Color(1, 1, 1, asset.Opacity * opacity);
             sprite.Material = asset.Additive ? _additive : null;
-            sprite.ZIndex = 0;
+            sprite.ZIndex = zIndex;
         }
         foreach (var cue in visuals.Where(c => c.Effect is not null && Active(c)))
         {
@@ -202,7 +156,7 @@ public partial class BattlePresentationView : Control
             if (cue.FadeOutStart is not null || age < cue.Effect!.Columns * cue.Effect.FrameMilliseconds / 1000.0)
                 Effect(cue.Effect!, age, cue.ScreenEffect ? new(_zoom is null ? GetViewportRect().Size.X / 2 : 512, 0) : Project(cue.Target),
                     cue.FadeOutStart is { } fadeStart ? BattleEffectFade.Opacity(time - fadeStart) : 1,
-                    sceneCoordinates: cue.ScreenEffect && _zoom is not null);
+                    sceneCoordinates: cue.ScreenEffect && _zoom is not null, zIndex: cue.ScreenEffect ? FullScreenEffectZIndex : 0);
         }
         if (!IsSceneActive)
             foreach (var cue in mapEffects.Where(c => day.IsMapEffectPresented(c.Id) && day.MapEffectElapsed(c.Id) < c.Sprite.Columns * c.Sprite.FrameMilliseconds / 1000.0))
@@ -221,6 +175,8 @@ public partial class BattlePresentationView : Control
                     Effect(frame.Sprite with { Centered = false }, frame.Frame * frame.Sprite.FrameMilliseconds / 1000.0, point, frame.Opacity, frame.Frame);
                 }
             }
+            foreach (var layer in active.Backdrop.Where(layer => layer.Foreground))
+                Effect(new(layer.Asset, 1, 1) { Centered = false }, 0, new(layer.X, layer.Y));
             if (active.Playback is { } playback)
                 foreach (var impact in playback.Impacts)
                 {
@@ -233,7 +189,7 @@ public partial class BattlePresentationView : Control
                 }
             if (active.Doubled && BattleReinforcementPlayback.Sample(active.Zoom!.DoubleEffect, elapsed) is { } reinforcement)
             {
-                Effect(reinforcement.Sprite, 0, new(512, (768 - _assets!.Get(reinforcement.Sprite.Asset, this).GetHeight()) / 2f), reinforcement.Opacity);
+                Effect(reinforcement.Sprite, 0, new(512, (768 - _assets!.Get(reinforcement.Sprite.Asset, this).GetHeight()) / 2f), reinforcement.Opacity, zIndex: FullScreenEffectZIndex);
             }
         }
         if (_duel is { } scene && scene.Sample(time) is { } duelStage)
@@ -311,7 +267,7 @@ public partial class BattlePresentationView : Control
         if (_zoom is not { } cue || _assets is null || cue.Zoom is not { } zoom || _day is null) return;
         DrawRect(new(Vector2.Zero, GetViewportRect().Size), new Color(16 / 255f, 25 / 255f, 34 / 255f, 217 / 256f));
         DrawSetTransform(SceneOffset);
-        foreach (var layer in cue.Backdrop) DrawTexture(_assets.Get(layer.Asset, this), new(layer.X, layer.Y));
+        foreach (var layer in cue.Backdrop.Where(layer => !layer.Foreground)) DrawTexture(_assets.Get(layer.Asset, this), new(layer.X, layer.Y));
         DrawTexture(_assets.Get(zoom.SourcePanel, this), new(0, 632)); DrawTexture(_assets.Get(zoom.TargetPanel, this), new(680, 0));
         var font = GetThemeFont("font");
         string Person(int id) => Texts.Resolve(_day.Before.MessageSpeaker(id).NameKey);
@@ -354,7 +310,7 @@ public partial class BattlePresentationView : Control
     }
     public override void _Ready()
     {
-        _streams = new(ContentRoot, Sounds); _ambience = new(); AddChild(_ambience); _numberRoll = new(); AddChild(_numberRoll);
+        InitializeSceneAudio();
         _numberLayer = new() { DrawNumbers = DrawNumbers, ZIndex = 1 }; AddChild(_numberLayer);
         _duelUi = Textures.CreateScope();
         _duelPanels = new Node2D { ZIndex = 3 }; AddChild(_duelPanels); _duelPanels.Draw += DrawDuelPanels;
@@ -368,5 +324,14 @@ public partial class BattlePresentationView : Control
         Size = GetViewportRect().Size;
     }
     public override void _ExitTree()
-    { EndSceneFastForward(); GetWindow().MouseExited -= EndSceneFastForward; GetViewport().SizeChanged -= ViewportChanged; _ambience.Stop(); _ambience.Stream = null; _numberRoll.Stop(); _numberRoll.Stream = null; _streams.Dispose(); _duelUi?.Dispose(); _assets?.Dispose(); _flags?.Dispose(); _numberAssets?.Dispose(); foreach (var portrait in _portraits) portrait.Dispose(); Textures.Defer(_additive.Dispose); }
+    {
+        EndSceneFastForward();
+        GetWindow().MouseExited -= EndSceneFastForward;
+        GetViewport().SizeChanged -= ViewportChanged;
+        ResetSceneAudio();
+        _streams.Dispose();
+        _duelUi?.Dispose(); _assets?.Dispose(); _flags?.Dispose(); _numberAssets?.Dispose();
+        foreach (var portrait in _portraits) portrait.Dispose();
+        Textures.Defer(_additive.Dispose);
+    }
 }

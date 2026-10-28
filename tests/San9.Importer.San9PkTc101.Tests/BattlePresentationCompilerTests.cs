@@ -5,6 +5,33 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class BattlePresentationCompilerTests
 {
+    [Fact]
+    public void FacilityBackdropsUseCatalogReferencesIncludingEveryGateAndWork()
+    {
+        var scene = BattleSceneCompiler.Compile((image, _) => image.ToString());
+        Assert.Equal(Enumerable.Range(0, 10), scene.Facilities.Keys.Order());
+        foreach (int type in new[] { 0, 2, 3, 4, 5, 9 })
+        {
+            Assert.Equal(1, BattleFacilityTypes.Groups[type]);
+            Assert.Equal("50", Assert.Single(scene.Facilities[type].Target).Asset);
+            Assert.Equal("51", Assert.Single(scene.Facilities[type].Source).Asset);
+            Assert.True(scene.Facilities[type].ReplacesTerrain);
+        }
+        foreach (int type in new[] { 1, 6 })
+        {
+            Assert.Equal(0, BattleFacilityTypes.Groups[type]);
+            Assert.Equal("54", Assert.Single(scene.Facilities[type].Target).Asset);
+            Assert.False(scene.Facilities[type].ReplacesTerrain);
+        }
+        foreach (int type in new[] { 7, 8 })
+        {
+            Assert.Equal(2, BattleFacilityTypes.Groups[type]);
+            Assert.Equal(new[] { "52", "56", "56" }, scene.Facilities[type].Target.Select(l => l.Asset));
+            Assert.False(scene.Facilities[type].Target[0].Foreground);
+            Assert.All(scene.Facilities[type].Target.Skip(1).Concat(scene.Facilities[type].Source.Skip(1)), layer => Assert.True(layer.Foreground));
+        }
+    }
+
     [Theory]
     [InlineData(23, 9, 6794, 10781, 10799, 10808, 10790, null)]
     [InlineData(25, 12, 6844, 10867, 10885, 10892, 10876, null)]

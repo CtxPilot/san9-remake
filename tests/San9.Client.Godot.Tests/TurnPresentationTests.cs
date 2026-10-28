@@ -348,6 +348,9 @@ public sealed class TurnPresentationTests
         double gate = day.Elapsed;
         Assert.NotEmpty(day.PendingDialogues);
         Assert.Equal(cue.EntranceStart, gate);
+        day.SkipVisual();
+        Assert.Equal(gate, day.Elapsed);
+        Assert.Equal(double.NegativeInfinity, day.SkippedSceneTime);
         day.Advance(100);
         Assert.Equal(gate, day.Elapsed);
         foreach (var dialogue in day.PendingDialogues) day.CompleteDialogue(dialogue.Id);
@@ -358,8 +361,10 @@ public sealed class TurnPresentationTests
         day.Advance(10, paused: true);
         Assert.Equal(opacity, San9.Rendering.BattleSceneTransition.Opacity(day.Elapsed - cue.EntranceStart.Value));
         // Skip from the darkening phase must still stop at the next response dialogue.
+        Assert.Equal(double.NegativeInfinity, day.SkippedSceneTime);
         day.SkipVisual();
         Assert.True(day.Elapsed < cue.End);
+        Assert.Equal(day.Elapsed, day.SkippedSceneTime);
         Assert.Equal("hit-reaction", Assert.Single(day.PendingDialogues).Message.Message.Key);
         gate = day.Elapsed;
         day.SkipVisual(); Assert.Equal(gate, day.Elapsed);
