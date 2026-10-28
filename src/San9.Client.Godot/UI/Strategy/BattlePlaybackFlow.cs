@@ -65,7 +65,8 @@ public partial class BattlePlaybackFlow : Control
     }
     public void Update()
     {
-        if (!NarrationActive()) _battleView.UpdatePlayback(Turn.Day);
+        // Narration pauses the day clock, not projection: its opening frame may end the previous scene.
+        _battleView.UpdatePlayback(Turn.Day);
         _mapSounds.TransitionGain = _battleView.MapAudioGain;
         SceneSounds.SetTransitionGain(_battleView.SceneAudioGain);
         Music.SetMapTransitionGain(_battleView.MapAudioGain);
