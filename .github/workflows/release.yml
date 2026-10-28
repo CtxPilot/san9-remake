@@ -125,6 +125,53 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw 'macOS packaging failed.' }
             }
           }
+      - name: Sign and verify macOS release
+        if: matrix.platform == 'macos'
+        shell: python3 {0}
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          output = Path("local/generated/export") / os.environ["EXPORT_TARGET"]
+          assets = Path("local/generated/release-assets")
+          name = f"San9R-{os.environ['RELEASE_VERSION']}-{os.environ['EXPORT_TARGET']}.zip"
+          archive = (assets / name).resolve()
+
+          def run(name, *args):
+              log = output / f"macos-{name}.log"
+              try:
+                  with log.open("w", encoding="utf-8") as stream:
+                      subprocess.run(args, stdout=stream, stderr=subprocess.STDOUT,
+                                     check=True, timeout=60)
+              finally:
+                  print(log.read_text(encoding="utf-8", errors="replace"), end="")
+
+          with tempfile.TemporaryDirectory(prefix="macos-release-", dir=output) as directory:
+              work = Path(directory).resolve()
+              package = work / "package"
+              run("unpack", "/usr/bin/ditto", "-x", "-k", str(archive), str(package))
+              app = package / "San9R.app"
+              # Rebuild DER entitlements with Apple's signer, retaining the .NET permissions.
+              # This also fixes existing tags exported with Godot's built-in ad-hoc signer.
+              run("sign", "/usr/bin/codesign", "--force", "--sign", "-",
+                  "--timestamp=none", "--generate-entitlement-der",
+                  "--preserve-metadata=identifier,entitlements,flags", str(app))
+              signed = work / name
+              run("pack", "/usr/bin/ditto", "-c", "-k", "--sequesterRsrc",
+                  str(package), str(signed))
+
+              # Test the actual ZIP that will be uploaded, including executable permissions.
+              extracted = work / "check"
+              run("unpack-check", "/usr/bin/ditto", "-x", "-k", str(signed), str(extracted))
+              app = extracted / "San9R.app"
+              run("verify", "/usr/bin/codesign", "--verify", "--deep", "--strict",
+                  "--verbose=2", str(app))
+              run("entitlements", "/usr/bin/codesign", "--display", "--entitlements", "-", str(app))
+              # Launch the exported executable without requiring private converted content.
+              run("launch", str(app / "Contents/MacOS/San9R"), "--headless", "--help")
+              signed.replace(archive)
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-${{ matrix.target }}
