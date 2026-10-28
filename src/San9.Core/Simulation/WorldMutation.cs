@@ -56,9 +56,8 @@ internal sealed partial class WorldMutation : IWorldQuery
     // Leadership is consistent when every place's commander flag and every unit's commander follow from the current
     // selection inputs. Then a change only needs its own places reselected: the places named at each change, their
     // commanders before it and the officers it touched are recorded, and maintenance reselects those alone. A world
-    // whose consistency is not known (a new branch, a load, a commit with pending changes) reselects everything once.
+    // whose consistency is not known (a new world, a load, a commit with pending changes) reselects everything once.
     private bool _leadershipConsistent;
-    private HashSet<int>? _leadershipPlaces;
     private HashSet<int>? _leadershipOfficers;
     internal bool LeadershipConsistentAtCommit => _leadershipConsistent && _leadershipBefore is null;
 
@@ -71,11 +70,10 @@ internal sealed partial class WorldMutation : IWorldQuery
             return;
         }
         _leadershipBefore ??= [];
-        _leadershipPlaces ??= [];
         _leadershipOfficers ??= [];
         void Place(int? place)
         {
-            if (place is not int id || !_leadershipPlaces.Add(id)) return;
+            if (place is not int id || _leadershipBefore.ContainsKey(id)) return;
             // the commander on record before this change (the same reading as the full snapshot above)
             _leadershipBefore[id] = SettlementMembers(id).FirstOrDefault(p => p.IsCommander && p.IsServing)?.Id;
         }
@@ -93,42 +91,33 @@ internal sealed partial class WorldMutation : IWorldQuery
 
     internal void MaintainLeadership(List<DomainEvent> events)
     {
-        if (_leadershipBefore is not null && _leadershipConsistent)
+        if (_leadershipBefore is not { } before) return;
+        var units = Units.Values.Where(u => u.CommanderId is not null).ToDictionary(u => u.Id);
+        IEnumerable<int> places = before.Keys;
+        if (_leadershipConsistent)
         {
-            var before = _leadershipBefore;
-            var units = Units.Values.Where(u => u.CommanderId is not null).ToDictionary(u => u.Id);
-            LeadershipMaintenance.Apply(this, _abilityRules.Governance, _leadershipPlaces!, _leadershipOfficers!);
-            foreach (int place in before.Keys.Order())
-            {
-                int? current = LeadershipMaintenance.Commander(this, place)?.Id;
-                if (before[place] != current)
-                    events.Add(new CommanderChangedEvent(Clock, place, current)
-                    { PreviousId = before[place], ForceId = Settlements.GetValueOrDefault(place)?.OwnerId });
-            }
-            foreach (var unit in Units.Values.Where(u => u.CommanderId is not null))
-                if (units.TryGetValue(unit.Id, out var previous) && previous.CommanderId != unit.CommanderId && previous.OwnerId == unit.OwnerId)
-                    events.Add(new UnitCommanderChangedEvent(Clock, BattleObjectContext.Capture(unit), previous.CommanderId!.Value, unit.CommanderId!.Value));
-            _leadershipBefore = null; _leadershipPlaces = null; _leadershipOfficers = null;
+            LeadershipMaintenance.Apply(this, _abilityRules.Governance, places, _leadershipOfficers!);
         }
-        else if (_leadershipBefore is not null)
+        else
         {
-            var before = _leadershipBefore;
-            var units = Units.Values.Where(u => u.CommanderId is not null).ToDictionary(u => u.Id);
             LeadershipMaintenance.Apply(this, _abilityRules.Governance);
-            foreach (int place in before.Keys.Concat(Officers.Values.Where(p => p.IsCommander && p.SettlementId is not null)
-                .Select(p => p.SettlementId!.Value)).Distinct().Order())
-            {
-                int? current = LeadershipMaintenance.Commander(this, place)?.Id;
-                if (before.GetValueOrDefault(place) != current)
-                    events.Add(new CommanderChangedEvent(Clock, place, current)
-                    { PreviousId = before.GetValueOrDefault(place), ForceId = Settlements.GetValueOrDefault(place)?.OwnerId });
-            }
-            foreach (var unit in Units.Values.Where(u => u.CommanderId is not null))
-                if (units.TryGetValue(unit.Id, out var previous) && previous.CommanderId != unit.CommanderId && previous.OwnerId == unit.OwnerId)
-                    events.Add(new UnitCommanderChangedEvent(Clock, BattleObjectContext.Capture(unit), previous.CommanderId!.Value, unit.CommanderId!.Value));
-            _leadershipBefore = null;
-            _leadershipConsistent = true;
+            places = places.Concat(Officers.Values.Where(p => p.IsCommander && p.SettlementId is not null)
+                .Select(p => p.SettlementId!.Value)).Distinct();
         }
+        foreach (int place in places.Order())
+        {
+            int? previous = before.GetValueOrDefault(place);
+            int? current = LeadershipMaintenance.Commander(this, place)?.Id;
+            if (previous != current)
+                events.Add(new CommanderChangedEvent(Clock, place, current)
+                { PreviousId = previous, ForceId = Settlements.GetValueOrDefault(place)?.OwnerId });
+        }
+        foreach (var unit in Units.Values.Where(u => u.CommanderId is not null))
+            if (units.TryGetValue(unit.Id, out var previous) && previous.CommanderId != unit.CommanderId && previous.OwnerId == unit.OwnerId)
+                events.Add(new UnitCommanderChangedEvent(Clock, BattleObjectContext.Capture(unit), previous.CommanderId!.Value, unit.CommanderId!.Value));
+        _leadershipBefore = null;
+        _leadershipOfficers = null;
+        _leadershipConsistent = true;
     }
 
     internal WorldMutation(

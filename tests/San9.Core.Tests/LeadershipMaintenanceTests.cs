@@ -58,6 +58,40 @@ public sealed class LeadershipMaintenanceTests
     }
 
     [Fact]
+    public void BatchedMovesAndAppointmentsMatchAfterForkAndRestore()
+    {
+        Engine(out var world);
+        var initial = world.BeginMutation(new(Treasures, Governance));
+        initial.Replace(initial.Officers[11] with { Injury = 1 });
+        initial.Replace(initial.Officers[11] with { Injury = 0 });
+        initial.MaintainLeadership([]);
+        world.Commit(initial);
+        var fork = world.Fork();
+        var restored = WorldState.Restore(world.CreateSnapshot());
+
+        static List<DomainEvent> Change(WorldState state)
+        {
+            var mutation = state.BeginMutation(new(Treasures, Governance));
+            mutation.Replace(mutation.Officers[11] with { SettlementId = 2, IsCommander = false });
+            mutation.Replace(mutation.Officers[21] with { SettlementId = 1, IsCommander = false });
+            mutation.Replace(mutation.Treasures[1] with { HolderId = 12 });
+            mutation.Replace(mutation.Officers[22] with { OfficeId = 100 });
+            List<DomainEvent> events = [];
+            mutation.MaintainLeadership(events);
+            mutation.MaintainLeadership(events);
+            state.Commit(mutation);
+            return events;
+        }
+
+        var events = Change(fork);
+        EventAssert.Equal(events, Change(restored));
+        StateAssert.Equal(fork.CreateSnapshot(), restored.CreateSnapshot());
+        Assert.Equal([(1, (int?)11, (int?)12), (2, (int?)21, (int?)22)],
+            events.OfType<CommanderChangedEvent>().Select(e => (e.PlaceId, e.PreviousId, e.OfficerId)).ToArray());
+        Assert.Equal([12, 22], fork.CreateSnapshot().Officers.Where(p => p.IsCommander).Select(p => p.Id).ToArray());
+    }
+
+    [Fact]
     public void UnrelatedChangesPreserveAnExistingAppointmentInsteadOfReselecting()
     {
         Engine(out var world);

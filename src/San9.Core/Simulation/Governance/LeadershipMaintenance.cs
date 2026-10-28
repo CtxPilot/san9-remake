@@ -17,26 +17,12 @@ internal static class LeadershipMaintenance
             world.Settlements.TryGetValue(placeId, out var place) && place.OwnerId == p.OwnerId &&
             place.CanHostPersons && !place.IsDestroyed);
 
-    internal static void Apply(WorldMutation world, GovernanceRulebook governance)
-    {
-        var people = world.Officers.Values.Where(p => p.IsServing).ToArray();
-        // This table is local to one maintenance pass and is never published as world state.
-        var abilities = people.ToDictionary(p => p.Id, world.Abilities);
-        var commanders = people.Where(p => p.SettlementId is int home && !world.IsTraveling(p.Id) &&
-                world.Settlements.TryGetValue(home, out var place) && place.OwnerId == p.OwnerId && place.CanHostPersons && !place.IsDestroyed)
-            .GroupBy(p => p.SettlementId!.Value)
-            .Select(group => governance.SelectCommander(group, abilities)!.Id).ToHashSet();
-        foreach (var person in world.Officers.Values.ToArray())
-            if (person.IsCommander != commanders.Contains(person.Id))
-                world.Replace(person with { IsCommander = commanders.Contains(person.Id) });
-        var members = people.Where(p => p.UnitId is not null).ToLookup(p => p.UnitId!.Value);
-        foreach (var unit in world.Units.Values.ToArray())
-            UpdateUnit(world, unit, members[unit.Id], abilities, governance);
-    }
+    internal static void Apply(WorldMutation world, GovernanceRulebook governance) =>
+        Apply(world, governance, world.Settlements.Keys, world.Officers.Keys);
 
-    /// <summary>The partial reselection of a consistent world: the changed places and officers, then every unit as
-    /// <see cref="Apply(WorldMutation, GovernanceRulebook)"/> does. Abilities are read only where an order needs them.</summary>
-    internal static void Apply(WorldMutation world, GovernanceRulebook governance, IReadOnlySet<int> places, IReadOnlySet<int> officers)
+    /// <summary>Reselects the supplied places, clears stale flags on affected officers and updates every unit.
+    /// Full maintenance supplies all places and officers; incremental maintenance supplies only changed ones.</summary>
+    internal static void Apply(WorldMutation world, GovernanceRulebook governance, IEnumerable<int> places, IEnumerable<int> officers)
     {
         var abilities = new LazyAbilities(world);
         var commanders = new HashSet<int>();
