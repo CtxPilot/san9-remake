@@ -45,7 +45,6 @@ public partial class BattlePlaybackFlow : Control
             ContentRoot = ContentRoot,
             Sounds = CommandPresentation.Sounds,
             SoundEnabled = SoundEnabled,
-            PauseRequested = () => Turn.TogglePause(),
             PlaySound = role => SceneSounds.PlayOverlapping(role, SoundEnabled()),
             PlayMapSound = (role, point) => _mapSounds.PlayOnce(role, point, SoundEnabled()),
             IsPaused = () => Turn.Paused,

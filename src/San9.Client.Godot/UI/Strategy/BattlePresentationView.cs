@@ -16,7 +16,6 @@ public partial class BattlePresentationView : Control
     public Func<BattleObjectContext, Vector2> Project { get; init; } = null!;
     public Action<string>? PlaySound { get; init; }
     public Action<string, Vector2>? PlayMapSound { get; init; }
-    public Action? PauseRequested { get; init; }
     public Func<bool> IsPaused { get; init; } = () => false;
     public string ContentRoot { get; init; } = "";
     public IReadOnlyDictionary<string, string> Sounds { get; init; } = null!;
@@ -223,8 +222,7 @@ public partial class BattlePresentationView : Control
     {
         if (!IsSceneActive || input is not InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mouse) return;
         _day?.EndSceneFastForward();
-        if (new Rect2(820, 700, 88, 44).HasPoint(mouse.Position - SceneOffset)) PauseRequested?.Invoke();
-        else if (new Rect2(920, 700, 96, 44).HasPoint(mouse.Position - SceneOffset)) _day?.SkipVisual();
+        if (new Rect2(920, 700, 96, 44).HasPoint(mouse.Position - SceneOffset)) _day?.SkipVisual();
         else if (!IsPaused() && _day?.PendingDuelDialogues.FirstOrDefault() is { } dialogue)
             _day.CompleteDialogue(dialogue.Id);
         else if (!IsPaused()) _day?.BeginSceneFastForward();
@@ -245,7 +243,6 @@ public partial class BattlePresentationView : Control
         var font = GetThemeFont("font");
         string? hint = IsPaused() ? "已暂停" : _day?.PendingDuelDialogues.Count > 0 ? "单击继续" : null;
         if (hint is not null) DrawString(font, new(560, 730), hint, fontSize: 18, modulate: Colors.LightGray);
-        DrawString(font, new(832, 730), CommandText.Resolve(Texts, IsPaused() ? "battle.resume" : "battle.pause"), fontSize: 20);
         DrawString(font, new(932, 730), CommandText.Resolve(Texts, "battle.skip"), fontSize: 20);
     }
     public override void _Draw()

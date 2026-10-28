@@ -6,8 +6,6 @@
   "battle.blocked": "抵挡",
   "battle.durability-loss": "耐久 −{0}",
   "battle.morale-change": "士气 {0}",
-  "battle.pause": "静止",
-  "battle.resume": "续行",
   "battle.skip": "跳过",
   "battle.unit-name": "{0}队",
   "battle.force-name": "{0}军",
