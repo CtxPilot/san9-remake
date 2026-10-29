@@ -244,7 +244,7 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
         var previous = _conditions.GetValueOrDefault(key, UnitCondition.Normal);
         _conditions[key] = condition.Condition;
         _stateValues.Add(new(time, condition.ObjectId, condition.IsSettlement, 0, 0, 0, condition.Condition));
-        if (previous != condition.Condition && obj is not null && MapVisible(obj) &&
+        if (previous != condition.Condition && obj is not null &&
             content.Battle?.ConditionEffects.TryGetValue(condition.Condition, out var sprite) == true)
         {
             _mapEffects.Add(new(Identity("condition"), time, obj, sprite));
@@ -255,9 +255,17 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
     {
         var messages = FeedbackMessages(FeedbackKind.Mission, FeedbackKind.Strategy).ToArray();
         var records = FeedbackRecords(FeedbackKind.Mission, FeedbackKind.Strategy, FeedbackKind.Progress).ToArray();
+        if (fact is UnitStrategyResolvedEvent { Strategy: UnitStrategyKind.Reinforce, Success: true } reinforcement &&
+            content.Battle?.ReinforcementEffect is { } reinforcementEffect)
+        {
+            var target = reinforcement.Target;
+            var obj = new BattleObjectContext(reinforcement.TargetUnitId, false, target.ForceId,
+                target.CommanderId, target.Position, target.ServicePlaceId, false);
+            _mapEffects.Add(new(Identity("reinforcement"), MapTime(_cursor), obj, reinforcementEffect));
+        }
         int? burning = fact is BurnResolvedEvent { Success: true } burn ? burn.TargetSettlementId : null;
         int? seizing = fact is SeizeResolvedEvent { Outcome: not SeizeOutcomeKind.Failure } seize ? seize.TargetSettlementId : null;
-        if (messages.Length > 0 && (burning ?? seizing) is int building && content.Battle?.BuildingEffects.TryGetValue(burning is null ? "seize" : "burn", out var effects) == true)
+        if ((burning ?? seizing) is int building && content.Battle?.BuildingEffects.TryGetValue(burning is null ? "seize" : "burn", out var effects) == true)
         {
             var place = before.Settlements.First(s => s.Id == building);
             int? type = place.FacilityTypeId ?? buildingTypes?.GetValueOrDefault(building);

@@ -341,11 +341,11 @@ public sealed class BattlePresentationTests
     }
 
     [Theory]
-    [InlineData(UnitCondition.Disguised, 1, true)]
-    [InlineData(UnitCondition.NoFormation, 1, true)]
-    [InlineData(UnitCondition.HighSpirits, 1, true)]
-    [InlineData(UnitCondition.Disguised, 3, false)]
-    public void StandaloneStrategyStateUsesItsOwnVisibilityPositionAndTimeline(UnitCondition condition, int sourceForce, bool visible)
+    [InlineData(UnitCondition.Disguised, 1)]
+    [InlineData(UnitCondition.NoFormation, 1)]
+    [InlineData(UnitCondition.HighSpirits, 1)]
+    [InlineData(UnitCondition.Disguised, 3)]
+    public void StandaloneStrategyStateUsesItsOwnPositionAndTimelineRegardlessOfForce(UnitCondition condition, int sourceForce)
     {
         var (session, texts, content, occurrence) = Fixture();
         content = content with { Battle = content.Battle! with
@@ -361,15 +361,77 @@ public sealed class BattlePresentationTests
         var scene = Assert.Single(plan.Visuals);
         var value = Assert.Single(plan.Values, v => v.Condition == condition);
         Assert.True(value.Time >= scene.End);
-        if (visible)
+        var effect = Assert.Single(plan.MapEffects);
+        Assert.Equal(target, effect.Target);
+        Assert.Equal(value.Time, effect.Start);
+        Assert.Equal("state-sound", effect.Sprite.Sound);
+        Assert.Equal(effect.Start, plan.Duration);
+    }
+
+    [Theory]
+    [InlineData(true, 1, UnitCondition.Normal)]
+    [InlineData(true, 1, UnitCondition.HighSpirits)]
+    [InlineData(false, 1, UnitCondition.Confused)]
+    [InlineData(true, 3, UnitCondition.Normal)]
+    public void ReinforcementSuccessEffectUsesTheOccurrenceWithoutRequiringAStateChange(
+        bool success, int force, UnitCondition condition)
+    {
+        var (session, texts, content, _) = Fixture();
+        var sprite = new BattleSprite("reinforcement", 8, 100, Sound: "reinforcement-sound");
+        content = content with { Battle = content.Battle! with { ReinforcementEffect = sprite } };
+        var fact = new UnitStrategyResolvedEvent(session.Snapshot.Clock, 3, 20, UnitStrategyKind.Reinforce, 100, 0, success,
+            new(new(67, 12), force, 23, 2, condition, false, false))
+        {
+            Audience = new(force, force, new(2, 2, null), 23, 1000, 1000, 70, 100, 90),
+            DeliveredSoldiers = success ? 3000u : 500u
+        };
+        var after = new StrategySnapshot(MissionScenario.Create(), session.View.World with
+        { Units = [], Officers = session.View.World.Officers.Select(p => p with { UnitId = null }).ToImmutableArray() });
+        var plan = BattlePresentationPlan.Create(session.View, after, [fact], session.Messages(texts), texts, content);
+        if (success)
         {
             var effect = Assert.Single(plan.MapEffects);
-            Assert.Equal(target, effect.Target);
-            Assert.Equal(value.Time, effect.Start);
-            Assert.Equal("state-sound", effect.Sprite.Sound);
+            Assert.Equal(sprite, effect.Sprite);
+            Assert.Equal(fact.TargetUnitId, effect.Target.Id);
+            Assert.Equal(fact.Target.Position, effect.Target.Position);
+            Assert.Equal(force, effect.Target.ForceId);
+            Assert.Equal(fact.Target.CommanderId, effect.Target.CommanderId);
             Assert.Equal(effect.Start, plan.Duration);
+            Assert.Equal(effect.FactIndex, Assert.Single(plan.MapBatches).FirstFactIndex);
         }
         else Assert.Empty(plan.MapEffects);
+    }
+
+    [Theory]
+    [InlineData("burn", SeizeOutcomeKind.Money, true)]
+    [InlineData("burn", SeizeOutcomeKind.Money, false)]
+    [InlineData("seize", SeizeOutcomeKind.Money, true)]
+    [InlineData("seize", SeizeOutcomeKind.Person, true)]
+    [InlineData("seize", SeizeOutcomeKind.Item, true)]
+    [InlineData("seize", SeizeOutcomeKind.Failure, false)]
+    public void SuccessfulBuildingStrategiesPlayEffectsWithoutAnySpeech(string kind, SeizeOutcomeKind outcome, bool success)
+    {
+        var (session, texts, content, _) = Fixture();
+        var place = session.View.Settlements.First();
+        var sprite = new BattleSprite(kind, 8, 125);
+        content = content with { Battle = content.Battle! with
+        { BuildingEffects = new() { [kind] = new() { [0] = [sprite] } } } };
+        DomainEvent fact = kind == "burn"
+            ? new BurnResolvedEvent(session.Snapshot.Clock, 3, place.Id, 100, 0, success, 10, 0, 0, 0)
+            : new SeizeResolvedEvent(session.Snapshot.Clock, 3, place.Id, 0, 100, 100, 100, true, outcome);
+        var plan = BattlePresentationPlan.Create(session.View, session.View, [fact], session.Messages(texts), texts,
+            content, new Dictionary<int, int> { [place.Id] = 0 });
+        Assert.Empty(plan.Messages);
+        if (success)
+        {
+            var effect = Assert.Single(plan.Visuals);
+            Assert.Equal(sprite, effect.Effect);
+            Assert.Equal(place.Id, effect.Target.Id);
+            Assert.True(effect.Target.IsSettlement);
+            Assert.True(effect.IsMapEffect);
+            Assert.Single(plan.MapBatches);
+        }
+        else Assert.Empty(plan.Visuals);
     }
 
     [Fact]
