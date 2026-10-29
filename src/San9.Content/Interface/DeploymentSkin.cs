@@ -9,7 +9,7 @@ public static class DeploymentSkin
         "choice-selected-left", "choice-selected-middle", "choice-selected-right",
         "background", "top-left", "top-right", "bottom-left", "bottom-right", "edge",
         "title-left", "title-middle", "title-right", "footer-left", "footer-middle", "footer-right",
-        "label-left", "label-middle", "label-right", "field", "field-rim",
+        "label-left", "label-middle", "label-right", "field", "field-rim", "unit-preview-background", "unit-preview-frame",
         "arrival-rim-left", "arrival-rim-middle", "arrival-rim-right",
         "roster-header-left", "roster-header-middle", "roster-header-right", "column-top", "column-middle", "column-bottom", "divider",
         "facility-left", "facility-middle", "facility-right", "mode-left", "mode-middle", "mode-right",

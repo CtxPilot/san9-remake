@@ -90,11 +90,10 @@ public partial class MissionCommandView : CommandPreparationView
             if (Draft.TargetKind == MissionTargetKind.Unit)
             {
                 var unit = Draft.View.World.Units.SingleOrDefault(u => u.Id == Draft.TargetId);
+                var previewFrame = new CommandUnitPreview { Textures = Textures, Position = at + new Vector2(104,88) };
                 if (unit is not null && Draft.TargetRegionId is int mapRegion)
-                {
-                    var preview = World.CreateInformationPreview(mapRegion,Texts,unit.Id);
-                    preview.Position = at+new Vector2(104,88); preview.Size = new(248,216); Body.AddChild(preview);
-                }
+                    previewFrame.Preview = World.CreateInformationPreview(mapRegion,Texts,unit.Id);
+                Body.AddChild(previewFrame);
                 if (Draft.Kind is "false-report" or "disorder")
                     WideProperties(at+new Vector2(360,56),80,new(CommandText.Resolve(Texts, "label.force"),TargetName(MissionTargetKind.Force,unit?.OwnerId),80),
                         new(CommandText.Resolve(Texts, "label.soldiers"),unit?.Soldiers.ToString() ?? "",56),new(CommandText.Resolve(Texts, "label.morale"),unit?.Morale.ToString() ?? "",40),
@@ -246,6 +245,29 @@ public partial class MissionCommandView : CommandPreparationView
             State = input,
             Confirmed = value => { Draft.SetGift(new(kind,value,null)); Changed(); }, Closed = CloseChild });
     }
+}
+
+/// <summary>The command target's inset frame owns the map viewport, including the empty selection state.</summary>
+internal partial class CommandUnitPreview : Control
+{
+    public TextureScope Textures { get; init; } = null!;
+    public Control? Preview { get; set; }
+    public override void _Ready()
+    {
+        Size = new(248,216);
+        MouseFilter = MouseFilterEnum.Ignore;
+        if (Preview is { } preview)
+        {
+            // The original 248x216 slot renders a 240x208 scene at +(3,3).
+            preview.Position = new(3,3);
+            preview.Size = new(240,208);
+            AddChild(preview);
+        }
+        var frame = new TextureRect { Size = Size, MouseFilter = MouseFilterEnum.Ignore };
+        frame.Texture = Textures.Get("deployment-unit-preview-frame", frame);
+        AddChild(frame);
+    }
+    public override void _Draw() => DrawTexture(Textures.Get("deployment-unit-preview-background", this), Vector2.Zero);
 }
 
 internal partial class MissionCommandFields : Control

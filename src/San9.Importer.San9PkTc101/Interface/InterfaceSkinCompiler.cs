@@ -475,6 +475,8 @@ public static partial class InterfaceSkinCompiler
         assets.Add(save("ui-deployment-field", "ui/deployment-field.png",
             IndexedImageArchive.Decode(deploymentField, common.Palettes[fieldPalette], true, true)));
         ui.Add("deployment-field", "ui-deployment-field");
+        Extra("deployment-unit-preview-background",199,20,true);
+        Extra("deployment-unit-preview-frame",200,20,true);
         foreach (var (role, resource) in new (string, int)[] {
             ("edit-left",253), ("edit-middle",254), ("edit-right",255),
             ("accept-left",220), ("accept-middle",221), ("accept-right",222),
