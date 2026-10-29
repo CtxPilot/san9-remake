@@ -97,6 +97,25 @@ public sealed class CommandPresentationTests
             ["repair"] = content.Facilities["repair"] with { Messages = roles.Where(k => k != "complete").ToDictionary(k => k) } } }).Validate(texts,[9],[]));
     }
 
+    [Theory]
+    [InlineData("commerce", "commerce-result")]
+    [InlineData("cultivate", "cultivation-result")]
+    public void DevelopmentRequiresItsOwnResultSound(string kind, string resultSound)
+    {
+        string[] roles = ["normal", "cooperative", "citizen", "pair-first", "pair-second", "result"];
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, [])
+        { Messages = roles.ToDictionary(k => k, k => new MessageDefinition([new MessageLiteral(k)])) };
+        var content = CommandPresentation.Empty with
+        {
+            Sounds = new() { ["facility-result"] = "generic.wav", ["patrol-citizen"] = "citizen.wav" },
+            Facilities = new() { [kind] = new(roles.ToDictionary(k => k), 9) }
+        };
+        Assert.Throws<InvalidDataException>(() => content.Validate(texts, [9], []));
+        content.Sounds.Remove("facility-result");
+        content.Sounds.Add(resultSound, "result.wav");
+        content.Validate(texts, [9], []);
+    }
+
     [Fact]
     public void NoticesResolveAuthoredKeysEvenWithoutPatrol()
     {

@@ -6,9 +6,10 @@ internal static class CommandPresentationCompiler
 {
     internal static readonly (string Role, string File)[] SoundSources =
         [("demolition-result", "SE/se_m005.WAV"), ("military-order", "SE/SE_C007.WAV"), ("decision-announcement", "SE/SE_G001.WAV"), ("decision-success", "SE/SE_G008.WAV"), ("decision-failure", "SE/SE_G009.WAV"), ("decision-increase", "SE/SE_G005.WAV"), ("decision-decrease", "SE/SE_G006.WAV"), ("decision-study", "SE/SE_C004.WAV"), ("patrol-citizen", "SE/SE_G008.WAV"), ("domestic-result", "SE/SE_C006.WAV"),
-         ("mission-departure", "SE/SE_C004.WAV"), ("strategy-departure", "SE/SE_C003.WAV"), ("seize-departure", "SE/SE_C007.WAV"),
+         ("mission-departure", "SE/SE_C004.WAV"), ("strategy-departure", "SE/SE_C003.WAV"), ("rescue-departure", "SE/SE_C007.WAV"),
          ("personnel-departure", "SE/SE_C004.WAV"), ("personnel-territory", "SE/SE_G012.WAV"), ("facility-result", "SE/SE_G005.WAV"), ("recruit-result", "SE/SE_C002.WAV"),
-         ("trade-start", "SE/SE_C001.WAV"), ("repair-complete", "SE/se_m002.WAV"), ("reward-result", "SE/SE_G005.WAV"), ("exile-result", "SE/SE_G001.WAV"), ("loyalty-decrease", "SE/SE_G006.WAV"), ("execution-result", "SE/SE_G002.WAV"),
+         ("trade-start", "SE/SE_C001.WAV"), ("commerce-result", "SE/SE_C008.WAV"), ("cultivation-result", "SE/SE_C000.WAV"),
+         ("repair-complete", "SE/se_m002.WAV"), ("reward-result", "SE/SE_G005.WAV"), ("exile-result", "SE/SE_G001.WAV"), ("loyalty-decrease", "SE/SE_G006.WAV"), ("execution-result", "SE/SE_G002.WAV"),
          ("strategy-order-prompt", "SE/SE_G000.WAV"), ("strategy-title", "SE/SE_G010.WAV"),
          ("settlement-capture", "SE/se_m006.WAV"), ("event-death", "SE/SE_G003.WAV"), ("event-founded", "SE/SE_G007.WAV"), ("event-consolidation", "SE/se_g100.WAV"), ("event-casualty", "SE/se_g106.WAV")];
 

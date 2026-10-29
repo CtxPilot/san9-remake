@@ -242,7 +242,12 @@ public sealed record CommandPresentation(Dictionary<string, string> Sounds, Patr
             if (required.Any(role => !definition.Messages.ContainsKey(role)) || definition.Messages.Values.Any(key => !texts.Messages.ContainsKey(key)) ||
                 combination && (definition.CitizenId is not int citizen || !personIds.Contains(citizen)))
                 throw new InvalidDataException($"Invalid facility presentation: {kind}.");
-            string[] sounds = combination ? ["facility-result","patrol-citizen"] : kind == "recruit" ? ["recruit-result"] : ["facility-result","trade-start"];
+            string resultSound = kind switch
+            {
+                "commerce" => "commerce-result", "cultivate" => "cultivation-result", "recruit" => "recruit-result",
+                _ => "facility-result"
+            };
+            string[] sounds = combination ? [resultSound,"patrol-citizen"] : kind == "recruit" ? [resultSound] : [resultSound,"trade-start"];
             if (kind == "repair") sounds = [.. sounds,"repair-complete"];
             if (sounds.Any(role => !Sounds.ContainsKey(role))) throw new InvalidDataException($"Missing facility sound: {kind}.");
         }

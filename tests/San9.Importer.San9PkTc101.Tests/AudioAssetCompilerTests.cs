@@ -4,6 +4,43 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class AudioAssetCompilerTests
 {
+    // RE-0182: command constructors 25..36, then prepare_command_participants; event kinds are a separate domain.
+    [Theory]
+    [InlineData("false-report", "SE/SE_C003.WAV")]
+    [InlineData("disorder", "SE/SE_C003.WAV")]
+    [InlineData("inspire", "SE/SE_C004.WAV")]
+    [InlineData("rescue", "SE/SE_C007.WAV")]
+    [InlineData("alienate", "SE/SE_C003.WAV")]
+    [InlineData("burn", "SE/SE_C003.WAV")]
+    [InlineData("seize", "SE/SE_C003.WAV")]
+    [InlineData("rumor", "SE/SE_C003.WAV")]
+    [InlineData("gift", "SE/SE_C004.WAV")]
+    [InlineData("request", "SE/SE_C004.WAV")]
+    [InlineData("return", "SE/SE_C004.WAV")]
+    [InlineData("surrender", "SE/SE_C004.WAV")]
+    public void MissionDepartureSoundsFollowCommandConstructorsRatherThanEventKinds(string kind, string source)
+    {
+        var message = MissionPresentationCompiler.Compile()[kind + "-start"];
+        var sound = Assert.Single(CommandPresentationCompiler.SoundSources, s => s.Role == message.Sound);
+        Assert.Equal(source, sound.File);
+    }
+
+    // RE-0095/0096/0097: independently checked against the TC101 command calls and SE table.
+    [Theory]
+    [InlineData("commerce-result", "SE/SE_C008.WAV")]
+    [InlineData("cultivation-result", "SE/SE_C000.WAV")]
+    [InlineData("domestic-result", "SE/SE_C006.WAV")]
+    [InlineData("facility-result", "SE/SE_G005.WAV")]
+    [InlineData("recruit-result", "SE/SE_C002.WAV")]
+    [InlineData("trade-start", "SE/SE_C001.WAV")]
+    [InlineData("repair-complete", "SE/se_m002.WAV")]
+    [InlineData("patrol-citizen", "SE/SE_G008.WAV")]
+    public void FacilitySoundsMatchOriginalCommandCues(string role, string source)
+    {
+        var sound = Assert.Single(CommandPresentationCompiler.SoundSources, s => s.Role == role);
+        Assert.Equal(source, sound.File);
+    }
+
     [Fact]
     public void ConstructionSoundsSeparateFortsFromBothOrientationsOfObstacles()
     {

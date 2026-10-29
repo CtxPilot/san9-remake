@@ -70,6 +70,11 @@ public sealed class FacilityCommandTests
         Assert.True(result.Submission.Accepted);
         var completed = Assert.Single(result.Events.OfType<FoodTradeCompletedEvent>());
         Assert.Equal(8u,completed.FoodAmount); Assert.Equal(money,completed.MoneyAmount);
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, [])
+        { Messages = new() { ["normal"] = new([new MessageLiteral("Trade")]), ["result"] = new([new MessageLiteral("Result")]) } };
+        var content = CommandPresentation.Empty with { Facilities = new() { [kind] = new(new() { ["normal"] = "normal", ["result"] = "result" }) } };
+        var messages = FacilityCommandPresentation.Create(new(Definition(), before), session.Messages(texts), content, kind, completed, _ => 99);
+        Assert.Equal(new[] { "trade-start", "facility-result" }, messages.Select(m => m.SoundRole));
         Assert.Equal(food,session.View.PlayerCorps!.Treasury.Food);
         Assert.All(new[] { "buy","sell" },k => Assert.Equal("ui.command-reason.trade-used",FacilityCommandDraft.UnavailableReasonKey(session.View,1,k)));
         Assert.False(draft.SetFoodAmount(1));
@@ -158,6 +163,33 @@ public sealed class FacilityCommandTests
             Assert.NotNull(reason);
             Assert.Equal(reason,MapCommandMenu.Settlement(view,1).Single(g => g.Id == "facilities").Children.Single(c => c.Id == kind).UnavailableReasonKey);
         }
+    }
+
+    [Theory]
+    [InlineData("commerce", DomesticActivity.Commerce, "commerce-result")]
+    [InlineData("cultivate", DomesticActivity.Cultivation, "cultivation-result")]
+    [InlineData("repair", DomesticActivity.Repair, "facility-result")]
+    [InlineData("train", DomesticActivity.Train, "facility-result")]
+    [InlineData("recruit", DomesticActivity.Recruit, "recruit-result")]
+    public void PresentationKeepsActivityResultSoundAcrossBonusBranches(string kind, DomesticActivity activity, string resultSound)
+    {
+        var session = GameSession.Start(Definition(), 7);
+        var before = session.Snapshot;
+        string[] roles = ["normal", "cooperative", "citizen", "pair-first", "pair-second", "result"];
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, [])
+        { Messages = roles.ToDictionary(k => k, k => new MessageDefinition([new MessageLiteral(k)])) };
+        var content = CommandPresentation.Empty with { Facilities = new() { [kind] = new(roles.ToDictionary(k => k), 3) } };
+        DomesticBonus?[] bonuses = activity == DomesticActivity.Recruit ? [null] :
+            [null, new(DomesticBonusKind.Affinity, 2, null), new(DomesticBonusKind.SpecialPair, 2, 1)];
+        foreach (var bonus in bonuses)
+        {
+            var completed = new DevelopmentCompletedEvent(before.Clock, new(1, 1, [1, 2], activity), 1, 0) { Bonus = bonus };
+            var messages = FacilityCommandPresentation.Create(session.View, session.Messages(texts), content, kind, completed, _ => 99);
+            Assert.Equal(resultSound, messages[^1].SoundRole);
+            Assert.All(messages.Take(messages.Count - 1), message => Assert.Equal(
+                bonus?.Kind == DomesticBonusKind.Affinity && message.SpeakerId == 3 ? "patrol-citizen" : null, message.SoundRole));
+        }
+        Assert.Same(before, session.Snapshot);
     }
 
     [Theory]

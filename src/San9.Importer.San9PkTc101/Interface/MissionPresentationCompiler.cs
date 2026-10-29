@@ -66,8 +66,8 @@ internal static class MissionPresentationCompiler
             {
                 Sound = role switch
             {
-                "seize-start" => "seize-departure",
-                "rumor-start" or "gift-start" or "request-start" or "return-start" or "surrender-start" => "mission-departure",
+                "rescue-start" => "rescue-departure",
+                "inspire-start" or "gift-start" or "request-start" or "return-start" or "surrender-start" => "mission-departure",
                 _ => "strategy-departure"
                 }
             };

@@ -56,10 +56,10 @@ public static class FacilityCommandPresentation
             {
                 case DomesticActivity.Commerce:
                     var commerce = home with { Commerce = home.Commerce + increment };
-                    Result("result","facility-result",commerce.Commerce,increment,EconomyMath.Revenue(commerce),EconomyMath.Revenue(commerce)-EconomyMath.Revenue(home)); break;
+                    Result("result","commerce-result",commerce.Commerce,increment,EconomyMath.Revenue(commerce),EconomyMath.Revenue(commerce)-EconomyMath.Revenue(home)); break;
                 case DomesticActivity.Cultivation:
                     var cultivated = home with { Cultivation = home.Cultivation + increment };
-                    Result("result","facility-result",cultivated.Cultivation,increment,EconomyMath.Harvest(cultivated),EconomyMath.Harvest(cultivated)-EconomyMath.Harvest(home)); break;
+                    Result("result","cultivation-result",cultivated.Cultivation,increment,EconomyMath.Harvest(cultivated),EconomyMath.Harvest(cultivated)-EconomyMath.Harvest(home)); break;
                 case DomesticActivity.Repair: Result("result","facility-result",home.Durability+increment,increment); break;
                 case DomesticActivity.Train: Result("result","facility-result",home.Morale+increment,increment); break;
                 case DomesticActivity.Recruit: Result("result","recruit-result",home.Soldiers+increment,increment); break;
