@@ -33,14 +33,18 @@ public partial class BattlePresentationView : Control
         UpdatePlayback(_day);
         QueueRedraw();
         _numberLayer.QueueRedraw();
+        _mapNumberLayer.QueueRedraw();
     }
     private BattleNumberLayer _numberLayer = null!;
+    private Node2D _mapLayer = null!;
+    private BattleNumberLayer _mapNumberLayer = null!;
     private TextureScope? _assets;
     private TextureScope? _flags;
     private readonly List<TextureScope> _portraits = [];
     private TurnDayPresentation? _day;
     private readonly CanvasItemMaterial _additive = new() { BlendMode = CanvasItemMaterial.BlendModeEnum.Add };
     private readonly List<Sprite2D> _effects = [];
+    private readonly List<Sprite2D> _mapEffectSprites = [];
     private const int FullScreenEffectZIndex = 2;
     private BattleVisualCue? _zoom;
     private BattleVisualCue? _preludeFrame;
@@ -65,12 +69,14 @@ public partial class BattlePresentationView : Control
         _duel = null; _duelSpeechLayout = null; _duelPortraits.Clear(); _duelText?.Hide();
         _duelPanels?.QueueRedraw(); _duelSpeechFrame?.QueueRedraw();
         _zoom = null; _preludeFrame = null; _entering = false;
+        _mapLayer?.Show();
         _publishedNumbers.Clear();
         _publishedMorales.Clear();
         MapAudioGain = SceneAudioGain = 1;
         _transition?.Sample(0);
         foreach (var portrait in _portraits) portrait.Dispose(); _portraits.Clear();
         foreach (var sprite in _effects) sprite.Hide();
+        foreach (var sprite in _mapEffectSprites) sprite.Hide();
         if (day?.Battle is not { } plan) { QueueRedraw(); return true; }
         HashSet<string> resources = [];
         HashSet<string> flagResources = [];
@@ -137,14 +143,24 @@ public partial class BattlePresentationView : Control
             : time >= cue.Start && time < cue.End;
         _preludeFrame = visuals.FirstOrDefault(c => c.PreludeId is not null && Active(c));
         _zoom = visuals.FirstOrDefault(c => c.Zoom is not null && time >= c.Start && time < c.End);
+        _mapLayer.Visible = !IsSceneActive;
         UpdateSceneAudio(day, visuals.Where(Active), mapEffects);
-        int slot = 0;
-        void Effect(BattleSprite asset, double elapsed, Vector2 point, float opacity = 1, int? frameIndex = null, bool sceneCoordinates = true, int zIndex = 0)
+        int slot = 0, mapSlot = 0;
+        void Effect(BattleSprite asset, double elapsed, Vector2 point, float opacity = 1, int? frameIndex = null,
+            bool sceneCoordinates = true, int zIndex = 0, bool mapEffect = false)
         {
             if (!_assets!.TryGetReady(asset.Asset, this, out var texture) && (_flags is null || !_flags.TryGetReady(asset.Asset, this, out texture))) return;
+            var sprites = mapEffect ? _mapEffectSprites : _effects;
+            int index = mapEffect ? mapSlot++ : slot++;
             Sprite2D sprite;
-            if (slot == _effects.Count) { sprite = new(); AddChild(sprite); _effects.Add(sprite); } else sprite = _effects[slot];
-            slot++; sprite.Show(); sprite.Texture = texture; sprite.Hframes = asset.Columns;
+            if (index == sprites.Count)
+            {
+                sprite = new();
+                if (mapEffect) _mapLayer.AddChild(sprite); else AddChild(sprite);
+                sprites.Add(sprite);
+            }
+            else sprite = sprites[index];
+            sprite.Show(); sprite.Texture = texture; sprite.Hframes = asset.Columns;
             sprite.Frame = frameIndex ?? Math.Clamp((int)(elapsed * 1000 / asset.FrameMilliseconds), 0, asset.Columns - 1);
             sprite.Centered = false; sprite.Position = (sceneCoordinates ? SceneOffset : Vector2.Zero) + point + new Vector2(asset.OffsetX - (asset.Centered ? texture.GetWidth() / asset.Columns / 2f : 0), asset.OffsetY);
             sprite.Modulate = new Color(1, 1, 1, asset.Opacity * opacity);
@@ -157,11 +173,12 @@ public partial class BattlePresentationView : Control
             if (cue.FadeOutStart is not null || age < cue.Effect!.Columns * cue.Effect.FrameMilliseconds / 1000.0)
                 Effect(cue.Effect!, age, cue.ScreenEffect ? new(_zoom is null ? GetViewportRect().Size.X / 2 : 512, 0) : Project(cue.Target),
                     cue.FadeOutStart is { } fadeStart ? BattleEffectFade.Opacity(time - fadeStart) : 1,
-                    sceneCoordinates: cue.ScreenEffect && _zoom is not null, zIndex: cue.ScreenEffect ? FullScreenEffectZIndex : 0);
+                    sceneCoordinates: cue.ScreenEffect && _zoom is not null, zIndex: cue.ScreenEffect ? FullScreenEffectZIndex : 0,
+                    mapEffect: cue.IsMapEffect);
         }
         if (!IsSceneActive)
             foreach (var cue in mapEffects.Where(c => day.IsMapEffectPresented(c.Id) && day.MapEffectElapsed(c.Id) < c.Sprite.Columns * c.Sprite.FrameMilliseconds / 1000.0))
-                Effect(cue.Sprite, day.MapEffectElapsed(cue.Id), Project(cue.Target), sceneCoordinates: false);
+                Effect(cue.Sprite, day.MapEffectElapsed(cue.Id), Project(cue.Target), sceneCoordinates: false, mapEffect: true);
         if (_zoom is { } active)
         {
             double elapsed = time - active.Start;
@@ -218,6 +235,7 @@ public partial class BattlePresentationView : Control
         }
         _duelPanels.QueueRedraw(); _duelSpeechFrame.QueueRedraw();
         for (int i = slot; i < _effects.Count; i++) _effects[i].Hide();
+        for (int i = mapSlot; i < _mapEffectSprites.Count; i++) _mapEffectSprites[i].Hide();
         QueueRedraw();
     }
     public override void _GuiInput(InputEvent input)
@@ -268,19 +286,9 @@ public partial class BattlePresentationView : Control
     public override void _Draw()
     {
         MouseFilter = !IsSceneActive ? MouseFilterEnum.Ignore : MouseFilterEnum.Stop;
-        if (!IsSceneActive)
-        {
-            var feedbackFont = GetThemeFont("font");
-            foreach (var morale in _mapMorales.Where(c => c.Age >= 0.8))
-            {
-                var feedback = morale.Cue;
-                string text = CommandText.Resolve(Texts, "battle.morale-change", $"+{feedback.MoraleGain}");
-                if (text.Length > 0) DrawString(feedbackFont, Project(feedback.Target) + new Vector2(-28, -52), text, fontSize: 24,
-                    modulate: feedback.SoldierGain > 0 ? Colors.LightGreen : Colors.OrangeRed);
-            }
-        }
         DrawPreludeBackdrop();
         _numberLayer.QueueRedraw();
+        _mapNumberLayer.QueueRedraw();
         if (_duel is not null) { DrawDuel(); return; }
         if (_zoom is not { } cue || _assets is null || cue.Zoom is not { } zoom || _day is null) return;
         DrawRect(new(Vector2.Zero, GetViewportRect().Size), new Color(16 / 255f, 25 / 255f, 34 / 255f, 217 / 256f));
@@ -302,20 +310,30 @@ public partial class BattlePresentationView : Control
         DrawSceneControls();
         DrawSetTransform(Vector2.Zero);
     }
+    private void DrawMapFeedback(BattleNumberLayer layer)
+    {
+        var font = GetThemeFont("font");
+        foreach (var morale in _mapMorales.Where(c => c.Age >= 0.8))
+        {
+            var feedback = morale.Cue;
+            string text = CommandText.Resolve(Texts, "battle.morale-change", $"+{feedback.MoraleGain}");
+            if (text.Length > 0) layer.DrawString(font, Project(feedback.Target) + new Vector2(-28, -52), text, fontSize: 24,
+                modulate: feedback.SoldierGain > 0 ? Colors.LightGreen : Colors.OrangeRed);
+        }
+        foreach (var number in _mapNumbers)
+        {
+            var numbers = number.Definition;
+            if (_numberAssets?.TryGetReady(numbers.Asset, layer, out var texture) != true ||
+                BattleMapNumberPlayback.Sample(numbers, number.Cue.Amount, number.Age) is not { } frame) continue;
+            var point = Project(number.Cue.Target) + new Vector2((float)frame.X, (float)frame.Y);
+            for (int i = 0; i < frame.Text.Length; i++)
+                layer.DrawTextureRectRegion(texture, new(point + new Vector2(i * numbers.GlyphWidth, 0), new(numbers.GlyphWidth, numbers.GlyphHeight)),
+                    new(BattleMapNumberPlayback.Column(frame.Text[i]) * numbers.GlyphWidth, frame.Row * numbers.GlyphHeight, numbers.GlyphWidth, numbers.GlyphHeight));
+        }
+    }
     private void DrawNumbers(BattleNumberLayer layer)
     {
-        if (!IsSceneActive)
-            foreach (var number in _mapNumbers)
-            {
-                var numbers = number.Definition;
-                if (_numberAssets?.TryGetReady(numbers.Asset, layer, out var texture) != true ||
-                    BattleMapNumberPlayback.Sample(numbers, number.Cue.Amount, number.Age) is not { } frame) continue;
-                var point = Project(number.Cue.Target) + new Vector2((float)frame.X, (float)frame.Y);
-                for (int i = 0; i < frame.Text.Length; i++)
-                    layer.DrawTextureRectRegion(texture, new(point + new Vector2(i * numbers.GlyphWidth, 0), new(numbers.GlyphWidth, numbers.GlyphHeight)),
-                        new(BattleMapNumberPlayback.Column(frame.Text[i]) * numbers.GlyphWidth, frame.Row * numbers.GlyphHeight, numbers.GlyphWidth, numbers.GlyphHeight));
-            }
-        if (_day?.Battle is not { } plan || _assets is null || !ResourcesReady) return;
+        if (_day?.Battle is null || _assets is null || !ResourcesReady) return;
         if (_zoom is { Playback.Numbers: { } numberPlayback } cue)
         {
             double elapsed = _day.Elapsed - cue.Start;
@@ -329,6 +347,10 @@ public partial class BattlePresentationView : Control
     public override void _Ready()
     {
         InitializeSceneAudio();
+        // Map feedback remains in the UI canvas for screen-space projection, but has
+        // its own ordering below HUD controls (0) and map speeches (-1).
+        _mapLayer = new() { Name = "MapEffects", ZAsRelative = false, ZIndex = -2 }; AddChild(_mapLayer);
+        _mapNumberLayer = new() { DrawNumbers = DrawMapFeedback, ZIndex = 1 }; _mapLayer.AddChild(_mapNumberLayer);
         _numberLayer = new() { DrawNumbers = DrawNumbers, ZIndex = 1 }; AddChild(_numberLayer);
         _duelUi = Textures.CreateScope();
         _duelPanels = new Node2D { ZIndex = 3 }; AddChild(_duelPanels); _duelPanels.Draw += DrawDuelPanels;

@@ -12,6 +12,7 @@ public sealed record UnitStrategyResolvedEvent(GameClock Clock, int OfficerId, i
     UnitStrategyKind Strategy, int Threshold, int Roll, bool Success,
     [property: System.Text.Json.Serialization.JsonRequired] UnitStrategyTarget Target) : DomainEvent
 {
+    /// <summary>Target identity and values after this strategy has resolved.</summary>
     [System.Text.Json.Serialization.JsonRequired] public StrategyAudience Audience { get; init; } = null!;
     [System.Text.Json.Serialization.JsonRequired] public int PreviousMorale { get; init; }
     public uint RequestedSoldiers { get; init; }

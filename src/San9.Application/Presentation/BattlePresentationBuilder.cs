@@ -118,11 +118,25 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
                 case BattleDamageEvent damage: PresentDamage(damage); break;
                 case BattleContactStartedEvent or UnitWaypointReachedEvent or UnitPolicyRespondedEvent: PresentMapNotification(); break;
                 case BattleConditionChangedEvent condition: PresentCondition(condition); break;
+                case DailyAttritionEvent attrition when attrition.UnitId is not null || attrition.SettlementId is not null:
+                    _stateValues.Add(new(MapTime(_cursor), attrition.UnitId ?? attrition.SettlementId!.Value,
+                        attrition.SettlementId is not null, -(long)attrition.SoldierLoss, attrition.Morale - attrition.PreviousMorale, 0));
+                    break;
+                case PeriodicMoraleLostEvent lost:
+                    _stateValues.Add(new(MapTime(_cursor), lost.UnitId, false, 0, lost.Morale - lost.PreviousMorale, 0));
+                    break;
+                case GarrisonMoraleRecoveredEvent recovered:
+                    _stateValues.Add(new(MapTime(_cursor), recovered.SettlementId, true, 0, recovered.Morale - recovered.PreviousMorale, 0));
+                    break;
+                case HighSpiritsExpiredEvent expired:
+                    _stateValues.Add(new(MapTime(_cursor), expired.UnitId, false, 0, expired.CurrentMorale - expired.PreviousMorale, 0));
+                    PresentOutcome();
+                    break;
                 case SecretContactReportedEvent or OfficerAbilityGrownEvent or RecruitmentResolvedEvent or
                     PersonnelJourneyInterruptedEvent or OfficerMovedEvent or PersonnelReturnedEvent or
                     ReturnCargoDeliveredEvent or ReturnCargoLostEvent: PresentFeedback(); break;
                 case TacticLearnedEvent or OfficerInjuryWorsenedEvent or CommanderChangedEvent or UnitCommanderChangedEvent or
-                    CorpsLeaderChangedEvent or CorpsDissolvedEvent or HighSpiritsExpiredEvent or OfficerAppearedEvent or
+                    CorpsLeaderChangedEvent or CorpsDissolvedEvent or OfficerAppearedEvent or
                     TreasuryCapturedEvent or PrisonerEscapedEvent or BattlePersonnelResolvedEvent or DiplomaticConflictsEndedEvent: PresentOutcome(); break;
                 case TacticMoraleChangedEvent morale: PresentMorale(morale); break;
                 case TacticDefectionEvent defection: PresentDefection(defection); break;
@@ -257,6 +271,15 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
 
     private void PresentMission(DomainEvent fact)
     {
+        _cursor = MapTime(_cursor);
+        if (fact is UnitStrategyResolvedEvent strategy)
+        {
+            int morale = strategy.Audience.Morale - strategy.PreviousMorale;
+            if (strategy.DeliveredSoldiers != 0 || morale != 0)
+                _stateValues.Add(new(_cursor, strategy.TargetUnitId, false, strategy.DeliveredSoldiers, morale, 0));
+        }
+        else if (fact is BurnResolvedEvent { DurabilityLoss: > 0 } burned)
+            _stateValues.Add(new(_cursor, burned.TargetSettlementId, true, 0, 0, -burned.DurabilityLoss));
         var messages = FeedbackMessages(FeedbackKind.Mission, FeedbackKind.Strategy).ToArray();
         var records = FeedbackRecords(FeedbackKind.Mission, FeedbackKind.Strategy, FeedbackKind.Progress).ToArray();
         if (fact is UnitStrategyResolvedEvent { Strategy: UnitStrategyKind.Reinforce, Success: true } reinforcement &&

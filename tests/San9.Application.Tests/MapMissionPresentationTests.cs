@@ -38,7 +38,13 @@ public sealed class MapMissionPresentationTests
             role.EndsWith("-action",StringComparison.Ordinal) ? "actor" : role == roles[2] ? null : "target-person"));
         var target = new UnitStrategyTarget(new(67,12),2,23,2,condition,defensive,countered);
         var clock = before.World.Clock.Advance();
-        DomainEvent[] facts = [new UnitStrategyResolvedEvent(clock,2,20,UnitStrategyKind.FalseReport,50,success ? 0 : 99,success,target)];
+        var targetUnit = before.World.Units.Single(u => u.Id == 20);
+        DomainEvent[] facts = [new UnitStrategyResolvedEvent(clock,2,20,UnitStrategyKind.FalseReport,50,success ? 0 : 99,success,target)
+        {
+            PreviousMorale = targetUnit.Morale,
+            Audience = new(1, target.ForceId, new(target.ForceId, target.ServicePlaceId, target.Position), target.CommanderId,
+                0, 0, targetUnit.Morale, targetUnit.Soldiers, 0)
+        }];
         ExecutionOutput Read() => MissionPresentation.Results(before,texts,facts,
             content: definitions,context: session.Messages(texts,before.World));
         var messages = Read();

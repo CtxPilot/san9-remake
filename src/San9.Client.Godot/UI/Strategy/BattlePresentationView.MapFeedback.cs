@@ -54,6 +54,7 @@ public partial class BattlePresentationView
         _mapMorales.RemoveAll(n => n.Age >= 1.5);
         if (_mapNumbers.Count == 0) { _numberAssets?.Dispose(); _numberAssets = null; }
         _numberLayer.QueueRedraw();
+        _mapNumberLayer.QueueRedraw();
         QueueRedraw();
     }
 }

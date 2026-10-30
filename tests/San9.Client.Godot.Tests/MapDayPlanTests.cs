@@ -1,5 +1,8 @@
 using San9.Tests;
 using San9.Application;
+using San9.Application.Presentation;
+using San9.Content.Interface;
+using San9.Content.Text;
 using San9.Content.Maps;
 using San9.Content.Scenarios;
 using San9.Core.Domain;
@@ -9,6 +12,79 @@ namespace San9.Client.Godot.Tests;
 
 public sealed class MapDayPlanTests
 {
+    [Theory]
+    [InlineData(UnitStrategyKind.FalseReport, true, UnitCondition.Disguised, 0, 70)]
+    [InlineData(UnitStrategyKind.Disorder, true, UnitCondition.NoFormation, 0, 68)]
+    [InlineData(UnitStrategyKind.Inspire, true, UnitCondition.HighSpirits, 0, 90)]
+    [InlineData(UnitStrategyKind.Inspire, false, UnitCondition.Normal, 0, 66)]
+    [InlineData(UnitStrategyKind.Reinforce, true, UnitCondition.Normal, 50, 75)]
+    [InlineData(UnitStrategyKind.Reinforce, false, UnitCondition.Normal, 20, 73)]
+    public void StrategyPublishesAtTheMovedTargetAndItsAdmittedEffectFinishesBeforeTheDay(
+        UnitStrategyKind strategy, bool success, UnitCondition condition, uint delivered, int morale)
+    {
+        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "strategy", 190, 1, 1, 5,
+            [new(5, "player", 0, 100)], [new(1, "city", 5, 0, 0, 100, 100, 100, 60, [])], [], [])
+        {
+            Units = [new(10, 5, new(2, 2), 100) { FormationId = 10000, Morale = 70 }],
+            Military = new(3, 1, [0, 0, 0], [new(0, 1, null)],
+                [new(10000, 1, 50, 1000, 5, new(1, 1), TravelMode.Land)], [new(1, new(2, 2), new(1, 1))]),
+            Information = new([], [], [], [new CorpsState(5, 5, null, new(100, 100)) { IsRoot = true }], [])
+                { Formations = [new(10000, "formation")] }
+        };
+        var session = GameSession.Start(definition, 1);
+        var before = session.View;
+        var finalUnit = before.World.Units.Single() with
+            { Position = new(7, 2), Condition = condition, Morale = morale, Soldiers = 100 + delivered };
+        var after = before.ForWorld(before.World with { Units = [finalUnit] });
+        List<DomainEvent> facts = [new UnitMovedEvent(before.World.Clock, 10, new(2, 2), finalUnit.Position, 1, NavigationStatus.Moving)];
+        if (condition != UnitCondition.Normal)
+            facts.Add(new BattleConditionChangedEvent(before.World.Clock, 10, false, condition, 5)
+                { Target = new(10, false, 5, null, finalUnit.Position, 1, false), SourceForceId = 5 });
+        facts.Add(new UnitStrategyResolvedEvent(before.World.Clock, 7, 10, strategy, 100, 0, success,
+            new(finalUnit.Position, 5, null, 1, UnitCondition.Normal, false, false))
+        {
+            PreviousMorale = 70, DeliveredSoldiers = delivered,
+            Audience = new(5, 5, new(5, 1, finalUnit.Position), null, 0, 0, morale, finalUnit.Soldiers, 0)
+        });
+        var sprite = new BattleSprite("strategy", 8, 100);
+        var content = new CommandPresentation([], null) { Battle = new(new(), new(), "hit", "block")
+            { ReinforcementEffect = sprite, ConditionEffects = new() { [condition] = sprite } } };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, []);
+        var battle = BattlePresentationPlan.Create(before, after, facts, session.Messages(texts), texts, content);
+        var map = new MapPackage(MapPackage.CurrentSchemaVersion, "fixture", "strategy", "spring", 3, 1, 13056, 6656,
+            Enumerable.Repeat(new MapSquare(0, 1, 0, 0), 3).ToArray(), [], [], [], [], [], [new(1, 0, 0, 0)],
+            Enumerable.Range(1, 14).Select(id => new MapComposition(id, [])).ToArray(),
+            [], [], [], [], new(UnitVisualFixture.Clips.Values.ToArray(), []), [])
+            { BuildingTypes = [new(0, 100)], Units = UnitVisualFixture.Catalog };
+        var day = new TurnDayPresentation(before, after, facts, new MapDayPlan(map, before, facts), battle: battle)
+        {
+            Viewport = () => new(-10000, -10000, 100000, 100000),
+            MapEffectAssets = new Dictionary<string, San9.Content.Images.ImageAsset> { ["strategy"] = new("strategy", "strategy.png", 512, 64) }
+        };
+        var scene = new MapScene(map, new San9.Rendering.TerrainRenderer(map, [], []), "spring", before,
+            new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, day: day);
+        var unit = Assert.Single(scene.Units);
+        day.Advance(.5);
+        Assert.Equal(100u, scene.Sample(unit).Soldiers);
+        Assert.Equal(70, scene.Sample(unit).Morale);
+        day.Advance(.5);
+        var presented = scene.Sample(unit);
+        Assert.Equal(finalUnit.Soldiers, presented.Soldiers);
+        Assert.Equal(finalUnit.Morale, presented.Morale);
+        Assert.Equal(MapCoordinates.Cell(finalUnit.Position).X, presented.CellX, 6);
+        if (success)
+        {
+            var effect = Assert.Single(battle.MapEffects);
+            Assert.Equal(finalUnit.Position, effect.Target.Position);
+            Assert.True(day.IsMapEffectPresented(effect.Id));
+            Assert.False(day.IsComplete);
+            day.Advance(.79);
+            Assert.False(day.IsComplete);
+            day.Advance(.01);
+        }
+        Assert.True(day.IsComplete);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

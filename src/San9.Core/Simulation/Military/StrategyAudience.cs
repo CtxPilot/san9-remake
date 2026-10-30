@@ -2,7 +2,7 @@ using San9.Core.Domain;
 
 namespace San9.Core.Simulation;
 
-/// <summary>Participants and target values retained before a strategy changes their identities or resources.</summary>
+/// <summary>Participants and target values captured by the strategy result; capture timing belongs to each event.</summary>
 public sealed record StrategyAudience(int ForceId, int TargetForceId, PersonOccurrence Target, int? CommanderId,
     long Money, long Food, int Morale, uint Soldiers, int Loyalty)
 {

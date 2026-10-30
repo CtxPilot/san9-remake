@@ -11,6 +11,79 @@ namespace San9.Application.Tests;
 public sealed class BattlePresentationTests
 {
     [Theory]
+    [InlineData(UnitStrategyKind.Disorder, true, 68)]
+    [InlineData(UnitStrategyKind.Disorder, false, 70)]
+    [InlineData(UnitStrategyKind.Inspire, true, 90)]
+    [InlineData(UnitStrategyKind.Inspire, false, 66)]
+    [InlineData(UnitStrategyKind.FalseReport, true, 70)]
+    public void StrategyMoralePublishesItsCapturedResultAfterThePrecedingTactic(
+        UnitStrategyKind strategy, bool success, int morale)
+    {
+        var (session, texts, content, occurrence) = Fixture();
+        var result = new UnitStrategyResolvedEvent(session.Snapshot.Clock, 3, 20, strategy, 100, 0, success,
+            new(new(67, 12), 2, 23, 2, UnitCondition.Normal, false, false))
+        {
+            PreviousMorale = 70,
+            Audience = new(1, 2, new(2, 2, new(67, 12)), 23, 0, 0, morale, 5000, 0)
+        };
+        DomainEvent[] facts = [new TacticActivatedEvent(session.Snapshot.Clock, 10, false, 20, false, 99, [new(3, 99)], false, 10)
+            { Occurrence = occurrence }, result];
+        // The final world deliberately does not contain the target: values belong to the result fact.
+        var after = session.View.ForWorld(session.View.World with
+        {
+            Units = [], Officers = session.View.World.Officers.Select(p => p with { UnitId = null }).ToImmutableArray()
+        });
+        var plan = BattlePresentationPlan.Create(session.View, after, facts, session.Messages(texts), texts, content);
+        if (morale == 70) Assert.Empty(plan.Values);
+        else
+        {
+            var value = Assert.Single(plan.Values);
+            Assert.Equal(morale - 70, value.Morale);
+            Assert.Equal(20, value.TargetId);
+            Assert.Equal(1, value.FactIndex);
+            Assert.Equal(Assert.Single(plan.Visuals).End, value.Time);
+            Assert.Equal(plan.Messages.Last(c => c.Channel == BattleMessageChannel.Dialogue).Id, value.AfterDialogueId);
+        }
+    }
+
+    [Fact]
+    public void DailyLossesAndRecoveryPublishBeforeCombatAndTheLaterStrategy()
+    {
+        var (session, texts, content, _) = Fixture();
+        var clock = session.Snapshot.Clock;
+        var unit = session.View.World.Units.Single(u => u.Id == 20);
+        var place = session.View.Settlements.First();
+        DomainEvent[] facts =
+        [
+            new DailyAttritionEvent(clock, new(ResourceOwnerKind.Corps, 2), 20, null, true, false, 50, 25, 25, 70, 67),
+            new PeriodicMoraleLostEvent(clock, 20, 67, 66),
+            new HighSpiritsExpiredEvent(clock, 20, 66, 36)
+                { Unit = new(20, false, 2, 23, unit.Position, 2, false) },
+            new BattleDamageEvent(clock, 10, 20, null, 500, 0, 500, 0, 1),
+            new UnitStrategyResolvedEvent(clock, 3, 20, UnitStrategyKind.Reinforce, 100, 0, true,
+                new(unit.Position, 2, 23, 2, UnitCondition.Normal, false, false))
+            {
+                DeliveredSoldiers = 500, PreviousMorale = 35,
+                Audience = new(2, 2, new(2, 2, unit.Position), 23, 0, 0, 40, unit.Soldiers - 50, 0)
+            },
+            new DailyAttritionEvent(clock, new(ResourceOwnerKind.Corps, 1), null, place.Id, true, false,
+                1, 0, 1, place.Morale, place.Morale - 3),
+            new GarrisonMoraleRecoveredEvent(clock, place.Id, place.Morale - 3, place.Morale - 2),
+            // A transport has no map object; its loss must not be charged to either army.
+            new DailyAttritionEvent(clock, new(ResourceOwnerKind.Corps, 1), null, null, true, false, 30, 15, 15, 70, 67)
+                { TaskId = Guid.NewGuid() }
+        ];
+        var plan = BattlePresentationPlan.Create(session.View, session.View, facts, session.Messages(texts), texts, content);
+        var values = plan.Values.Where(v => !v.IsSettlement && v.TargetId == unit.Id).ToArray();
+        Assert.Equal(unit.Soldiers - 50, (long)unit.Soldiers + values.Sum(v => v.Soldiers));
+        Assert.Equal(40, unit.Morale + values.Sum(v => v.Morale));
+        var frame = new BattleMapFrame(session.View, plan.MapChanges, plan.Values);
+        Assert.Equal(place.Soldiers - 1, frame.Settlements[place.Id].Soldiers);
+        Assert.Equal(place.Morale - 2, frame.Settlements[place.Id].Morale);
+        Assert.DoesNotContain(plan.Values, v => v.FactIndex == 7);
+    }
+
+    [Theory]
     [InlineData(12, "contact")]
     [InlineData(67, "separated")]
     public void AmbienceUsesOccurrenceContactRatherThanTheTacticBody(int targetX, string expected)
@@ -376,18 +449,26 @@ public sealed class BattlePresentationTests
     public void ReinforcementSuccessEffectUsesTheOccurrenceWithoutRequiringAStateChange(
         bool success, int force, UnitCondition condition)
     {
-        var (session, texts, content, _) = Fixture();
+        var (session, texts, content, occurrence) = Fixture();
         var sprite = new BattleSprite("reinforcement", 8, 100, Sound: "reinforcement-sound");
         content = content with { Battle = content.Battle! with { ReinforcementEffect = sprite } };
         var fact = new UnitStrategyResolvedEvent(session.Snapshot.Clock, 3, 20, UnitStrategyKind.Reinforce, 100, 0, success,
             new(new(67, 12), force, 23, 2, condition, false, false))
         {
-            Audience = new(force, force, new(2, 2, null), 23, 1000, 1000, 70, 100, 90),
+            PreviousMorale = 70,
+            Audience = new(force, force, new(2, 2, null), 23, 1000, 1000, 75, 5000 + (success ? 3000u : 500u), 90),
             DeliveredSoldiers = success ? 3000u : 500u
         };
         var after = new StrategySnapshot(MissionScenario.Create(), session.View.World with
         { Units = [], Officers = session.View.World.Officers.Select(p => p with { UnitId = null }).ToImmutableArray() });
-        var plan = BattlePresentationPlan.Create(session.View, after, [fact], session.Messages(texts), texts, content);
+        DomainEvent[] facts = [new TacticActivatedEvent(session.Snapshot.Clock, 10, false, 20, false, 99, [new(3, 99)], false, 10)
+            { Occurrence = occurrence }, fact];
+        var plan = BattlePresentationPlan.Create(session.View, after, facts, session.Messages(texts), texts, content);
+        var value = Assert.Single(plan.Values);
+        Assert.Equal(fact.DeliveredSoldiers, value.Soldiers);
+        Assert.Equal(5, value.Morale);
+        Assert.Equal(Assert.Single(plan.Visuals).End, value.Time);
+        Assert.Equal(plan.Messages.Last(c => c.Channel == BattleMessageChannel.Dialogue).Id, value.AfterDialogueId);
         if (success)
         {
             var effect = Assert.Single(plan.MapEffects);
@@ -397,6 +478,8 @@ public sealed class BattlePresentationTests
             Assert.Equal(force, effect.Target.ForceId);
             Assert.Equal(fact.Target.CommanderId, effect.Target.CommanderId);
             Assert.Equal(effect.Start, plan.Duration);
+            Assert.Equal(effect.Start, value.Time);
+            Assert.Equal(effect.AfterDialogueId, value.AfterDialogueId);
             Assert.Equal(effect.FactIndex, Assert.Single(plan.MapBatches).FirstFactIndex);
         }
         else Assert.Empty(plan.MapEffects);
@@ -417,11 +500,21 @@ public sealed class BattlePresentationTests
         content = content with { Battle = content.Battle! with
         { BuildingEffects = new() { [kind] = new() { [0] = [sprite] } } } };
         DomainEvent fact = kind == "burn"
-            ? new BurnResolvedEvent(session.Snapshot.Clock, 3, place.Id, 100, 0, success, 10, 0, 0, 0)
+            ? new BurnResolvedEvent(session.Snapshot.Clock, 3, place.Id, 100, 0, success, success ? 10 : 0, 0, 0, 0)
             : new SeizeResolvedEvent(session.Snapshot.Clock, 3, place.Id, 0, 100, 100, 100, true, outcome);
         var plan = BattlePresentationPlan.Create(session.View, session.View, [fact], session.Messages(texts), texts,
             content, new Dictionary<int, int> { [place.Id] = 0 });
         Assert.Empty(plan.Messages);
+        if (kind == "burn" && success)
+        {
+            var value = Assert.Single(plan.Values);
+            Assert.Equal(-10, value.Durability);
+            var before = new BattleMapFrame(session.View, [], []);
+            var result = new BattleMapFrame(session.View, plan.MapChanges, plan.Values);
+            Assert.Equal(Math.Max(0, before.Settlements[place.Id].Durability - 10), result.Settlements[place.Id].Durability);
+            Assert.Equal(plan.Visuals[0].Start, value.Time);
+        }
+        else Assert.Empty(plan.Values);
         if (success)
         {
             var effect = Assert.Single(plan.Visuals);

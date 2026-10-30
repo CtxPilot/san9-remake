@@ -86,4 +86,4 @@ Core显式使用`DailyMovement → BeforeDailyCommands → DailyCombat → Daily
 
 默认解决方案各项目合计6634项通过（Core3193、Application2084、Client611、Content171、Importer575）；默认解决方案首次运行后仅重跑修正了旧日期断言的Application，其余已通过项目复用结果。Headless另41项通过。未运行Godot视觉验收。规则版本升为`san9-core-g10-v204`，保存130／命令日志137结构不变；旧规则档案继续走既有规则变化提示，不反推或迁移旧版本已经结算的历史。没有内容契约或资源变化，无需重转包。
 
-上文忽略目录探针及其哈希为修复前取证，修复后的持续验收使用正式测试入口。独立的表现层数值投影漏项仍见前一轮记录，未将其宣称为本次Core修复已覆盖。
+上文忽略目录探针及其哈希为修复前取证，修复后的持续验收使用正式测试入口。Core修复提交为`bb3e4dd5`；独立的表现层数值投影漏项在后续修改补齐，详见[表现修复](2026-10-30-strategy-presentation-timing-audit.md#用户授权后的表现修复)，不属于该Core提交。
