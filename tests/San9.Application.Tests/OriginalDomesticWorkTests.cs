@@ -35,19 +35,45 @@ public sealed class OriginalDomesticWorkTests
     }
 
     [Fact]
-    public void FailedRollsDoNotExtendCheckBudgetOrSkipFailedPreparation()
+    public void FailedRollsKeepTheLocalCheckBudgetAndContinueToTheNextCity()
     {
         var input = Input(Site(1, [1, 2, 3, 4]), Site(2, [5])) with
         {
-            Abilities = Enumerable.Range(1, 5).ToImmutableDictionary(id => id, _ => new OfficerAbilities(50, 50, 50, 50)),
+            Abilities = Enumerable.Range(1, 5).ToImmutableDictionary(id => id,
+                id => id == 5 ? new OfficerAbilities(100, 100, 100, 100) : new(50, 50, 50, 50)),
         };
         int draws = 0, submits = 0;
         var result = OriginalDomesticWork.Run(DomesticActivity.Commerce, 10, () => input,
             () => { draws++; return 99; }, _ => { submits++; return true; });
-        Assert.Equal(OriginalDomesticEnd.PreparationFailed, result.End);
-        Assert.Equal(1, Assert.Single(result.Steps).SettlementId);
-        Assert.Equal(2, draws);
-        Assert.Equal(0, submits);
+        Assert.Equal(OriginalDomesticEnd.NoCandidates, result.End);
+        Assert.Equal(new[] { OriginalDomesticAttempt.PreparationFailed, OriginalDomesticAttempt.Submitted }, result.Steps.Select(s => s.Outcome));
+        Assert.True(result.Steps[0].ProbabilityFailed);
+        Assert.Equal(3, draws);
+        Assert.Equal(1, submits);
+    }
+
+    [Theory]
+    [InlineData(DomesticActivity.Patrol)]
+    [InlineData(DomesticActivity.Commerce)]
+    [InlineData(DomesticActivity.Cultivation)]
+    [InlineData(DomesticActivity.Repair)]
+    [InlineData(DomesticActivity.Recruit)]
+    [InlineData(DomesticActivity.Train)]
+    public void IncapableFirstCityDoesNotConsumeTheOnlyAttemptForAStaffedCity(DomesticActivity activity)
+    {
+        var first = Site(1, [1], 2000) with { HasPriorityRelation = true };
+        var input = Input(first, Site(2, [2])) with
+        {
+            Sites = [first with { Settlement = first.Settlement with { Morale = 90 } },
+                Site(2, [2]) with { Settlement = Site(2, [2]).Settlement with { Morale = 90 } }],
+            Abilities = Abilities((1, new(0, 0, 0, 0)), (2, new(100, 100, 100, 100))),
+        };
+        var submitted = new List<DevelopmentCommand>();
+        var result = OriginalDomesticWork.Run(activity, 1, () => input, () => 0,
+            command => { submitted.Add(command); return true; });
+        Assert.Equal(2, Assert.Single(submitted).SettlementId);
+        Assert.Equal(OriginalDomesticAttempt.PreparationFailed, result.Steps[0].Outcome);
+        Assert.Equal(OriginalDomesticAttempt.Submitted, result.Steps[1].Outcome);
     }
 
     [Fact]
@@ -163,16 +189,36 @@ public sealed class OriginalDomesticWorkTests
         Assert.Equal(1, submitted);
         Assert.Equal(OriginalDomesticEnd.ReserveReached, result.End);
 
-        input = Input(Site(1, [1]), Site(2, [2]));
+        input = Input(Site(1, [1]), Site(2, [2]), Site(3, [3]));
         result = OriginalDomesticWork.Run(DomesticActivity.Commerce, 10, () => input, () => 0, _ =>
         {
-            input = input with { Sites = [input.Sites[0], input.Sites[1] with
-                { Settlement = input.Sites[1].Settlement with { OfficerIds = [] } }] };
+            input = input with { Sites = input.Sites.Select(s => s.Settlement.Id == 2 ? s with
+                { Settlement = s.Settlement with { OfficerIds = [] } } : s).ToImmutableArray() };
             return true;
         });
-        Assert.Equal(OriginalDomesticEnd.PreparationFailed, result.End);
+        Assert.Equal(OriginalDomesticEnd.NoCandidates, result.End);
         Assert.Equal(OriginalDomesticAttempt.Submitted, result.Steps[0].Outcome);
         Assert.Equal(OriginalDomesticAttempt.PreparationFailed, result.Steps[1].Outcome);
+        Assert.Equal(3, result.Steps[2].SettlementId);
+        Assert.Equal(OriginalDomesticAttempt.Submitted, result.Steps[2].Outcome);
+    }
+
+    [Fact]
+    public void RecruitmentStopsForSharedFoodReserveBeforeCheckingLaterCities()
+    {
+        var input = Input(Site(1, [1]), Site(2, [2])) with { Food = 1000 };
+        input = input with { Sites = input.Sites.Select(s => s with
+            { Settlement = s.Settlement with { Morale = 90 } }).ToImmutableArray() };
+        int submitted = 0;
+        var result = OriginalDomesticWork.Run(DomesticActivity.Recruit, 10, () => input,
+            () => throw new InvalidOperationException("Recruitment selection must not roll."), _ =>
+            {
+                submitted++;
+                input = input with { Food = 999 };
+                return true;
+            });
+        Assert.Equal(1, submitted);
+        Assert.Equal(OriginalDomesticEnd.ReserveReached, result.End);
     }
 
     [Fact]

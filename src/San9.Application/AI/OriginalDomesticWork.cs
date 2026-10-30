@@ -52,12 +52,12 @@ internal static class OriginalDomesticWork
         var targets = initial.Sites.Where(site => Eligible(initial, site, activity))
             .OrderByDescending(site => Priority(site, activity))
             .Select(site => site.Settlement.Id).ToArray();
+        int attempts = 0;
         for (int index = 0; index < targets.Length; index++)
         {
-            if (steps.Count >= attemptLimit) return new(OriginalDomesticEnd.AttemptsExhausted, steps.ToImmutable());
-            // Preparation pops one target. A failed preparation ends the entire work, without
-            // spending a command attempt or silently skipping to a more convenient settlement.
+            if (attempts >= attemptLimit) return new(OriginalDomesticEnd.AttemptsExhausted, steps.ToImmutable());
             var current = capture();
+            if (!HasResources(current, activity)) return new(OriginalDomesticEnd.ReserveReached, steps.ToImmutable());
             var site = current.Sites.FirstOrDefault(s => s.Settlement.Id == targets[index]);
             bool eligible = site is not null && Eligible(current, site, activity);
             var people = eligible
@@ -67,9 +67,11 @@ internal static class OriginalDomesticWork
                 bool probabilityFailed = eligible &&
                     site!.Settlement.OfficerIds.Any(id => activity == DomesticActivity.Train || Ability(current.Abilities[id], activity) >= 35);
                 steps.Add(new(targets[index], OriginalDomesticAttempt.PreparationFailed) { ProbabilityFailed = probabilityFailed });
-                return new(OriginalDomesticEnd.PreparationFailed, steps.ToImmutable());
+                // Local exhaustion consumes this candidate, not the rest of the corps or a command attempt.
+                continue;
             }
             var command = new DevelopmentCommand(current.ForceId, targets[index], people, activity);
+            attempts++;
             bool accepted = submit(command);
             steps.Add(new(targets[index], accepted ? OriginalDomesticAttempt.Submitted : OriginalDomesticAttempt.Rejected));
             // There is no private money debit: only an accepted public command changes funds.
@@ -81,7 +83,8 @@ internal static class OriginalDomesticWork
                     return new(OriginalDomesticEnd.ReserveReached, steps.ToImmutable());
             }
         }
-        return new(OriginalDomesticEnd.NoCandidates, steps.ToImmutable());
+        return new(attempts == 0 && steps.Count > 0 ? OriginalDomesticEnd.PreparationFailed : OriginalDomesticEnd.NoCandidates,
+            steps.ToImmutable());
     }
 
     private static bool Eligible(OriginalDomesticInputs input, OriginalDomesticSite site, DomesticActivity activity)
@@ -91,20 +94,24 @@ internal static class OriginalDomesticWork
         if (!site.IsCity && activity is not (DomesticActivity.Repair or DomesticActivity.Train)) return false;
         return activity switch
         {
-            DomesticActivity.Patrol => city.PublicOrder < 1000 && HasDevelopmentFunds(input),
-            DomesticActivity.Commerce => city.Commerce < city.MaxCommerce && HasDevelopmentFunds(input),
-            DomesticActivity.Cultivation => city.Cultivation < city.MaxCultivation && HasDevelopmentFunds(input),
-            DomesticActivity.Repair => city.Durability < city.MaxDurability && HasDevelopmentFunds(input),
+            DomesticActivity.Patrol => city.PublicOrder < 1000 && HasResources(input, activity),
+            DomesticActivity.Commerce => city.Commerce < city.MaxCommerce && HasResources(input, activity),
+            DomesticActivity.Cultivation => city.Cultivation < city.MaxCultivation && HasResources(input, activity),
+            DomesticActivity.Repair => city.Durability < city.MaxDurability && HasResources(input, activity),
             DomesticActivity.Recruit => input.RecruitmentAllowed && city.DraftPopulation > 0 && city.Soldiers < 500000 &&
-                (city.Soldiers < 10000 || city.Morale >= 90) &&
-                (long)input.Money >= input.SalaryDemand + 1000 &&
-                (long)input.Food >= 3 * input.RationDemand / 2 + 1000,
+                (city.Soldiers < 10000 || city.Morale >= 90) && HasResources(input, activity),
             DomesticActivity.Train => city.Morale < 100 && city.Soldiers > 0,
             _ => false,
         };
     }
 
-    private static bool HasDevelopmentFunds(OriginalDomesticInputs input) => (long)input.Money >= input.SalaryDemand + 250;
+    private static bool HasResources(OriginalDomesticInputs input, DomesticActivity activity) => activity switch
+    {
+        DomesticActivity.Train => true,
+        DomesticActivity.Recruit => (long)input.Money >= input.SalaryDemand + 1000 &&
+            (long)input.Food >= 3 * input.RationDemand / 2 + 1000,
+        _ => (long)input.Money >= input.SalaryDemand + 250,
+    };
 
     private static long Priority(OriginalDomesticSite site, DomesticActivity activity)
     {

@@ -75,16 +75,16 @@ public sealed partial class OriginalAiMilitaryTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void RejectedDeploymentPairStopsAtAttemptBudgetWithoutReservingResources(bool relief)
+    public void IdenticalRejectedDeploymentIsNotRetriedWithoutAWorldChange(bool relief)
     {
         var content = relief ? SupportReliefFixture(4) : Fixture(6);
         var h = new Harness(content, w => EnemyArmy(w, target: relief ? 3 : 1), reject: true);
         var before = h.Engine.Snapshot;
         var report = h.Run(OriginalAiWork.Deploy, 2);
-        Assert.Equal(2, report.Attempts);
-        Assert.Equal(2, report.Rejected);
+        Assert.Equal(1, report.Attempts);
+        Assert.Equal(1, report.Rejected);
         Assert.Equal(0, report.Submitted);
-        Assert.Equal(2, h.Commands.Count);
+        Assert.Single(h.Commands);
         Assert.Same(before, h.Engine.Snapshot);
     }
 

@@ -108,8 +108,23 @@ internal sealed partial class OriginalAiMilitary
     private void Deploy()
     {
         var failedSources = new HashSet<int>();
+        var rejectedPlans = new List<DeployUnitCommand>();
+        var failureWorld = World;
+        bool TryPlan(DeployUnitCommand? command)
+        {
+            if (command is not null && rejectedPlans.Any(previous => SameDeployment(previous, command))) return false;
+            if (!Send(command) && command is not null && ReferenceEquals(failureWorld, World))
+                rejectedPlans.Add(command);
+            return true;
+        }
         while (More)
         {
+            if (!ReferenceEquals(failureWorld, World))
+            {
+                failureWorld = World;
+                rejectedPlans.Clear();
+                failedSources.Clear();
+            }
             bool chosen = false;
             var group0 = Places.Where(s => s.ConfusionDaysRemaining == 0 && Pressure(s.Id, Advanced).Any(u => Opponent(u.OwnerId))).Select(s => s.Id).ToHashSet();
             for (int group = 0; group < 2 && !chosen; group++)
@@ -143,7 +158,9 @@ internal sealed partial class OriginalAiMilitary
                     };
                     var preferred = targets.Where(c => Assigned(c.Unit.Id) == 0).ToArray();
                     var ranked = group == 0 ? preferred.Length > 0
-                        ? preferred.OrderByDescending(c => Score(c.Unit) - c.Route!.Days - c.Unit.DepartureDaysRemaining).ToArray()
+                        ? preferred.OrderByDescending(c => Score(c.Unit) - c.Route!.Days - c.Unit.DepartureDaysRemaining)
+                            .Concat(targets.Where(c => Assigned(c.Unit.Id) != 0)
+                                .OrderBy(c => MapCoordinates.Distance(rules.Place(source).Position, c.Unit.Position))).ToArray()
                         : targets.OrderBy(c => MapCoordinates.Distance(rules.Place(source).Position, c.Unit.Position)).ToArray()
                         : targets.OrderBy(c => c.Route!.Days + c.Unit.DepartureDaysRemaining).ToArray();
                     if (group == 1 && ranked.Length > 0)
@@ -152,17 +169,20 @@ internal sealed partial class OriginalAiMilitary
                         ranked = ranked.Where(c => c.Route!.Days + c.Unit.DepartureDaysRemaining == minimum && c.Unit.Soldiers > Assigned(c.Unit.Id)).ToArray();
                     }
                     if (ranked.Length == 0) continue;
-                    var candidate = ranked[0];
-                    chosen = true;
                     int count = Math.Min(5, people.Length / 2);
                     var members = new[] { people[0] }.Concat(people.Skip(1).OrderBy(p => PersonnelRulebook.AffinityDistance(p, people[0])).Take(count - 1)).ToArray();
                     long related = Pressure(source.Id).Count(u => UnitTo(u, source.Id) is { Days: < 8 });
                     uint soldiers = (uint)Math.Max(0, Math.Min(source.Soldiers - (8000 + Math.Min(20000, 4000 * related)), Math.Min(25000, Capacity(people[0]))));
-                    int wait = group0.Count > 0 ? Math.Max(0, candidate.Route!.Days + candidate.Unit.DepartureDaysRemaining - 10) : candidate.Unit.DepartureDaysRemaining;
-                    if (soldiers < 8000) failedSources.Add(source.Id);
-                    Send(soldiers < 8000 ? null : Deployment(source, members, soldiers,
-                        new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = candidate.Unit.Id }, null, candidate.Unit, true, delay: wait));
-                    break;
+                    foreach (var candidate in ranked)
+                    {
+                        int wait = group0.Count > 0 ? Math.Max(0, candidate.Route!.Days + candidate.Unit.DepartureDaysRemaining - 10) : candidate.Unit.DepartureDaysRemaining;
+                        if (soldiers < 8000) failedSources.Add(source.Id);
+                        if (!TryPlan(soldiers < 8000 ? null : Deployment(source, members, soldiers,
+                            new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = candidate.Unit.Id }, null, candidate.Unit, true, delay: wait))) continue;
+                        chosen = true;
+                        break;
+                    }
+                    if (chosen) break;
                 }
             }
             if (chosen) continue;
@@ -188,7 +208,8 @@ internal sealed partial class OriginalAiMilitary
                     var person = Commanders(People(candidate.Place.Id))[0];
                     uint cap = Fortified(candidate.Place) ? Math.Min(10000, Capacity(person)) : Capacity(person);
                     uint amount = (uint)Math.Min(usable, cap);
-                    Send(Deployment(candidate.Place, [person], amount, new(MilitaryOrderKind.Return, null, target.Place.Id), target.Place, null, true, true));
+                    if (!TryPlan(Deployment(candidate.Place, [person], amount,
+                        new(MilitaryOrderKind.Return, null, target.Place.Id), target.Place, null, true, true))) continue;
                     chosen = true; break;
                 }
                 if (chosen) break;
@@ -196,6 +217,16 @@ internal sealed partial class OriginalAiMilitary
             if (!chosen) break;
         }
     }
+
+    // Identity/sequence are envelopes; rejection reuse depends on the full plan and the exact world above.
+    private static bool SameDeployment(DeployUnitCommand first, DeployUnitCommand second) =>
+        first.SettlementId == second.SettlementId && first.Soldiers == second.Soldiers &&
+        first.FormationId == second.FormationId && first.NavalFormationId == second.NavalFormationId &&
+        first.Order == second.Order && first.DepartureDelayDays == second.DepartureDelayDays &&
+        first.Waypoint == second.Waypoint && first.Policies == second.Policies && first.ConfirmAttack == second.ConfirmAttack &&
+        first.OfficerIds.AsSpan().SequenceEqual(second.OfficerIds.AsSpan()) &&
+        first.Tactics.Count == second.Tactics.Count && first.Tactics.All(p => second.Tactics.TryGetValue(p.Key, out var tactic) && tactic == p.Value) &&
+        first.Ranks.Count == second.Ranks.Count && first.Ranks.All(p => second.Ranks.TryGetValue(p.Key, out var rank) && rank == p.Value);
 
     private long ReliefDefense(SettlementState place) => place.Soldiers +
         World.Units.Where(u => FieldUnit(u) &&
