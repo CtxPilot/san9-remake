@@ -2,11 +2,97 @@ using San9.Tests;
 using San9.Application.Persistence;
 using San9.Application.Presentation;
 using San9.Core.Domain;
+using San9.Content.Interface;
+using San9.Content.Text;
 
 namespace San9.Application.Tests;
 
 public sealed class MissionSelectionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SoleRescueTargetIsPreselectedAndAdviserControlsDialogue(bool hasAdviser)
+    {
+        var basis = MissionScenario.Create();
+        var content = basis with
+        {
+            Forces = basis.Forces.Select(f => f.Id == 1 ? f with { AdviserId = hasAdviser ? 2 : null } : f).ToArray(),
+            Officers = basis.Officers.Where(p => hasAdviser || p.State.Id != 2).Select(p => p.State.Id == 2 ?
+                p with { State = p.State with { Status = OfficerStatus.Strategist } } : p).ToArray()
+        };
+        var session = GameSession.Start(content, 42);
+        var before = session.Capture();
+        var draft = new MissionDraft(session, 1, "rescue");
+        Assert.Equal(10, draft.TargetId);
+        Assert.False(draft.CanSelectTarget);
+        Assert.Equal(hasAdviser, draft.CanSelectActor);
+        Assert.True(draft.CanExecute);
+        string[] roles = ["strategy-favorable", "strategy-unfavorable"];
+        var texts = MissionScenario.Texts(draft.View) with { Messages = roles.ToDictionary(role => role,
+            role => new MessageDefinition([new MessageLiteral(role)])) };
+        var messages = roles.ToDictionary(role => role, role => new DecisionMessageDefinition(role, [], "adviser"));
+        var dialogue = MissionPresentation.Advice(draft, messages, session.Messages(texts), texts);
+        if (hasAdviser) Assert.Equal(2, Assert.Single(dialogue).SpeakerId);
+        else Assert.Empty(dialogue);
+        Assert.Same(before, session.Capture());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void EmptyAndMultipleRescueTargetsDoNotChooseOrAdvise(int count)
+    {
+        var basis = MissionScenario.Create();
+        var unit = basis.Units.Single(u => u.Id == 10);
+        var officer = basis.Officers.Single(p => p.State.UnitId == 10);
+        var content = basis with
+        {
+            Units = count == 0 ? basis.Units.Where(u => u.Id != 10).ToArray() :
+                [.. basis.Units, unit with { Id = 110, CommanderId = 103 }],
+            Officers = count == 0 ? basis.Officers.Where(p => p.State.UnitId != 10).ToArray() :
+                [.. basis.Officers, officer with { State = officer.State with { Id = 103, UnitId = 110 } }]
+        };
+        var session = GameSession.Start(content, 42);
+        var before = session.Capture();
+        var draft = new MissionDraft(session, 1, "rescue");
+        Assert.Equal(count, draft.Targets.Length);
+        Assert.Null(draft.TargetId);
+        Assert.Null(draft.Advice);
+        Assert.False(draft.CanExecute);
+        Assert.Equal(count > 1, draft.CanSelectTarget);
+        Assert.Same(before, session.Capture());
+    }
+
+    [Fact]
+    public void SolePrisonerDeterminesRecipientWhileRumorStillRequiresBothForces()
+    {
+        var basis = MissionScenario.Create();
+        var content = basis with
+        {
+            Officers = basis.Officers.Select(p => p.State.Id == 3 ? p with { State = p.State with
+                { UnitId = null, SettlementId = 2, Status = OfficerStatus.Captive } } : p).ToArray(),
+            Units = basis.Units.Where(u => u.Id != 10).ToArray()
+        };
+        var session = GameSession.Start(content, 42);
+        var before = session.Capture();
+        var returning = new MissionDraft(session, 1, "return");
+        Assert.Equal(3, returning.SecondaryId);
+        Assert.Equal(2, returning.TargetId);
+        Assert.False(returning.CanSelectTarget);
+        Assert.True(returning.CanExecute);
+        var rumor = new MissionDraft(session, 1, "rumor");
+        Assert.Null(rumor.TargetId);
+        Assert.Null(rumor.SecondaryId);
+        Assert.True(rumor.CanSelectTarget);
+        Assert.False(rumor.CanSelectSecondaryTarget);
+        Assert.Null(rumor.Advice);
+        Assert.True(rumor.SetTarget(2));
+        Assert.Null(rumor.SecondaryId);
+        Assert.True(rumor.CanSelectSecondaryTarget);
+        Assert.Same(before, session.Capture());
+    }
+
     [Theory]
     [InlineData("false-report", 20)]
     [InlineData("disorder", 20)]
@@ -89,13 +175,14 @@ public sealed class MissionSelectionTests
     {
         var session = GameSession.Start(MissionScenario.Create(),42);
         var draft = new MissionDraft(session,1,"alienate");
+        int? selected = draft.TargetId;
         var before = session.Capture();
         var pages = MissionOfficerCatalog.Pages(draft,MissionScenario.Texts(draft.View),targets:true);
         var rows = MissionOfficerCatalog.Read(draft,MissionScenario.Texts(draft.View),0,targets:true);
         var row = rows.Single(r => r.Id == 22);
         var arrival = row.Cells[Array.FindIndex(pages[0].Columns,c => c.Id == "estimate")];
         Assert.True(arrival.Number > 0);
-        Assert.Null(draft.TargetId);
+        Assert.Equal(selected,draft.TargetId);
         Assert.Same(before, session.Capture());
     }
 

@@ -22,6 +22,7 @@ public partial class MissionCommandFlow : CommandWorkflow
         _mission = new() { Draft = new(Session,id,kind), Session = Session, Texts = Texts, Service = Textures, Textures = Scope, Skin = Skin,
             World = World, Closed = Close, Submit = SubmitMission, SelectionChanged = ShowMissionAdvice, ChooseMap = Targets.Begin };
         ShowWindow(_mission, () => { _mission = null; });
+        ShowMissionAdvice();
     }
     public override void Close()
     {

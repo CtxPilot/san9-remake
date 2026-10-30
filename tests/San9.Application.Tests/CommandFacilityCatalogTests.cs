@@ -44,6 +44,7 @@ public sealed class CommandFacilityCatalogTests
     {
         var session = GameSession.Start(MissionScenario.Create(),42);
         var draft = new MissionDraft(session,1,"burn");
+        int? selected = draft.TargetId;
         var before = session.Capture();
         int calls = 0;
         var catalog = new CommandFacilityCatalog(draft.View,MissionScenario.Texts(draft.View),"burn",draft.Targets,
@@ -52,7 +53,7 @@ public sealed class CommandFacilityCatalogTests
         Assert.True(catalog.Read(0).Single(r => r.Id == 2).Cells[column].Number > 0);
         catalog.Read(1); catalog.Read(0);
         Assert.Equal(draft.Targets.Length,calls);
-        Assert.Null(draft.TargetId);
+        Assert.Equal(selected,draft.TargetId);
         Assert.Same(before, session.Capture());
     }
 

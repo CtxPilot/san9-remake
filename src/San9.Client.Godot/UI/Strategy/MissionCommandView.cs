@@ -66,6 +66,7 @@ public partial class MissionCommandView : CommandPreparationView
         var targetButton = window.ActionButton(Draft.Kind == "return" ? CommandText.Resolve(Texts, "label.prisoner") : Draft.TargetKind == MissionTargetKind.Unit ? CommandText.Resolve(Texts, "label.target-unit") : Draft.TargetKind == MissionTargetKind.Officer ? CommandText.Resolve(Texts, "label.target-officer") :
             Draft.TargetKind == MissionTargetKind.Settlement ? CommandText.Resolve(Texts, "label.target-facility") : CommandText.Resolve(Texts, "label.recipient-force"), "edit", new(0,48,104,40),
             () => { if (Draft.Kind == "return") Select(InformationCategory.Officers, Draft.Prisoners, Draft.SecondaryId, id => { Draft.SetPrisoner(id); Changed(); }, officerTargets: true); else SelectTarget(false); });
+        targetButton.Disabled = !Draft.CanSelectTarget;
         if (Draft.IsDiplomacy)
             window.BindHint(targetButton, CommandText.Resolve(Texts, Draft.Kind == "return" ? "hint.prisoner" : "hint.force"));
         if (Draft.Kind == "alienate")
@@ -134,12 +135,14 @@ public partial class MissionCommandView : CommandPreparationView
             if (Draft.Kind is "rumor" or "request")
             {
                 var secondaryButton = window.ActionButton(Draft.Kind == "rumor" ? CommandText.Resolve(Texts, "label.target-force") : CommandText.Resolve(Texts, "label.target-facility"), "edit", new(0,Draft.Kind == "rumor" ? 112 : 88,104,40), () => SelectTarget(true));
+                secondaryButton.Disabled = !Draft.CanSelectSecondaryTarget;
                 if (Draft.IsDiplomacy)
                     window.BindHint(secondaryButton, CommandText.Resolve(Texts, Draft.TargetId is null ? "hint.force" : "hint.target-facility"));
                 Value(TargetName(Draft.SecondaryKind,Draft.SecondaryId),at+new Vector2(104,Draft.Kind == "rumor" ? 112 : 88),new(Draft.Kind == "rumor" ? 80 : 96,32));
             }
         }
         var actorButton = window.ActionButton(CommandText.Resolve(Texts, "label.actor"), "edit", new(0,actorY,104,40), SelectActor);
+        actorButton.Disabled = !Draft.CanSelectActor;
         if (Draft.IsDiplomacy)
             window.BindHint(actorButton, Draft.Actors.IsEmpty ? idle : Texts.Resolve(CommandMenuSkin.OfficerSelectionHintKey));
         Person(Draft.View,Draft.ActorId,at+new Vector2(104,actorY));

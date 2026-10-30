@@ -30,6 +30,12 @@ public sealed class MissionDraft
     private bool CanPrepare => IsCurrent && !session.IsExecuting;
     private bool NeedsSecondary => Kind is "rumor" or "request" or "return";
     public ImmutableArray<int> Actors { get; }
+    public bool CanSelectActor => CanPrepare && Actors.Length > 1;
+    public bool CanSelectTarget => CanPrepare && CanChoose(Kind == "return" ? Prisoners : Targets,
+        Kind == "return" ? SecondaryId : TargetId);
+    public bool CanSelectSecondaryTarget => CanPrepare && CanChoose(SecondaryTargets, SecondaryId);
+    private static bool CanChoose(ImmutableArray<int> candidates, int? selected) =>
+        candidates.Length > 1 || selected is null && !candidates.IsEmpty;
     public int? ActorId { get; private set; }
     public int? TargetId { get; private set; }
     public int? SecondaryId { get; private set; }
@@ -72,12 +78,29 @@ public sealed class MissionDraft
             .ThenByDescending(p => Kind == "inspire" && KnowsInspiration(p.Id)).ThenBy(p => p.Id)
             .Select(p => p.Id).ToImmutableArray();
         ActorId = Actors.IsEmpty ? null : Actors[0];
-        if (Kind != "gift") return;
-        var root = View.World.Corps.Single(c => c.OwnerId == View.RequirePlayerForce() && c.IsRoot);
-        // Candidate and journey queries need an affordable offer, but do not select a gift for the player.
-        if (root.Treasury.Money >= GiftOffer.MinimumMoney) availableGift = new(GiftKind.Money, GiftOffer.MinimumMoney, null);
-        else if (root.Treasury.Food >= GiftOffer.MinimumFood) availableGift = new(GiftKind.Food, GiftOffer.MinimumFood, null);
-        else if (!Treasures.IsEmpty) availableGift = new(GiftKind.Treasure, 0, Treasures[0]);
+        if (Kind == "gift")
+        {
+            var root = View.World.Corps.Single(c => c.OwnerId == View.RequirePlayerForce() && c.IsRoot);
+            // Candidate and journey queries need an affordable offer, but do not select a gift for the player.
+            if (root.Treasury.Money >= GiftOffer.MinimumMoney) availableGift = new(GiftKind.Money, GiftOffer.MinimumMoney, null);
+            else if (root.Treasury.Food >= GiftOffer.MinimumFood) availableGift = new(GiftKind.Food, GiftOffer.MinimumFood, null);
+            else if (!Treasures.IsEmpty) availableGift = new(GiftKind.Treasure, 0, Treasures[0]);
+        }
+        if (Kind == "return")
+        {
+            var prisoners = Prisoners;
+            if (prisoners.Length == 1) SetPrisoner(prisoners[0]);
+        }
+        else if (Kind != "rumor")
+        {
+            var targets = Targets;
+            if (targets.Length == 1) SetTarget(targets[0]);
+            if (Kind == "request" && TargetId is not null)
+            {
+                var secondary = SecondaryTargets;
+                if (secondary.Length == 1) SetTarget(secondary[0], secondary: true);
+            }
+        }
     }
 
     private UnitStrategyKind UnitKind => Kind switch
