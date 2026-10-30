@@ -102,7 +102,7 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
     private string? UnitStrategy(SettlementState home, string command)
     {
         bool friendly = command is "inspire" or "rescue";
-        bool candidate = view.World.Units.Any(u => !u.IsEmbedded && !u.IsPersonnel && u.Soldiers > 0 && u.FormationId is not null &&
+        bool candidate = view.World.Units.Any(u => !u.IsEmbedded && !u.IsPersonnel && u.HasEnteredDailyCycle && u.Soldiers > 0 && u.FormationId is not null &&
             (friendly ? u.OwnerId == Owner : Hostile(u.OwnerId)) && view.MilitaryRules?.RegionAt(u.Position) is int region && InRange(home.Id, region) &&
             (command != "disorder" || !view.MilitaryRules.Formation(u).ImmuneToDisorder) &&
             (command != "inspire" || u.Morale < 100 || u.Condition is not (UnitCondition.Normal or UnitCondition.HighSpirits)));

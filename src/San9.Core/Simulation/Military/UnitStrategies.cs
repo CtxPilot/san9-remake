@@ -115,7 +115,7 @@ internal static class UnitStrategies
     internal static bool Eligible(WorldMutation world, int force, UnitStrategyKind strategy, int targetId, SimulationRules rules)
     {
         if (!Enum.IsDefined(strategy) || rules.Military is not { } military || !world.Units.TryGetValue(targetId, out var target) ||
-            target.IsPersonnel || target.IsEmbedded || target.FormationId is not int formationId ||
+            target.IsPersonnel || target.IsEmbedded || !target.HasEnteredDailyCycle || target.FormationId is not int formationId ||
             !military.Formations.TryGetValue(formationId, out var formation) || Members(world, target).Length == 0) return false;
         if (strategy == UnitStrategyKind.Inspire)
             return target.OwnerId == force &&

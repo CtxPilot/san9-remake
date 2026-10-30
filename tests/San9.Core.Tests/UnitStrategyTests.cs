@@ -8,6 +8,41 @@ namespace San9.Core.Tests;
 public sealed class UnitStrategyTests
 {
     [Theory]
+    [InlineData(UnitStrategyKind.FalseReport)]
+    [InlineData(UnitStrategyKind.Disorder)]
+    [InlineData(UnitStrategyKind.Inspire)]
+    [InlineData(UnitStrategyKind.Reinforce)]
+    public void TargetRequiresDailyCycleEntryEvenWhenDepartureIsDelayed(UnitStrategyKind strategy)
+    {
+        var rules = Rules();
+        var world = World(friendly: strategy is UnitStrategyKind.Inspire or UnitStrategyKind.Reinforce);
+        var engine = new SimulationEngine(world, rules);
+        var setup = world.BeginMutation();
+        setup.Replace(setup.Units[5] with { Order = new(MilitaryOrderKind.Move, new(100, 2), null) });
+        setup.Replace(setup.Units[5] with { HasEnteredDailyCycle = false, CommandedThisXun = true,
+            DepartureDaysRemaining = 9 });
+        world.Commit(setup);
+        var command = new UnitStrategyCommand(Guid.NewGuid(), 1, 0, 11, strategy, 5);
+        var before = engine.Snapshot;
+        Assert.Equal(CommandRejection.InvalidTask, engine.GetUnitStrategyAdvice(1, 11, strategy, 5).Rejection);
+        Assert.Equal(CommandRejection.InvalidTask, engine.GetPreparationEligibility(new("player"), command));
+        var rejected = engine.Execute(new("player"), command);
+        Assert.Equal(CommandRejection.InvalidTask, rejected.Submission.Rejection);
+        Assert.Empty(rejected.Events);
+        StateAssert.Equal(before, engine.Snapshot);
+
+        var daily = world.BeginMutation();
+        MilitaryMovement.BeginDailyCycle(daily);
+        world.Commit(daily);
+        var entered = Assert.Single(engine.Snapshot.Units);
+        Assert.Equal(before.Units.Single().Position, entered.Position);
+        Assert.Equal(9, entered.DepartureDaysRemaining);
+        Assert.True(entered.CommandedThisXun);
+        Assert.Equal(CommandRejection.None, engine.GetUnitStrategyAdvice(1, 11, strategy, 5).Rejection);
+        Assert.True(engine.Execute(new("player"), command).Submission.Accepted);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void QuarterlyPopulationCountsOutboundAndReturningReinforcements(bool returning)

@@ -8,6 +8,30 @@ namespace San9.Application.Tests;
 public sealed class MissionSelectionTests
 {
     [Theory]
+    [InlineData("false-report", 20)]
+    [InlineData("disorder", 20)]
+    [InlineData("inspire", 10)]
+    [InlineData("rescue", 10)]
+    public void UnitStrategyMenuAndTargetsRequireDailyCycleEntry(string kind, int target)
+    {
+        var basis = MissionScenario.Create();
+        foreach (bool entered in new[] { false, true })
+        {
+            var content = basis with { Units = basis.Units.Select(u => u.Id == target ? u with
+                { HasEnteredDailyCycle = entered, CommandedThisXun = true, DepartureDaysRemaining = 9,
+                    Order = u.Order ?? new(MilitaryOrderKind.Move, new(100, 7), null) } : u).ToArray() };
+            var session = GameSession.Start(content, 42);
+            var before = session.Capture();
+            var draft = new MissionDraft(session, 1, kind);
+            var menu = MapCommandMenu.Settlement(session.View, 1).SelectMany(e => e.Children).Single(e => e.Id == kind);
+            Assert.Equal(entered, menu.UnavailableReasonKey is null);
+            Assert.Equal(entered, draft.Targets.Contains(target));
+            Assert.Equal(entered, draft.SetTarget(target));
+            Assert.Same(before, session.Capture());
+        }
+    }
+
+    [Theory]
     [InlineData("burn", false, CommandTargetMarker.Hostile)]
     [InlineData("seize", false, CommandTargetMarker.Hostile)]
     [InlineData("false-report", false, CommandTargetMarker.Hostile)]
