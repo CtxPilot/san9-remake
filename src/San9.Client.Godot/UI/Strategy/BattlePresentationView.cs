@@ -43,6 +43,7 @@ public partial class BattlePresentationView : Control
     private readonly List<Sprite2D> _effects = [];
     private const int FullScreenEffectZIndex = 2;
     private BattleVisualCue? _zoom;
+    private BattleVisualCue? _preludeFrame;
     public void RetryResources() { _duelUi?.RetryFailed(); _assets?.RetryFailed(); _flags?.RetryFailed(); _numberAssets?.RetryFailed(); foreach (var portrait in _portraits) portrait.RetryFailed(); }
     public bool ResourcesReady => _duelUi?.IsReady != false && _assets?.IsReady != false && _flags?.IsReady != false && _portraits.All(p => p.IsReady);
 
@@ -63,7 +64,7 @@ public partial class BattlePresentationView : Control
         _flags?.Dispose(); _flags = null;
         _duel = null; _duelSpeechLayout = null; _duelPortraits.Clear(); _duelText?.Hide();
         _duelPanels?.QueueRedraw(); _duelSpeechFrame?.QueueRedraw();
-        _zoom = null; _entering = false;
+        _zoom = null; _preludeFrame = null; _entering = false;
         _publishedNumbers.Clear();
         _publishedMorales.Clear();
         MapAudioGain = SceneAudioGain = 1;
@@ -115,7 +116,7 @@ public partial class BattlePresentationView : Control
         if (!ReferenceEquals(_day, day)) Prepare(day);
         if (day?.Battle is not { } plan || !ResourcesReady || _assets?.Error is not null || _flags?.Error is not null || _portraits.Any(p => p.Error is not null)) return;
         double time = day.Elapsed;
-        var visuals = plan.Visuals.Where(c => day.IsFactReady(c.FactIndex) && day.IsDialogueComplete(c.AfterDialogueId));
+        var visuals = plan.Visuals.Where(day.IsVisualReady);
         var mapEffects = plan.MapEffects.Where(c => day.IsFactReady(c.FactIndex) && day.IsDialogueComplete(c.AfterDialogueId));
         UpdateDuel(plan, time);
         var entrance = visuals.FirstOrDefault(c => c.EntranceStart is { } start && time >= start && time < c.End);
@@ -134,6 +135,7 @@ public partial class BattlePresentationView : Control
         bool Active(BattleVisualCue cue) => cue.IsMapEffect
             ? day.IsMapEffectPresented(cue.Id) && day.MapEffectElapsed(cue.Id) < cue.End - cue.Start
             : time >= cue.Start && time < cue.End;
+        _preludeFrame = visuals.FirstOrDefault(c => c.PreludeId is not null && Active(c));
         _zoom = visuals.FirstOrDefault(c => c.Zoom is not null && time >= c.Start && time < c.End);
         UpdateSceneAudio(day, visuals.Where(Active), mapEffects);
         int slot = 0;
@@ -245,6 +247,24 @@ public partial class BattlePresentationView : Control
         if (hint is not null) DrawString(font, new(560, 730), hint, fontSize: 18, modulate: Colors.LightGray);
         DrawString(font, new(932, 730), CommandText.Resolve(Texts, "battle.skip"), fontSize: 20);
     }
+    private void DrawPreludeBackdrop()
+    {
+        if (_preludeFrame?.Effect is not { } sprite || _assets is null) return;
+        var texture = _assets.Get(sprite.Asset, this);
+        float width = texture.GetWidth() / (float)sprite.Columns;
+        var viewport = GetViewportRect();
+        var image = new Rect2(new(viewport.Size.X / 2 + sprite.OffsetX - (sprite.Centered ? width / 2 : 0), sprite.OffsetY),
+            new(width, texture.GetHeight())).Intersection(viewport);
+        // The original full-screen pictures contain a half-density shadow. Extend
+        // that backdrop into the extra window area without stretching the artwork
+        // or darkening its transparent pixels a second time.
+        var shade = new Color(0, 0, 0, .5f * sprite.Opacity);
+        if (!image.HasArea()) { DrawRect(viewport, shade); return; }
+        DrawRect(new(viewport.Position, new(viewport.Size.X, image.Position.Y - viewport.Position.Y)), shade);
+        DrawRect(new(new(viewport.Position.X, image.End.Y), new(viewport.Size.X, viewport.End.Y - image.End.Y)), shade);
+        DrawRect(new(new(viewport.Position.X, image.Position.Y), new(image.Position.X - viewport.Position.X, image.Size.Y)), shade);
+        DrawRect(new(new(image.End.X, image.Position.Y), new(viewport.End.X - image.End.X, image.Size.Y)), shade);
+    }
     public override void _Draw()
     {
         MouseFilter = !IsSceneActive ? MouseFilterEnum.Ignore : MouseFilterEnum.Stop;
@@ -259,6 +279,7 @@ public partial class BattlePresentationView : Control
                     modulate: feedback.SoldierGain > 0 ? Colors.LightGreen : Colors.OrangeRed);
             }
         }
+        DrawPreludeBackdrop();
         _numberLayer.QueueRedraw();
         if (_duel is not null) { DrawDuel(); return; }
         if (_zoom is not { } cue || _assets is null || cue.Zoom is not { } zoom || _day is null) return;

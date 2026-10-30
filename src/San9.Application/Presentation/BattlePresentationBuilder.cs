@@ -14,6 +14,7 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
 {
     private readonly List<BattleMessageCue> _messages = [];
     private readonly List<BattleVisualCue> _visuals = [];
+    private readonly List<BattlePreludeCue> _preludes = [];
     private readonly HashSet<string> _presented = [];
     private readonly List<BattleRecordCue> _records = [];
     private readonly List<BattleValueCue> _stateValues = [];
@@ -107,6 +108,7 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
             double firstCursor = _cursor;
             int firstValue = _stateValues.Count;
             int firstVisual = _visuals.Count, firstEffect = _mapEffects.Count, firstNumber = _mapNumbers.Count;
+            int firstPrelude = _preludes.Count;
             int firstChange = _mapChanges.Count;
             int firstDuel = _duels.Count;
             switch (events[_index])
@@ -136,6 +138,8 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
                 _stateValues[i] = _stateValues[i] with { FactIndex = _index, AfterDialogueId = DialogueBefore(_stateValues[i].Time) ?? _mapDialogue };
             for (int i = firstVisual; i < _visuals.Count; i++)
                 _visuals[i] = _visuals[i] with { FactIndex = _index, AfterDialogueId = DialogueBefore(_visuals[i].EntranceStart ?? _visuals[i].Start) };
+            for (int i = firstPrelude; i < _preludes.Count; i++)
+                _preludes[i] = _preludes[i] with { FactIndex = _index, AfterDialogueId = DialogueBefore(_preludes[i].Start) };
             for (int i = firstEffect; i < _mapEffects.Count; i++)
                 _mapEffects[i] = _mapEffects[i] with { FactIndex = _index, AfterDialogueId = DialogueBefore(_mapEffects[i].Start) };
             for (int i = firstNumber; i < _mapNumbers.Count; i++)
@@ -167,7 +171,7 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
         return new BattlePresentationPlan(_messages, _records, _visuals, _stateValues, _mapEffects, _mapNumbers, content.Battle?.MapNumbers, _presented,
             _duels.Count == 0 && _messages.Count == 0 && _records.Count == 0 && _visuals.Count == 0 && _mapEffects.Count == 0 &&
             _mapNumbers.Count == 0 && _mapChanges.Count == 0 && _stateValues.Count == 0 && _batches.Count == 0
-                ? finalCue : Math.Max(_cursor, finalCue), _duels, _mapChanges, _batches);
+                ? finalCue : Math.Max(_cursor, finalCue), _duels, _mapChanges, _batches, _preludes);
     }
 
     private bool Player(int? force) => before.World.Simulation.Controls.Any(c => c.ForceId == force && c.Kind == ControllerKind.Player);

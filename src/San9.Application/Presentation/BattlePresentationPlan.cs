@@ -11,6 +11,11 @@ namespace San9.Application.Presentation;
 
 public enum BattleMessageChannel { MapSpeech, Dialogue, DuelDialogue }
 public sealed record BattleMapBatch(double Time, int FirstFactIndex, int LastFactIndex, string? AfterDialogueId);
+public sealed record BattlePreludeCue(string Id, double Start, double End, BattleObjectContext Target)
+{
+    public int FactIndex { get; init; }
+    public string? AfterDialogueId { get; init; }
+}
 public sealed record BattleMessageCue(string Id, double Time, CommandMessage Message,
     BattleMessageChannel Channel = BattleMessageChannel.MapSpeech)
 {
@@ -30,6 +35,7 @@ public sealed record BattleVisualCue(string Id, double Start, double End, Battle
     public bool IsMapEffect => Zoom is null && !ScreenEffect;
     public uint SoldierGain { get; init; }
     public bool ScreenEffect { get; init; }
+    public string? PreludeId { get; init; }
     public double? FadeOutStart { get; init; }
     public double? EntranceStart { get; init; }
     public int MoraleGain { get; init; }
@@ -74,6 +80,7 @@ public sealed record BattleMapNumberCue(string Id, double Start, BattleObjectCon
 /// <summary>Occurrence ordered, immutable presentation. Text choices and identities are fixed before playback.</summary>
 public sealed class BattlePresentationPlan
 {
+    public IReadOnlyList<BattlePreludeCue> Preludes { get; }
     public IReadOnlyList<BattleMapBatch> MapBatches { get; }
     public IReadOnlyList<DuelSceneCue> Duels { get; }
     public IReadOnlyList<BattleMessageCue> Messages { get; }
@@ -88,8 +95,9 @@ public sealed class BattlePresentationPlan
     public BattleMapNumberDefinition? NumberDefinition { get; }
     internal BattlePresentationPlan(List<BattleMessageCue> messages, List<BattleRecordCue> records, List<BattleVisualCue> visuals, List<BattleValueCue> values,
         List<BattleMapEffectCue> effects, List<BattleMapNumberCue> numbers, BattleMapNumberDefinition? numberDefinition, HashSet<string> feedback, double duration, List<DuelSceneCue> duels,
-        List<BattleMapChangeCue> mapChanges, List<BattleMapBatch> batches)
+        List<BattleMapChangeCue> mapChanges, List<BattleMapBatch> batches, List<BattlePreludeCue> preludes)
     {
+        Preludes = preludes.AsReadOnly();
         MapBatches = batches.AsReadOnly();
         Duels = duels.AsReadOnly();
         Messages = messages.AsReadOnly(); Records = records.AsReadOnly(); Visuals = visuals.AsReadOnly(); Values = values.AsReadOnly();

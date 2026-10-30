@@ -9,6 +9,75 @@ namespace San9.Client.Godot.Tests;
 
 public sealed class MapDayPlanTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AreaPreludeAdmitsItsFirstTargetOnceAndSkipsOnlyItsOwnWait(bool targetVisible)
+    {
+        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "prelude", 190, 1, 1, 5,
+            [new(5, "player", 0, 100)],
+            [new(1, "source", 5, 0, 0, 100, 100, 100, 60, []),
+             new(2, "target", 5, 24, 0, 100, 100, 100, 60, [])], [], [])
+        { Information = new([], [], [], [new CorpsState(5, 5, null, new(100, 100)) { IsRoot = true }], []) };
+        var session = GameSession.Start(definition, 1);
+        var map = new MapPackage(MapPackage.CurrentSchemaVersion, "fixture", "prelude", "spring", 32, 1, 13056, 6656,
+            Enumerable.Repeat(new MapSquare(0, 1, 0, 0), 32).ToArray(), [], [], [], [], [],
+            [new(1, 0, 0, 0), new(2, 24, 0, 0)],
+            Enumerable.Range(1, 14).Select(id => new MapComposition(id, [])).ToArray(),
+            [], [], [], [], new([], []), []) { BuildingTypes = [new(0, 100)] };
+        string[] roles = ["activation-own", "announcement", "action", "hit"];
+        var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, [])
+        { Messages = roles.ToDictionary(r => r, r => new San9.Content.Text.MessageDefinition([new San9.Content.Text.MessageLiteral(r)])) };
+        var messages = roles.ToDictionary(r => r, r => new San9.Content.Interface.DecisionMessageDefinition(r, []));
+        var content = new San9.Content.Interface.CommandPresentation([], null)
+        {
+            Battle = new(messages, new() { [99] = new(messages, new("impact", 2, 100), null)
+                { Prelude = [new("screen", 1, 500, Sound: "prelude-sound"), new("screen", 1, 125) { Opacity = .5f }] } }, "hit", "block")
+        };
+        var source = new BattleObjectContext(1, true, 5, null, null, 1, true);
+        var target = source with { Id = 2, ServicePlaceId = 2 };
+        var occurrence = new TacticOccurrence(source, target, null, null, UnitCondition.Normal, null, null, null, false);
+        DomainEvent[] events =
+        [
+            new TacticActivatedEvent(session.Snapshot.Clock, 1, true, 2, true, 99, [new(7, 99)], false, 10) { Occurrence = occurrence },
+            new IntelligenceEffectResolvedEvent(session.Snapshot.Clock, new(1, true), 2, true, 99, 10) { ActorId = 7, Occurrence = occurrence },
+            new IntelligenceEffectResolvedEvent(session.Snapshot.Clock, new(1, true), 1, true, 99, 10)
+                { ActorId = 7, Occurrence = occurrence with { Target = source } }
+        ];
+        var battle = San9.Application.Presentation.BattlePresentationPlan.Create(session.View, session.View, events,
+            session.Messages(texts), texts, content, tacticScenesEnabled: false);
+        var prelude = Assert.Single(battle.Preludes);
+        var plan = new MapDayPlan(map, session.View, events);
+        var sourceBounds = new San9.Rendering.MapPresentationBounds(0, 0, 256, 256);
+        var targetBounds = new San9.Rendering.MapPresentationBounds(800, 400, 256, 256);
+        var viewport = targetVisible ? targetBounds : sourceBounds;
+        var day = new TurnDayPresentation(session.View, session.View, events, plan, battle: battle)
+        {
+            Viewport = () => viewport,
+            MapEffectAssets = new Dictionary<string, San9.Content.Images.ImageAsset> { ["impact"] = new("impact", "impact.png", 64, 32) }
+        };
+        day.Advance(1);
+        day.CompleteDialogue(Assert.Single(day.PendingDialogues).Id);
+        day.Advance(.25, paused: true);
+        Assert.False(day.IsPreludePresented(prelude.Id));
+        Assert.Equal(prelude.Start, day.Elapsed);
+        day.Advance(0);
+        Assert.Equal(targetVisible, day.IsPreludePresented(prelude.Id));
+        Assert.Equal(targetVisible ? prelude.Start : prelude.End, day.Elapsed);
+        Assert.Equal(1.25, day.VisualElapsed, 8);
+        if (targetVisible) day.Advance(.3);
+        // Moving the camera neither drops an admitted sequence nor revives a
+        // rejected one. The later visible area target cannot replace its anchor.
+        viewport = targetVisible ? sourceBounds : targetBounds;
+        day.Advance(0);
+        Assert.All(battle.Visuals.Where(c => c.ScreenEffect), c => Assert.Equal(targetVisible, day.IsVisualReady(c)));
+        day.Advance(100);
+        Assert.True(day.IsComplete);
+        Assert.Equal(1.25 + (targetVisible ? prelude.End - prelude.Start : 0) + .2, day.VisualElapsed, 8);
+        Assert.Equal(200, day.VisualAge(prelude.End * 1000), 6);
+        Assert.Equal(2, day.ReadyMapSpeeches.Count(c => c.Message.Message.Key == "hit"));
+    }
+
     [Fact]
     public void MovementVisionSurvivesDayHandoffsAndPreparationUntilMovementActuallyStops()
     {

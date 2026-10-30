@@ -171,6 +171,8 @@ internal sealed partial class BattlePresentationBuilder
         }
         double Prelude()
         {
+            if (definition.Prelude.Length == 0) return _cursor;
+            string? preludeId = definition.Zoom is null ? Identity("prelude") : null;
             double end = _cursor;
             for (int frame = 0; frame < definition.Prelude.Length; frame++)
             {
@@ -179,9 +181,10 @@ internal sealed partial class BattlePresentationBuilder
                 _visuals.Add(new(Identity($"prelude-{frame}"), end, next,
                     source, target, tacticId, actor, false, false, 0, 0, 0,
                     sprite with { Sound = frame == 0 ? sprite.Sound : null }, null)
-                { ScreenEffect = true });
+                { ScreenEffect = true, PreludeId = preludeId });
                 end = next;
             }
+            if (preludeId is not null) _preludes.Add(new(preludeId, _cursor, end, target));
             return end;
         }
         if (!Visible(occurrence))

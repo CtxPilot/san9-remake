@@ -15,10 +15,13 @@ public sealed class MapDayPlan
     public IReadOnlyList<MapAttackMotion> Attacks => _attacks;
     private readonly Dictionary<MapAttackMotion, (double Duration, double Blocking)> _bodies = [];
     public double BodyDuration(MapAttackMotion attack) => _bodies[attack].Duration;
+    public bool AdmitMapTarget(BattleObjectContext target, MapPresentationBounds viewport) =>
+        AdmittedMapTargetOrigin(target, viewport) is not null;
+    private MapMotionPoint? AdmittedMapTargetOrigin(BattleObjectContext target, MapPresentationBounds viewport) =>
+        MapFeedbackOrigin(target) is { } origin && viewport.ContainsBody(origin) ? origin : null;
     public bool AdmitMapEffect(BattleObjectContext target, BattleSprite sprite, ImageAsset asset, MapPresentationBounds viewport)
     {
-        if (MapFeedbackOrigin(target) is not { } origin) return false;
-        if (!viewport.ContainsBody(origin)) return false;
+        if (AdmittedMapTargetOrigin(target, viewport) is not { } origin) return false;
         double width = asset.Width / (double)sprite.Columns;
         double left = origin.X + sprite.OffsetX - (sprite.Centered ? width / 2 : 0);
         double top = origin.Y + sprite.OffsetY;

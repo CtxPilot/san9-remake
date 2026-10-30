@@ -18,10 +18,10 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
     public double Elapsed { get; private set; }
     public double VisualElapsed { get; private set; }
     public long PresentationRevision { get; private set; }
-    private readonly List<(double Position, double Duration)> _pauses = [];
-    // Visual age since a progress timestamp was reached, including subsequent pauses.
+    private readonly List<(double Position, double Duration)> _clockOffsets = [];
+    // Holds add visual time; rejected modal spans advance progress without spending visual time.
     public double VisualAge(double progressMilliseconds) =>
-        (VisualElapsed - progressMilliseconds / 1000 - _pauses.Where(p => p.Position < progressMilliseconds / 1000).Sum(p => p.Duration)) * 1000;
+        (VisualElapsed - progressMilliseconds / 1000 - _clockOffsets.Where(p => p.Position < progressMilliseconds / 1000).Sum(p => p.Duration)) * 1000;
     public MapDayPlan? Plan { get; } = plan;
     public Func<MapPresentationBounds?>? Viewport { get; init; }
     public IReadOnlyDictionary<string, ImageAsset> MapEffectAssets { get; init; } = new Dictionary<string, ImageAsset>();
@@ -30,6 +30,11 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
     private readonly MapEffect[] _mapEffects = ReadMapEffects(battle);
     private readonly Dictionary<string, (double Start, bool Admitted)> _mapEffectStarts = [];
     private double _mapEffectEnd;
+    private readonly IReadOnlyList<BattlePreludeCue> _preludes = battle?.Preludes ?? [];
+    private readonly Dictionary<string, bool> _preludeAdmissions = [];
+    public bool IsPreludePresented(string id) => _preludeAdmissions.GetValueOrDefault(id);
+    public bool IsVisualReady(BattleVisualCue cue) => IsFactReady(cue.FactIndex) && IsDialogueComplete(cue.AfterDialogueId) &&
+        (cue.PreludeId is null || IsPreludePresented(cue.PreludeId));
     private bool IsMapEffectBlocking => VisualElapsed < _mapEffectEnd - 1e-9;
     public bool IsMapEffectPresented(string id) => _mapEffectStarts.TryGetValue(id, out var state) && state.Admitted;
     public double MapEffectElapsed(string id) => IsMapEffectPresented(id) ? VisualElapsed - _mapEffectStarts[id].Start : -1;
@@ -123,7 +128,7 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
     public IReadOnlyList<BattleMessageCue> ReadyMapSpeeches => _speeches.Read(IsComplete ? double.PositiveInfinity : Elapsed, LastReadyFact, _completedDialogues);
     public IReadOnlyList<BattleRecordCue> ReadyRecords => _records.Read(IsComplete ? double.PositiveInfinity : Elapsed, LastReadyFact, _completedDialogues);
     public bool IsComplete => Elapsed >= Duration && NextBatch is null && NextDialogueTime is null &&
-        !IsMapEffectBlocking && _mapEffectStarts.Count == _mapEffects.Length;
+        !IsMapEffectBlocking && _mapEffectStarts.Count == _mapEffects.Length && _preludeAdmissions.Count == _preludes.Count;
     public void CompleteDialogue(string id)
     {
         var cue = PendingDialogues.Concat(PendingDuelDialogues).FirstOrDefault(c => c.Id == id)
@@ -216,7 +221,11 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
                 CompleteDialogue(dialogue.Id);
                 continue;
             }
+            if (StartPreludes()) continue;
             double remaining = NextBatch is { } next ? Math.Max(0, next.Time - Elapsed) : double.PositiveInfinity;
+            double? preludeTime = _preludes.Where(c => !_preludeAdmissions.ContainsKey(c.Id) && IsFactReady(c.FactIndex) && IsDialogueComplete(c.AfterDialogueId))
+                .Select(c => (double?)c.Start).Min();
+            if (preludeTime is { } preludeStart) remaining = Math.Min(remaining, Math.Max(0, preludeStart - Elapsed));
             double? effectTime = _mapEffects.Where(c => !_mapEffectStarts.ContainsKey(c.Id) && IsFactReady(c.FactIndex) && IsDialogueComplete(c.AfterDialogueId))
                 .Select(c => (double?)c.Time).Min();
             if (effectTime is { } start) remaining = Math.Min(remaining, Math.Max(0, start - Elapsed));
@@ -238,10 +247,31 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
                 _sceneHoldElapsed = Math.Min(FastForwardHoldDuration, _sceneHoldElapsed + spent * readingRate);
             if (heldScene is not null && consumed > 0 && seconds > 0) continue;
             if (NextBatch is { } due && due.Time <= Elapsed + 1e-9) continue;
+            if (preludeTime is { } duePrelude && duePrelude <= Elapsed + 1e-9) continue;
             if (effectTime is { } effectStart && effectStart <= Elapsed + 1e-9) continue;
             if (PendingDuelDialogues.Count > 0 && seconds > 0) continue;
             return;
         }
+    }
+    private bool StartPreludes()
+    {
+        bool skipped = false;
+        foreach (var cue in _preludes.Where(c => !_preludeAdmissions.ContainsKey(c.Id) && c.Start <= Elapsed + 1e-9 &&
+            IsFactReady(c.FactIndex) && IsDialogueComplete(c.AfterDialogueId)))
+        {
+            bool admitted = Plan is not null && Viewport?.Invoke() is { } bounds && Plan.AdmitMapTarget(cue.Target, bounds);
+            _preludeAdmissions.Add(cue.Id, admitted);
+            if (!admitted)
+            {
+                // The reserved plan span contains only this prelude's frames. Outcome
+                // cues at its end keep their order without a hidden animation wait.
+                OffsetClock(-(cue.End - Elapsed));
+                Elapsed = cue.End;
+                skipped = true;
+            }
+            PresentationRevision++;
+        }
+        return skipped;
     }
     private void StartMapEffects()
     {
@@ -258,10 +288,14 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
     private void Hold(double seconds)
     {
         if (seconds <= 0) return;
-        if (_pauses.Count > 0 && _pauses[^1].Position == Elapsed)
-            _pauses[^1] = (Elapsed, _pauses[^1].Duration + seconds);
-        else _pauses.Add((Elapsed, seconds));
+        OffsetClock(seconds);
         VisualElapsed += seconds;
+    }
+    private void OffsetClock(double seconds)
+    {
+        if (_clockOffsets.Count > 0 && _clockOffsets[^1].Position == Elapsed)
+            _clockOffsets[^1] = (Elapsed, _clockOffsets[^1].Duration + seconds);
+        else _clockOffsets.Add((Elapsed, seconds));
     }
     private double AdvanceTimeline(double seconds)
     {
