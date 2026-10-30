@@ -53,7 +53,7 @@ public sealed class DeploymentArrivalTests
         for (int i = 0; i < 10 && arrival is null; i++)
             arrival = session.AdvanceXun().Events.OfType<UnitAbsorbedEvent>().SingleOrDefault(e => e.UnitId == unit.Id);
         Assert.NotNull(arrival);
-        Assert.Equal((long)estimate.Days!.Value, arrival.Clock.DayNumber - before.Clock.DayNumber);
+        Assert.Equal((long)estimate.Days!.Value, arrival.Clock.DayNumber - before.Clock.DayNumber + 1);
     }
 
     [Fact]

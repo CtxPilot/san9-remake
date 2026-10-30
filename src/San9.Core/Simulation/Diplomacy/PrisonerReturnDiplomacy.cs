@@ -128,7 +128,7 @@ internal static class PrisonerReturnDiplomacy
         else ForceRelations.Change(world, task.ForceId, mission.TargetForceId, -5, null, events);
         events.Add(new PrisonerReturnResolvedEvent(world.Clock, task.Id, mission.PrisonerId, offer, accepted,
             received, accepted ? offer.Money - received : 0));
-        PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCommandsConsumed);
+        PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCountdownConsumed);
 
     }
 }

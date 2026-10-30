@@ -111,7 +111,7 @@ public sealed class WaterCombatContactTests
         Assert.True(rules.Map.IsWater(position));
         Assert.False(Area(position.X, position.Y).Overlaps(rules.BuildingArea(rules.Places[2])));
         Assert.All(approach.SelectMany(e => e.Steps), p => Assert.True(rules.Map.IsWater(p)));
-        Assert.Equal(estimate.Days, events.OfType<BattleDamageEvent>().First(e => e.AttackerId == 0).Clock.Day - 1);
+        Assert.Equal(estimate.Days, events.OfType<BattleDamageEvent>().First(e => e.AttackerId == 0).Clock.Day);
     }
 
     [Fact]

@@ -82,8 +82,7 @@ public sealed class MilitaryArrivalForecast(WorldSnapshot snapshot, MilitaryRule
         var movementDate = snapshot.Clock;
         for (int day = 1; day <= maximumDays; day++)
         {
-            // ResolutionPipeline advances the calendar before DailyMapUpdate, including waiting days.
-            movementDate = movementDate.NextDay();
+            // Movement uses the current date; waiting days advance the same calendar after combat.
             bool preparing = unit.DepartureDaysRemaining > 0;
             bool immobilized = unit.Condition == UnitCondition.Confused;
             if (!preparing && !constructionPreview && !Valid(world, unit)) return new(ArrivalEstimateStatus.NotApplicable);
@@ -109,6 +108,7 @@ public sealed class MilitaryArrivalForecast(WorldSnapshot snapshot, MilitaryRule
             if (preparing) unit = unit with { DepartureDaysRemaining = unit.DepartureDaysRemaining - 1 };
             world.SetForecastUnit(unit);
             unit = MilitaryEngagements.ForecastNextCombat(world, unit, rules);
+            movementDate = movementDate.NextDay();
         }
         return new(ArrivalEstimateStatus.Incomplete);
     }

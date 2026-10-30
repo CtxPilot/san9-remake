@@ -102,7 +102,7 @@ internal static class IntelligenceTactics
         }
         if (!MilitaryCombat.IsDefeated(world, source))
             BattleAftermath.ResolveSettlementDefeats(world, defeatedSettlements, source, rules, events);
-        GovernanceLifecycle.Reconcile(world, forces, rules, events, world.CurrentDateCommandsConsumed);
+        GovernanceLifecycle.Reconcile(world, forces, rules, events, world.CurrentDateCountdownConsumed);
         ResolutionPipeline.CheckConquest(world, events);
         return primary;
     }

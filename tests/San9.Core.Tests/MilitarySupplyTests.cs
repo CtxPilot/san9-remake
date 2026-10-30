@@ -95,7 +95,7 @@ public sealed class MilitarySupplyTests
         mutation.AddUnit(new(1, 1, new(3, 2), 100) { FormationId = 70, Morale = 70, CargoFood = 100,
             Order = new(MilitaryOrderKind.Transport, null, 1) });
         mutation.SetSimulation(mutation.Simulation with { NextUnitId = 2 });
-        MilitaryMovement.AdvanceDay(mutation, Rules().Military, new([]), PersonnelRulebook.Empty, events);
+        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, Rules().Military, events), Rules().Military, new([]), PersonnelRulebook.Empty, events);
         Assert.Single(events.OfType<UnitAbsorbedEvent>());
         events.Clear();
         mutation.SetClock(new(190, 1, 2));

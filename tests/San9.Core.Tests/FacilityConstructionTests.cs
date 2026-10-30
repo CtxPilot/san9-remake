@@ -89,7 +89,7 @@ public sealed class FacilityConstructionTests
             new MilitaryArrivalForecast(lostCity, Military, Geography.RegionCities, TreasureRulebook.Empty).Estimate(id).Status);
         var events = Advance(engine).Events;
         var arrival = events.OfType<UnitMovedEvent>().First(e => e.Status == NavigationStatus.Arrived);
-        Assert.Equal((long)estimate.Days!.Value, arrival.Clock.DayNumber - snapshot.Clock.DayNumber);
+        Assert.Equal(Math.Max(1L, estimate.Days!.Value), arrival.Clock.DayNumber - snapshot.Clock.DayNumber + 1);
         Assert.Equal(arrival.Clock, events.OfType<FacilityConstructionChangedEvent>().Single(e => e.Phase == "started").Clock);
     }
 
@@ -137,7 +137,7 @@ public sealed class FacilityConstructionTests
         var departureDate = engine.CaptureStableState().Clock;
         var events = Advance(engine).Events;
         var started = Assert.Single(events.OfType<FacilityConstructionChangedEvent>(), e => e.Phase == "started");
-        Assert.Equal((long)estimate.Days!.Value, started.Clock.DayNumber - departureDate.DayNumber);
+        Assert.Equal(Math.Max(1L, estimate.Days!.Value), started.Clock.DayNumber - departureDate.DayNumber + 1);
     }
 
     [Theory]
@@ -176,13 +176,12 @@ public sealed class FacilityConstructionTests
         var estimate = new MilitaryArrivalForecast(snapshot, rules, geography.RegionCities, TreasureRulebook.Empty).Estimate(0);
         Assert.Equal(new(ArrivalEstimateStatus.Known, 1), estimate);
         var world = state.BeginMutation();
-        world.SetClock(world.Clock.NextDay());
         List<DomainEvent> events = [];
         FacilityConstruction.AdvanceDay(world, simulation, events);
         Assert.False(MilitaryCombat.Area(world.Units[0], rules).Overlaps(site));
         Assert.Equal(NavigationStatus.Arrived, Assert.Single(events.OfType<UnitMovedEvent>()).Status);
         var started = Assert.Single(events.OfType<FacilityConstructionChangedEvent>(), e => e.Phase == "started");
-        Assert.Equal((long)estimate.Days!.Value, started.Clock.DayNumber - snapshot.Clock.DayNumber);
+        Assert.Equal(Math.Max(1L, estimate.Days!.Value), started.Clock.DayNumber - snapshot.Clock.DayNumber + 1);
         Assert.True(world.Settlements.ContainsKey(8000));
         Assert.Equal(builder, snapshot.Units.Single());
     }

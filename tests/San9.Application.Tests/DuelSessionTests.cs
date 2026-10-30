@@ -58,7 +58,7 @@ public sealed class DuelSessionTests
         Assert.DoesNotContain("pendingDuel", System.Text.Encoding.UTF8.GetString(SaveService.Encode(session)));
         var events = arrival.Events.Concat(result.Events);
         Assert.Single(events.OfType<OfficerDiedEvent>(), e => e.OfficerId == 22);
-        Assert.Single(events.OfType<DuelStartedEvent>(), e => e.Clock.Day == 2);
+        Assert.Single(events.OfType<DuelStartedEvent>(), e => e.Clock.Day == 1);
         if (Environment.GetEnvironmentVariable("SAN9_G09_REPORT_DIR") is { Length: > 0 } output)
         {
             Directory.CreateDirectory(output);

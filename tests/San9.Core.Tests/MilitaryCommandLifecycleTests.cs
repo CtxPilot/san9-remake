@@ -21,7 +21,7 @@ public sealed partial class MilitaryCommandLifecycleTests
         Assert.Equal(2, world.Units[1].ServicePlaceId);
         Assert.Equal(new(MilitaryOrderKind.Return, null, 2), world.Units[1].Order);
         var position = world.Units[1].Position;
-        MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+        MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
         Assert.NotEqual(position, world.Units[1].Position);
         Assert.Equal(100u, world.Units[1].CargoFood);
         WorldInvariants.Validate(world);
@@ -72,7 +72,7 @@ public sealed partial class MilitaryCommandLifecycleTests
         Assert.Equal(order, world.Units[1].Order);
         Assert.Empty(events.OfType<BattleDamageEvent>());
         for (int i = 0; i < 30 && rules.Map.IsWater(world.Units[1].Position); i++)
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, events);
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
         Assert.False(rules.Map.IsWater(world.Units[1].Position));
         Assert.Equal(order, world.Units[1].Order);
     }
@@ -88,7 +88,7 @@ public sealed partial class MilitaryCommandLifecycleTests
         var rules = Rules();
         MilitaryOrders.RemoveTarget(world, 1, true, []);
         MilitaryOrders.ResolveOrders(world, rules, []);
-        MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+        MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
         Assert.Equal(new(MilitaryOrderKind.Return, null, 2), world.Units[1].Order);
         world.Replace(world.Settlements[2] with { Durability = 100 });
         MilitaryOrders.ResolveOrders(world, rules, []);

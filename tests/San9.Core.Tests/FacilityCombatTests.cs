@@ -102,7 +102,7 @@ public sealed class FacilityCombatTests
         var engine = Engine(attacking: attacking);
         var result = Advance(engine);
         var activations = result.Events.OfType<TacticActivatedEvent>().ToArray();
-        Assert.Equal([2, 5, 8, 11], activations.Select(e => e.Clock.Day).ToArray());
+        Assert.Equal([1, 4, 7, 10], activations.Select(e => e.Clock.Day).ToArray());
         Assert.All(activations, e => { Assert.True(e.SourceIsSettlement); Assert.Equal(1, e.SourceId); Assert.Equal(11, Assert.Single(e.Participants).OfficerId); });
         Assert.Null(engine.Snapshot.Officers.Single(p => p.Id == 11).EquippedTacticId);
         Assert.True(engine.Snapshot.Units.Single().Soldiers < 10000);
@@ -202,7 +202,7 @@ public sealed class FacilityCombatTests
         var engine = Engine(TacticEffect.TrapSelection);
         var result = Advance(engine);
         var activations = result.Events.OfType<TacticActivatedEvent>().ToArray();
-        Assert.Equal([2, 11], activations.Select(e => e.Clock.Day).ToArray());
+        Assert.Equal([1, 10], activations.Select(e => e.Clock.Day).ToArray());
         Assert.All(activations, e => Assert.Equal(9100, e.TacticId));
         Assert.True(engine.Snapshot.Units.Single().Soldiers < 10000);
         Assert.DoesNotContain(9100, engine.Snapshot.Officers.Single(p => p.Id == 11).LearnedTactics);

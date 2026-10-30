@@ -56,7 +56,7 @@ public sealed class MilitaryRoutePreviewTests
         do
         {
             var events = new List<DomainEvent>();
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, events);
+            MilitaryMovement.AdvanceDay(world, rules, events);
             movement = Assert.Single(events.OfType<UnitMovedEvent>());
             Assert.True(++days < 100);
         } while (movement.Status != NavigationStatus.Arrived);

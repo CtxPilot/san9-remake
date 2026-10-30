@@ -7,7 +7,7 @@ public enum ResolutionStage
 {
     TerminalCheck, XunEvents, XunUpdate, MonthEvents, AppearanceAndIndependence,
     QuarterPrelude, QuarterEvents, QuarterUpdate, AnnualAppearance, AnnualCleanup,
-    BeforeDailyCommands, DailyCommands, DailyMapUpdate, UnitAndBuildingEvents, QuarterStudyOffers, QuarterPolitics, XunCleanup,
+    DailyMovement, BeforeDailyCommands, DailyCombat, DailyCommands, UnitAndBuildingEvents, QuarterStudyOffers, QuarterPolitics, XunCleanup,
 }
 
 public sealed record StageCompletedEvent(GameClock Clock, ResolutionStage Stage) : DomainEvent;
@@ -77,15 +77,52 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
     internal void AdvanceDay(WorldMutation world, List<DomainEvent> events, GameClock xunStarted,
         ImmutableArray<Guid>? remainingTasks = null)
     {
-        if (remainingTasks is null && !Run(ResolutionStage.BeforeDailyCommands, world, events)) return;
-        world.CurrentDateCommandsConsumed = true;
+        if (remainingTasks is { } tasks)
+        {
+            CompleteDailyCommands(world, events, xunStarted, tasks);
+            return;
+        }
+        world.MaintainDerivedState(events);
+        if (!CheckTerminal(world, events)) return;
+        var contactsBefore = rules.Military is { } military ? world.Engagements(military) : null;
+        MilitaryPolicies.AdvanceDay(world, rules.Military, events);
+        world.MaintainDerivedState(events);
+        var arrivals = MilitaryMovement.AdvanceDay(world, rules.Military, events);
+        world.MaintainDerivedState(events);
+        if (!CompleteStage(ResolutionStage.DailyMovement, world, events)) return;
+
+        var rationAccounts = EconomicCycle.Apply(ResolutionStage.BeforeDailyCommands, world, rules.Economy, events);
+        MilitaryTactics.TickCooldowns(world);
+        MilitaryDailyCycle.Apply(world, rationAccounts, rules, events);
+        BattleLearning.Daily(world, rules.Military, events);
+        MilitaryMovement.BeginDailyCycle(world);
+        MilitaryPolicies.FinishPursuitResponses(world);
+        MilitaryConditions.Tick(world, events);
+        MilitaryMovement.TickDepartureDelays(world);
+        MilitaryPolicies.ApproachDay(world, rules.Military, events);
+        world.MaintainDerivedState(events);
+        if (contactsBefore is not null) BattleContact.PublishEntries(world, rules.Military!, contactsBefore, events);
+        world.CurrentDateCountdownConsumed = true;
+        if (!CompleteStage(ResolutionStage.BeforeDailyCommands, world, events)) return;
+
+        MilitaryMovement.ResolveArrivals(world, arrivals, rules.Military, rules.Governance, rules.Personnel, events);
+        world.MaintainDerivedState(events);
+        FacilityConstruction.AdvanceDay(world, rules, events);
+        world.MaintainDerivedState(events);
+        if (rules.Military is { } engagementRules) MilitaryEngagements.ClearExpired(world, engagementRules);
+        MilitaryCombat.AdvanceDay(world, rules, events, xunStarted);
+        CompleteDailyCombat(world, events, xunStarted);
+    }
+
+    private void CompleteDailyCommands(WorldMutation world, List<DomainEvent> events, GameClock xunStarted,
+        ImmutableArray<Guid>? remainingTasks = null)
+    {
         ResolveTasks(world, events, xunStarted, remainingTasks: remainingTasks);
         if (world.Simulation.PendingDailyTask is not null) return;
         if (!CheckTerminal(world, events) || !Run(ResolutionStage.DailyCommands, world, events)) return;
         world.SetClock(world.Clock.NextDay());
         world.SetSimulation(world.Simulation with { Tasks = world.Simulation.Tasks
             .Select(t => t with { ProgressDays = checked(t.ProgressDays + 1) }).ToImmutableArray() });
-        if (!Run(ResolutionStage.DailyMapUpdate, world, events, xunStarted)) return;
         FinishDay(world, events, xunStarted);
     }
 
@@ -113,7 +150,7 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
         Run(ResolutionStage.UnitAndBuildingEvents, world, events);
     }
 
-    private bool Run(ResolutionStage stage, WorldMutation world, List<DomainEvent> events, GameClock? xunStarted = null)
+    private bool Run(ResolutionStage stage, WorldMutation world, List<DomainEvent> events)
     {
         world.MaintainDerivedState(events);
         if (stage == ResolutionStage.TerminalCheck && rules.Terminal is not null)
@@ -168,34 +205,9 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
             ForceRelations.AdvanceQuarter(world, rules.Military, events);
         }
         if (stage == ResolutionStage.AnnualAppearance) OfficerAppearance.AdvanceYear(world, rules.Personnel, events);
-        var rationAccounts = EconomicCycle.Apply(stage, world, rules.Economy, events);
-        if (stage == ResolutionStage.BeforeDailyCommands)
-        {
-            MilitaryTactics.TickCooldowns(world);
-            MilitaryDailyCycle.Apply(world, rationAccounts, rules, events);
-            BattleLearning.Daily(world, rules.Military, events);
-        }
+        EconomicCycle.Apply(stage, world, rules.Economy, events);
         if (stage == ResolutionStage.XunUpdate) WoundedRecovery.Apply(world, rules.Military, events);
         if (stage == ResolutionStage.XunUpdate) PrisonerEscapeCycle.Apply(world, rules.Personnel, rules.Economy, events);
-        var contactsBefore = stage == ResolutionStage.DailyMapUpdate && rules.Military is { } contactRules
-            ? world.Engagements(contactRules) : null;
-        if (stage == ResolutionStage.DailyMapUpdate) { MilitaryPolicies.AdvanceDay(world, rules.Military, events); world.MaintainDerivedState(events); }
-        if (stage == ResolutionStage.DailyMapUpdate) { MilitaryMovement.AdvanceDay(world, rules.Military, rules.Governance, rules.Personnel, events); world.MaintainDerivedState(events); }
-        if (stage == ResolutionStage.DailyMapUpdate) { FacilityConstruction.AdvanceDay(world, rules, events); world.MaintainDerivedState(events); }
-        if (stage == ResolutionStage.DailyMapUpdate)
-        {
-            MilitaryMovement.BeginDailyCycle(world);
-            MilitaryPolicies.FinishPursuitResponses(world);
-            MilitaryConditions.Tick(world, events);
-            MilitaryMovement.TickDepartureDelays(world);
-            MilitaryPolicies.ApproachDay(world, rules.Military, events);
-            world.MaintainDerivedState(events);
-            if (contactsBefore is not null) BattleContact.PublishEntries(world, rules.Military!, contactsBefore, events);
-            if (rules.Military is { } engagementRules) MilitaryEngagements.ClearExpired(world, engagementRules);
-            MilitaryCombat.AdvanceDay(world, rules, events, xunStarted);
-            world.MaintainDerivedState(events);
-            if (world.Simulation.PendingDuel is not null || world.Simulation.PendingSniping is not null || !CheckTerminal(world, events)) return false;
-        }
         if (stage == ResolutionStage.XunUpdate)
         {
             OfficeRequests.Begin(world, rules, events);
@@ -205,26 +217,34 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
 
     internal void ResumeDuel(WorldMutation world, List<DomainEvent> events, int successorId)
     {
+        world.CurrentDateCountdownConsumed = true;
         var xunStarted = world.Simulation.PendingDuel!.XunStarted;
         MilitaryCombat.ResumeDuel(world, rules, events, successorId);
-        if (world.Simulation.PendingDuel is not null || world.Simulation.PendingSniping is not null || !CheckTerminal(world, events)) return;
-        if (!CompleteStage(ResolutionStage.DailyMapUpdate, world, events)) return;
-        FinishDay(world, events, xunStarted);
+        CompleteDailyCombat(world, events, xunStarted);
     }
 
     internal void ResumeSniping(WorldMutation world, List<DomainEvent> events, int successorId)
     {
+        world.CurrentDateCountdownConsumed = true;
         var xunStarted = world.Simulation.PendingSniping!.Exchange!.XunStarted;
         MilitaryCombat.ResumeSniping(world, rules, events, successorId);
-        if (world.Simulation.PendingSniping is not null || world.Simulation.PendingDuel is not null || !CheckTerminal(world, events)) return;
-        if (!CompleteStage(ResolutionStage.DailyMapUpdate, world, events)) return;
-        FinishDay(world, events, xunStarted);
+        CompleteDailyCombat(world, events, xunStarted);
+    }
+
+    private void CompleteDailyCombat(WorldMutation world, List<DomainEvent> events, GameClock xunStarted)
+    {
+        world.MaintainDerivedState(events);
+        if (world.Simulation.PendingDuel is not null || world.Simulation.PendingSniping is not null || !CheckTerminal(world, events)) return;
+        TacticSupport.AdvanceDay(world, rules, events);
+        world.MaintainDerivedState(events);
+        MilitaryOrders.ResolveOrders(world, rules.Military, events);
+        world.MaintainDerivedState(events);
+        if (!CompleteStage(ResolutionStage.DailyCombat, world, events)) return;
+        CompleteDailyCommands(world, events, xunStarted);
     }
 
     private bool CompleteStage(ResolutionStage stage, WorldMutation world, List<DomainEvent> events)
     {
-        if (stage == ResolutionStage.DailyMapUpdate) { TacticSupport.AdvanceDay(world, rules, events); world.MaintainDerivedState(events); }
-        if (stage == ResolutionStage.DailyMapUpdate) { MilitaryOrders.ResolveOrders(world, rules.Military, events); world.MaintainDerivedState(events); }
         rules.ApplyStage(stage, world, events);
         AttackRequests.Cleanup(world, events);
         CorpsDelegations.Cleanup(world, rules.Military, events);
@@ -261,7 +281,7 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
     internal void Respond(WorldMutation world, RespondDailyTaskCommand response, List<DomainEvent> events)
     {
         var pending = world.Simulation.PendingDailyTask!;
-        world.CurrentDateCommandsConsumed = pending.Phase == TaskResolutionPhase.DailyCommands;
+        world.CurrentDateCountdownConsumed = pending.Phase == TaskResolutionPhase.DailyCommands;
         var task = world.Simulation.Tasks.Single(t => t.Id == pending.RemainingTaskIds[0]);
         var rule = rules.FindTask(task.Kind)!;
         world.SetSimulation(world.Simulation with { PendingDailyTask = null, Boundary = SimulationBoundary.Stable });

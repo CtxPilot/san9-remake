@@ -24,19 +24,19 @@ public sealed class NavigationQueryConsistencyTests
         var forecast = new MilitaryArrivalForecast(snapshot, rules);
         Assert.Equal(new(ArrivalEstimateStatus.Incomplete), forecast.Estimate(0, maximumDays: 4));
         Assert.Equal(new(ArrivalEstimateStatus.Incomplete), forecast.Estimate(0, maximumExpanded: 1));
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 10), forecast.Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 11), forecast.Estimate(0));
 
         var world = state.BeginMutation();
-        for (int day = 1; day <= 10; day++)
+        for (int day = 1; day <= 11; day++)
         {
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
+            if (day <= 5) Assert.Equal(mover.Position, world.Units[0].Position);
+            if (day == 6) Assert.NotEqual(mover.Position, world.Units[0].Position);
+            Assert.Equal(day == 11, world.Units[0].Position == mover.Order.Position);
             world.SetClock(world.Clock.NextDay());
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
-            if (day <= 4) Assert.Equal(mover.Position, world.Units[0].Position);
-            if (day == 5) Assert.NotEqual(mover.Position, world.Units[0].Position);
-            Assert.Equal(day == 10, world.Units[0].Position == mover.Order.Position);
         }
         Assert.All(obstacles, obstacle => Assert.Equal(obstacle.Position, world.Units[obstacle.Id].Position));
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 10), forecast.Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 11), forecast.Estimate(0));
         Assert.Equal(mover.Position, snapshot.Units.Single(u => u.Id == 0).Position);
     }
 
@@ -143,8 +143,7 @@ public sealed class NavigationQueryConsistencyTests
         var world = state.BeginMutation();
         for (int day = 1; day <= expectedDays; day++)
         {
-            world.SetClock(world.Clock.NextDay());
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
             MilitaryConditions.Tick(world, []);
             MilitaryEngagements.ClearExpired(world, rules);
             MilitaryMovement.TickDepartureDelays(world);
@@ -212,10 +211,10 @@ public sealed class NavigationQueryConsistencyTests
         var world = state.BeginMutation();
         for (int day = 1; day <= forecast.Days; day++)
         {
-            world.SetClock(world.Clock.NextDay());
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
             MilitaryConditions.Tick(world, []);
             MilitaryMovement.TickDepartureDelays(world);
+            world.SetClock(world.Clock.NextDay());
             Assert.Equal(day == forecast.Days, world.Units[0].Position == unit.Order.Position);
         }
     }
@@ -259,8 +258,7 @@ public sealed class NavigationQueryConsistencyTests
         var world = state.BeginMutation();
         for (int day = 1; day <= estimate.Days; day++)
         {
-            world.SetClock(world.Clock.NextDay());
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
             MilitaryConditions.Tick(world, []);
             if (day == 1) Assert.Null(world.Units[0].Lookahead);
             Assert.Equal(day == estimate.Days, world.Units[0].Position == unit.Order.Position);

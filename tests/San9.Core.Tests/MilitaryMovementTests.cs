@@ -129,12 +129,12 @@ public sealed class MilitaryMovementTests
         var world = state.BeginMutation();
         for (int day = 0; day < delay; day++)
         {
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
             Assert.Equal(unit.Position, world.Units[unit.Id].Position);
             MilitaryMovement.TickDepartureDelays(world);
             Assert.Equal(delay - day - 1, world.Units[unit.Id].DepartureDaysRemaining);
         }
-        MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+        MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
         Assert.NotEqual(unit.Position, world.Units[unit.Id].Position);
     }
 
@@ -391,7 +391,7 @@ public sealed class MilitaryMovementTests
         Assert.Equal(CommandRejection.None, GovernanceMaintenance.RepairCorps(mutation, 11, new GovernanceRulebook([]), events));
         Assert.Equal(11, mutation.Corps[11].LeaderId);
         Assert.Empty(events);
-        MilitaryMovement.AdvanceDay(mutation, Rules(10), new GovernanceRulebook([]), PersonnelRulebook.Empty, events);
+        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, Rules(10), events), Rules(10), new GovernanceRulebook([]), PersonnelRulebook.Empty, events);
         world.Commit(mutation);
         var state = world.CreateSnapshot();
         if (overflow && !transport)

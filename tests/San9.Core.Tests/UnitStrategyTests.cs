@@ -98,7 +98,7 @@ public sealed class UnitStrategyTests
         var facts = Day(state, rules);
         var effect = Assert.Single(facts.OfType<BattleConditionChangedEvent>(), e => e.Condition == UnitCondition.Disguised);
         Assert.Equal(1, effect.SourceForceId);
-        Assert.Equal(BattleObjectContext.Capture(target), effect.Target);
+        Assert.Equal(BattleObjectContext.Capture(target with { Position = Assert.Single(facts.OfType<UnitMovedEvent>()).To }), effect.Target);
         Assert.Equal(target.Order, state.Units[5].Order);
         Assert.Equal(24, state.Units[5].ConditionDaysRemaining);
         Assert.Equal(UnitCondition.Disguised, state.Units[5].Condition);
@@ -226,7 +226,7 @@ public sealed class UnitStrategyTests
         Assert.Equal(22,result.Target.CommanderId);
         var unit = Assert.Single(state.Units.Values);
         Assert.Equal(UnitCondition.HighSpirits, unit.Condition);
-        Assert.Equal(10, unit.ConditionDaysRemaining); // The movement day's common phase has consumed one day.
+        Assert.Equal(11, unit.ConditionDaysRemaining); // Today's countdown preceded the new strategy state.
         Assert.Equal(89, unit.Morale); // The first daily stage already applied the ordinary field morale loss.
         Assert.True(unit.HighSpiritsMoralePenaltyPending);
         Assert.Equal(0, state.Officers.Values.Single(p => p.Id == 22).TacticCooldown);
@@ -261,6 +261,7 @@ public sealed class UnitStrategyTests
         Submit(world, rules, UnitStrategyKind.Inspire, 0);
         var state = world.BeginMutation(rules.Abilities);
         state.Replace(state.Units[5] with { Morale = 100, Condition = UnitCondition.HighSpirits, ConditionDaysRemaining = 100 });
+        Assert.Empty(Day(state, rules).OfType<TaskCancelledEvent>());
         var events = Day(state, rules);
         Assert.Single(events.OfType<TaskCancelledEvent>());
         Assert.Empty(events.OfType<UnitStrategyResolvedEvent>());
@@ -473,7 +474,7 @@ public sealed class UnitStrategyTests
         Assert.Equal(CommandRejection.InvalidTask, MilitaryMovement.Order(state,
             new(Guid.NewGuid(), 2, 0, 5, new(MilitaryOrderKind.Move, new(20, 2), null)), rules.Military, []));
         var before = state.Units[5].Position;
-        MilitaryMovement.AdvanceDay(state, rules.Military, rules.Governance, rules.Personnel, []);
+        MilitaryMovement.ResolveArrivals(state, MilitaryMovement.AdvanceDay(state, rules.Military, []), rules.Military, rules.Governance, rules.Personnel, []);
         Assert.True(state.Units[5].Position.X > before.X);
         Assert.Equal(MilitaryOrderKind.Return, state.Units[5].EffectiveOrder!.Kind);
         state.Replace(state.Units[5] with { ConditionDaysRemaining = 1 });
@@ -481,7 +482,7 @@ public sealed class UnitStrategyTests
         Assert.Equal(MilitaryOrderKind.Move, state.Units[5].EffectiveOrder!.Kind);
         Assert.Equal(new WorldPosition(25, 2), state.Units[5].ActiveWaypoint);
         before = state.Units[5].Position;
-        MilitaryMovement.AdvanceDay(state, rules.Military, rules.Governance, rules.Personnel, []);
+        MilitaryMovement.ResolveArrivals(state, MilitaryMovement.AdvanceDay(state, rules.Military, []), rules.Military, rules.Governance, rules.Personnel, []);
         Assert.True(state.Units[5].Position.X < before.X);
     }
 
@@ -517,7 +518,7 @@ public sealed class UnitStrategyTests
             ServicePlaceId = null, Order = new(MilitaryOrderKind.Move, new(50, 2), null) });
         var before = state.Units[5].Position;
         Assert.Null(state.Units[5].EffectiveOrder);
-        MilitaryMovement.AdvanceDay(state, rules.Military, rules.Governance, rules.Personnel, []);
+        MilitaryMovement.ResolveArrivals(state, MilitaryMovement.AdvanceDay(state, rules.Military, []), rules.Military, rules.Governance, rules.Personnel, []);
         Assert.Equal(before, state.Units[5].Position);
     }
 
@@ -530,7 +531,7 @@ public sealed class UnitStrategyTests
         state.Replace(state.Units[5] with { Position = new(995, 12), ServicePlaceId = 2,
             Condition = UnitCondition.Disguised, ConditionDaysRemaining = 7 });
         for (int day = 0; day < 5 && state.Units.ContainsKey(5); day++)
-            MilitaryMovement.AdvanceDay(state, rules.Military, rules.Governance, rules.Personnel, []);
+            MilitaryMovement.ResolveArrivals(state, MilitaryMovement.AdvanceDay(state, rules.Military, []), rules.Military, rules.Governance, rules.Personnel, []);
         Assert.False(state.Units.ContainsKey(5));
         Assert.Equal(15000u, state.Settlements[2].Soldiers);
         Assert.Equal(2, state.Officers[22].SettlementId);

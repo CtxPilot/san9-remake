@@ -197,7 +197,7 @@ public sealed class IntelligenceMartialChainTests
             var first = events.FirstOrDefault(e => e.TacticId == 9000);
             var chain = first is null ? null : events.FirstOrDefault(e => e.Clock == first.Clock && e.TacticId is 9100 or 9101);
             if (chain is null) continue;
-            int elapsed = engine.Snapshot.Clock.Day - chain.Clock.Day;
+            int elapsed = engine.Snapshot.Clock.Day - chain.Clock.Day - 1;
             Assert.Equal(30 - elapsed, engine.Snapshot.Officers.Single(p => p.Id == 11).TacticCooldown);
             Assert.Equal(30 - elapsed, engine.Snapshot.Officers.Single(p => p.Id == chain.Participants[0].OfficerId).TacticCooldown);
             Assert.Equal(10 - elapsed, engine.Snapshot.Officers.Single(p => p.Id == chain.Participants[1].OfficerId).TacticCooldown);

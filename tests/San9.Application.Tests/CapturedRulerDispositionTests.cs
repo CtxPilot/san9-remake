@@ -82,7 +82,7 @@ public sealed class CapturedRulerDispositionTests
         Assert.Equal(new GameClock(190, 1, 11), session.Snapshot.Clock);
         Assert.Single(completed.Events.OfType<XunAdvancedEvent>());
         Assert.Equal(10, completed.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.UnitAndBuildingEvents));
-        Assert.Equal(10, result.Events.Concat(completed.Events).OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyMapUpdate));
+        Assert.Equal(10, result.Events.Concat(completed.Events).OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyCombat));
         if (action == CapturedRulerAction.Release)
         {
             Assert.Single(completed.Events.OfType<PrisonerReleasedEvent>());

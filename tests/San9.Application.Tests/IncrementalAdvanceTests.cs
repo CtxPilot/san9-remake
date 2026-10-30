@@ -10,12 +10,11 @@ public sealed class IncrementalAdvanceTests
     {
         internal override void ApplyStage(ResolutionStage stage, WorldMutation world, List<DomainEvent> events)
         {
-            if (world.Clock.Day != 11) return;
-            int value = stage switch
+            int value = (world.Clock.Day, stage) switch
             {
-                ResolutionStage.DailyMapUpdate => 111,
-                ResolutionStage.UnitAndBuildingEvents => 222,
-                ResolutionStage.XunUpdate => 333,
+                (10, ResolutionStage.DailyCombat) => 111,
+                (11, ResolutionStage.UnitAndBuildingEvents) => 222,
+                (11, ResolutionStage.XunUpdate) => 333,
                 _ => 0
             };
             if (value > 0) world.Replace(world.Settlements[1] with { PublicOrder = value });

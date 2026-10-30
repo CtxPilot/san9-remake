@@ -83,7 +83,7 @@ public sealed class TacticCombatTests
     [InlineData(true, 217UL, false)] // Water formations do not receive the land bonus.
     public void OwnCityInfluenceAddsTenPointsToLandOpportunityOnly(bool water, ulong seed, bool expected)
     {
-        bool FirstDay(SimulationEngine engine) => engine.AdvanceXun().Events.OfType<TacticActivatedEvent>().Any(e => e.Clock.Day == 2);
+        bool FirstDay(SimulationEngine engine) => engine.AdvanceXun().Events.OfType<TacticActivatedEvent>().Any(e => e.Clock.Day == 1);
         Assert.Equal(expected, FirstDay(Engine(water: water, seed: seed, opportunityChance: 15, influence: new(8, 10))));
         Assert.False(FirstDay(Engine(water: water, seed: seed, opportunityChance: 15)));
     }
@@ -276,8 +276,8 @@ public sealed class TacticCombatTests
         var result = engine.AdvanceXun();
         var repeated = restored.AdvanceXun();
         var firstDay = result.Events;
-        Assert.Equal(new[] { 21, 12 }, firstDay.OfType<TacticLearnedEvent>().Where(e => e.Clock.Day == 2).Select(e => e.OfficerId));
-        Assert.Equal(new[] { 11, 12 }, firstDay.OfType<TacticProficiencyGrownEvent>().Where(e => e.Clock.Day == 2).Select(e => e.OfficerId));
+        Assert.Equal(new[] { 21, 12 }, firstDay.OfType<TacticLearnedEvent>().Where(e => e.Clock.Day == 1).Select(e => e.OfficerId));
+        Assert.Equal(new[] { 11, 12 }, firstDay.OfType<TacticProficiencyGrownEvent>().Where(e => e.Clock.Day == 1).Select(e => e.OfficerId));
         EventAssert.Equal(result.Events, repeated.Events);
         StateAssert.Equal(engine.Snapshot, restored.Snapshot);
     }

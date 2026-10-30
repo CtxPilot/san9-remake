@@ -53,9 +53,9 @@ public sealed class AttackRangeTests
         Assert.Equal(new WorldPosition(16, 2), events.OfType<UnitMovedEvent>().First(e => e.UnitId == 0).To);
         var destination = events.OfType<UnitMovedEvent>().Last(e => e.UnitId == 0).To;
         Assert.True(new MapOccupancy(destination, rules.Formations[7000].Footprint).IntersectsExpanded(MilitaryCombat.Area(engine.Snapshot.Units.Single(u => u.Id == 1), rules), 1));
-        Assert.Contains(events.OfType<TacticActivatedEvent>(), e => e.SourceId == 0 && e.Clock.Day == 2);
-        Assert.Contains(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 0 && e.Clock.Day == 2);
-        Assert.DoesNotContain(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 1 && e.Clock.Day == 2 && e.SoldierLoss > 0);
+        Assert.Contains(events.OfType<TacticActivatedEvent>(), e => e.SourceId == 0 && e.Clock.Day == 1);
+        Assert.Contains(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 0 && e.Clock.Day == 1);
+        Assert.DoesNotContain(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 1 && e.Clock.Day == 1 && e.SoldierLoss > 0);
         Assert.Contains(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 1 && e.Clock.Day >= 4 && e.SoldierLoss > 0);
         var restored = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), EconomyRulebook.Empty,
             PersonnelRulebook.Empty, TreasureRulebook.Empty, military: rules);

@@ -40,7 +40,7 @@ internal static class BattleAftermath
         if (city is int cityId && (!world.Settlements.TryGetValue(cityId, out var s) || s.Kind != SettlementKind.City)) city = null;
         UnitTerminationService.Complete(world, id, winner, city, rules.Governance, events, repairCorps: false,
             target: BattleObjectContext.Capture(unit));
-        if (victorForce is int victorId) GovernanceLifecycle.EliminateIfDefeated(world, unit.OwnerId, rules, events, world.CurrentDateCommandsConsumed, victorId);
+        if (victorForce is int victorId) GovernanceLifecycle.EliminateIfDefeated(world, unit.OwnerId, rules, events, world.CurrentDateCountdownConsumed, victorId);
     }
 
     internal static void ResolveSettlementDefeat(WorldMutation world, int id, BattleSource attacker, SimulationRules rules, List<DomainEvent> events)
@@ -70,14 +70,14 @@ internal static class BattleAftermath
         foreach (var capture in captures)
             CaptureSettlement(world, capture.Id, capture.Receiver, attacker, capture.Units, rules, events);
         foreach (int owner in previousOwners)
-            GovernanceLifecycle.EliminateIfDefeated(world, owner, rules, events, world.CurrentDateCommandsConsumed,
+            GovernanceLifecycle.EliminateIfDefeated(world, owner, rules, events, world.CurrentDateCountdownConsumed,
                 captures.Last(c => c.PreviousOwner == owner).Owner);
         foreach (var capture in captures.Where(c => !world.Settlements[c.Id].IsDestroyed &&
             world.Settlements[c.Id].OwnerId == c.Owner))
             foreach (int unitId in capture.Units)
                 if (world.Units.TryGetValue(unitId, out var unit))
                     MilitaryMovement.Absorb(world, unit, capture.Id, rules.Governance, rules.Personnel, rules.Military!, events);
-        GovernanceLifecycle.Reconcile(world, previousOwners.ToHashSet(), rules, events, world.CurrentDateCommandsConsumed);
+        GovernanceLifecycle.Reconcile(world, previousOwners.ToHashSet(), rules, events, world.CurrentDateCountdownConsumed);
         foreach (var capture in captures) MilitaryOrders.SettlementChanged(world, capture.Id, rules.Military!, events);
         foreach (var capture in captures) UnitDisplacement.Resolve(world, capture.Id, rules.Military!, events);
     }
@@ -170,7 +170,7 @@ internal static class BattleAftermath
                 if (defeatedUnit is null && fallbackPlace is int lost && world.Settlements[lost].Kind == SettlementKind.City &&
                     original.OwnerId is int defender && world.Forces[defender].IsBarbarian)
                 {
-                    OfficerDeath.Remove(world, original.Id, OfficerDeathCause.NoRetreat, rules.Personnel, events, world.CurrentDateCommandsConsumed);
+                    OfficerDeath.Remove(world, original.Id, OfficerDeathCause.NoRetreat, rules.Personnel, events, world.CurrentDateCountdownConsumed);
                     OfficerDeath.SettleTreasures(world, original.Id, null, events);
                     continue;
                 }
@@ -185,7 +185,7 @@ internal static class BattleAftermath
             }
             else
             {
-                PersonnelTransitions.CancelMissions(world, original.Id, "battle-location-lost", events, rules.Personnel, world.CurrentDateCommandsConsumed);
+                PersonnelTransitions.CancelMissions(world, original.Id, "battle-location-lost", events, rules.Personnel, world.CurrentDateCountdownConsumed);
                 var person = world.Officers[original.Id];
                 if (winner is { } recipient)
                 {

@@ -266,9 +266,12 @@ internal static class MilitaryMovement
             world.Replace(unit with { HasEnteredDailyCycle = true });
     }
 
-    internal static void AdvanceDay(WorldMutation world, MilitaryRulebook? rules, GovernanceRulebook governance, PersonnelRulebook geography, List<DomainEvent> events)
+    internal sealed record Arrival(int UnitId, MilitaryOrder Order);
+
+    internal static IReadOnlyList<Arrival> AdvanceDay(WorldMutation world, MilitaryRulebook? rules, List<DomainEvent> events)
     {
-        if (rules is null) return;
+        List<Arrival> arrivals = [];
+        if (rules is null) return arrivals;
         foreach (int id in world.Units.Keys.Order().ToArray())
         {
             var unit = world.Units[id];
@@ -286,11 +289,23 @@ internal static class MilitaryMovement
             unit = MilitaryNavigation.Commit(world, unit, result, rules, events);
             if (unit.EffectiveOrder?.IsAttack == true) continue;
             if (!result.Arrived) continue;
-            if (order.SettlementId is int destination) Absorb(world, unit, destination, governance, geography, rules, events);
+            arrivals.Add(new(unit.Id, order));
+        }
+        return arrivals;
+    }
+
+    internal static void ResolveArrivals(WorldMutation world, IReadOnlyList<Arrival> arrivals, MilitaryRulebook? rules,
+        GovernanceRulebook governance, PersonnelRulebook geography, List<DomainEvent> events)
+    {
+        if (rules is null) return;
+        foreach (var arrival in arrivals)
+        {
+            if (!world.Units.TryGetValue(arrival.UnitId, out var unit) || unit.EffectiveOrder != arrival.Order) continue;
+            if (arrival.Order.SettlementId is int destination) Absorb(world, unit, destination, governance, geography, rules, events);
             else
             {
                 world.Replace(unit with { Order = null, AutonomousReturn = false, PursuitResponsePending = false });
-                UnitOrderChanges.Report(world, id, null, "arrived", events);
+                UnitOrderChanges.Report(world, unit.Id, null, "arrived", events);
             }
         }
     }

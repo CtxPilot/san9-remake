@@ -168,11 +168,12 @@ public sealed class SimulationEngineTests
         var cursor = new GameClock(190, month, day);
         for (int i = 0; i < 10; i++)
         {
-            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.BeforeDailyCommands), stages[4 * i]);
-            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.DailyCommands), stages[4 * i + 1]);
+            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.DailyMovement), stages[5 * i]);
+            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.BeforeDailyCommands), stages[5 * i + 1]);
+            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.DailyCombat), stages[5 * i + 2]);
+            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.DailyCommands), stages[5 * i + 3]);
             cursor = cursor.NextDay();
-            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.DailyMapUpdate), stages[4 * i + 2]);
-            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.UnitAndBuildingEvents), stages[4 * i + 3]);
+            Assert.Equal(new StageCompletedEvent(cursor, ResolutionStage.UnitAndBuildingEvents), stages[5 * i + 4]);
         }
         List<ResolutionStage> expected = [ResolutionStage.TerminalCheck, ResolutionStage.XunEvents, ResolutionStage.XunUpdate];
         if (monthly) expected.Add(ResolutionStage.MonthEvents);
@@ -181,7 +182,7 @@ public sealed class SimulationEngineTests
         if (annual) expected.AddRange([ResolutionStage.AnnualAppearance, ResolutionStage.AnnualCleanup]);
         expected.Add(ResolutionStage.XunCleanup);
         if (quarterly) expected.Add(ResolutionStage.QuarterPolitics);
-        Assert.Equal(expected, stages.Skip(40).Select(s => s.Stage));
+        Assert.Equal(expected, stages.Skip(50).Select(s => s.Stage));
     }
 
     [Fact]
@@ -360,11 +361,11 @@ public sealed class SimulationEngineTests
             Assert.Throws<InvalidOperationException>(() => engine.AdvanceXun());
             Assert.False(engine.Execute(new("player"), new WaitCommand(Id(2), 1, 1)).Submission.Accepted);
             Assert.Equal(new GameClock(190, 1, 1), engine.Snapshot.Clock);
-            if (stage == ResolutionStage.DailyMapUpdate)
+            if (stage == ResolutionStage.DailyCombat)
                 world.SetSimulation(world.Simulation with { TerminalReason = "player-defeated" });
         };
         var result = Advance(engine);
-        Assert.Equal(new GameClock(190, 1, 2), result.Snapshot.Clock);
+        Assert.Equal(new GameClock(190, 1, 1), result.Snapshot.Clock);
         Assert.Single(result.Events.OfType<TaskCancelledEvent>());
         Assert.Single(result.Events.OfType<SimulationEndedEvent>());
         Assert.DoesNotContain(result.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.UnitAndBuildingEvents);

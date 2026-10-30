@@ -27,8 +27,8 @@ internal sealed partial class WorldMutation : IWorldQuery
     private readonly long _expectedRevision;
     private bool _committed;
     // Relative to Clock, rather than to the enclosing AdvanceDay operation.
-    // Date advancement opens a new day's command stage.
-    internal bool CurrentDateCommandsConsumed { get; set; }
+    // The countdown pass precedes combat and task execution; new journeys then start counting next date.
+    internal bool CurrentDateCountdownConsumed { get; set; }
     private Dictionary<int, int?>? _leadershipBefore;
     private EngagementRelations? _engagements;
     private MilitaryRulebook? _engagementRules;
@@ -218,7 +218,7 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal void SetClock(GameClock clock)
     {
         EnsureOpen();
-        if (Clock != clock) CurrentDateCommandsConsumed = false;
+        if (Clock != clock) CurrentDateCountdownConsumed = false;
         Clock = clock;
     }
 

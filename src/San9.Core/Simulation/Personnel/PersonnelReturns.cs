@@ -32,9 +32,8 @@ internal static class PersonnelReturns
         var context = new PersonnelReturnContext("system", unit.OwnerId, sequence);
         world.SetSimulation(world.Simulation with { NextSequence = checked(sequence + 1) });
         var route = new PersonnelRoute(unit.Position, military.Place(home).Position, false);
-        // Military map updates run after the date advances. The displayed date's
-        // daily commands have not run yet, so they must consume the first return day.
-        Schedule(world, context, personId, arrivalId, home.Id, route.Days, world.CurrentDateCommandsConsumed, events, route, true, home.CorpsId);
+        // Transport arrival follows the daily countdown pass; a new return starts counting on the next date.
+        Schedule(world, context, personId, arrivalId, home.Id, route.Days, world.CurrentDateCountdownConsumed, events, route, true, home.CorpsId);
     }
 
     internal static void FromField(WorldMutation world, int personId, WorldPosition origin, SimulationRules rules,

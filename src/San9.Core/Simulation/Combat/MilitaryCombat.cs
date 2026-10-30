@@ -271,7 +271,7 @@ internal static class MilitaryCombat
         BattleRouting.CompleteExchange(world, exchange.Source, exchange.Target, rules, events);
         if (exchange.Target.IsSettlement)
             CityBattleEffects.CompleteAttack(world, exchange.Source.Id, exchange.Target.Id, exchange.PreviousSettlementOwnerId, events);
-        GovernanceLifecycle.Reconcile(world, exchange.AffectedForces.ToHashSet(), rules, events, world.CurrentDateCommandsConsumed);
+        GovernanceLifecycle.Reconcile(world, exchange.AffectedForces.ToHashSet(), rules, events, world.CurrentDateCountdownConsumed);
         ResolutionPipeline.CheckConquest(world, events);
     }
 
@@ -314,7 +314,7 @@ internal static class MilitaryCombat
             continuation.AffectedForces, () => continuation.Day, continuation.PreviousSettlementOwnerId);
         world.SetSimulation(world.Simulation with { PendingSniping = null, Boundary = SimulationBoundary.Stable });
         OfficerDeath.Resolve(world, pending.RulerId, OfficerDeathCause.Sniping, rules, events,
-            afterDailyCommands: world.CurrentDateCommandsConsumed, successorId: successorId);
+            afterDailyCommands: world.CurrentDateCountdownConsumed, successorId: successorId);
         if (!ResolutionPipeline.CheckTerminal(world, events)) return;
         TacticCombat.ResumeAfterSniping(world, pending.Tactic!, rules, events);
         CompleteExchange(world, exchange, rules, events);

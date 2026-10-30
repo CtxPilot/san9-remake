@@ -92,10 +92,10 @@ public sealed class SnipingSessionTests
         var prompt = Assert.IsType<SnipingSuccessionPrompt>(session.GetSnipingSuccessionPrompt());
         Assert.Equal(22, prompt.RulerId);
         Assert.Equal(new[] { 21, 23 }, prompt.CandidateIds);
-        Assert.Equal(new GameClock(190, 1, 2), session.Snapshot.Clock);
+        Assert.Equal(new GameClock(190, 1, 1), session.Snapshot.Clock);
         Assert.Equal(OfficerStatus.Ruler, session.Snapshot.Officers.Single(p => p.Id == 22).Status);
         Assert.DoesNotContain(arrival.Events, e => e is OfficerDiedEvent or XunAdvancedEvent);
-        Assert.DoesNotContain(arrival.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.DailyMapUpdate);
+        Assert.DoesNotContain(arrival.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.DailyCombat);
         Assert.Equal(SaveFailure.NotStable, Assert.Throws<SaveException>(() => SaveService.Encode(session)).Failure);
         var hash = session.Snapshot;
         long sequence = session.Snapshot.Simulation.NextSequence;
@@ -127,10 +127,10 @@ public sealed class SnipingSessionTests
         var all = arrival.Events.Concat(result.Events).ToArray();
         Assert.Single(all.OfType<TacticSnipingResolvedEvent>(), e => e.OfficerId == 22);
         Assert.Single(all.OfType<OfficerDiedEvent>(), e => e.OfficerId == 22 && e.Cause == OfficerDeathCause.Sniping);
-        Assert.Equal(10, all.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyMapUpdate));
+        Assert.Equal(10, all.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyCombat));
         // A later independently initiated exchange can cause one reply on this same day.
         Assert.Equal(path == "assault" || path == "facility-counter" && counterRoll < 50 ? 1 : 0,
-            result.Events.OfType<BattleDamageEvent>().Count(e => e.Clock.Day == 2 && e.AttackerId == 1 &&
+            result.Events.OfType<BattleDamageEvent>().Count(e => e.Clock.Day == 1 && e.AttackerId == 1 &&
                 e.TargetUnitId == pending.Tactic!.Target.UnitId && e.SettlementId == pending.Tactic.Target.SettlementId));
         Assert.DoesNotContain("pendingSniping", System.Text.Encoding.UTF8.GetString(SaveService.Encode(session)));
         StateAssert.Equal(session.Capture(), SaveService.Decode(SaveService.Encode(session), scenario).Capture());

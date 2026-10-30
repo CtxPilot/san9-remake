@@ -619,7 +619,7 @@ public sealed class PersonnelMissionTests
             var arrival = Assert.Single(events.OfType<PersonnelReturnedEvent>());
             Assert.Equal(new GameClock(190, 1, 11), arrival.Clock);
             int map = events.ToList().FindIndex(e => e is StageCompletedEvent
-                { Clock: { Day: 11 }, Stage: ResolutionStage.DailyMapUpdate });
+                { Clock: { Day: 11 }, Stage: ResolutionStage.DailyCombat });
             int units = events.ToList().FindIndex(e => e is StageCompletedEvent
                 { Clock: { Day: 11 }, Stage: ResolutionStage.UnitAndBuildingEvents });
             Assert.True(map < events.ToList().IndexOf(arrival) && events.ToList().IndexOf(arrival) < units);

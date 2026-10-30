@@ -163,7 +163,7 @@ public sealed class FacilityReprisalTests
         var (engine, rules) = Create(intelligence: 0, seed: seed);
         var result = Advance(engine);
         Assert.Equal(confused, result.Events.OfType<BattleConditionChangedEvent>()
-            .Any(e => e.Clock.Day == 2 && e.Condition == UnitCondition.Confused));
+            .Any(e => e.Clock.Day == 1 && e.Condition == UnitCondition.Confused));
         Assert.Contains(engine.Snapshot.Simulation.RandomStreams, s => s.Name == "military-facility-reprisal");
         var restored = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), EconomyRulebook.Empty,
             PersonnelRulebook.Empty, TreasureRulebook.Empty, military: rules);

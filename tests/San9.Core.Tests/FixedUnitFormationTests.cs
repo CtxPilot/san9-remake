@@ -104,7 +104,7 @@ public sealed class FixedUnitFormationTests
         while (world.CreateSnapshot().Units[0].Order is not null && days < 20)
         {
             var mutation = world.BeginMutation(); List<DomainEvent> events = [];
-            MilitaryMovement.AdvanceDay(mutation, rules, new([]), PersonnelRulebook.Empty, events);
+            MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
             world.Commit(mutation); days++;
             unit = world.CreateSnapshot().Units[0];
             bool water = rules.Map.IsWater(unit.Position); visitedWater |= water;

@@ -253,7 +253,7 @@ public sealed class DiplomacyTimingTests
         Assert.Equal(new GameClock(190, 1, 11), engine.Snapshot.Clock);
         Assert.Single(all.OfType<XunAdvancedEvent>());
         foreach (var stage in new[] { ResolutionStage.BeforeDailyCommands, ResolutionStage.DailyCommands,
-            ResolutionStage.DailyMapUpdate, ResolutionStage.UnitAndBuildingEvents })
+            ResolutionStage.DailyCombat, ResolutionStage.UnitAndBuildingEvents })
             Assert.Equal(10, all.OfType<StageCompletedEvent>().Count(e => e.Stage == stage));
         Assert.Single(all.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.XunUpdate);
     }
@@ -288,7 +288,7 @@ public sealed class DiplomacyTimingTests
         Assert.DoesNotContain(arrived.Events, e => e is XunAdvancedEvent ||
             e is StageCompletedEvent { Stage: ResolutionStage.XunUpdate });
         Assert.Equal(10, arrived.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.BeforeDailyCommands));
-        Assert.Equal(10, arrived.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyMapUpdate));
+        Assert.Equal(10, arrived.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyCombat));
         var saved = engine.Snapshot;
         var restored = new SimulationEngine(WorldState.Restore(saved), rules);
         var response = new RespondDailyTaskCommand(Guid.NewGuid(), 2, 1, task.Id, 0, false);
@@ -300,7 +300,7 @@ public sealed class DiplomacyTimingTests
         Assert.Single(answered.Events.OfType<XunAdvancedEvent>());
         Assert.Single(answered.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.XunUpdate);
         Assert.DoesNotContain(answered.Events.OfType<StageCompletedEvent>(), e => e.Stage is
-            ResolutionStage.BeforeDailyCommands or ResolutionStage.DailyCommands or ResolutionStage.DailyMapUpdate);
+            ResolutionStage.BeforeDailyCommands or ResolutionStage.DailyCommands or ResolutionStage.DailyCombat);
         Assert.DoesNotContain(engine.Snapshot.Simulation.Tasks, t => t.Id == task.Id);
         if (distance == 0) Assert.Empty(engine.Snapshot.Simulation.Tasks);
         else
@@ -408,7 +408,7 @@ public sealed class DiplomacyTimingTests
         Assert.Single(all.OfType<XunAdvancedEvent>());
         Assert.Equal(2, all.OfType<GiftResolvedEvent>().Count());
         foreach (var stage in new[] { ResolutionStage.BeforeDailyCommands, ResolutionStage.DailyCommands,
-            ResolutionStage.DailyMapUpdate, ResolutionStage.UnitAndBuildingEvents })
+            ResolutionStage.DailyCombat, ResolutionStage.UnitAndBuildingEvents })
             Assert.Equal(10, all.OfType<StageCompletedEvent>().Count(e => e.Stage == stage));
         Assert.Single(all.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.XunUpdate);
     }

@@ -142,7 +142,7 @@ public sealed class MovementForecastTests
 
     private static UnitState Day(WorldMutation world, MilitaryRulebook rules)
     {
-        MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, []);
+        MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
         MilitaryConditions.Tick(world, []);
         return world.Units[0];
     }
@@ -159,13 +159,13 @@ public sealed class MovementForecastTests
         var moved = MilitaryNavigation.Apply(unit, step);
         Assert.Equal(unit.Position, moved.Position); Assert.Null(moved.Waypoint); Assert.Equal(unit.Order, moved.Order);
         List<DomainEvent> events = [];
-        MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, events);
+        MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
         var arrival = Assert.Single(events.OfType<UnitWaypointReachedEvent>());
         Assert.Equal(new WorldPosition(7, 2), arrival.Position);
         Assert.Equal(arrival.Position, arrival.Unit.Position);
         Assert.NotEqual(arrival.Position, world.Units[0].Position);
         events.Clear();
-        MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, events);
+        MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
         Assert.Empty(events.OfType<UnitWaypointReachedEvent>());
     }
 
@@ -182,7 +182,7 @@ public sealed class MovementForecastTests
         for (int day = 0; day < 4; day++)
         {
             List<DomainEvent> events = [];
-            MilitaryMovement.AdvanceDay(world, rules, new([]), PersonnelRulebook.Empty, events);
+            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
             positions.AddRange(Assert.Single(events.OfType<UnitMovedEvent>()).Steps);
         }
         Assert.Equal(new WorldPosition(12, 2), plan.Steps[0]);
@@ -300,7 +300,7 @@ public sealed class MovementForecastTests
     {
         var rules = Rules(95, true); var mutation = World().BeginMutation();
         var events = new List<DomainEvent>();
-        MilitaryMovement.AdvanceDay(mutation, rules, new([]), PersonnelRulebook.Empty, events);
+        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
         // Two ordinary steps, five slow steps, then one ordinary step: 20 + 60 + 10.
         Assert.Equal(new WorldPosition(10, 2), mutation.Units[0].Position);
         Assert.Equal(90, Assert.Single(events.OfType<UnitMovedEvent>()).Spent);
@@ -353,7 +353,7 @@ public sealed class MovementForecastTests
         Assert.Single(world.CreateSnapshot().Units);
         var mutation = world.BeginMutation();
         Day(mutation, rules);
-        MilitaryMovement.AdvanceDay(mutation, rules, new([]), PersonnelRulebook.Empty, []);
+        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
         Assert.Empty(mutation.Units);
     }
 

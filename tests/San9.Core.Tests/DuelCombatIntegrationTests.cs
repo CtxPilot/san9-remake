@@ -71,12 +71,12 @@ public sealed class DuelCombatIntegrationTests
     {
         var engine = Engine(opportunity: opportunity);
         var result = engine.AdvanceXun();
-        Assert.Contains(result.Events.OfType<DuelStartedEvent>(), e => e.Clock.Day == 2);
-        Assert.Contains(result.Events.OfType<DuelCompletedEvent>(), e => e.Clock.Day == 2);
+        Assert.Contains(result.Events.OfType<DuelStartedEvent>(), e => e.Clock.Day == 1);
+        Assert.Contains(result.Events.OfType<DuelCompletedEvent>(), e => e.Clock.Day == 1);
         Assert.Empty(result.Events.OfType<TacticActivatedEvent>());
         Assert.Equal(SimulationBoundary.Stable, engine.Snapshot.Simulation.Boundary);
         Assert.Equal(new(190, 1, 11), engine.Snapshot.Clock);
-        Assert.Equal(10, result.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyMapUpdate));
+        Assert.Equal(10, result.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyCombat));
     }
 
     [Theory]
@@ -102,8 +102,8 @@ public sealed class DuelCombatIntegrationTests
         var response = engine.Execute(new("player"), new ChooseDuelSuccessorCommand(Guid.NewGuid(), 2,
             engine.Snapshot.Simulation.NextSequence, 22, 21));
         Assert.True(response.Submission.Accepted);
-        Assert.Equal(new[] { 1, 2, 3, 4 }, response.Events.OfType<BattleDamageEvent>().Where(e => e.Clock.Day == 2).Select(e => e.AttackerId).Order());
-        Assert.Single(response.Events.OfType<StageCompletedEvent>(), e => e.Clock.Day == 2 && e.Stage == ResolutionStage.DailyMapUpdate);
+        Assert.Equal(new[] { 1, 2, 3, 4 }, response.Events.OfType<BattleDamageEvent>().Where(e => e.Clock.Day == 1).Select(e => e.AttackerId).Order());
+        Assert.Single(response.Events.OfType<StageCompletedEvent>(), e => e.Clock.Day == 1 && e.Stage == ResolutionStage.DailyCombat);
     }
 
     [Fact]
@@ -131,13 +131,13 @@ public sealed class DuelCombatIntegrationTests
         var engine = Engine(deaths: true, cooldown: 10);
         var paused = engine.AdvanceXun();
         Assert.NotNull(engine.GetDuelSuccessionPrompt());
-        Assert.Equal(new(190, 1, 11), engine.Snapshot.Clock);
+        Assert.Equal(new(190, 1, 10), engine.Snapshot.Clock);
         Assert.DoesNotContain(paused.Events, e => e is XunAdvancedEvent || e is StageCompletedEvent { Stage: ResolutionStage.XunUpdate });
         var result = engine.Execute(new("player"), new ChooseDuelSuccessorCommand(Guid.NewGuid(), 2,
             engine.Snapshot.Simulation.NextSequence, 22, 21));
         Assert.True(result.Submission.Accepted);
         Assert.Single(result.Events.OfType<XunAdvancedEvent>());
-        Assert.Single(result.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.DailyMapUpdate);
+        Assert.Single(result.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.DailyCombat);
         Assert.Single(result.Events.OfType<StageCompletedEvent>(), e => e.Stage == ResolutionStage.XunUpdate);
         Assert.Equal(new(190, 1, 11), engine.CaptureStableState().Clock);
     }
@@ -151,9 +151,9 @@ public sealed class DuelCombatIntegrationTests
         var arrival = engine.AdvanceXun();
         var prompt = Assert.IsType<DuelSuccessionPrompt>(engine.GetDuelSuccessionPrompt());
         Assert.Equal(22, prompt.RulerId);
-        Assert.Equal(new(190, 1, 2), engine.Snapshot.Clock);
+        Assert.Equal(new(190, 1, 1), engine.Snapshot.Clock);
         Assert.Throws<InvalidOperationException>(() => engine.CaptureStableState());
-        Assert.DoesNotContain(arrival.Events, e => e is StageCompletedEvent { Stage: ResolutionStage.DailyMapUpdate });
+        Assert.DoesNotContain(arrival.Events, e => e is StageCompletedEvent { Stage: ResolutionStage.DailyCombat });
         Assert.DoesNotContain(arrival.Events, e => e is OfficerDiedEvent);
         var before = engine.Snapshot;
         var damage = before.Simulation.PendingDuel!.Damage;
@@ -174,13 +174,13 @@ public sealed class DuelCombatIntegrationTests
         Assert.Equal(OfficerStatus.Dead, engine.Snapshot.Officers.Single(p => p.Id == 22).Status);
         Assert.Equal(deathRandom, engine.Snapshot.Simulation.RandomStreams.Single(s => s.Name == "duel-death"));
         Assert.Empty(arrival.Events.OfType<BattleDamageEvent>());
-        var committed = result.Events.OfType<BattleDamageEvent>().Where(e => e.Clock.Day == 2).ToArray();
+        var committed = result.Events.OfType<BattleDamageEvent>().Where(e => e.Clock.Day == 1).ToArray();
         Assert.Equal(2, committed.Length);
         Assert.Equal(damage.Outgoing, Assert.Single(committed, e => e.AttackerId == 1).SoldierLoss);
         Assert.Equal(damage.Incoming, Assert.Single(committed, e => e.AttackerId == 2).SoldierLoss);
-        Assert.DoesNotContain(result.Events.OfType<DuelStartedEvent>(), e => e.Clock.Day == 2);
-        Assert.Single(result.Events.OfType<DuelCompletedEvent>(), e => e.Clock.Day == 2);
-        Assert.Equal(10, arrival.Events.Concat(result.Events).OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyMapUpdate));
+        Assert.DoesNotContain(result.Events.OfType<DuelStartedEvent>(), e => e.Clock.Day == 1);
+        Assert.Single(result.Events.OfType<DuelCompletedEvent>(), e => e.Clock.Day == 1);
+        Assert.Equal(10, arrival.Events.Concat(result.Events).OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.DailyCombat));
         Assert.Single(result.Events.OfType<XunAdvancedEvent>());
         Assert.Equal(SimulationBoundary.Stable, engine.CaptureStableState().Simulation.Boundary);
     }

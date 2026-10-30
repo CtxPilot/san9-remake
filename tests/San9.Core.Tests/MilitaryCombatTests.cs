@@ -283,7 +283,7 @@ public sealed class MilitaryCombatTests
     }
 
     [Fact]
-    public void BattleEliminationReturnsEnvoyBeforeCurrentDatesCommandsAcrossRestore()
+    public void BattleEliminationSchedulesReturnAfterTheCurrentCountdownAcrossRestore()
     {
         var initial = World(defenders: 0, controlled: true).CreateSnapshot();
         var world = WorldState.Create(initial.Clock, 42,
@@ -315,11 +315,11 @@ public sealed class MilitaryCombatTests
             all.AddRange(events);
             if (i == 0)
             {
-                Assert.Equal(new GameClock(190, 1, 12), Assert.Single(events.OfType<ForceEliminatedEvent>()).Clock);
+                Assert.Equal(new GameClock(190, 1, 11), Assert.Single(events.OfType<ForceEliminatedEvent>()).Clock);
                 var returning = Assert.Single(engine.Snapshot.Simulation.Tasks.Where(t => t.OfficerId == 12));
-                Assert.False(returning.Journey!.ReturnLeg!.AfterDailyCommands);
+                Assert.True(returning.Journey!.ReturnLeg!.AfterDailyCommands);
                 Assert.True(returning.Journey.ReturnLeg.DiplomaticEnvoy);
-                // Date 12 already includes eleven outbound ticks: 20 - (20 - 11).
+                // Date 11 already includes eleven outbound ticks: 20 - (20 - 11).
                 Assert.Equal(11, returning.Journey.ReturnLeg.CountdownDays);
                 Assert.Equal(new GameClock(190, 1, 22), returning.Due);
                 restored = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), rules);

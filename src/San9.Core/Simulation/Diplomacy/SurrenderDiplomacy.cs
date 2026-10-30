@@ -93,7 +93,7 @@ internal static class SurrenderDiplomacy
         else ForceRelations.Set(world, task.ForceId, target,
             DiplomacyMath.SurrenderRejectedRelation(MilitaryDiplomacy.Relation(world, task.ForceId, target)), null, events);
         events.Add(new SurrenderResolvedEvent(world.Clock, task.Id, task.ForceId, target, accept, threshold, task.Journey!.SuccessRoll!.Value));
-        PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCommandsConsumed);
+        PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCountdownConsumed);
         ResolutionPipeline.CheckConquest(world, events);
     }
 }

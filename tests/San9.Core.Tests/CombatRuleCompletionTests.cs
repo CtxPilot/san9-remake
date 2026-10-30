@@ -206,12 +206,12 @@ public sealed class CombatRuleCompletionTests
     {
         var (world, rules) = Create();
         var m = world.BeginMutation();
-        m.CurrentDateCommandsConsumed = true;
+        m.CurrentDateCountdownConsumed = true;
         BattlePersonnel.Escape(m, 11, 1, rules.Personnel, [], new(402, 7), rules.Military!);
         var task = Assert.Single(m.Simulation.Tasks);
         // Date advancement increments general task age; this return missed that day's tick.
         m.SetClock(m.Clock.NextDay());
-        m.CurrentDateCommandsConsumed = false;
+        m.CurrentDateCountdownConsumed = false;
         task = task with { ProgressDays = 1 };
         m.SetSimulation(m.Simulation with { Tasks = [] });
         m.Replace(m.Settlements[1] with { OwnerId = 2 });

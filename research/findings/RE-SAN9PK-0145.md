@@ -33,7 +33,7 @@
 
 四张周期事件表进一步固定了边界：每旬表为 `0,1,14,15,16,18,5,-1`；当前样本月表只有 `-1`；季度前置表为 `24,25`；季度主表为 `26,12,13,8,11,10,-1`。空月表是当前内容事实，不取消月边界本身。2026-09-20续核补齐第五张政治表：季度收尾经`483140 → 47F750`、开局至少30日后按`20,21,22,23`生产；位于季度更新与可选年度登场之后，详见[RE-0141续核](RE-SAN9PK-0141.md#2026-09-20g10政治生产入口最低官爵与皇帝分支续核)。
 
-`process_simulation_state_machine`（`0x50A760`）按子任务串行处理每日命令前工作、部队命令事件、`advance_date_and_run_daily_updates`、后续部队/建筑事件，最后调用 `refresh_mainmap_for_date`。日期推进函数每次只令权威日期加一并执行日级地图更新；循环到下一旬第一日后，`sync_mainmap_display_date_from_world`（`0x51EE80`）才把世界年月日打包，经 `set_mainmap_display_date_and_refresh`（`0x52C340`）写入大地图 `+0x1364` 缓存并刷新。`refresh_mainmap_calendar_display`（`0x525BA0`）只从该缓存渲染年、月、旬。
+`process_simulation_state_machine`（`0x50A760`）按子任务串行处理当日移动、每日命令前工作、部队命令事件、`advance_date_and_run_daily_updates`、后续部队/建筑事件，最后调用 `refresh_mainmap_for_date`。**2026-10-30补正：**此前摘要漏记最前面的移动阶段；日期推进后的“地图更新”经`508930 → 52E050 → 52DF80/52D4D0`创建显示快照，不是计算次日军事移动和战斗。普通战斗／兵法及晚组计略均在日期推进前完成，详见[七类计略Core核查](../notes/2026-10-30-strategy-core-resolution-audit.md#c1原作日期推进后是显示快照core却执行军事日规则)。循环到下一旬第一日后，`sync_mainmap_display_date_from_world`（`0x51EE80`）才把世界年月日打包，经 `set_mainmap_display_date_and_refresh`（`0x52C340`）写入大地图 `+0x1364` 缓存并刷新。`refresh_mainmap_calendar_display`（`0x525BA0`）只从该缓存渲染年、月、旬。
 
 `serialize_save_header`（`0x45AF50`）把 `ScenarioWorldState.current_date_code` 作为权威日期写入存档头；`deserialize_save_header`（`0x457530`）在恢复记录载荷前写回它。世界状态和各记录数组随后对称保存/恢复，但活动任务阶段和大地图日期缓存均未进入载荷。因此载入后的 UI 必须从世界状态重建，不能被视为第二份日期。
 

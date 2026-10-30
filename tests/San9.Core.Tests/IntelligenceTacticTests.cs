@@ -151,7 +151,7 @@ public sealed partial class IntelligenceTacticTests
         var officer = engine.Snapshot.Officers.Single(p => p.Id == 11);
         Assert.Equal(9000, officer.EquippedTacticId);
         Assert.DoesNotContain(9200, officer.LearnedTactics);
-        if (fires) Assert.Equal(Math.Max(0, 9 - (engine.Snapshot.Clock.Day - activations[^1].Clock.Day)), officer.TacticCooldown);
+        if (fires) Assert.Equal(Math.Max(0, 9 - (engine.Snapshot.Clock.Day - activations[^1].Clock.Day - 1)), officer.TacticCooldown);
         else Assert.Equal(0, officer.TacticCooldown);
     }
 

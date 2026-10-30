@@ -107,7 +107,7 @@ public sealed partial class UnitPolicyTests
         mutation.Replace(mutation.Units[2] with { Position = new(22, 10) });
         var events = new List<DomainEvent>(); var rules = Rules();
         MilitaryPolicies.ApproachDay(mutation, rules, events);
-        MilitaryMovement.AdvanceDay(mutation, rules, new([]), PersonnelRulebook.Empty, events);
+        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
         Assert.Equal(new WorldPosition(21, 10), mutation.Units[1].Position);
         MilitaryCombat.AdvanceDay(mutation, new() { Military = rules }, events);
         Assert.Contains(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 1 && e.TargetUnitId == 2 && e.SoldierLoss > 0);

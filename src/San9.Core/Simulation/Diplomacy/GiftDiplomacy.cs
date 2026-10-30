@@ -180,7 +180,7 @@ internal static class GiftDiplomacy
         }
         events.Add(new GiftResolvedEvent(world.Clock, task.Id, task.OfficerId, gift.TargetForceId, gift.Offer, accepted,
             received, refunded, gift.Offer.Amount - received - refunded));
-        PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCommandsConsumed);
+        PersonnelReturns.Start(world, task, rules.Personnel, events, world.CurrentDateCountdownConsumed);
     }
 }
 
