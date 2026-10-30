@@ -35,9 +35,7 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
         if (command is "strategist" or "rank" or "reward" or "bestow" or "confiscate" or "execute" or "exile")
             return Appointment(command);
         if (command == "summon") return Recall(home);
-        if (command == "demolish" && (!OtherHomes(home).Any() ||
-            !view.RegionCityIds.TryGetValue(id, out int cityId) || !places.TryGetValue(cityId, out var city) ||
-            city.Kind != SettlementKind.City || city.OwnerId != Owner || !Present(city) || city.Durability == 0))
+        if (command == "demolish" && !places.Values.Any(s => FacilityDemolitionRules.IsOtherDirectFacility(home, s)))
             return "no-move-destination";
         if (home.ConfusionDaysRemaining > 0) return "confused";
         // Deployment and transport remain available under siege; ordinary missions do not.

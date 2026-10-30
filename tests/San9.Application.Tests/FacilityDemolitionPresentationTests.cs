@@ -69,6 +69,35 @@ public sealed class FacilityDemolitionPresentationTests
     }
 
     [Fact]
+    public void EnemyParentCityDoesNotDisableTheMenuOrConfirmationAndExecutionUsesSeparateDestinations()
+    {
+        var definition = Definition() with { RegionCityIds = new() { [1] = 1, [2] = 2, [3] = 2 } };
+        var session = GameSession.Start(definition, 42);
+        var entry = MapCommandMenu.Settlement(session.View, 3).SelectMany(g => g.Children).Single(e => e.Id == "demolish");
+        Assert.True(entry.Enabled, entry.UnavailableReasonKey);
+        var draft = new FacilityDemolitionDraft(session, 3);
+        Assert.True(draft.CanExecute);
+        var result = session.Execute(new("player"), draft.CreateCommand(Guid.NewGuid(), session.Snapshot.Simulation.NextSequence));
+        Assert.True(result.Submission.Accepted, result.Submission.Rejection.ToString());
+        Assert.Equal(2, Assert.Single(result.Events.OfType<FacilityDemolishedEvent>()).DestinationCityId);
+        Assert.Equal(1, session.Snapshot.Officers.Single(p => p.Id == 2).SettlementId);
+    }
+
+    [Fact]
+    public void MissingOtherDirectFacilityIsReportedBeforeConfusionAndOtherCorpsDoNotCount()
+    {
+        var definition = Definition();
+        var world = GameSession.Start(definition, 42).Snapshot;
+        int? directCorps = world.Settlements.Single(s => s.Id == 3).CorpsId;
+        world = world with { Settlements = world.Settlements.Select(s => s.Id == 1 ? s with { CorpsId = 99 } :
+            s.Id == 3 ? s with { ConfusionDaysRemaining = 1 } : s).ToArray() };
+        var entry = MapCommandMenu.Settlement(new(definition, world), 3).SelectMany(g => g.Children).Single(e => e.Id == "demolish");
+        Assert.Equal(CommandMenuSkin.ReasonKey("no-move-destination"), entry.UnavailableReasonKey);
+        world = world with { Settlements = world.Settlements.Select(s => s.Id == 1 ? s with { CorpsId = directCorps } : s).ToArray() };
+        Assert.Equal(CommandMenuSkin.ReasonKey("confused"), FacilityDemolitionDraft.UnavailableReasonKey(new(definition, world), 3));
+    }
+
+    [Fact]
     public void UnrelatedWorldChangeInvalidatesPendingConfirmation()
     {
         var session = GameSession.Start(Definition(), 42);

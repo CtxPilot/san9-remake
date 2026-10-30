@@ -7,7 +7,8 @@ namespace San9.Core.Tests;
 public sealed class FacilityDemolitionTests
 {
     private static readonly CommandContext Player = new("player");
-    private static SimulationEngine Engine(bool allowed = true, bool friendlyCity = true, uint soldiers = 1000, bool confused = false, bool engaged = false)
+    private static SimulationEngine Engine(bool allowed = true, bool friendlyCity = true, uint soldiers = 1000, bool confused = false, bool engaged = false,
+        bool otherHome = false)
     {
         var military = new MilitaryRulebook(new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, 1, null)],
             [new(1, 5, 0, 10000, 1, new(1, 1), TravelMode.Land),
@@ -22,10 +23,10 @@ public sealed class FacilityDemolitionTests
             [new(1, 100) { LeaderId = 11 }, new(2, 100) { LeaderId = 21 }],
             [new(1, friendlyCity ? 1 : 2, soldiers, 100, 100, 80, 0, 0, 100, 0, 100) { Wounded = 49990 },
                 new(2, 1, 100, 100, 100, 50, 0, 0, 100, 0, 100) { Kind = SettlementKind.Facility, Wounded = 20, ConfusionDaysRemaining = confused ? 1 : 0 },
-                new(3, 2, 100, 100, 100, 100, 0, 0, 100, 0, 100)],
+                new(3, otherHome ? 1 : 2, 100, 100, 100, 100, 0, 0, 100, 0, 100)],
             [new(11, 1, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler },
                 new(12, 2, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Captive },
-                new(21, 2, 3, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler },
+                new(21, 2, otherHome ? 1 : 3, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler },
                 new(13, 1, null, new(70, 70, 70, 70), false) { UnitId = 0 }],
             units: [new(0, 1, new(7, 2), 100) { FormationId = 1, Morale = 100, ServicePlaceId = 2,
                 CargoFood = 100, Order = new(MilitaryOrderKind.Transport, null, 2) },
@@ -71,12 +72,28 @@ public sealed class FacilityDemolitionTests
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
-    public void ProtectedFacilityOrMissingFriendlyReceivingCityRejectsAtomically(bool allowed, bool friendlyCity)
+    public void ProtectedFacilityOrNoOtherDirectFacilityRejectsAtomically(bool allowed, bool friendlyCity)
     {
         var engine = Engine(allowed, friendlyCity);
         var hash = engine.Snapshot;
         Assert.False(engine.Execute(Player, new DemolishFacilityCommand(Guid.NewGuid(), 1, 0, 2)).Submission.Accepted);
         StateAssert.Equal(hash, engine.Snapshot);
+    }
+
+    [Fact]
+    public void EnemyGeographicCityReceivesPopulationWhilePersonnelRemainInFriendlyFacilities()
+    {
+        var engine = Engine(friendlyCity: false, otherHome: true);
+        var result = engine.Execute(Player, new DemolishFacilityCommand(Guid.NewGuid(), 1, 0, 2));
+        Assert.True(result.Submission.Accepted, result.Submission.Rejection.ToString());
+        var populationCity = engine.Snapshot.Settlements.Single(s => s.Id == 1);
+        Assert.Equal(2, populationCity.OwnerId);
+        Assert.Equal(120u, populationCity.DraftPopulation);
+        Assert.Equal(1, Assert.Single(result.Events.OfType<FacilityDemolishedEvent>()).DestinationCityId);
+        Assert.All(engine.Snapshot.Officers.Where(p => p.Id is 11 or 12), p => Assert.Equal(3, p.SettlementId));
+        Assert.Equal(OfficerStatus.Captive, engine.Snapshot.Officers.Single(p => p.Id == 12).Status);
+        Assert.True(engine.Snapshot.Settlements.Single(s => s.Id == 2).IsDestroyed);
+        Assert.Equal(3, Assert.Single(engine.Snapshot.Units).ServicePlaceId);
     }
 
     [Fact]
