@@ -12,26 +12,31 @@ public sealed class FacilityReprisalTests
 
     private static (SimulationEngine Engine, MilitaryRulebook Rules) Create(int proficiency = 0, int intelligence = 100,
         uint soldiers = 10000, uint wounded = 0, int durability = 600, bool walls = true, bool enabled = true,
-        FacilityReprisal? reprisal = null, ulong seed = 42)
+        FacilityReprisal? reprisal = null, ulong seed = 42, TacticEffect? tactic = null, bool automatic = false)
     {
         var combat = new CombatProfile(0, 0, 1, 1000, 50);
         var military = new MilitaryRulebook(new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
             [new(700, 5, 0, 100000, 2, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(1, walls), CaptureRanks = [BattleRank.Front, BattleRank.Rear] }],
+                { Combat = combat, Attack = new(1, walls), CaptureRanks = [BattleRank.Front, BattleRank.Rear],
+                    Tactics = tactic is null ? null : new(100, 2, [0], automatic ? [9000] : [])
+                        { AutomaticOpportunityChance = automatic ? 100 : null } }],
             [new(1, new(2, 2), new(1, 1)) { FacilityTypeId = 8001, Combat = combat },
              new(2, new(7, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat, DestroyedAtZeroDurability = true },
              new(3, new(17, 2), new(1, 1)) { FacilityTypeId = 8001, Combat = combat }])
         {
             Facilities = [new(8000, 0, 600, new(1, 1), 0, false, false, false, 100000, null, null, null, [])
-                { Combat = combat, DestroyedAtZeroDurability = true, Reprisal = enabled ? reprisal ?? Reprisal : null },
-                new(8001, 0, 600, new(1, 1), 0, false, true, true, 100000, null, null, null, []) { Combat = combat }]
+                { Combat = combat, IsWork = true, DestroyedAtZeroDurability = true, Reprisal = enabled ? reprisal ?? Reprisal : null },
+                new(8001, 0, 600, new(1, 1), 0, false, true, true, 100000, null, null, null, []) { Combat = combat }],
+            Tactics = tactic is null ? [] : [new(9000, tactic == TacticEffect.Martial ? 0 : 7,
+                tactic.Value, 10, 9, 0, true, true, [700])]
         });
         var world = WorldState.Create(new(190, 1, 1), seed,
             [new(1, 100) { LeaderId = 11 }, new(2, 100) { LeaderId = 21 }],
             [new(1, 1, 1000, 600, 600, 100, 0, 0, 100, 0, 100),
              new(2, 2, 0, durability, 600, 0, 0, 0, 100, 0, 100) { CanHostPersons = false, ConsumesFood = false },
              new(3, 2, 1000, 600, 600, 100, 0, 0, 100, 0, 100)],
-            [new(11, 1, null, new(100, 0, 0, 0), false) { UnitId = 0, Status = OfficerStatus.Ruler },
+            [new(11, 1, null, new(100, 0, 0, 0), false) { UnitId = 0, Status = OfficerStatus.Ruler,
+                LearnedTactics = tactic is null ? [] : [9000], EquippedTacticId = tactic is null ? null : 9000 },
              new(12, 1, null, new(10, intelligence, 0, 0), false) { UnitId = 0,
                 TacticProficiencies = [0, 0, 0, 0, 0, 0, proficiency, 0, 0] },
              new(21, 2, 3, new(10, 10, 10, 10), false) { Status = OfficerStatus.Ruler }],
@@ -45,6 +50,43 @@ public sealed class FacilityReprisalTests
     }
 
     private static AdvanceXunResult Advance(SimulationEngine engine) { engine.EndControl(Player); return engine.AdvanceXun(); }
+
+    [Theory]
+    [InlineData(TacticEffect.Martial, false, true, true, 2, true)]
+    [InlineData(TacticEffect.Confusion, false, true, true, 1, true)]
+    [InlineData(TacticEffect.Illusion, false, false, true, null, true)]
+    [InlineData(TacticEffect.Martial, true, true, true, 2, false)]
+    [InlineData(TacticEffect.Confusion, false, false, false, 2, false)]
+    [InlineData(TacticEffect.Martial, true, false, false, 1, false)]
+    public void AttackingWorksOnlyResolvesSiegeAndReprisalWithoutTacticOpportunities(TacticEffect tactic,
+        bool automatic, bool reprisal, bool walls, int? owner, bool playerAttacker)
+    {
+        var (engine, military) = Create(tactic: tactic, automatic: automatic, enabled: reprisal, walls: walls);
+        var state = WorldState.Restore(engine.CaptureStableState());
+        var world = state.BeginMutation();
+        world.Replace(world.Settlements[2] with { OwnerId = owner, CorpsId = owner });
+        world.SetSimulation(world.Simulation with { Controls = [new("player", playerAttacker ? 1 : 2, ControllerKind.Player)] });
+        WorldInvariants.Validate(world);
+        List<DomainEvent> events = [];
+
+        MilitaryCombat.AdvanceDay(world, new() { Military = military }, events);
+
+        Assert.Empty(events.OfType<TacticActivatedEvent>());
+        Assert.DoesNotContain(world.Simulation.RandomStreams, s => s.Name.StartsWith("military-tactic", StringComparison.Ordinal));
+        Assert.Equal(0, world.Officers[11].TacticCooldown);
+        Assert.Equal(walls, world.Settlements[2].Durability < 600);
+        Assert.True(world.Settlements[2].Durability > 0);
+        var losses = events.OfType<BattleDamageEvent>().ToArray();
+        Assert.Equal(walls ? reprisal ? 2 : 1 : 0, losses.Length);
+        Assert.Equal(walls && reprisal ? 9900u : 10000u, world.Units[0].Soldiers);
+        Assert.All(losses, loss =>
+        {
+            Assert.Null(loss.TacticId);
+            Assert.False(loss.IsTacticExchange);
+            Assert.True(loss.DurabilityLoss > 0 || loss.AttackerIsSettlement && loss.SoldierLoss == 100);
+        });
+        WorldInvariants.Validate(world);
+    }
 
     [Theory]
     [InlineData(0, 100u)]

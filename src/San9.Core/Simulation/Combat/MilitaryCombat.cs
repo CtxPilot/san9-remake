@@ -163,9 +163,11 @@ internal static class MilitaryCombat
         var affected = new[] { source.IsSettlement ? world.Settlements[source.Id].OwnerId : source.Owner(world),
             target.IsSettlement ? world.Settlements[target.Id].OwnerId : target.Owner(world) }.OfType<int>().Distinct().Order().ToImmutableArray();
         var exchange = new Exchange(xunStarted, source, target, affected, captureDay, previousOwner);
-        bool counter = CanReply(world, target, source, military);
+        // Works resolve siege damage and reprisal without an ordinary troop exchange.
+        bool attacksWork = target.IsSettlement && MilitaryDiplomacy.Work(world, target.Id, military);
+        bool counter = !attacksWork && CanReply(world, target, source, military);
         // The pair is captured before any casualty, condition change, duel or succession.
-        var damage = new CombatExchangeDamage(NormalDamage(world, source, target, military),
+        var damage = attacksWork ? default : new CombatExchangeDamage(NormalDamage(world, source, target, military),
             counter ? NormalDamage(world, target, source, military) : 0);
         var siegeUnit = source.IsSettlement ? target : source;
         var siegeTarget = source.IsSettlement ? source : target;
@@ -186,7 +188,11 @@ internal static class MilitaryCombat
                         reprisal, military.CombatFormation(unit)!, events);
             }
         }
-        if (!IsDefeated(world, source) && !IsDefeated(world, target))
+        if (attacksWork)
+        {
+            CompleteLosses(world, source, target, rules, events);
+        }
+        else if (!IsDefeated(world, source) && !IsDefeated(world, target))
         {
             if (!FinishOpportunities(world, rules, events, exchange, damage, counter)) return false;
         }
@@ -227,7 +233,7 @@ internal static class MilitaryCombat
             bool counter = opportunity == 1;
             var source = counter ? exchange.Target : exchange.Source;
             var target = counter ? exchange.Source : exchange.Target;
-            // Neutral places and unstaffed works remain targets even though they cannot act as battle sources.
+            // Neutral and unstaffed garrisons remain targets even though they cannot act as battle sources.
             if (!source.IsPresent(world) || !target.IsPresent(world) || IsDefeated(world, source) || IsDefeated(world, target)) break;
             var oriented = counter ? damage.Reverse() : damage;
             bool resolved;

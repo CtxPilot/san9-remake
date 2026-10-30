@@ -100,7 +100,7 @@ public sealed class CombatExchangeTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void SettlementTargetsDoNotNeedToQualifyAsTacticSources(bool neutral)
+    public void UnstaffedGarrisonsRemainTacticTargets(bool neutral)
     {
         var (world, rules, source, target) = Create("assault");
         var m = world.BeginMutation();
@@ -115,9 +115,9 @@ public sealed class CombatExchangeTests
             OwnerId = neutral ? null : 2,
             CorpsId = neutral ? null : 2,
             Kind = neutral ? SettlementKind.City : SettlementKind.Facility,
-            CanHostPersons = neutral,
-            Soldiers = neutral ? 10000u : 0,
-            Morale = neutral ? 100 : 0
+            CanHostPersons = true,
+            Soldiers = 10000,
+            Morale = 100
         });
         WorldInvariants.Validate(m);
         Assert.True(MilitaryCombat.ValidTarget(m, 1, MilitaryCombat.TargetOrder(target),
