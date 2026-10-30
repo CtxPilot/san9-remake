@@ -176,6 +176,9 @@ internal sealed partial class OriginalAiActions
             if (PlacePosition(source.Id) is not { } from) continue;
             var travel = military.Travel(unit);
             pathQueries++;
+            var approach = travel.Map.FindRouteIntoRange(unit.Position, military.SettlementArea(source), travel.Shape, travel.Mode, []);
+            if (!approach.Reachable || approach.Cost >= 5L * travel.DailyBudget) continue;
+            pathQueries++;
             var route = travel.Map.FindRouteIntoRange(from, new MapOccupancy(unit.Position, military.UnitFootprint(unit)), travel.Shape, travel.Mode, []);
             if (!route.Reachable) continue;
             bool excluded = false;
@@ -186,8 +189,7 @@ internal sealed partial class OriginalAiActions
                 if (building is null) continue;
                 if (military.TryPlace(building, out var place) && place.FacilityTypeId is int type &&
                     content.OriginalAi.Military.RouteObstacleFacilityIds.Contains(type) ||
-                    building.OwnerId is int owner && OriginalAiStrategy.IsOpponent(World, unit.OwnerId, owner) ||
-                    route.Cost >= 5L * travel.DailyBudget) { excluded = true; break; }
+                    building.OwnerId is int owner && OriginalAiStrategy.IsOpponent(World, unit.OwnerId, owner)) { excluded = true; break; }
             }
             if (!excluded) count++;
         }

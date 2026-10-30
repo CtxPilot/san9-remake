@@ -63,7 +63,7 @@ internal static class OriginalAiEconomy
         var world = snapshot();
         var cities = world.Settlements.ToDictionary(s => s.Id);
         var sources = initial.Sites.Where(s => s.IsCity && cities[s.Settlement.Id].MerchantPresent && !cities[s.Settlement.Id].FoodTradeUsed &&
-                !s.Settlement.OfficerIds.IsEmpty).OrderBy(s => s.HasPriorityRelation).Select(s => s.Settlement.Id).ToArray();
+                !s.Settlement.OfficerIds.IsEmpty).OrderBy(s => s.HasExpandedFrontier).Select(s => s.Settlement.Id).ToArray();
         int used = 0, submitted = 0, empty = 0, rejected = 0;
         OriginalAiWorkReport Report(OriginalAiWorkEnd end) => new(corpsId, OriginalAiWork.Trade, end, used, submitted) { EmptyPlans = empty, Rejected = rejected };
         foreach (int id in sources)
@@ -101,7 +101,7 @@ internal static class OriginalAiEconomy
             var current = capture();
             var site = current.Sites.FirstOrDefault(s => s.Settlement.Id == source);
             if (site is null || site.Settlement.OfficerIds.IsEmpty)
-                return Report(OriginalAiWorkEnd.PreparationFailed);
+                continue;
             var city = site.Settlement;
             bool canTrain = !city.UnavailableActivities.Contains(DomesticActivity.Train) && city.Soldiers > 0 && city.Morale < 100;
             var people = city.OfficerIds.OrderByDescending(id => current.Abilities[id].War).ToArray();
@@ -109,7 +109,7 @@ internal static class OriginalAiEconomy
             if (people.Length == present && !canTrain)
                 people = people.OrderByDescending(id => OriginalDomesticWork.Adjusted(current.Abilities[id], DomesticActivity.Recruit)).Skip(1).ToArray();
             if (people.Length == 0)
-                return Report(OriginalAiWorkEnd.PreparationFailed);
+                continue;
             int cursor = 0;
             while (cursor < people.Length)
             {

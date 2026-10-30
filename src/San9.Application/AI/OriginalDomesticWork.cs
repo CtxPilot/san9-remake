@@ -8,7 +8,8 @@ internal sealed record OriginalDomesticInputs(int ForceId, uint Money, uint Food
     long SalaryDemand, long RationDemand, bool RecruitmentAllowed,
     ImmutableArray<OriginalDomesticSite> Sites, ImmutableDictionary<int, OfficerAbilities> Abilities);
 
-internal sealed record OriginalDomesticSite(DomesticSettlementObservation Settlement, bool IsCity, bool HasPriorityRelation);
+internal sealed record OriginalDomesticSite(DomesticSettlementObservation Settlement, bool IsCity,
+    bool HasFrontierInCity, bool HasExpandedFrontier);
 
 internal enum OriginalDomesticEnd
 {
@@ -121,9 +122,9 @@ internal static class OriginalDomesticWork
             DomesticActivity.Patrol => 1000L * city.DraftPopulation + Math.Max(0, 1000 - city.PublicOrder),
             DomesticActivity.Commerce => 1000L * city.DraftPopulation + Math.Max(0, 1000 - city.Commerce),
             DomesticActivity.Cultivation => 1000L * city.DraftPopulation + Math.Max(0, 1000 - city.Cultivation),
-            DomesticActivity.Repair => (long)city.MaxDurability - city.Durability + (site.HasPriorityRelation ? 1000 : 0),
-            DomesticActivity.Train => 100L - city.Morale + (site.HasPriorityRelation ? 100 : 0),
-            DomesticActivity.Recruit => (long)city.DraftPopulation + (site.HasPriorityRelation ? 500000 : 0),
+            DomesticActivity.Repair => (long)city.MaxDurability - city.Durability + (site.HasExpandedFrontier ? 1000 : 0),
+            DomesticActivity.Train => 100L - city.Morale + (site.HasExpandedFrontier ? 100 : 0),
+            DomesticActivity.Recruit => (long)city.DraftPopulation + (site.HasFrontierInCity ? 500000 : 0),
             _ => throw new ArgumentOutOfRangeException(nameof(activity)),
         };
     }

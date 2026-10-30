@@ -150,7 +150,7 @@ public sealed partial class OriginalAiPersonnelTests
     }
 
     [Fact]
-    public void OfficesRetainOccupiedSlotsWhenFilteredRosterExcludesRulerAndDoNotRequireIdleRulerForOrdinarySlots()
+    public void OfficesReassignTheWholeEligibleRosterAndConvergeEvenAfterTheRulerActs()
     {
         var content = Fixture();
         content = content with
@@ -163,10 +163,10 @@ public sealed partial class OriginalAiPersonnelTests
         var h = new Harness(content);
         Assert.Equal(1, h.Run(OriginalAiWork.Offices).Submitted);
         var assignments = Assert.IsType<AssignOfficesCommand>(Assert.Single(h.Commands)).Assignments;
-        Assert.Contains(assignments, a => a.OfficerId == 2 && a.OfficeId == 902);
-        Assert.DoesNotContain(assignments, a => a.OfficeId == 901);
-        Assert.Contains(assignments, a => a.OfficerId == 3 && a.OfficeId is null);
-        Assert.Null(h.Engine.Snapshot.Officers.Single(p => p.Id == 3).OfficeId);
+        Assert.Contains(assignments, a => a.OfficerId == 2 && a.OfficeId == 901);
+        Assert.Contains(assignments, a => a.OfficerId == 3 && a.OfficeId == 902);
+        Assert.Equal(0, h.Run(OriginalAiWork.Offices).Submitted);
+        Assert.Single(h.Commands);
     }
 
     [Theory]

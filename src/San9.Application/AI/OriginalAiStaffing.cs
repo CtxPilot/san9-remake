@@ -58,10 +58,9 @@ internal static class OriginalAiStaffing
         }
         var cities = initial.Settlements.Where(s => s.OwnerId == owner && s.Kind == SettlementKind.City &&
             !s.IsDormant && !s.IsDestroyed).ToArray();
-        var rootCities = cities.Where(s => s.CorpsId == corpsId || s.CorpsId is null).ToArray();
         var children = initial.Corps.Where(c => c.OwnerId == owner && !c.IsRoot).ToArray();
-        int maximum = Math.Min(rootCities.Length / 7 + 1, 7);
-        if (rootCities.Length >= 7 && children.Length >= maximum)
+        int maximum = Math.Min(cities.Length / 7 + 1, 7);
+        if (cities.Length >= 7 && children.Length >= maximum)
             return new(corpsId, OriginalAiWork.CreateCorps, OriginalAiWorkEnd.PreparationFailed, 0, 0);
         var world = initial;
         var own = world.Officers.Where(p => !p.IsDormant && p.IsServing && p.OwnerId == owner).ToArray();
@@ -81,9 +80,23 @@ internal static class OriginalAiStaffing
             }).Where(g => g.Cities.Length > 1 && g.Frontier > 0 && g.Governor is not null &&
                 !g.People.Any(p => p.Status is OfficerStatus.Ruler or OfficerStatus.Governor))
             .OrderByDescending(g => g.Cities.Length + g.Frontier).ToArray();
-        foreach (var child in children)
+        bool KeepsItsRegion(CorpsState child)
+        {
+            if (cities.Length < 7) return false;
+            var district = cities.Where(s => s.CorpsId == child.Id).ToArray();
+            if (district.Length < 2 || !content.CityProvinceIds.TryGetValue(district[0].Id, out int province)) return false;
+            var region = cities.Where(s => content.CityProvinceIds.TryGetValue(s.Id, out int id) && id == province)
+                .Select(s => s.Id).ToHashSet();
+            if (!region.SetEquals(district.Select(s => s.Id))) return false;
+            var people = own.Where(p => City(p) is int city && region.Contains(city)).ToArray();
+            return !people.Any(p => p.Status == OfficerStatus.Ruler) &&
+                people.Any(p => City(p) is int city && geography.Frontier(city, owner)) &&
+                people.Any(p => p.Id == child.LeaderId && p.UnitId is null && p.IsCommander &&
+                    cities.Any(s => s.Id == p.SettlementId) && !world.Simulation.Tasks.Any(t => t.OfficerId == p.Id));
+        }
+        foreach (var child in children.Where(c => !KeepsItsRegion(c)))
             Send((id, seq) => new DissolveCorpsCommand(id, owner, seq, child.Id));
-        if (rootCities.Length >= 7)
+        if (cities.Length >= 7)
         {
             foreach (var group in groups.Take(maximum - children.Length))
             {

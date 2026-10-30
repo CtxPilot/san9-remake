@@ -228,47 +228,44 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
     internal static int Maximum(OfficerAbilities a) => Math.Max(Math.Max(a.War, a.Intelligence), Math.Max(a.Politics, a.Leadership));
     private static long Sum(OfficerAbilities a) => (long)a.War + a.Intelligence + a.Politics + a.Leadership;
 
-    private sealed record OfficeSlot(int? Id, uint Capacity, int Priority, bool Special, bool HasBonus);
-
     private ImmutableArray<OfficeAssignment> Offices()
     {
         if (Ruler is not { } ruler) return [];
         var people = Own.Where(p => p.Id != ruler.Id && p.UnitId is null && p.SettlementId is not null &&
-            !World.Simulation.Tasks.Any(t => t.OfficerId == p.Id && t.Journey is not null)).ToList();
+            !World.Simulation.Tasks.Any(t => t.OfficerId == p.Id && t.Journey is not null)).ToArray();
+        var candidatesById = people.ToDictionary(p => p.Id);
         var available = engine.GetAvailableOffices(Owner).Select(o => o.OfficeId).ToHashSet();
-        bool allPresent = people.Count == Own.Count();
-        foreach (var p in Own.Where(p => !allPresent || !people.Contains(p)))
+        foreach (var p in Own.Where(p => !candidatesById.ContainsKey(p.Id)))
             if (p.OfficeId is int office) available.Remove(office);
-        var offices = content.Information.Offices.Where(o => available.Contains(o.Id)).OrderByDescending(o => o.GovernorPriority)
-            .Select(o => new OfficeSlot(o.Id, o.CommandCapacity, o.GovernorPriority, o.FillBeforeOrdinaryOffices,
-                o.AbilityBonuses != default)).ToList();
-        // The original no-office entry is a semantic unassignment option, never a content identity.
-        offices.Add(new(null, 10000, 0, false, false));
+        var offices = content.Information.Offices.Where(o => available.Contains(o.Id)).OrderByDescending(o => o.GovernorPriority).ToList();
         var assigned = new Dictionary<int, int?>();
         var remaining = people.Select(p => p.Id).ToHashSet();
         long SeniorityScore(OfficerState p) => ServiceYears(p) + (p.Loyalty >= 150 ? 5 : 0);
-        void Fill(IEnumerable<OfficeSlot> slots, IEnumerable<OfficerState> candidates, Func<OfficerState, bool> eligible)
+        void Fill(IEnumerable<OfficeDefinition> slots, IEnumerable<OfficerState> candidates, Func<OfficerState, bool> eligible)
         {
-            var ordered = new Queue<OfficerState>(candidates.Where(p => remaining.Contains(p.Id)));
+            var ordered = new Queue<OfficerState>(candidates.Where(p => remaining.Contains(p.Id) && eligible(p)));
             foreach (var office in slots.ToArray())
             {
                 if (!ordered.TryDequeue(out var person)) break;
                 remaining.Remove(person.Id);
-                if (!eligible(person)) break;
                 assigned[person.Id] = office.Id;
                 offices.Remove(office);
             }
         }
-        Fill(offices.Where(o => o.Special),
+        Fill(offices.Where(o => o.FillBeforeOrdinaryOffices),
             people.OrderByDescending(p => Ability(p).Leadership + Ability(p).Intelligence + SeniorityScore(p)), _ => true);
-        Fill(offices.OrderByDescending(o => o.HasBonus ? -1 : o.Priority).TakeWhile(o => !o.HasBonus),
+        Fill(offices.Where(o => o.AbilityBonuses == default).OrderByDescending(o => o.GovernorPriority),
             people.OrderByDescending(p => Ability(p).Leadership + SeniorityScore(p)), p => Ability(p).Leadership >= 60);
         long payroll = OriginalAiProjection.SalaryDemand(World, Corps, content.Information.Offices.ToDictionary(o => o.Id, o => o.Salary));
         if (Corps.Treasury.Money > payroll)
-            Fill(offices.OrderByDescending(o => o.Capacity == 10000 ? o.Priority : -1).TakeWhile(o => o.Capacity <= 10000),
+            Fill(offices.OrderByDescending(o => o.CommandCapacity == 10000 ? o.GovernorPriority : -1).TakeWhile(o => o.CommandCapacity <= 10000),
                 people.OrderByDescending(p => Ability(p).Intelligence + Ability(p).Politics + SeniorityScore(p)),
                 p => Math.Max(Ability(p).Intelligence, Ability(p).Politics) >= 70);
-        return assigned.Where(a => World.Officers.Single(p => p.Id == a.Key).OfficeId != a.Value)
+        var occupied = assigned.Values.OfType<int>().ToHashSet();
+        foreach (var person in people.Where(p => remaining.Contains(p.Id) && p.OfficeId is not null))
+            if (!available.Contains(person.OfficeId!.Value) || !occupied.Add(person.OfficeId.Value))
+                assigned[person.Id] = null;
+        return assigned.Where(a => candidatesById[a.Key].OfficeId != a.Value)
             .Select(a => new OfficeAssignment(a.Key, a.Value)).ToImmutableArray();
     }
     private int[] GrantPool(int holder, int recipient)

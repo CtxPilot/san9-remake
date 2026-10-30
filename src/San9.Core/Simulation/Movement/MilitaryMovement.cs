@@ -121,7 +121,14 @@ internal static class MilitaryMovement
     {
         var rejection = PrepareDeployment(world, command, rules, treasures, purpose, cargoMoney, cargoFood, out var prepared);
         if (rejection != CommandRejection.None) return rejection;
-        var (home, formation, navalId, start, account, deploymentCost) = prepared!;
+        return ApplyDeployment(world, command, governance, events, prepared!, cargoMoney, cargoFood);
+    }
+
+    internal static CommandRejection ApplyDeployment(WorldMutation world, DeployUnitCommand command,
+        GovernanceRulebook governance, List<DomainEvent> events, DeploymentPreparation prepared, uint cargoMoney = 0, uint cargoFood = 0)
+    {
+        var (formation, navalId, start, account, deploymentCost) = prepared;
+        var home = world.Settlements[command.SettlementId];
         int id = (int)world.Simulation.NextUnitId;
         int? commander = LeadershipMaintenance.SelectUnitCommander(world, command.OfficerIds, governance);
         var unit = new UnitState(id, home.OwnerId!.Value, start, command.Soldiers)
@@ -152,12 +159,12 @@ internal static class MilitaryMovement
         return CommandRejection.None;
     }
 
-    internal sealed record DeploymentPreparation(SettlementState Home, FormationRule Formation, int? NavalId,
+    internal sealed record DeploymentPreparation(FormationRule Formation, int? NavalId,
         WorldPosition Start, ResourceAccount Account, long Cost);
 
     internal static CommandRejection PrepareDeployment(WorldMutation world, DeployUnitCommand command,
         MilitaryRulebook? rules, TreasureRulebook treasures, UnitPurpose purpose, uint cargoMoney, uint cargoFood,
-        out DeploymentPreparation? prepared)
+        out DeploymentPreparation? prepared, DeploymentPlan? plan = null)
     {
         prepared = null;
         if (rules is null || !rules.Formations.TryGetValue(command.FormationId, out var formation))
@@ -178,11 +185,12 @@ internal static class MilitaryMovement
             !home.CanHostPersons || home.Durability == 0 || !rules.TryPlace(home, out var place))
             return CommandRejection.NoDestination;
         if (home.ConfusionDaysRemaining > 0) return CommandRejection.SettlementConfused;
-        if (command.Soldiers == 0 || command.Soldiers > home.Soldiers || command.Soldiers > formation.SoldierCapacity ||
+        if (command.Soldiers == 0 || command.Soldiers > (plan?.AvailableSoldiers(home.Id) ?? home.Soldiers) || command.Soldiers > formation.SoldierCapacity ||
             command.OfficerIds.IsDefaultOrEmpty || command.OfficerIds.Length > formation.OfficerCapacity ||
             command.OfficerIds.Distinct().Count() != command.OfficerIds.Length)
             return CommandRejection.InvalidTask;
-        if (command.OfficerIds.Any(id => !PersonnelMissions.CanAct(world, command.IssuerId, id) || world.Officers[id].SettlementId != home.Id))
+        if (command.OfficerIds.Any(id => plan?.IsOfficerReserved(id) == true ||
+            !PersonnelMissions.CanAct(world, command.IssuerId, id) || world.Officers[id].SettlementId != home.Id))
             return CommandRejection.PersonUnavailable;
         if (command.Tactics is null || command.Ranks is null ||
             command.Tactics.Keys.Concat(command.Ranks.Keys).Any(id => !command.OfficerIds.Contains(id)) ||
@@ -198,17 +206,19 @@ internal static class MilitaryMovement
         if (!command.ConfirmAttack && MilitaryDiplomacy.Warning(world, command.IssuerId, command.Order, rules) != AttackWarning.None)
             return CommandRejection.AttackConfirmationRequired;
         var account = ResourceAccounts.Resolve(world, command.IssuerId, home.CorpsId);
-        if ((ulong)cargoMoney + (uint)deploymentCost > ResourceAccounts.Balance(world, account, ResourceKind.Money) ||
+        if ((long)cargoMoney + deploymentCost > ResourceAccounts.Balance(world, account, ResourceKind.Money) - (plan?.ReservedMoney(account) ?? 0) ||
             cargoFood > ResourceAccounts.Balance(world, account, ResourceKind.Food)) return CommandRejection.InsufficientFunds;
-        var occupancy = world.MovementOccupancy(rules, command.IssuerId, command.Policies, null, null);
+        var existing = world.MovementOccupancy(rules, command.IssuerId, command.Policies, null, null);
+        IReadOnlyList<MapOccupancy> occupancy = plan is null || plan.Positions.Count == 0 ? existing : [.. existing, .. plan.Positions];
         WorldPosition? start = MilitaryRouteQuery.DeploymentPosition(travel, rules.BuildingArea(place), occupancy);
         if (start is null) return CommandRejection.NoDestination;
         if (command.Waypoint is { } via && (travel.Map.PassageCost(via, travel.Shape, travel.Mode, []) is null ||
             Occupancy(world, rules, null, null).Any(o => o.Overlaps(new(via, new(1, 1)))) ||
+            plan is not null && plan.Positions.Any(o => o.Overlaps(new(via, new(1, 1)))) ||
             !travel.Map.FindRoute(start.Value, via, travel.Shape, travel.Mode, occupancy).Reachable))
             return CommandRejection.NoDestination;
-        if (world.Simulation.NextUnitId > int.MaxValue) return CommandRejection.ResourceOverflow;
-        prepared = new(home, formation, navalId, start.Value, account, deploymentCost);
+        if (world.Simulation.NextUnitId > int.MaxValue - (long)(plan?.Count ?? 0)) return CommandRejection.ResourceOverflow;
+        prepared = new(formation, navalId, start.Value, account, deploymentCost);
         return CommandRejection.None;
     }
 

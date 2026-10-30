@@ -24,6 +24,7 @@ internal sealed class OriginalAiGeography
     private readonly Dictionary<int, Place> _places;
     private readonly Dictionary<int, int[]> _neighbors;
     private readonly Dictionary<int, int[]> _cityNeighbors;
+    private readonly Dictionary<int, HashSet<int>> _frontierCities = [];
     private readonly Dictionary<int, HashSet<int>> _priority = [];
     private IReadOnlyList<SettlementState> _source;
 
@@ -80,13 +81,21 @@ internal sealed class OriginalAiGeography
         .Select(id => _places.GetValueOrDefault(id)).OfType<Place>();
     internal IEnumerable<int> NearbyCities(int city) => new[] { city }.Concat(_cityNeighbors.GetValueOrDefault(city, []));
     internal bool Frontier(int place, int owner) => Neighbors(place).Any(p => p.OwnerId != owner);
+    private HashSet<int> FrontierCities(int owner)
+    {
+        if (!_frontierCities.TryGetValue(owner, out var cities))
+            _frontierCities[owner] = cities = Places.Where(p => p.OwnerId == owner && Frontier(p.Id, owner))
+                .Select(p => p.CityId).ToHashSet();
+        return cities;
+    }
+    internal bool HasFrontierInCity(int place, int owner) => _places.TryGetValue(place, out var own) &&
+        FrontierCities(owner).Contains(own.CityId);
     internal bool Priority(int place, int owner)
     {
         var own = _places.GetValueOrDefault(place);
         if (own is null) return false;
         if (!_priority.TryGetValue(owner, out var cities))
-            _priority[owner] = cities = Places.Where(p => p.OwnerId == owner && Frontier(p.Id, owner))
-                .SelectMany(p => NearbyCities(p.CityId)).ToHashSet();
+            _priority[owner] = cities = FrontierCities(owner).SelectMany(NearbyCities).ToHashSet();
         return cities.Contains(own.CityId);
     }
 }
@@ -147,7 +156,7 @@ internal sealed class OriginalAiProjection(SimulationEngine engine, ScenarioInit
         return inputs = new(corps.OwnerId, corps.Treasury.Money, corps.Treasury.Food, SalaryDemand(world, corps, salaries, root, units, settlementCorps), foodNeed, recruitmentAllowed,
             places.Select(s => new OriginalDomesticSite(DomesticObservation.Settlement(s, corps.Id, corps.Treasury.Money, corps.Treasury.Food,
                 available[s.Id].Select(o => o.Id).ToImmutableArray()), s.Kind == SettlementKind.City,
-                geography.Priority(s.Id, corps.OwnerId))).ToImmutableArray(), ownAbilities);
+                geography.HasFrontierInCity(s.Id, corps.OwnerId), geography.Priority(s.Id, corps.OwnerId))).ToImmutableArray(), ownAbilities);
     }
 
     internal DomesticSettlementObservation? Observe(int id)

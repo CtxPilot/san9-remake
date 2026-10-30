@@ -169,6 +169,6 @@ internal sealed partial class OriginalAiMilitary
             people.Select(p => p.Id).ToImmutableArray(), soldiers, pair.Land, order)
             { NavalFormationId = pair.Naval, Tactics = tactics.ToImmutableDictionary(), Ranks = ranks,
                 DepartureDelayDays = Math.Clamp(delay, 0, 9), Policies = Policies(fallback), ConfirmAttack = order.IsAttack });
-        return Legal(command) ? command : null;
+        return command;
     }
 }

@@ -19,16 +19,20 @@ public sealed class OriginalAiCycleTests
         var context = new OriginalAiGeographyContext(content, null);
         var geography = context.Get(world);
         Assert.True(geography.Frontier(1, 1));
+        Assert.True(geography.HasFrontierInCity(1, 1));
         var developed = world with { Settlements = world.Settlements.Select(s => s.Id == 1
             ? s with { Soldiers = s.Soldiers + 1000, Commerce = s.Commerce + 1, CommerceUsed = true } : s).ToArray() };
         Assert.Same(geography, context.Get(developed));
         Assert.True(geography.Frontier(1, 1));
+        Assert.True(geography.HasFrontierInCity(1, 1));
         var captured = developed with { Settlements = developed.Settlements.Select(s => s.Id == 2
             ? s with { OwnerId = 1 } : s).ToArray() };
         var refreshed = context.Get(captured);
         Assert.NotSame(geography, refreshed);
         Assert.False(refreshed.Frontier(1, 1));
+        Assert.False(refreshed.HasFrontierInCity(1, 1));
         Assert.True(geography.Frontier(1, 1));
+        Assert.True(geography.HasFrontierInCity(1, 1));
     }
 
     [Fact]
@@ -462,7 +466,7 @@ public sealed class OriginalAiCycleTests
         var singleWorld = engine.Snapshot with { Officers = engine.Snapshot.Officers.Where(o => o.OwnerId != 1 || o.Id == 1).ToArray() };
         report = OriginalAiEconomy.Residual(1, false, 100, () => input, () => singleWorld, _ => false, (_, _) => throw new InvalidOperationException(),
             id => input.Sites.FirstOrDefault(s => s.Settlement.Id == id)?.Settlement);
-        Assert.Equal(OriginalAiWorkEnd.PreparationFailed, report.End);
+        Assert.Equal(OriginalAiWorkEnd.NoCandidates, report.End);
         Assert.Equal(0, report.Attempts);
     }
 }

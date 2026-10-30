@@ -59,9 +59,8 @@ internal static class OriginalAiTurnRunner
                 .Concat(force.IsBarbarian ? [] : policy.SecondaryBatches[strategy.Mode]).Append(OriginalAiWork.Residual).ToArray();
             var domestic = new OriginalAiProjection(engine, definition.Content, corps.Id, geography, policy.RecruitmentEnabled);
             OriginalDomesticInputs Capture() => domestic.Domestic();
-            bool Submit(GameCommand command)
+            bool Submitted(CommandExecutionResult result)
             {
-                var result = engine.Execute(context, command);
                 if (result.Submission.Accepted)
                 {
                     events.AddRange(result.Events);
@@ -69,6 +68,7 @@ internal static class OriginalAiTurnRunner
                 }
                 return result.Submission.Accepted;
             }
+            bool Submit(GameCommand command) => Submitted(engine.Execute(context, command));
             (Guid Id, long Sequence) Identity()
             {
                 long sequence = engine.Snapshot.Simulation.NextSequence;
@@ -172,7 +172,8 @@ internal static class OriginalAiTurnRunner
                 else if (OriginalAiMilitary.Handles(work))
                     Report(definition.MilitaryRules is { } military
                         ? new OriginalAiMilitary(engine, definition.Content with { OriginalAi = policy }, military, definition.Rules,
-                            geographyContext, terrainRoutes, corps.Id, context, random, Submit).Run(work, limit, state, strategy)
+                            geographyContext, terrainRoutes, corps.Id, context, random, (command, prepared) => Submitted(prepared is null
+                                ? engine.Execute(context, command) : engine.Execute(context, (DeployUnitCommand)command, prepared))).Run(work, limit, state, strategy)
                         : new(corps.Id, work, OriginalAiWorkEnd.PreparationFailed, 0, 0));
                 else if (work == OriginalAiWork.DisposePrisoner)
                 {

@@ -493,7 +493,7 @@ public sealed partial class SimulationEngine
         Evaluate(context, command, commit: true);
 
     private CommandExecutionResult Evaluate(CommandContext context, GameCommand command, bool commit,
-        Action<IReadOnlyList<DomainEvent>>? preview = null)
+        Action<IReadOnlyList<DomainEvent>>? preview = null, MilitaryMovement.DeploymentPreparation? deployment = null)
     {
         ArgumentNullException.ThrowIfNull(command);
         var rejection = ValidateEnvelope(context, command);
@@ -560,7 +560,9 @@ public sealed partial class SimulationEngine
                     if (tacticRejection != CommandRejection.None) return Reject(tacticRejection);
                     break;
                 case DeployUnitCommand deploy:
-                    var deployRejection = MilitaryMovement.Deploy(mutation, deploy, _rules.Military, _rules.Governance, _rules.Treasures, events);
+                    var deployRejection = deployment is null
+                        ? MilitaryMovement.Deploy(mutation, deploy, _rules.Military, _rules.Governance, _rules.Treasures, events)
+                        : MilitaryMovement.ApplyDeployment(mutation, deploy, _rules.Governance, events, deployment);
                     if (deployRejection != CommandRejection.None) return Reject(deployRejection);
                     break;
                 case TransportUnitCommand transport:

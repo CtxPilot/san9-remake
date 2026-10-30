@@ -52,6 +52,49 @@ public sealed partial class OriginalAiPersonnelTests
             Assert.Equal(h.Engine.Snapshot.Corps.Single(c => c.LeaderId == 106).Id, s.CorpsId));
     }
 
+    [Fact]
+    public void OrganizationKeepsItsOwnValidPartitionOnSubsequentPasses()
+    {
+        var content = OrganizationFixture();
+        var h = new Harness(content);
+        Assert.Equal(2, RunOrganization(h, content).Submitted);
+        var established = h.Engine.Snapshot;
+        Assert.Equal(0, RunOrganization(h, content).Submitted);
+        Assert.Equal(0, RunOrganization(h, content).Submitted);
+        Assert.Equal(established, h.Engine.Snapshot);
+        Assert.Equal(2, h.Commands.Count);
+    }
+
+    [Fact]
+    public void OrganizationKeepsASingleEligiblePartitionBelowTheCorpsLimit()
+    {
+        var content = OrganizationFixture();
+        content = content with { CityConnections = [new(6, 2)] };
+        var h = new Harness(content);
+        Assert.Equal(1, RunOrganization(h, content).Submitted);
+        var established = h.Engine.Snapshot;
+        Assert.Single(established.Corps, c => c.OwnerId == 1 && !c.IsRoot);
+        Assert.Equal(0, RunOrganization(h, content).Submitted);
+        Assert.Equal(0, RunOrganization(h, content).Submitted);
+        Assert.Equal(established, h.Engine.Snapshot);
+        Assert.Single(h.Commands);
+    }
+
+    [Fact]
+    public void OrganizationFillsAnotherRegionWithoutDissolvingItsExistingPartition()
+    {
+        var content = OrganizationFixture();
+        content = content with { CityConnections = [new(6, 2)] };
+        var h = new Harness(content);
+        Assert.Equal(1, RunOrganization(h, content).Submitted);
+        int established = Assert.Single(h.Engine.Snapshot.Corps, c => c.OwnerId == 1 && !c.IsRoot).Id;
+        var expanded = content with { CityConnections = [new(6, 2), new(8, 2)] };
+        Assert.Equal(1, RunOrganization(h, expanded).Submitted);
+        Assert.Contains(h.Engine.Snapshot.Corps, c => c.Id == established);
+        Assert.All(h.Commands, c => Assert.IsType<CreateCorpsCommand>(c));
+        Assert.Equal(0, RunOrganization(h, expanded).Submitted);
+    }
+
     [Theory]
     [InlineData(false, false, 25000u, 12500u)]
     [InlineData(true, false, 33333u, 5555u)]

@@ -61,7 +61,7 @@ public sealed class OriginalDomesticWorkTests
     [InlineData(DomesticActivity.Train)]
     public void IncapableFirstCityDoesNotConsumeTheOnlyAttemptForAStaffedCity(DomesticActivity activity)
     {
-        var first = Site(1, [1], 2000) with { HasPriorityRelation = true };
+        var first = Site(1, [1], 2000) with { HasExpandedFrontier = true };
         var input = Input(first, Site(2, [2])) with
         {
             Sites = [first with { Settlement = first.Settlement with { Morale = 90 } },
@@ -113,7 +113,7 @@ public sealed class OriginalDomesticWorkTests
     public void RelationBonusPrecedesLargerUnprioritizedGap(DomesticActivity activity)
     {
         var first = Site(1, [1]);
-        var second = Site(2, [2]) with { HasPriorityRelation = true };
+        var second = Site(2, [2]) with { HasExpandedFrontier = true };
         first = first with { Settlement = first.Settlement with { Morale = 1, Durability = 0 } };
         second = second with { Settlement = second.Settlement with { Morale = 99, Durability = 99 } };
         Assert.Equal(new[] { 2, 1 }, Commands(Input(first, second), activity).Select(c => c.SettlementId));
@@ -122,7 +122,7 @@ public sealed class OriginalDomesticWorkTests
     [Fact]
     public void RecruitmentPrioritizesPopulationWithRelationBonusAndSelectsFiveWithoutRolling()
     {
-        var input = Input(Site(1, [1, 2, 3, 4, 5, 6], 499999), Site(2, [7], 1) with { HasPriorityRelation = true });
+        var input = Input(Site(1, [1, 2, 3, 4, 5, 6], 499999), Site(2, [7], 1) with { HasFrontierInCity = true });
         input = input with { Sites = input.Sites.Select(s => s with
             { Settlement = s.Settlement with { Morale = 90 } }).ToImmutableArray() };
         var commands = Commands(input, DomesticActivity.Recruit, () => throw new InvalidOperationException());
@@ -243,7 +243,7 @@ public sealed class OriginalDomesticWorkTests
             var engine = new SimulationEngine(WorldState.Restore(session.Snapshot));
             var observed = DomesticObservation.Capture(session.Snapshot, seat, context, engine.GetAbilities(session.Snapshot));
             return new(seat.ForceId, observed.Settlements[0].Money, observed.Settlements[0].Food, 0, 0, true,
-                observed.Settlements.Select(s => new OriginalDomesticSite(s, true, false)).ToImmutableArray(), observed.Abilities);
+                observed.Settlements.Select(s => new OriginalDomesticSite(s, true, false, false)).ToImmutableArray(), observed.Abilities);
         }
         bool Submit(DevelopmentCommand development)
         {
@@ -268,7 +268,7 @@ public sealed class OriginalDomesticWorkTests
     private static OriginalDomesticSite Site(int id, ImmutableArray<int> people, uint population = 1000) =>
         new(new(id, 1, 10000, 100000, 10000, 50, 500, 50, 100, people)
         { DraftPopulation = population, SoldierCapacity = 500000, Commerce = 300, MaxCommerce = 500,
-            Cultivation = 200, MaxCultivation = 500 }, true, false);
+            Cultivation = 200, MaxCultivation = 500 }, true, false, false);
 
     private static OriginalDomesticInputs Input(params OriginalDomesticSite[] sites) =>
         new(1, 10000, 100000, 0, 0, true, sites.ToImmutableArray(),

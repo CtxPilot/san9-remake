@@ -65,11 +65,11 @@ public sealed partial class OriginalAiMilitaryTests
             var context = new CommandContext("player");
             var rules = definition.Rules.Military!;
             Military = new(Engine, content, rules, definition.Rules,
-                new(content, rules), new(), 1, context, new OriginalAiRandom(draw ?? (_ => 0)), command =>
+                new(content, rules), new(), 1, context, new OriginalAiRandom(draw ?? (_ => 0)), (command, prepared) =>
             {
                 Commands.Add(command);
                 if (reject || rejectCommand?.Invoke(command) == true) return false;
-                var result = Engine.Execute(context, command);
+                var result = prepared is null ? Engine.Execute(context, command) : Engine.Execute(context, (DeployUnitCommand)command, prepared);
                 Assert.True(result.Submission.Accepted, $"{command}: {result.Submission.Rejection}");
                 return true;
             });

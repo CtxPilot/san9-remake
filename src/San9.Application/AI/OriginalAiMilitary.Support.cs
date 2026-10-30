@@ -253,10 +253,16 @@ internal sealed partial class OriginalAiMilitary
         var receivers = World.Settlements.Where(s => s.OwnerId == Owner && !s.IsDormant && !s.IsDestroyed &&
             s.Durability > 0 && s.CanHostPersons && s.Facility?.BuilderUnitId is null).ToArray();
         var budgets = receivers.ToDictionary(s => s.Id, TransportBudget);
+        var incoming = World.Units.Where(u => u.OwnerId == Owner && FieldUnit(u) && u.EffectiveOrder is
+                { Kind: MilitaryOrderKind.Transport or MilitaryOrderKind.Return, SettlementId: not null })
+            .GroupBy(u => u.EffectiveOrder!.SettlementId!.Value)
+            .ToDictionary(g => g.Key, g => g.Sum(u => (long)u.Soldiers + u.Wounded));
+        var capacity = receivers.ToDictionary(s => s.Id,
+            s => Math.Max(0, (long)s.SoldierCapacity - s.Soldiers - s.Wounded - incoming.GetValueOrDefault(s.Id)));
         var sources = WorkSources.Where(s => budgets[s.Id] > 0 && (!Front(s) || !geography.Priority(s.Id, Owner)) && s.Morale >= 70 &&
             People(s.Id).Length > 0 && (s.Kind != SettlementKind.City || budgets[s.Id] >= 10000))
             .OrderByDescending(s => budgets[s.Id]).Select(s => s.Id).ToArray();
-        var targets = receivers.Where(s => budgets[s.Id] > 0 && Front(s) && geography.Priority(s.Id, Owner) &&
+        var targets = receivers.Where(s => capacity[s.Id] > 0 && budgets[s.Id] > 0 && Front(s) && geography.Priority(s.Id, Owner) &&
             (s.Kind == SettlementKind.City || World.Officers.Any(p => p.SettlementId == s.Id && p.IsServing)))
             .OrderBy(s => budgets[s.Id]).Select(s => s.Id).ToList();
         foreach (int home in sources)
@@ -268,7 +274,7 @@ internal sealed partial class OriginalAiMilitary
             if (person is null) continue;
             foreach (int destination in targets.OrderBy(id => Near(home, id) ? 0 : 1).ToArray())
             {
-                uint soldiers = Math.Min(10000, source.Soldiers);
+                uint soldiers = (uint)Math.Min(capacity[destination], Math.Min(10000, source.Soldiers));
                 bool fallback = source.Kind != SettlementKind.City && soldiers == source.Soldiers;
                 var transit = fallback ? Basic([person], true) : rules.TransportFormations is { } transport
                     ? (transport.LandFormationId, transport.NavalFormationId) : ((int Land, int? Naval)?)null;

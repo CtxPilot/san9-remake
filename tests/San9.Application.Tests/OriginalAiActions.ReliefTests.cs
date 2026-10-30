@@ -9,6 +9,30 @@ namespace San9.Application.Tests;
 public sealed partial class OriginalAiActionsTests
 {
     [Theory]
+    [InlineData(false, 1, 1)]
+    [InlineData(true, 1, 1)]
+    [InlineData(false, 30, 0)]
+    [InlineData(true, 30, 0)]
+    public void ReliefCountsApproachingEnemiesByTravelTimeRegardlessOfIntermediateBuildings(bool intermediate, int speed, int submitted)
+    {
+        var c = Fixture();
+        c = c with
+        {
+            Settlements = c.Settlements.Select(s => s.Id == 1 ? s with { Soldiers = 14000 } :
+                s with { Y = s.Id == 2 && intermediate ? 1 : 2 }).ToArray(),
+            Military = c.Military! with
+            {
+                RegionIds = Enumerable.Repeat<int?>(1, 60).ToImmutableArray(),
+                Formations = c.Military.Formations.Select(f => f with { MovementBudget = speed }).ToImmutableArray(),
+                Places = c.Military.Places.Select(p => p.Id == 2 ? p with { Position = new(37, intermediate ? 7 : 12) } :
+                    p.Id == 3 ? p with { Position = new(67, 12) } : p).ToImmutableArray()
+            }
+        };
+        var h = new Harness(c, w => w with { Units = w.Units.Select(u => u.Id == 20 ? u with { Position = new(97, 7) } : u).ToArray() });
+        Assert.Equal(submitted, h.Run(OriginalAiWork.Reinforce).Submitted);
+    }
+
+    [Theory]
     [InlineData(10999u, 0)]
     [InlineData(11000u, 1)]
     [InlineData(12999u, 1)]

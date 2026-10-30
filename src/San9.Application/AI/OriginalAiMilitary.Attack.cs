@@ -88,7 +88,7 @@ internal sealed partial class OriginalAiMilitary
         {
             int id = remaining.OrderByDescending(p => p.Value).First().Key;
             var source = candidates.Single(s => s.Id == id);
-            var people = Commanders(People(id));
+            var people = CommandersAt(id);
             int index = counts[id];
             if (index >= people.Length - 1) { remaining.Remove(id); continue; }
             long amount = Math.Min(remaining[id] - Reserve(source), Capacity(people[index]));
@@ -184,8 +184,7 @@ internal sealed partial class OriginalAiMilitary
         bool ConstructionConflict(int region) => World.Units.Any(u => Direct(u) && Active(u) && u.EffectiveOrder is
             { Kind: MilitaryOrderKind.Construct, Construction: { } construction } && construction.RegionId == region);
         if (ConstructionConflict(target.Id)) return null;
-        var people = Commanders(People(source.Id));
-        if (people.Length == 0 || Basic([people[0]]) is not { } pair || !rules.TryPlace(source, out var origin)) return null;
+        if (AttackFormation(source.Id) is not { } pair || !rules.TryPlace(source, out var origin)) return null;
         var travel = rules.Travel(pair.Land, pair.Naval);
         paths++;
         var path = terrainRoutes.FindRouteIntoRange(travel.Map, origin.Position, rules.SettlementArea(target), travel.Shape, travel.Mode);

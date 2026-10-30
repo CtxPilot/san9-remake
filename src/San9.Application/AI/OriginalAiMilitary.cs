@@ -9,7 +9,7 @@ namespace San9.Application.AI;
 internal sealed partial class OriginalAiMilitary(SimulationEngine engine, ScenarioInitialState content,
     MilitaryRulebook rules, ScenarioRules scenarioRules,
     OriginalAiGeographyContext geographyContext, OriginalAiTerrainRoutes terrainRoutes,
-    int corpsId, CommandContext context, OriginalAiRandom random, Func<GameCommand, bool> submit)
+    int corpsId, CommandContext context, OriginalAiRandom random, Func<GameCommand, PreparedDeployment?, bool> submit)
 {
     private WorldSnapshot World => engine.Snapshot;
     private bool Advanced => World.Simulation.NewGame.Difficulty == GameDifficulty.Advanced;
@@ -25,7 +25,11 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
     private CorpsState? currentCorps;
     private ForceState? currentForce;
     private SettlementState[]? places;
+    private SettlementState[]? workSources;
     private Dictionary<int, OfficerState[]>? people;
+    private readonly Dictionary<int, OfficerState[]> commandersByPlace = [];
+    private readonly Dictionary<int, long> reserves = [];
+    private readonly Dictionary<int, (int Land, int? Naval)?> attackFormations = [];
     private Dictionary<int, long>? assignedTroops;
     private MilitaryRouteQueryContext? navigation;
     private SettlementState[]? obstacles;
@@ -40,6 +44,12 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
     {
         if (ReferenceEquals(projected, World)) return;
         var world = World;
+        // Source assessments are local to this work and the exact published world.
+        // Successful commands invalidate them; failed candidates share the same inputs.
+        workSources = null;
+        commandersByPlace.Clear();
+        reserves.Clear();
+        attackFormations.Clear();
         bool placesChanged = projected is null || projected.Settlements != world.Settlements;
         bool corpsChanged = projected is null || projected.Corps != world.Corps;
         bool ownerChanged = projected is null || corpsChanged &&
@@ -90,7 +100,10 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
         }
     }
     // Ordinary automatic work uses queried normal status; defensive deployment has its own raw-state gate.
-    private IEnumerable<SettlementState> WorkSources => Places.Where(s => engine.CanStartSettlementWork(s.Id));
+    private SettlementState[] WorkSources
+    {
+        get { Refresh(); return workSources ??= Places.Where(s => engine.CanStartSettlementWork(s.Id)).ToArray(); }
+    }
 
     private OfficerState[] People(int home)
     {
@@ -113,6 +126,20 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
     }
     private OfficerAbilities Ability(OfficerState p) => Abilities[p.Id];
     private OfficerState[] Commanders(IEnumerable<OfficerState> people) => Governance.OrderCommanders(people, Abilities).ToArray();
+    private OfficerState[] CommandersAt(int home)
+    {
+        Refresh();
+        if (!commandersByPlace.TryGetValue(home, out var ordered))
+            commandersByPlace[home] = ordered = Commanders(People(home));
+        return ordered;
+    }
+    private (int Land, int? Naval)? AttackFormation(int home)
+    {
+        Refresh();
+        if (!attackFormations.TryGetValue(home, out var pair))
+            attackFormations[home] = pair = CommandersAt(home).FirstOrDefault() is { } commander ? Basic([commander]) : null;
+        return pair;
+    }
     private uint Capacity(OfficerState p) => CommanderCapacity.Read(p.Id == Force.LeaderId,
         content.Information.Ranks.FirstOrDefault(r => r.Id == Force.RankId)?.CommandCapacity,
         content.Information.Offices.FirstOrDefault(o => o.Id == p.OfficeId)?.CommandCapacity);
@@ -120,7 +147,8 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
     private bool Near(int first, int second) => City(first) == City(second) || CityNeighbors.AreNeighbors(City(first), City(second));
     private bool Opponent(int? owner) => owner is int id && (World.Forces.FirstOrDefault(f => f.Id == id)?.IsBarbarian == true
         ? id != Owner : OriginalAiStrategy.IsOpponent(World, Owner, id));
-    private bool Target(SettlementState s) => !s.IsDormant && !s.IsDestroyed && s.OwnerId != Owner && (s.OwnerId is null || Opponent(s.OwnerId));
+    private bool Target(SettlementState s) => !s.IsDormant && !s.IsDestroyed && s.OwnerId != Owner &&
+        (s.OwnerId is null || OriginalAiStrategy.IsOpponent(World, Owner, s.OwnerId.Value));
     private bool Fortified(SettlementState s) => s.Kind == SettlementKind.City ||
         rules.TryPlace(s, out var p) && p.FacilityTypeId is int type && Policy.FortifiedFacilityIds.Contains(type);
     private long BuildingReserve(SettlementState s)
@@ -131,18 +159,26 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
             place.FacilityTypeId is int type ? Policy.FrontierFacilityReserves.GetValueOrDefault(type) : 0;
         return (Math.Min(150000, amount) + 2499) / 2500 * 2500;
     }
-    private long Reserve(SettlementState s) => Math.Max(Fortified(s) ? 10000L : 0,
-        Pressure(s.Id).Sum(u => (long)u.Soldiers) * 2 / 3);
+    private long Reserve(SettlementState s)
+    {
+        Refresh();
+        if (!reserves.TryGetValue(s.Id, out long reserve))
+            reserves[s.Id] = reserve = Math.Max(Fortified(s) ? 10000L : 0, Pressure(s.Id).Sum(u => (long)u.Soldiers) * 2 / 3);
+        return reserve;
+    }
     private GameCommand Command(Func<Guid, int, long, GameCommand> create)
     {
         long sequence = World.Simulation.NextSequence;
         return create(SimulationIdentity.Command(sequence, Owner), Owner, sequence);
     }
-    private bool Send(GameCommand? command)
+    private bool Send(GameCommand? command, PreparedDeployment? preparation = null)
     {
         attempts++;
+        if (command is DeployUnitCommand deploy && preparation is null &&
+            engine.PrepareDeployments(context).TryPrepare(deploy, out preparation) != CommandRejection.None)
+            command = null;
         if (command is null) { empty++; return false; }
-        if (!submit(command)) { rejected++; return false; }
+        if (!submit(command, preparation)) { rejected++; return false; }
         submitted++;
         return true;
     }
@@ -168,14 +204,15 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
                 PathExpanded = diagnostics.Expanded, PathEndpointExpanded = diagnostics.EndpointExpanded };
     }
 
-    private (int Land, int? Naval)? Basic(OfficerState[] people, bool march = false)
+    private (int Land, int? Naval)? Basic(OfficerState[] people, bool march = false, long? money = null)
     {
-        var land = AvailableFormations(people, false, Corps.Treasury.Money);
+        long budget = money ?? Corps.Treasury.Money;
+        var land = AvailableFormations(people, false, budget);
         var choice = march && Policy.Formations.TryGetValue(OriginalAiFormationRole.March, out int preferred)
             ? land.FirstOrDefault(f => f.Id == preferred) : null;
         choice ??= land.FirstOrDefault();
         if (choice is null) return null;
-        var naval = AvailableFormations(people, true, Corps.Treasury.Money - (uint)choice.DeploymentCost)
+        var naval = AvailableFormations(people, true, budget - choice.DeploymentCost)
             .FirstOrDefault(f => f.Id == rules.BasicNavalFormationId && rules.ValidFormationPair(choice.Id, f.Id));
         return (choice.Id, naval?.Id);
     }

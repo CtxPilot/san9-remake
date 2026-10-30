@@ -7,6 +7,99 @@ namespace San9.Core.Tests;
 
 public sealed class MilitaryMovementTests
 {
+    private static WorldState DeploymentPlanningWorld(uint money)
+    {
+        var snapshot = Engine(World(), Rules()).Snapshot;
+        return WorldState.Restore(snapshot with
+        {
+            Officers = [.. snapshot.Officers, snapshot.Officers[0] with { Id = 12 }, snapshot.Officers[0] with { Id = 13 }],
+            Corps = snapshot.Corps.Select(c => c with { Treasury = c.Treasury with { Money = money } }).ToArray()
+        });
+    }
+
+    [Fact]
+    public void PreparedDeploymentsReserveResourcesWithoutChangingTheWorldAndMatchNormalExecution()
+    {
+        var rules = Rules();
+        var engine = Engine(DeploymentPlanningWorld(100), rules);
+        var before = engine.Snapshot;
+        var planning = engine.PrepareDeployments(Player);
+        var first = new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 400, 7, new(MilitaryOrderKind.Move, new(32, 7), null));
+        var second = first with { CommandId = Guid.NewGuid(), OfficerIds = [12] };
+        Assert.Equal(CommandRejection.None, planning.TryPrepare(first, out var a));
+        Assert.Equal(CommandRejection.PersonUnavailable, planning.TryPrepare(first, out _));
+        Assert.Equal(CommandRejection.InvalidTask, planning.TryPrepare(second with { Soldiers = 700 }, out _));
+        Assert.Equal(600, planning.AvailableSoldiers(1));
+        Assert.Equal(50, planning.AvailableMoney(1));
+        Assert.Equal(CommandRejection.None, planning.TryPrepare(second, out var b));
+        Assert.Equal(CommandRejection.InsufficientFunds, planning.TryPrepare(first with { OfficerIds = [13], Soldiers = 100 }, out _));
+        StateAssert.Equal(before, engine.Snapshot);
+        var normal = Engine(WorldState.Restore(before), rules);
+        foreach (var (command, prepared) in new[] { (first, a!), (second with { Sequence = 1 }, b!) })
+        {
+            var actual = engine.Execute(Player, command, prepared);
+            var expected = normal.Execute(Player, command);
+            Assert.True(actual.Submission.Accepted, actual.Submission.Rejection.ToString());
+            StateAssert.Equal(normal.Snapshot, engine.Snapshot);
+            Assert.Equal(CanonicalJson.Text(expected.Events), CanonicalJson.Text(actual.Events));
+        }
+        Assert.Equal(200u, engine.Snapshot.Settlements.Single(s => s.Id == 1).Soldiers);
+        Assert.Equal(0u, engine.Snapshot.Corps.Single().Treasury.Money);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PreparedDeploymentIsBoundToItsEngineAndCommandAndRechecksChangedState(bool spendBudget)
+    {
+        var rules = Rules();
+        var engine = Engine(DeploymentPlanningWorld(50), rules);
+        var command = new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 400, 7, new(MilitaryOrderKind.Move, new(32, 7), null));
+        Assert.Equal(CommandRejection.None, engine.PrepareDeployments(Player).TryPrepare(command, out var prepared));
+        var other = Engine(WorldState.Restore(engine.Snapshot), rules);
+        Assert.Equal(CommandRejection.InvalidTask, other.Execute(Player, command, prepared!).Submission.Rejection);
+        var before = engine.Snapshot;
+        Assert.Equal(CommandRejection.InvalidTask, engine.Execute(Player, command with { Soldiers = 500 }, prepared!).Submission.Rejection);
+        StateAssert.Equal(before, engine.Snapshot);
+        GameCommand intervening = spendBudget ? command with { CommandId = Guid.NewGuid(), OfficerIds = [12] }
+            : new WaitCommand(Guid.NewGuid(), 1, 0);
+        Assert.True(engine.Execute(Player, intervening).Submission.Accepted);
+        before = engine.Snapshot;
+        var result = engine.Execute(Player, command with { Sequence = 1 }, prepared!);
+        Assert.Equal(spendBudget ? CommandRejection.InsufficientFunds : CommandRejection.None, result.Submission.Rejection);
+        if (spendBudget) StateAssert.Equal(before, engine.Snapshot);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PreparedBatchRechecksAfterASkippedOrRejectedPrefix(bool rejectPrefix)
+    {
+        var rules = Rules();
+        var engine = Engine(DeploymentPlanningWorld(100), rules);
+        var normal = Engine(WorldState.Restore(engine.Snapshot), rules);
+        var first = new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 400, 7, new(MilitaryOrderKind.Move, new(32, 7), null));
+        var second = first with { CommandId = Guid.NewGuid(), OfficerIds = [12] };
+        var planning = engine.PrepareDeployments(Player);
+        Assert.Equal(CommandRejection.None, planning.TryPrepare(first, out var a));
+        Assert.Equal(CommandRejection.None, planning.TryPrepare(second, out var b));
+        if (rejectPrefix)
+        {
+            var before = engine.Snapshot;
+            Assert.Equal(CommandRejection.WrongSequence,
+                engine.Execute(Player, first with { Sequence = 5 }, a!).Submission.Rejection);
+            StateAssert.Equal(before, engine.Snapshot);
+        }
+        foreach (var (command, prepared) in new[] { (second, b!), (first with { Sequence = 1 }, a!) })
+        {
+            var expected = normal.Execute(Player, command);
+            var actual = engine.Execute(Player, command, prepared);
+            Assert.True(actual.Submission.Accepted, actual.Submission.Rejection.ToString());
+            StateAssert.Equal(normal.Snapshot, engine.Snapshot);
+            EventAssert.Equal(expected.Events, actual.Events);
+        }
+    }
+
     [Fact]
     public void FacingTracksDailyNetMovementAndSurvivesStopsAndNewOrders()
     {
