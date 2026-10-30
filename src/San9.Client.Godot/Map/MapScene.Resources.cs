@@ -35,6 +35,7 @@ internal sealed partial class MapScene
         var imperialIds = Map.Units.Bodies.Where(b => bodyIds.Contains(b.Id)).Select(b => b.ImperialBodyId).OfType<string>().ToHashSet();
         foreach (var body in Map.Units.Bodies.Where(b => bodyIds.Contains(b.Id) || imperialIds.Contains(b.Id)))
             foreach (string clip in body.DirectionClips.Concat(body.Attacks.SelectMany(a => a.Actions).SelectMany(a => a.DirectionClips))
+                .Concat(body.ConstructionClips)
                 .Concat(body.Wake is {} wake ? new[] { wake.ClipId } : [])
                 .Concat(body.Trail is {} trail ? new[] { trail.ClipId } : []).Concat(body.Engagement.Select(e => e.ClipId))
                 .Concat(body.Retirement?.DirectionClips ?? [])

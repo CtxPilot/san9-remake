@@ -1,4 +1,5 @@
 using San9.Content.Interface;
+using San9.Core.Domain;
 using San9.Rendering;
 
 namespace San9.Client.Godot;
@@ -40,13 +41,22 @@ internal sealed partial class MapScene
         {
             var place = Settlements[building.Id];
             var anchor = Anchor(building);
-            if (place.IsUnderConstruction && place.FacilityTypeId is int type)
+            if (place.IsUnderConstruction && place.FacilityTypeId is int type && place.BuilderUnitId is int builder &&
+                _unitStates.ContainsKey(builder) && _stateSampler(builder, LocalMotionTime) is {} worker && UnitVisuals.IsConstructing(worker))
                 yield return new($"construction:{building.Id}", audio.ConstructionSounds[type], anchor.X, anchor.Y) { Kind = MapSoundKind.Construction };
             bool engaged = Day?.Elapsed >= TurnDayPresentation.DayDuration ? Day.After.IsSettlementEngaged(place.Id) : State.IsSettlementEngaged(place.Id);
             if (engaged)
                 yield return new($"battle-place:{building.Id}", audio.BattleAmbience[0], anchor.X, anchor.Y) { Kind = MapSoundKind.BattleAmbience };
         }
         if (Day is not { } day) yield break;
+        foreach (var cue in day.ReadyMapChanges.Where(c => c.Construction is { Phase: "completed", Occurrence: not null }))
+        {
+            var occurrence = cue.Construction!.Occurrence!;
+            var cell = MapCoordinates.Cell(occurrence.Position);
+            var anchor = BuildingInfoGeometry.Anchor(cell.X, cell.Y, occurrence.FacilityTypeId,
+                Map.Squares[cell.Y * Map.Width + cell.X].Elevation, Map.Height);
+            yield return new($"construction-complete:{cue.FactIndex}", audio.ConstructionCompleteSound, anchor.X, anchor.Y) { Pulse = 0 };
+        }
         foreach (var attack in _attacks.Where(a => a.SourceIsSettlement && day.IsAttackPresented(a)))
         {
             if (attack.Projectile == San9.Content.Maps.MapProjectileKind.Arrow)

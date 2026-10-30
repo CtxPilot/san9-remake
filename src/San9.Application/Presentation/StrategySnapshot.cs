@@ -36,6 +36,7 @@ public sealed record SettlementView(int Id,string NameKey,int? OwnerId,int X,int
     public bool UsesRockfallPower { get; init; }
     public FacilityReprisal? Reprisal { get; init; }
     public bool IsUnderConstruction { get; init; }
+    public int? BuilderUnitId { get; init; }
     public bool IsWork { get; init; }
     public bool HasMapContextMenu { get; init; } = true;
 }
@@ -271,7 +272,8 @@ public sealed class StrategySnapshot
                 BaseAttackRange = attack?.Attack?.Range,
                 UsesRockfallPower = attack?.UsesRockfallPower == true,
                 Reprisal = facilityRule?.Reprisal,
-                IsUnderConstruction = s.Facility?.BuilderUnitId is not null
+                IsUnderConstruction = s.Facility?.BuilderUnitId is not null,
+                BuilderUnitId = s.Facility?.BuilderUnitId
             };
         }).ToArray());
     }

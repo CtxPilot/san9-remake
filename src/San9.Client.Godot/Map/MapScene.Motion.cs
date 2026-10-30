@@ -133,7 +133,7 @@ internal sealed partial class MapScene
                 Condition = condition
             };
         }
-        return state;
+        return UnitVisuals.ConstructionPose(state);
     }
     public UnitVisual Sample(UnitVisual unit)
     {

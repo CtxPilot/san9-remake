@@ -66,7 +66,8 @@ internal sealed partial class BattlePresentationBuilder
                 _mapChanges.Add(new(_impact, _index, null, Project(destroyed.SettlementId), _mapDialogue));
                 break;
             case FacilityConstructionChangedEvent { Result: { } result } construction:
-                _mapChanges.Add(new(construction.Phase == "cancelled" ? _impact : 1, _index, null, Project(result.Id), _mapDialogue));
+                _mapChanges.Add(new(construction.Phase == "cancelled" ? _impact : 1, _index, null,
+                    Project(result.Id), _mapDialogue) { Construction = construction });
                 break;
         }
     }

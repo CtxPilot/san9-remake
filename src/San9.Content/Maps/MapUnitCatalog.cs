@@ -6,6 +6,7 @@ namespace San9.Content.Maps;
 public sealed record MapUnitBody(string Id, string[] DirectionClips, int AnchorX, int AnchorY)
 {
     public string? ImperialBodyId { get; init; }
+    [JsonRequired] public string[] ConstructionClips { get; init; } = [];
     [JsonRequired] public MapUnitAttack? MeleeAttack { get; init; }
     [JsonRequired] public MapUnitAttack? RangedAttack { get; init; }
     [JsonRequired] public MapUnitFlagPlacement[][] Flags { get; init; } = [];
@@ -59,6 +60,8 @@ public sealed record MapUnitCatalog(MapUnitBody[] Bodies, MapUnitFormation[] For
         if (RulerFlagGlyph < -1 ||
             Bodies.Any(b => string.IsNullOrWhiteSpace(b.Id) || b.DirectionClips.Length != 8 ||
                 b.DirectionClips.Any(c => !clips.ContainsKey(c)) ||
+                b.ConstructionClips is null || b.ConstructionClips.Length is not (0 or 8) ||
+                b.ConstructionClips.Any(c => !clips.ContainsKey(c)) ||
                 b.Flags.Length != 8 || b.Flags.Any(f => f is null || f.Any(flag => flag is null)) ||
                 b.Attacks.Any(a => a.Timings.Length == 0 || a.Timings.Any(t => t.BodyDelayMilliseconds < 0 || t.ProjectileDelayMilliseconds < 0) ||
                     a.ShotSpacingMilliseconds < 0 || a.Actions.Length == 0 || a.Actions.Any(v => v.DirectionClips.Length != 8 || v.DirectionClips.Any(c => !clips.ContainsKey(c))) ||

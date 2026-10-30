@@ -4,6 +4,16 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class MapUnitCompilerTests
 {
+    [Theory]
+    [InlineData(0, 5016)]
+    [InlineData(3, 5136)]
+    [InlineData(16, -1)]
+    public void ConstructionUsesItsOwnBodyRowAndPreservesUnsupportedBodies(int body, int resource)
+    {
+        var resources = MapUnitCompiler.CompileConstructionResources(address =>
+            address == 0x664a40 + 4 * (20 + body) ? resource : throw new InvalidOperationException(), body);
+        Assert.Equal(resource < 0 ? [] : Enumerable.Range(resource, 8), resources);
+    }
     [Fact]
     public void StoneRecipesKeepBodyStartupAndProjectileLaunchAsSeparateTimings()
     {

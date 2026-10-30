@@ -113,6 +113,8 @@ public static class MapUnitCompiler
             Int(0x214980 + 8 * type), Int(0x214984 + 8 * type))
         {
             ImperialBodyId = type == 0 ? "unit-body-3" : null,
+            ConstructionClips = CompileConstructionResources(At, type).Select((resource, direction) =>
+                Export($"unit-construction-{type}-{direction}", resource, 100)).ToArray(),
             MeleeAttack = Attack(type, 0x663fd0), RangedAttack = Attack(type, 0x663e90),
             Flags = CompileFlags(At, type),
             TrailChance = type >= 16 ? 100 : 6.25,
@@ -163,6 +165,12 @@ public static class MapUnitCompiler
     internal static MapAttackTiming[] CompileAttackTimings(int body) => body == 13
         ? Enumerable.Range(0, 5).Select(n => new MapAttackTiming(n * 100, (n + 5) * 100)).ToArray()
         : [new(0, 0)];
+
+    internal static int[] CompileConstructionResources(Func<int, int> at, int body)
+    {
+        int first = at(0x664a40 + 4 * (20 + body));
+        return first < 0 ? [] : Enumerable.Range(first, 8).ToArray();
+    }
 
     // Source-format tables are decoded here; consumers only receive complete projected layouts.
     internal static MapUnitFormation[] CompileFormations(Func<int, int> At, MapUnitBody[] bodies, string[] influenceClips)

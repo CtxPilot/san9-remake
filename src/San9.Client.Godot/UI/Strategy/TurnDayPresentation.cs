@@ -78,6 +78,7 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
     }
     public void EndSceneFastForward() { _heldSceneId = null; _sceneHoldElapsed = 0; }
     private readonly PresentationCueTimeline<BattleMapChangeCue> _changes = new(battle?.MapChanges ?? [], c => c.Time, c => c.FactIndex, c => c.AfterDialogueId);
+    public IReadOnlyList<BattleMapChangeCue> ReadyMapChanges => _changes.Read(Elapsed, LastReadyFact, _completedDialogues);
     private readonly PresentationCueTimeline<BattleValueCue> _values = new(battle?.Values.Where(c => c.IsSettlement) ?? [], c => c.Time, c => c.FactIndex, c => c.AfterDialogueId);
     private readonly PresentationCueTimeline<BattleMessageCue> _dialogues = Messages(battle, BattleMessageChannel.Dialogue);
     private readonly PresentationCueTimeline<BattleMessageCue> _duelDialogues = Messages(battle, BattleMessageChannel.DuelDialogue);

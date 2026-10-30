@@ -64,6 +64,7 @@ internal static class MapAudioCompiler
         {
             ExecutionMusic = new("execution-battle", "execution-battle-ranked", "execution-march", "execution-march-ranked", "execution-domestic"),
             RecordNotificationSound = Sound("map-record-notification", 2),
+            ConstructionCompleteSound = Sound("map-construction-complete", 23),
             FacilityArrowSounds = Enumerable.Range(64, 3).Select(i => Sound($"map-facility-arrow-{i - 64}", i)).ToArray(),
             RockfallImpactSounds = [Sound("map-rockfall-impact", 75), Sound("map-rockfall-dust", 71)]
         };

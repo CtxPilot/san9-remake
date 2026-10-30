@@ -27,6 +27,7 @@ public sealed class UnitMotionPlayback
         public long Frame = frame;
         public int Phase;
         public bool Pending;
+        public bool Constructing;
         public int DirectionOffset, DirectionCooldown;
         public Member Copy()
         {
@@ -101,6 +102,7 @@ public sealed class UnitMotionPlayback
     public void Begin(UnitVisualState before, MapUnitCatalog catalog, double time, double visualTime, bool moving)
     {
         Reconcile(before, catalog, visualTime);
+        SynchronizeConstruction(before, catalog, visualTime);
         _time = time; _visualTime = visualTime; _nextPosition = time;
         if (moving && !_moving)
         {
@@ -147,6 +149,7 @@ public sealed class UnitMotionPlayback
             double motionTime = tick <= positionTick ? AtMotionTime(next) : _nextPosition;
             var state = stateAt(motionTime);
             Reconcile(state, catalog, next);
+            SynchronizeConstruction(state, catalog, next);
             // Timer callbacks continue during pause; only position consumption and sway are gated.
             bool advancing = motionEnabled && Math.Abs(emissionTime(motionTime) - next) < .00001;
             foreach (var member in _members.Values.Where(m => m.NextTick <= next))
@@ -162,6 +165,7 @@ public sealed class UnitMotionPlayback
         }
         var current = stateAt(time);
         Reconcile(current, catalog, visualTime);
+        SynchronizeConstruction(current, catalog, visualTime);
         if (current.PositionMode == UnitPositionMode.Formation) SynchronizeFormation(current);
         _trails.RemoveAll(t => visualTime - t.Emitted >= clips[t.ClipId].Frames.Length * clips[t.ClipId].FrameMilliseconds);
         _time = time; _visualTime = visualTime;
@@ -195,6 +199,24 @@ public sealed class UnitMotionPlayback
         }
         member.Frame++; AdvanceDirection(member, state);
         member.NextTick += member.Interval;
+    }
+
+    private void SynchronizeConstruction(UnitVisualState state, MapUnitCatalog catalog, double visualTime)
+    {
+        bool active = UnitVisuals.IsConstructing(state);
+        if (!active && !_members.Values.Any(m => m.Constructing)) return;
+        foreach (var member in _members.Values)
+        {
+            var body = catalog.Bodies.Single(b => b.Id == member.Definition.BodyId);
+            if (state.UsesImperialAppearance && body.ImperialBodyId is {} imperial)
+                body = catalog.Bodies.Single(b => b.Id == imperial);
+            bool constructing = active && body.ConstructionClips.Length > 0;
+            if (member.Constructing == constructing) continue;
+            member.Constructing = constructing;
+            member.Frame = constructing ? 0 : Seed(state.Id, member.Definition, 5);
+            member.NextTick = visualTime + member.Interval;
+            Revision++;
+        }
     }
 
     private void PublishPositions(UnitVisualState state, MapUnitCatalog catalog, double motionTime, double visualTime)

@@ -53,6 +53,8 @@ public sealed class ConstructionSessionTests
         var startedFrame = new BattleMapFrame(beforeConstruction, mapPlan.MapChanges.Where(c => c.FactIndex == 0), []);
         Assert.DoesNotContain(beforeConstruction.Settlements, s => s.Id == 8000);
         Assert.True(startedFrame.Settlements[8000].IsUnderConstruction);
+        Assert.Equal(started.UnitId, startedFrame.Settlements[8000].BuilderUnitId);
+        Assert.Same(started, mapPlan.MapChanges.First(c => c.FactIndex == 0).Construction);
         Assert.Equal(started.Durability, startedFrame.Settlements[8000].Durability);
         var destroyed = new BattleMapFrame(beforeConstruction, mapPlan.MapChanges, []).Settlements[8000];
         Assert.True(destroyed.IsDestroyed);

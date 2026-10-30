@@ -57,6 +57,7 @@ public sealed record BattleMapChangeCue(double Time, int FactIndex, int? Removed
     public const double DisplacementDuration = .1;
     public UnitDisplacedEvent? Displacement { get; init; }
     public UnitTerminatedEvent? Retirement { get; init; }
+    public FacilityConstructionChangedEvent? Construction { get; init; }
     public double End => Time + (Displacement is null ? 0 : DisplacementDuration);
     public (double X, double Y, int Direction) SampleDisplacement(double time)
     {

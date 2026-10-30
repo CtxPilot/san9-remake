@@ -10,6 +10,10 @@ internal sealed record MapSceneProjection(BuildingVisualState[] BuildingStates,
 {
     public MapAnimatedSprite[] CombatAnimations { get; init; } = [];
 
+    private static Dictionary<int, WorldPosition> ConstructionTargets(IEnumerable<SettlementView> places) =>
+        places.Where(s => !s.IsDestroyed && s.IsUnderConstruction && s.BuilderUnitId is not null)
+            .ToDictionary(s => s.BuilderUnitId!.Value, s => MapCoordinates.Center(new(s.X, s.Y)));
+
     private static BuildingVisualState BuildingState(StrategySnapshot state, SettlementView settlement,
         IReadOnlyDictionary<int, ForceView> forces)
     {
@@ -34,6 +38,7 @@ internal sealed record MapSceneProjection(BuildingVisualState[] BuildingStates,
         var forces = state.Forces.ToDictionary(f => f.Id);
         var buildingStates = (frame?.Settlements.Values ?? state.Settlements).Select(s => BuildingState(state, s, forces)).ToArray();
         var visuals = BuildingVisuals.Resolve(map, buildingStates);
+        var construction = ConstructionTargets(frame?.Settlements.Values ?? state.Settlements);
         var units = state.World.Units.Where(u => !u.IsEmbedded && !u.IsPersonnel && u.FormationId is not null && u.Soldiers > 0 &&
                 frame?.RemovedUnits.Contains(u.Id) != true)
             .Select(u =>
@@ -49,6 +54,7 @@ internal sealed record MapSceneProjection(BuildingVisualState[] BuildingStates,
                     force.ColorCode, commander?.FlagGlyph ?? -1, map.Height)
                 {
                     IsEngaged = state.IsUnitEngaged(u.Id),
+                    ConstructionTarget = construction.TryGetValue(u.Id, out var target) ? target : null,
                     VisionAngleDegrees = state.Information.Formations.Single(f => f.Id == state.FormationId(u)).Presentation?.VisionAngleDegrees ?? 0,
                     Morale = u.Morale, CommanderNameKey = commander?.NameKey,
                     IsRulerCommander = u.CommanderId is int leader && force.LeaderId == leader,
@@ -62,7 +68,7 @@ internal sealed record MapSceneProjection(BuildingVisualState[] BuildingStates,
     public MapSceneProjection ForDay(StrategySnapshot state, MapPackage map, BattleMapFrame frame, StrategySnapshot after) =>
         (this with { CombatAnimations = Combat(map, BuildingStates, after) }).WithFrame(state, map, null, frame, after);
 
-    // A presentation boundary changes local building inputs, not the world's unit projection.
+    // Construction membership follows the presented facility lifecycle, independently of world publication.
     public MapSceneProjection WithFrame(StrategySnapshot state, MapPackage map, BattleMapFrame? previous,
         BattleMapFrame frame, StrategySnapshot after)
     {
@@ -78,6 +84,15 @@ internal sealed record MapSceneProjection(BuildingVisualState[] BuildingStates,
         bool sameRemoved = previous is null ? frame.RemovedUnits.Count == 0 : previous.RemovedUnits.SetEquals(frame.RemovedUnits);
         var units = sameRemoved ? Units :
             Units.Where(p => !frame.RemovedUnits.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value);
+        var construction = ConstructionTargets(frame.Settlements.Values);
+        foreach (var (id, unit) in Units)
+        {
+            if (frame.RemovedUnits.Contains(id)) continue;
+            WorldPosition? target = construction.TryGetValue(id, out var position) ? position : null;
+            if (unit.ConstructionTarget == target) continue;
+            if (ReferenceEquals(units, Units)) units = new(Units);
+            units[id] = unit with { ConstructionTarget = target };
+        }
         return new(BuildingStates.Where(s => !changedIds.Contains(s.Id)).Concat(states).ToArray(), buildings,
             Replace(Animations, visuals.Animations, changedIds, s => s.BuildingId), units)
         { CombatAnimations = Replace(CombatAnimations, changed.Length == 0 ? [] : Combat(map, states, after), changedIds, s => s.BuildingId) };

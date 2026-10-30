@@ -24,9 +24,13 @@ public sealed class MapAudioContentTests
         var audio = new MapAudioDefinition("cue", ["spring", "summer", "autumn", "winter"],
             ["spring", "summer", "autumn", "winter"], [99], new() { ["custom"] = new(["foot"], [], [])
                 { Retirement = new(["defeat"], 400, "fade") } },
-            new() { [1000] = "build" }, ["battle"]) { RecordNotificationSound = "notification", ExecutionMusic = new("combat", "rank-combat", "march", "rank-march", "domestic") };
+            new() { [1000] = "build" }, ["battle"]) { ConstructionCompleteSound = "complete", RecordNotificationSound = "notification", ExecutionMusic = new("combat", "rank-combat", "march", "rank-march", "domestic") };
         var sounds = audio.SoundRoles.Distinct().ToDictionary(r => r, r => $"audio/{r}.wav");
         audio.Validate(sounds);
+        Assert.Throws<InvalidDataException>(() => audio.Validate(sounds.Where(s => s.Key != "complete").ToDictionary()));
+        var node = System.Text.Json.JsonSerializer.SerializeToNode(audio, San9.Content.Packages.PackageFiles.JsonOptions)!.AsObject();
+        node.Remove("constructionCompleteSound");
+        Assert.Throws<System.Text.Json.JsonException>(() => System.Text.Json.JsonSerializer.Deserialize<MapAudioDefinition>(node, San9.Content.Packages.PackageFiles.JsonOptions));
         Assert.Throws<InvalidDataException>(() => audio.Validate(sounds.Where(s => s.Key != "fade").ToDictionary()));
         Assert.Throws<InvalidDataException>(() => (audio with { Bodies = new() { ["custom"] = new([], [], [])
             { Retirement = new(["defeat"], -1, null) } } }).Validate(sounds));

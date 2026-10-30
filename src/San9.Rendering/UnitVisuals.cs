@@ -28,6 +28,7 @@ public sealed record UnitVisualState(int Id, double CellX, double CellY, int Ele
     public UnitVisualAction Action { get; init; }
     public bool IsEngaged { get; init; }
     public bool IsMoving { get; init; }
+    public WorldPosition? ConstructionTarget { get; init; }
     public bool MovementVisionVisible { get; init; }
     public bool ReceivesPositionUpdates { get; init; }
     public UnitPositionMode PositionMode { get; init; }
@@ -37,10 +38,22 @@ public sealed record UnitVisualState(int Id, double CellX, double CellY, int Ele
     public int Morale { get; init; }
     public string? CommanderNameKey { get; init; }
 }
-public enum UnitVisualAction { Idle, Moving, Melee, Ranged }
+public enum UnitVisualAction { Idle, Moving, Melee, Ranged, Construction }
 
 public static class UnitVisuals
 {
+    public static bool IsConstructing(UnitVisualState state) => state.ConstructionTarget is not null &&
+        state.Condition == UnitCondition.Normal && !state.IsEngaged && !state.IsMoving &&
+        state.Action is not (UnitVisualAction.Melee or UnitVisualAction.Ranged);
+
+    public static UnitVisualState ConstructionPose(UnitVisualState state)
+    {
+        if (!IsConstructing(state)) return state.Action == UnitVisualAction.Construction ? state with { Action = UnitVisualAction.Idle } : state;
+        var position = new WorldPosition((int)Math.Round((state.CellX + .5) * MapCoordinates.UnitsPerCell),
+            (int)Math.Round((state.CellY + .5) * MapCoordinates.UnitsPerCell));
+        return state with { Action = UnitVisualAction.Construction, Direction = Direction(position, state.ConstructionTarget) };
+    }
+
     public static int ScreenDirection(double x, double y) =>
         ((int)Math.Round(Math.Atan2(2 * y, x) * 4 / Math.PI) + 9) % 8;
 
@@ -77,6 +90,7 @@ public static class UnitVisuals
         IReadOnlyDictionary<string, MapAnimationClip> clips, UnitMotionPlayback? playback = null,
         Func<double, double, double>? elevationAt = null)
     {
+        state = ConstructionPose(state);
         if (state.BodySoldiers == 0 || state.Direction is < 0 or > 7) throw new ArgumentOutOfRangeException(nameof(state));
         var formation = catalog.Formations.Single(f => f.FormationId == state.FormationId);
         var bodies = catalog.Bodies.ToDictionary(b => b.Id);
@@ -128,7 +142,8 @@ public static class UnitVisuals
             if (state.UsesImperialAppearance && body.ImperialBodyId is {} imperial) body = bodies[imperial];
             bool attacking = state.Action is UnitVisualAction.Melee or UnitVisualAction.Ranged;
             int direction = attacking ? state.Direction : m.Pose.Direction;
-            string clip = (SelectAction(body, state.Action, state.Id, m.Member)?.DirectionClips ?? body.DirectionClips)[direction];
+            string clip = (SelectAction(body, state.Action, state.Id, m.Member)?.DirectionClips ??
+                (state.Action == UnitVisualAction.Construction && body.ConstructionClips.Length > 0 ? body.ConstructionClips : body.DirectionClips))[direction];
             Add(clip, m.Pose.X - body.AnchorX, m.Pose.Y - body.AnchorY, m.Pose.GroundY + 30000,
                 attacking ? 0 : (int)(MemberSeed(m.Member, 5) % (uint)clips[clip].Frames.Length));
             animations[^1] = animations[^1] with

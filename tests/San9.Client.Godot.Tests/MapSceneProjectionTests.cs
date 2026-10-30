@@ -2,12 +2,61 @@ using San9.Application;
 using San9.Application.Presentation;
 using San9.Content.Maps;
 using San9.Content.Scenarios;
+using San9.Core.Domain;
+using San9.Core.Simulation;
 using San9.Rendering;
 
 namespace San9.Client.Godot.Tests;
 
 public sealed class MapSceneProjectionTests
 {
+    [Fact]
+    public void ConstructionFollowsPresentedMembershipWithoutChangingTheCachedBaseline()
+    {
+        var (state, map) = Fixture();
+        var baseline = MapSceneProjection.Create(state, map) with { Units = new() { [10] = UnitVisualFixture.State with { Id = 10 } } };
+        var place = state.Settlements.Single(s => s.Id == 2) with { IsUnderConstruction = true, BuilderUnitId = 10 };
+        var started = new BattleMapFrame(state, [new(1, 0, null, place)], []);
+        var working = baseline.WithFrame(state, map, null, started, state);
+        Assert.Equal(MapCoordinates.Center(new(1, 0)), working.Units[10].ConstructionTarget);
+        Assert.Null(baseline.Units[10].ConstructionTarget);
+        foreach (bool destroyed in new[] { false, true })
+        {
+            var ended = new BattleMapFrame(state, [new(1, 0, null, place),
+                new(1, 1, null, place with { IsUnderConstruction = false, BuilderUnitId = null, IsDestroyed = destroyed })], []);
+            Assert.Null(working.WithFrame(state, map, started, ended, state).Units[10].ConstructionTarget);
+        }
+    }
+
+    [Fact]
+    public void CompletionSoundUsesTheOccurrencePositionAndOnePulseAfterItsFactIsPresented()
+    {
+        var (state, map) = Fixture();
+        var result = state.World.Settlements.Single(s => s.Id == 2);
+        var completion = new FacilityConstructionChangedEvent(state.World.Clock, 2, 10, "completed", 100,
+            new(5, 0, 1, MapCoordinates.Center(new(1, 0)))) { Result = result };
+        DomainEvent[] facts = [completion];
+        var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, []);
+        var battle = BattlePresentationPlan.Create(state, state, facts,
+            new WorldMessageContext(Definition(), state.World, texts), texts, new([], null));
+        var day = new TurnDayPresentation(state, state, facts, new MapDayPlan(map, state, facts), battle: battle);
+        var scene = new MapScene(map, new TerrainRenderer(map, [], []), "spring", state,
+            new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, day: day);
+        var audio = new San9.Content.Interface.MapAudioDefinition("title", [], [], [], [], [], []) { ConstructionCompleteSound = "complete" };
+        Assert.Empty(scene.SoundSources(audio, []));
+        day.Advance(2);
+        var source = Assert.Single(scene.SoundSources(audio, []));
+        var anchor = BuildingInfoGeometry.Anchor(1, 0, 0, 1, map.Height);
+        Assert.Equal((anchor.X, anchor.Y), (source.X, source.Y));
+        Assert.Equal("complete", source.Role);
+        Assert.Equal(0L, source.Pulse);
+        var pulses = new MapSoundPulses(); pulses.Begin(day);
+        var voice = new MapSoundVoice(source.Key, source.Role, source.X, source.Y, 1) { Pulse = source.Pulse };
+        pulses.MarkEmitted(voice);
+        Assert.True(pulses.WasEmitted(voice));
+        Assert.Equal(source, Assert.Single(scene.RefreshMapFrame().SoundSources(audio, [])));
+    }
+
     [Fact]
     public void SharedBaseProjectionIsIsolatedByBothInputsAndPresentationFramesDoNotMutateIt()
     {
@@ -89,14 +138,15 @@ public sealed class MapSceneProjectionTests
         Assert.Same(projection.Units, updated.Units);
     }
 
-    private static (StrategySnapshot State, MapPackage Map) Fixture()
-    {
-        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "feedback", 190, 1, 1, 5,
+    private static ScenarioInitialState Definition() => new(ScenarioInitialState.CurrentSchemaVersion, "feedback", 190, 1, 1, 5,
             [new(5, "player", 0, 100)],
             [new(1, "city-1", 5, 0, 0, 100, 100, 100, 60, []),
                 new(2, "city-2", 5, 1, 0, 100, 100, 100, 60, [])], [], [])
             { Information = new([], [], [], [new(5, 5, null, new(0, 0)) { IsRoot = true }], []) };
-        var state = GameSession.Start(definition, 1).View;
+
+    private static (StrategySnapshot State, MapPackage Map) Fixture()
+    {
+        var state = GameSession.Start(Definition(), 1).View;
         var map = new MapPackage(MapPackage.CurrentSchemaVersion, "fixture", "feedback", "spring", 2, 1, 13056, 6656,
             Enumerable.Repeat(new MapSquare(0, 1, 0, 0), 2).ToArray(), [], [], [], [], [],
             [new(1, 0, 0, 0), new(2, 1, 0, 0)],

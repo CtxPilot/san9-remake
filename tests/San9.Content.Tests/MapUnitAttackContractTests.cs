@@ -52,6 +52,7 @@ public sealed class MapUnitAttackContractTests
     [InlineData("meleeAttack")]
     [InlineData("rangedAttack")]
     [InlineData("retirement")]
+    [InlineData("constructionClips")]
     public void MissingVisualDefinitionsAreRejectedInsteadOfReadingTheOldActionContract(string field)
     {
         var node = JsonSerializer.SerializeToNode(Body, PackageFiles.JsonOptions)!.AsObject();
@@ -68,5 +69,14 @@ public sealed class MapUnitAttackContractTests
         Assert.Throws<InvalidDataException>(() => Catalog(body with { Retirement = retirement with { DirectionClips = ["body"] } }).Validate(Clips));
         Assert.Throws<InvalidDataException>(() => Catalog(body with { Retirement = retirement with { Effect = new("absent", 0, 0) } }).Validate(Clips));
         Assert.Throws<InvalidDataException>(() => Catalog(body with { Retirement = retirement with { FadeMilliseconds = 0 } }).Validate(Clips));
+    }
+
+    [Fact]
+    public void ConstructionClipsDeclareBodySupportAndValidateAllDirections()
+    {
+        Catalog(Body with { ConstructionClips = [] }).Validate(Clips);
+        Catalog(Body with { ConstructionClips = Enumerable.Repeat("body", 8).ToArray() }).Validate(Clips);
+        Assert.Throws<InvalidDataException>(() => Catalog(Body with { ConstructionClips = ["body"] }).Validate(Clips));
+        Assert.Throws<InvalidDataException>(() => Catalog(Body with { ConstructionClips = Enumerable.Repeat("absent", 8).ToArray() }).Validate(Clips));
     }
 }

@@ -10,6 +10,7 @@ public sealed class UnitFlagTextureGroupsTests
         Assert.Equal("map/animations/flags/poles/set-1", TextureGroups.MapAnimation("flag-pole-front", 1));
         Assert.Equal("map/animations/buildings/smoke/set-0", TextureGroups.MapAnimation("building-smoke-damage-a", 0));
         Assert.Equal("map/animations/units/actions/13/set-0", TextureGroups.MapAnimation("unit-action-13-7-2", 0));
+        Assert.Equal("map/animations/units/construction/0/set-0", TextureGroups.MapAnimation("unit-construction-0-2", 0));
         Assert.Equal("map/animations/units/wake/set-0", TextureGroups.MapAnimation("unit-wake-0", 0));
         Assert.Equal("map/animations/projectiles/rockfall-impact/set-0", TextureGroups.MapAnimation("rockfall-impact", 0));
         foreach (int direction in Enumerable.Range(0, 8))
