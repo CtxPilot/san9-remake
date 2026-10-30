@@ -21,6 +21,7 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
     public int TitleWidth { get; init; } = 248;
     public int MapButtonWidth { get; init; } = 108;
     public Vector2 PortraitSize { get; init; } = new(64, 80);
+    public string PortraitFrameRole { get; init; } = "catalog-portrait-frame";
     public Action<int>? Activated { get; init; }
     public Action<int>? CurrentChanged { get; init; }
     public Action? Closed { get; init; }
@@ -128,6 +129,7 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
         IconButton("catalog-help", new(_body.End.X - 72, _body.Position.Y + 8), ToggleHelp);
         if (Portrait is not null)
         {
+            Textures.Request([PortraitFrameRole]);
             _portrait = new AsyncPortrait { Service = Service, View = San9.Content.Images.PortraitView.Face,
                 IsDeceased = () => _state.Current is { } current && (PortraitDeceased?.Invoke(current.Id) ?? false), Size = PortraitSize,
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.Scale, MouseFilter = MouseFilterEnum.Ignore };
@@ -498,7 +500,7 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
             if (pressed || currentRow || selected)
                 DrawRow(_tableOrigin + new Vector2(SelectionWidth,28+r*24), width-SelectionWidth, pressed ? 2 : currentRow ? 1 : 3);
         }
-        if(_portrait is { Visible: true }) DrawTextureRect(Textures.Get("catalog-portrait-frame", this), new(_portrait.Position - new Vector2(12,12), PortraitSize + new Vector2(24,24)), false);
+        if(_portrait is { Visible: true }) DrawTextureRect(Textures.Get(PortraitFrameRole, this), new(_portrait.Position - new Vector2(12,12), PortraitSize + new Vector2(24,24)), false);
     }
     private void DrawRow(Vector2 point, int width, int frame)
     {

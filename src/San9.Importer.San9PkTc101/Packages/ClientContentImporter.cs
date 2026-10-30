@@ -66,7 +66,7 @@ public static class ClientContentImporter
         ChroniclePresentationCompiler.AddMessages(messages);
         ExecutionPresentationCompiler.AddMessages(messages);
         text = text with { Messages = messages };
-        var roles = InformationArtCompiler.Compile(scenarioBytes, scenario, textures.Library, textures.Portraits);
+        var roles = InformationArtCompiler.Compile(exe, scenarioBytes, scenario, textures.Library, textures.Portraits);
         var dependency = new TextureDependency(Path.GetRelativePath(output, textureRoot).Replace('\\','/'));
         var mapAudio = MapAudioCompiler.Compile(exe);
         var battle = BattlePresentationCompiler.Compile(exe, textures.Library);

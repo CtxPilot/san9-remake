@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+using System.Reflection.PortableExecutable;
 using San9.Content.Scenarios;
 using San9.Content.Images;
 
@@ -6,15 +8,15 @@ namespace San9.Importer.San9PkTc101.Interface;
 /// <summary>Resolves scenario illustrations to the source catalog; never decodes or writes an image.</summary>
 public static class InformationArtCompiler
 {
-    public static Dictionary<string,string> Compile(byte[] scenarioBytes, ScenarioInitialState scenario, TextureLibrary library, PortraitDefinition[] portraits)
+    public static Dictionary<string,string> Compile(byte[] executable, byte[] scenarioBytes, ScenarioInitialState scenario, TextureLibrary library, PortraitDefinition[] portraits)
     {
         using var stream = new MemoryStream(scenarioBytes);
         var people = San9ScenarioPersonArchive.ReadKnownRecords(stream);
         stream.Position = 0;
         var treasures = San9ScenarioItemArchive.ReadKnownRecords(stream);
         Dictionary<string,string> roles = [];
-        string Image(string archive, int index) => library.Archives.Single(a => a.Id == archive)
-            .Variants.Single(v => v.ImageIndex == index && v.PaletteIndex == (archive == "g_still" ? index : 0)).Image.Id;
+        string Image(string archive, int index, int palette = 0) => library.Archives.Single(a => a.Id == archive)
+            .Variants.Single(v => v.ImageIndex == index && v.PaletteIndex == (archive == "g_still" ? index : palette)).Image.Id;
         // RE-0111: image-control mode 2 code 26 resolves to G_Still 71.
         roles.Add("personnel-city-transfer",Image("g_still",71));
         // RE-0182: surrender result mode2 code19 resolves to G_Still64.
@@ -39,13 +41,25 @@ public static class InformationArtCompiler
         int[] workImages = [276, 281, 282, 277, 278, 279, 274, 275, 272, 273, 280];
         foreach (var facility in scenario.Military!.Facilities.Where(f => f.Buildable))
             roles.Add($"catalog-facility-{facility.Id}", Image("g_still", workImages[facility.Id-6]));
-        // Original formation catalog order maps to the G_Jinkei three-state diagram groups.
-        int[] diagrams = [9, 12, 3, 6, 15, 18, 0, 21, 42, 45, 39, 36, 48, 48, 48, 48, 48, 48, 48, 48, 24, 27, 30, 33, 48, 48, 48, 48];
+        using var pe = new PEReader(new MemoryStream(executable));
+        int Int(int address) => BinaryPrimitives.ReadInt32LittleEndian(pe.GetSectionData(address - 0x400000).GetContent(0, 4).AsSpan());
+        // RE-0177: the board and the catalog preview have independent source mappings.
         foreach (var formation in scenario.Information.Formations)
         {
-            int diagram = diagrams[formation.Id];
+            int diagram = Int(0x622D68 + formation.Id * 4) - 915;
             roles.Add($"formation-diagram-{formation.Id}", Image("g_jinkei", diagram));
-            roles.Add($"formation-available-{formation.Id}", Image("g_jinkei", diagram + 1));
+            roles.Add($"formation-available-{formation.Id}", Image("g_jinkei", diagram is 48 or 49 ? diagram : diagram + 1));
+        }
+        // These authored 120x120 thumbnails include the slot highlights and grid.
+        roles.Add("catalog-formation-frame", Image("g_common", 301, 37));
+        foreach (var (table, count) in new[] { (0x66B460, 12), (0x66B43C, 4) })
+        {
+            for (int i = 0; i < count; i++)
+            {
+                int formation = Int(table + i * 8 + 4);
+                if (scenario.Information.Formations.Any(f => f.Id == formation))
+                    roles.Add($"catalog-formation-{formation}", Image("g_jinkei", Int(table + i * 8) - 915));
+            }
         }
         foreach (var (role, index, palette) in new[] { ("formation-member", 51, 1), ("formation-commander", 52, 1),
             ("formation-panel-deployment", 65, 3), ("formation-panel-detail", 67, 3) })
