@@ -4,13 +4,14 @@ using San9.Core.Domain;
 namespace San9.Core.Simulation;
 
 /// <summary>Read-only mission facts shared by preparation and task creation.</summary>
-internal sealed record MissionJourneyPlan(int Origin, int Destination, PersonnelRoute Route, GameClock Arrival)
+internal sealed record MissionJourneyPlan(int Origin, int Destination, PersonnelRoute Route, int JourneyDays, GameClock Arrival)
 {
     internal static MissionJourneyPlan Strategy(WorldMutation world, PersonnelRulebook rules, int origin,
         int destination, WorldPosition? position = null)
     {
         var route = PersonnelLocations.Route(world, rules, origin, destination, position);
-        return Create(world.Clock, origin, destination, route, Math.Max(0, route.Days - 1));
+        int days = route.Days;
+        return Create(world.Clock, origin, destination, route, days, Math.Max(0, days - 1));
     }
 
     internal static MissionJourneyPlan Diplomacy(WorldMutation world, SimulationRules rules, int officer, int target)
@@ -18,13 +19,15 @@ internal sealed record MissionJourneyPlan(int Origin, int Destination, Personnel
         int origin = world.Officers[officer].SettlementId!.Value;
         GiftDiplomacy.Destination(world, target, rules, out int destination, out var position);
         var route = PersonnelLocations.Route(world, rules.Personnel, origin, destination, position);
-        return Create(world.Clock, origin, destination, route, route.XunRoundedDays);
+        int days = route.XunRoundedDays;
+        return Create(world.Clock, origin, destination, route, days, days);
     }
 
-    private static MissionJourneyPlan Create(GameClock clock, int origin, int destination, PersonnelRoute route, int days)
+    private static MissionJourneyPlan Create(GameClock clock, int origin, int destination, PersonnelRoute route,
+        int journeyDays, int resolutionDayOffset)
     {
-        for (int day = 0; day < days; day++) clock = clock.NextDay();
-        return new(origin, destination, route, clock);
+        for (int day = 0; day < resolutionDayOffset; day++) clock = clock.NextDay();
+        return new(origin, destination, route, journeyDays, clock);
     }
 }
 
@@ -146,6 +149,6 @@ public sealed partial class SimulationEngine
         var rejection = ValidateEnvelope(context, command);
         if (rejection != CommandRejection.None) return new(rejection, null, null);
         var plan = MissionPreparation.Prepare(PreparationWorld(), command, _rules, out rejection);
-        return new(rejection, plan?.Arrival, null);
+        return new(rejection, plan?.Arrival, null) { JourneyDays = plan?.JourneyDays };
     }
 }

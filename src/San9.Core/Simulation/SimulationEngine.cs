@@ -247,14 +247,17 @@ public sealed partial class SimulationEngine
     public CommandPreparationPreview Preview(CommandContext context, GameCommand command)
     {
         GameClock? arrival = null;
+        long? journeyDays = null;
         int? governor = null;
         var result = Evaluate(context, command, commit: false, events =>
         {
-            arrival = events.OfType<TaskStartedEvent>().FirstOrDefault()?.Task.Due;
+            var task = events.OfType<TaskStartedEvent>().FirstOrDefault()?.Task;
+            arrival = task?.Due;
+            journeyDays = task is null ? null : PersonnelJourneyTiming.InitialDays(task);
             governor = events.OfType<CorpsCreatedEvent>().FirstOrDefault()?.LeaderId ??
                 events.OfType<CorpsChangedEvent>().FirstOrDefault()?.LeaderId;
         });
-        return new(result.Submission.Rejection, arrival, governor);
+        return new(result.Submission.Rejection, arrival, governor) { JourneyDays = journeyDays };
     }
 
     public AllianceFormationCandidates GetAllianceCandidates()

@@ -20,8 +20,8 @@ public sealed class OfficerArrivalTests
             Started, After(dueOffset), progress, 0)
         { Journey = new(2, null, null) { Route = new(new(0, 0), new(distance, 0), false) } };
 
-    private static (CatalogCell Cell, string Detail) Read(PersistentTask? task, int elapsed = 0,
-        int? owner = 1, bool deployed = false, bool pending = false)
+    private static (CatalogCell Cell, string Detail, long? Execution) Read(PersistentTask? task, int elapsed = 0,
+        int? owner = 1, bool deployed = false, string? pause = null)
     {
         var definition = G01ScenarioTests.Fixture();
         var world = GameSession.Start(definition, 1).Snapshot;
@@ -34,7 +34,14 @@ public sealed class OfficerArrivalTests
             Simulation = world.Simulation with
             {
                 Tasks = task is null ? [] : [task],
-                PendingDailyTask = pending ? new(Started, 1, []) : null
+                PendingDailyTask = pause is "daily" or "boundary" ? new(Started, 1, [])
+                    { Phase = pause == "daily" ? TaskResolutionPhase.DailyCommands : TaskResolutionPhase.XunBoundary } : null,
+                PendingDuel = pause == "duel" ? new(Started, new([], [], []), 10, 20, [1, 2], false, false,
+                    new(new(new(10, 20, [2], [4]), 10, 2, 10, []), 0, 4), 2, default) : null,
+                PendingSniping = pause == "sniping" ? new(4, 2) : null,
+                PendingCapturedRuler = pause == "captured" ? new(Started, 4, 1) : null,
+                PendingExecutionSuccession = pause is "execution" or "strategic-execution" ? new(1, 4, 2)
+                    { XunStarted = pause == "execution" ? Started : null } : null
             }
         };
         var view = new StrategySnapshot(definition, world);
@@ -43,7 +50,9 @@ public sealed class OfficerArrivalTests
         var table = OfficerCatalog.Read(view, texts, 2, null, null, 1);
         var cell = Assert.Single(table.Rows).Cells[Array.IndexOf(table.Columns, "到达预定")];
         var detail = OfficerDetails.Read(view, texts, 1).Fields.SelectMany(f => f).Single(f => f.Label == "到达预定");
-        return (cell, detail.Value);
+        long? execution = pause is not null && task is not null
+            ? ExecutionCommands.Read(view, texts).Single(r => r.OfficerId == 1).RemainingDays : null;
+        return (cell, detail.Value, execution);
     }
 
     [Theory]
@@ -56,7 +65,7 @@ public sealed class OfficerArrivalTests
     [InlineData("personnel-move", 600, 19, 12, 8)]
     public void ArrivalIsNumericCountdownNotResolutionDate(string kind, int distance, int due, int progress, int expected)
     {
-        var (cell, detail) = Read(Task(kind, distance, due, progress), progress);
+        var (cell, detail, _) = Read(Task(kind, distance, due, progress), progress);
         Assert.Equal(new CatalogCell(expected.ToString(), expected), cell);
         Assert.Equal(cell.Text, detail);
     }
@@ -86,7 +95,37 @@ public sealed class OfficerArrivalTests
     [Fact]
     public void DailyDecisionAlreadyConsumedTodaysCountdown()
     {
-        Assert.Equal(0, Read(Task("personnel-move", 300, 9, 9), 9, pending: true).Cell.Number);
+        Assert.Equal(0, Read(Task("personnel-move", 300, 9, 9), 9, pause: "daily").Cell.Number);
+    }
+
+    [Theory]
+    [InlineData("daily", 5)]
+    [InlineData("duel", 5)]
+    [InlineData("sniping", 5)]
+    [InlineData("boundary", 6)]
+    [InlineData("captured", 6)]
+    [InlineData("execution", 6)]
+    [InlineData("strategic-execution", 6)]
+    public void PausedCountdownFollowsTheCurrentDateStage(string pause, int expected)
+    {
+        var result = Read(Task("personnel-move", 300, 9, 4), 4, pause: pause);
+        Assert.Equal(expected, result.Cell.Number);
+        Assert.Equal(expected.ToString(), result.Detail);
+        Assert.Equal(expected, result.Execution);
+    }
+
+    [Theory]
+    [InlineData("duel", 0, 3)]
+    [InlineData("sniping", 0, 3)]
+    [InlineData("duel", 1, 2)]
+    [InlineData("sniping", 1, 2)]
+    public void CombatPauseDoesNotConsumeAReturnCreatedAfterTodaysCountdown(string pause, int progress, int expected)
+    {
+        var task = Task("personnel-return", 600, 3, progress);
+        task = task with { Journey = task.Journey! with { ReturnLeg = new(1, 3, true) } };
+        var result = Read(task, progress, pause: pause);
+        Assert.Equal(expected, result.Cell.Number);
+        Assert.Equal(expected, result.Execution);
     }
 
     [Theory]
@@ -97,7 +136,7 @@ public sealed class OfficerArrivalTests
     [InlineData(null, false, "**")]
     public void VisibilityPrecedesApplicability(int? owner, bool deployed, string expected)
     {
-        var (cell, detail) = Read(null, owner: owner, deployed: deployed);
+        var (cell, detail, _) = Read(null, owner: owner, deployed: deployed);
         Assert.Equal(expected, cell.Text);
         Assert.Equal(expected, detail);
         Assert.Null(cell.Number);

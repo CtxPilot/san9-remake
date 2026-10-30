@@ -59,7 +59,7 @@ public partial class MissionCommandView : CommandPreparationView
         int arrivalWidth = Draft.Kind is "alienate" or "burn" or "seize" or "rumor" ? 152 : 136;
         Body.AddChild(new CommandArrivalField { Textures = Textures, Position = at + new Vector2(arrivalX,0), Size = new(arrivalWidth,32),
             Text = Draft.Kind is ("gift" or "return") && Draft.TargetId is null ? "" :
-                CommandArrivalField.FormatDays(Texts, Draft.Preview.Arrival is {} arrival ? arrival.DayNumber - Draft.View.World.Clock.DayNumber : null) });
+                CommandArrivalField.FormatDays(Texts, Draft.Preview.JourneyDays) });
         int actorY = Draft.Kind switch { "false-report" or "disorder" => 312, "inspire" or "rescue" => 320,
             "alienate" or "return" => 176, "seize" => 152, "burn" => 120, "rumor" => 160,
             "gift" => 88, _ => 128 };

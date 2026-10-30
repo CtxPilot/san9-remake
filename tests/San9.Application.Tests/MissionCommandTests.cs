@@ -54,11 +54,11 @@ public sealed class MissionCommandTests
     }
 
     [Theory]
-    [InlineData("false-report",20)] [InlineData("disorder",20)]
-    [InlineData("inspire",10)] [InlineData("rescue",10)]
-    [InlineData("alienate",22)] [InlineData("burn",2)] [InlineData("seize",2)] [InlineData("rumor",2)]
-    [InlineData("gift",2)] [InlineData("request",2)] [InlineData("return",2)] [InlineData("surrender",2)]
-    public void ReadOnlyPreparationMatchesSubmissionAndRefreshesAfterWorldChanges(string kind,int target)
+    [InlineData("false-report",20,2)] [InlineData("disorder",20,2)]
+    [InlineData("inspire",10,1)] [InlineData("rescue",10,1)]
+    [InlineData("alienate",22,2)] [InlineData("burn",2,2)] [InlineData("seize",2,2)] [InlineData("rumor",2,2)]
+    [InlineData("gift",2,10)] [InlineData("request",2,10)] [InlineData("return",2,10)] [InlineData("surrender",2,10)]
+    public void ReadOnlyPreparationMatchesSubmissionAndRefreshesAfterWorldChanges(string kind,int target,int journeyDays)
     {
         var content = MissionScenario.Create();
         if (kind == "return") content = content with { Officers = content.Officers.Select(p => p.State.Id == 3 ?
@@ -79,6 +79,22 @@ public sealed class MissionCommandTests
         var advice = draft.Advice;
         Assert.NotNull(advice);
         Assert.NotNull(preview.Arrival);
+        Assert.Equal(journeyDays, preview.JourneyDays);
+        Assert.Equal(draft.IsDiplomacy ? journeyDays : journeyDays - 1,
+            preview.Arrival.Value.DayNumber - before.World.Clock.DayNumber);
+        var texts = MissionScenario.Texts(draft.View);
+        if (kind == "alienate")
+        {
+            var pages = MissionOfficerCatalog.Pages(draft, texts, targets: true);
+            int column = Array.FindIndex(pages[0].Columns, c => c.Id == "estimate");
+            Assert.Equal(journeyDays, MissionOfficerCatalog.Read(draft, texts, 0, targets: true).Single(r => r.Id == target).Cells[column].Number);
+        }
+        if (kind is "burn" or "seize")
+        {
+            var catalog = new CommandFacilityCatalog(draft.View, texts, kind, draft.Targets, draft.ArrivalDaysToSettlement);
+            int column = Array.FindIndex(catalog.Pages[0].Columns, c => c.Id == "estimate");
+            Assert.Equal(journeyDays, catalog.Read(0).Single(r => r.Id == target).Cells[column].Number);
+        }
         Assert.Same(before, session.Capture());
         var command = draft.CreateCommand();
         Assert.Equal(command,draft.CreateCommand());
@@ -88,6 +104,7 @@ public sealed class MissionCommandTests
         var result = session.Execute(new("player"),command);
         Assert.True(result.Submission.Accepted);
         Assert.Equal(preview.Arrival,Assert.Single(result.Events.OfType<TaskStartedEvent>()).Task.Due);
+        Assert.Equal(journeyDays, ExecutionCommands.Read(session.View, texts).Single(r => r.OfficerId == 2).RemainingDays);
         Assert.False(draft.IsCurrent);
         Assert.Equal(CommandRejection.NotStable,draft.Rejection);
         Assert.False(draft.SetActor(2));
@@ -97,6 +114,28 @@ public sealed class MissionCommandTests
         Assert.NotEqual(CommandRejection.None,session.GetPreparationEligibility(new("player"),acted));
         if (!draft.IsDiplomacy)
             Assert.NotEmpty(MissionPresentation.Results(new(content,result.Snapshot),MissionScenario.Texts(new(content,result.Snapshot)),session.AdvanceXun().Events).Records);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0)]
+    [InlineData(1, 1, 0)]
+    [InlineData(30, 1, 0)]
+    [InlineData(31, 2, 1)]
+    [InlineData(95, 4, 3)]
+    public void StrategyJourneyDaysRemainDistinctFromResolutionDate(int distance, int journeyDays, int dateOffset)
+    {
+        var content = MissionScenario.Create();
+        content = content with { Units = content.Units.Select(u => u.Id == 10 ? u with { Position = new(2 + distance, 7) } : u).ToArray() };
+        var session = GameSession.Start(content, 42);
+        var draft = new MissionDraft(session, 1, "inspire");
+        Assert.True(draft.SetActor(2));
+        Assert.True(draft.SetTarget(10));
+        var preview = draft.Preview;
+        Assert.Equal(journeyDays, preview.JourneyDays);
+        Assert.Equal(dateOffset, preview.Arrival!.Value.DayNumber - session.Snapshot.Clock.DayNumber);
+        var result = session.Execute(new("player"), draft.CreateCommand());
+        Assert.True(result.Submission.Accepted);
+        Assert.Equal(preview.Arrival, Assert.Single(result.Events.OfType<TaskStartedEvent>()).Task.Due);
     }
 
     [Fact]

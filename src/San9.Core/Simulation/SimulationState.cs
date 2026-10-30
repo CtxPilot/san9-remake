@@ -91,6 +91,9 @@ public sealed record SimulationState(GameClock Started, ulong InitialSeed)
     [JsonIgnore] public CapturedRulerDecision? PendingCapturedRuler { get; init; }
     [JsonIgnore] public bool HasPendingDailyResolution => PendingDailyTask is not null || PendingDuel is not null ||
         PendingCapturedRuler is not null || PendingSniping is not null || PendingExecutionSuccession?.XunStarted is not null;
+    /// <summary>Whether the committed continuation has passed the countdown stage of its current date.</summary>
+    [JsonIgnore] public bool CurrentDateCountdownConsumed => PendingDuel is not null || PendingSniping is not null ||
+        PendingDailyTask is { Phase: TaskResolutionPhase.DailyCommands };
     [JsonIgnore] public DuelCombatDecision? PendingDuel { get; init; }
     [JsonIgnore] public EventSession? PendingEvent { get; init; }
     [JsonIgnore] public DailyTaskDecision? PendingDailyTask { get; init; }

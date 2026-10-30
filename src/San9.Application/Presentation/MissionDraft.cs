@@ -218,7 +218,7 @@ public sealed class MissionDraft
         GameCommand? command = Kind == "alienate" ? new AlienateCommand(commandId,View.RequirePlayerForce(),View.World.Simulation.NextSequence,actor,id) :
             Kind == "return" && Prisoners.Contains(id) ? new ReturnPrisonerCommand(commandId,View.RequirePlayerForce(),View.World.Simulation.NextSequence,actor,
                 Targets.First(force => EligibilityFor(actor,force,id) == CommandRejection.None),id) : null;
-        return command is not null && session.GetMissionPreparation(new("player"),command).Arrival is {} arrival ? arrival.DayNumber - View.World.Clock.DayNumber : null;
+        return command is not null ? session.GetMissionPreparation(new("player"),command).JourneyDays : null;
     }
     public GameCommand CreateCommand()
     {
@@ -228,8 +228,7 @@ public sealed class MissionDraft
     public long? ArrivalDaysToSettlement(int id)
     {
         if (!IsCurrent || ActorId is not int actor || Kind is not ("burn" or "seize")) return null;
-        return session.GetMissionPreparation(new("player"),CommandFor(actor,id,null)).Arrival is {} arrival ?
-            arrival.DayNumber - View.World.Clock.DayNumber : null;
+        return session.GetMissionPreparation(new("player"),CommandFor(actor,id,null)).JourneyDays;
     }
     private GameCommand CommandFor(int actor, int target, int? second)
     {

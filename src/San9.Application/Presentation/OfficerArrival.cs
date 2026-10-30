@@ -9,15 +9,10 @@ internal static class OfficerArrival
     {
         // Corps retain their root force as OwnerId. Visibility precedes applicability.
         if (person.OwnerId != viewerForceId) return new("**", IsUnavailable: true);
-        if (person.UnitId is not null || task?.Journey is not { } journey) return CatalogCell.Unavailable;
-
-        long days = journey.ReturnLeg is { } leg ? leg.CountdownDays
-            : task.Kind == "tactic-study" ? task.Due.DayNumber - task.Started.DayNumber
-            : task.Kind == "personnel-search" || task.Gift is not null || task.PrisonerReturn is not null ||
-                task.AttackRequest is not null || task.Surrender is not null ? journey.Route.XunRoundedDays
-            : journey.Route.Days;
+        if (person.UnitId is not null || task is null || PersonnelJourneyTiming.InitialDays(task) is not long days)
+            return CatalogCell.Unavailable;
         int elapsed = PersonnelJourneyTiming.ElapsedDays(task, view.World.Clock,
-            view.World.Simulation.PendingDailyTask is { Phase: TaskResolutionPhase.DailyCommands });
+            view.World.Simulation.CurrentDateCountdownConsumed);
         return Math.Max(0, days - elapsed);
     }
 }
