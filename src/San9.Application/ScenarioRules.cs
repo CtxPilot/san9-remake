@@ -33,10 +33,10 @@ internal sealed class ScenarioRules
         Politics = new PoliticalRulebook(definition.PoliticalEvents,
             definition.Information.Ranks.Select(r => new PeerageRule(r.Id, r.Precedence, r.RequiredTrust, r.LoyaltyBonus)),
             definition.Information.CountryTitles.Select(t => t.Rule), definition.ProvinceCountryTitleIds);
-        Abilities = new(Treasures, Governance);
+        Abilities = new(Treasures, Governance, definition.OfficerGrowth);
         _simulation = new()
         {
-            Economy = Economy, Personnel = Personnel, Treasures = Treasures, Governance = Governance,
+            Economy = Economy, Personnel = Personnel, Treasures = Treasures, Governance = Governance, OfficerGrowth = definition.OfficerGrowth,
             Military = Military, Terminal = definition.Terminal, Politics = Politics,
             QiaoMarriage = definition.QiaoMarriage, SunMarriage = definition.SunMarriage,
             HanzhongKing = definition.HanzhongKing, FiveTigers = definition.FiveTigers,

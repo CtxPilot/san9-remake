@@ -282,7 +282,7 @@ public static class EventContentCompiler
         if (scenarioMode is 2 or 9) return [];
         var retained = retainedOfficerIds.ToHashSet();
         if (retained.Any(id => id < 0 || id >= people.Count)) throw new InvalidDataException("Invalid retained officer identity.");
-        return [new ScholarInsultSearchEventDefinition(HistoricalPerson(people, retained, 296), 30, 200, 5, 115, 2, 2, 7, 2)
+        return [new ScholarInsultSearchEventDefinition(HistoricalPerson(people, retained, 296), 30, 200, 5, 2, 2, 7, 2)
             { Id = "ni-heng.insult", Priority = -15, Consumption = EventConsumption.None }];
     }
 
@@ -368,7 +368,7 @@ public static class EventContentCompiler
             new ImperialCeremonySearchEventDefinition(82, 0, 5, 50, 10, new("fengshan"))
             { Id = "fengshan", Priority = -4, Consumption = EventConsumption.OnSuccess },
             new ScholarReturnSearchEventDefinition(HistoricalPerson(people, retained, 569), 96,
-                new(195, 1, 1), new(207, 12, 30), 115, 3, 300, 1000, 3000, 2, 2, 2,
+                new(195, 1, 1), new(207, 12, 30), 3, 300, 1000, 3000, 2, 2, 2,
                 [10, 25, 22, 29], new("cai-yan"), new("cai-yan.returned"))
             { Id = "cai-yan", Priority = -16, Consumption = EventConsumption.OnPresentation },
             new HealingSearchEventDefinition(healers[0], retained.Where(id => people[id].BiographyResourceCode == 60).Order().ToImmutableArray(), 6)

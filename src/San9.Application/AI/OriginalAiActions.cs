@@ -120,7 +120,7 @@ internal sealed partial class OriginalAiActions(SimulationEngine engine, Scenari
         var actors = World.Officers.Where(Available)
             .Where(p => work != OriginalAiWork.Reinforce || ReliefSourceReady(p))
             .Where(p => work == OriginalAiWork.Gift ||
-            Skill(p) >= (work == OriginalAiWork.RequestAttack ? 50 : 45) && Skill(p) <= 115)
+            Skill(p) >= (work == OriginalAiWork.RequestAttack ? 50 : 45))
             .Where(p => targets.Any(t => SourceInRange(work, p, t, rule))).ToList();
         if (work == OriginalAiWork.Alienate) actors = actors.OrderBy(Skill).ToList();
         if (work is OriginalAiWork.Gossip or OriginalAiWork.RequestAttack or OriginalAiWork.Surrender)

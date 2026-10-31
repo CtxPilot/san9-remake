@@ -26,10 +26,10 @@ public sealed partial class SimulationEngine
                 {
                     case OfficerEdit p when kind == WorldEditorKind.Officers:
                         var person = mutation.Officers[p.Id];
-                        if (ChangedOutside(p.Abilities.War, person.BaseAbilities.War, 1, 100) ||
-                            ChangedOutside(p.Abilities.Intelligence, person.BaseAbilities.Intelligence, 1, 100) ||
-                            ChangedOutside(p.Abilities.Politics, person.BaseAbilities.Politics, 1, 100) ||
-                            ChangedOutside(p.Abilities.Leadership, person.BaseAbilities.Leadership, 1, 100) ||
+                        if (ChangedOutside(p.Abilities.War, person.BaseAbilities.War, OfficerGrowthRules.MinimumEditableAbility, OfficerGrowth.MaximumBaseAbility) ||
+                            ChangedOutside(p.Abilities.Intelligence, person.BaseAbilities.Intelligence, OfficerGrowthRules.MinimumEditableAbility, OfficerGrowth.MaximumBaseAbility) ||
+                            ChangedOutside(p.Abilities.Politics, person.BaseAbilities.Politics, OfficerGrowthRules.MinimumEditableAbility, OfficerGrowth.MaximumBaseAbility) ||
+                            ChangedOutside(p.Abilities.Leadership, person.BaseAbilities.Leadership, OfficerGrowthRules.MinimumEditableAbility, OfficerGrowth.MaximumBaseAbility) ||
                             p.Personality is < 0 or > 3 || p.Righteousness is < 0 or > 15 || p.Ambition is < 0 or > 15 ||
                             p.Affinity is < 0 or > 149 || ChangedOutside(p.LifespanTier, person.LifespanTier, 0, 7) ||
                             (person.OwnerId is null ? p.Loyalty is not null : p.Loyalty is null || ChangedOutside(p.Loyalty.Value, person.Loyalty, 0, 100)) ||

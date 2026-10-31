@@ -6,7 +6,7 @@ namespace San9.Core.Tests;
 
 public sealed class ScholarInsultTests
 {
-    private static ScholarInsultSearchEventDefinition Definition => new(3, 30, 200, 5, 115, 2, 2, 7, 2)
+    private static ScholarInsultSearchEventDefinition Definition => new(3, 30, 200, 5, 2, 2, 7, 2)
         { Id = "insult", Consumption = EventConsumption.None };
 
     private static (WorldMutation World, PersistentTask Task) Create(int roll = 0)
@@ -78,11 +78,11 @@ public sealed class ScholarInsultTests
     [Theory]
     [InlineData(98, 100, 0)]
     [InlineData(99, 100, 0)]
-    [InlineData(100, 100, 0)]
-    [InlineData(114, 114, 0)]
+    [InlineData(100, 100, 2)]
+    [InlineData(114, 114, 2)]
     [InlineData(115, 115, 2)]
     [InlineData(150, 150, 2)]
-    public void IgnoreUsesBaseIntelligenceAndDoesNotReplaceThe115ThresholdWithTheGrowthCap(int before, int after, int trust)
+    public void IgnoreUsesTheBaseAbilityGrowthCapToChooseAbilityOrTrust(int before, int after, int trust)
     {
         var (world, task) = Create();
         world.Replace(world.Officers[2] with { BaseAbilities = new(999, before, 999, 999), Injury = 4 });

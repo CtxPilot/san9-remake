@@ -160,10 +160,10 @@ public sealed class WorldEditorDraft
         }
         if (_edits[id] is OfficerEdit)
         {
-            Number<OfficerEdit>("统率", 1, 100, p => (uint)p.Abilities.Leadership, (p, v) => p with { Abilities = p.Abilities with { Leadership = (int)v } });
-            Number<OfficerEdit>("武力", 1, 100, p => (uint)p.Abilities.War, (p, v) => p with { Abilities = p.Abilities with { War = (int)v } });
-            Number<OfficerEdit>("智力", 1, 100, p => (uint)p.Abilities.Intelligence, (p, v) => p with { Abilities = p.Abilities with { Intelligence = (int)v } });
-            Number<OfficerEdit>("政治", 1, 100, p => (uint)p.Abilities.Politics, (p, v) => p with { Abilities = p.Abilities with { Politics = (int)v } });
+            Number<OfficerEdit>("统率", OfficerGrowthRules.MinimumEditableAbility, (uint)_session.OfficerGrowth.MaximumBaseAbility, p => (uint)p.Abilities.Leadership, (p, v) => p with { Abilities = p.Abilities with { Leadership = (int)v } });
+            Number<OfficerEdit>("武力", OfficerGrowthRules.MinimumEditableAbility, (uint)_session.OfficerGrowth.MaximumBaseAbility, p => (uint)p.Abilities.War, (p, v) => p with { Abilities = p.Abilities with { War = (int)v } });
+            Number<OfficerEdit>("智力", OfficerGrowthRules.MinimumEditableAbility, (uint)_session.OfficerGrowth.MaximumBaseAbility, p => (uint)p.Abilities.Intelligence, (p, v) => p with { Abilities = p.Abilities with { Intelligence = (int)v } });
+            Number<OfficerEdit>("政治", OfficerGrowthRules.MinimumEditableAbility, (uint)_session.OfficerGrowth.MaximumBaseAbility, p => (uint)p.Abilities.Politics, (p, v) => p with { Abilities = p.Abilities with { Politics = (int)v } });
             string[] personalities = ["莽撞", "刚胆", "冷静", "慎重"];
             for (int i = 0; i < personalities.Length; i++)
             {

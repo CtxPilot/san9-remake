@@ -5,6 +5,7 @@ namespace San9.Core.Simulation;
 // Rules are compiled domain code, not callbacks loaded from content or saves.
 public class SimulationRules
 {
+    public OfficerGrowthRules OfficerGrowth { get; init; } = OfficerGrowthRules.Default;
     public GuanduDefinition? Guandu { get; init; }
     public ShanyangGongDefinition? ShanyangGong { get; init; }
     public RedCliffsDefinition? RedCliffs { get; init; }
@@ -22,7 +23,7 @@ public class SimulationRules
     public PersonnelRulebook Personnel { get; init; } = PersonnelRulebook.Empty;
     public GovernanceRulebook Governance { get; init; } = new([]);
     public MilitaryRulebook? Military { get; init; }
-    internal OfficerAbilityRules Abilities => new(Treasures, Governance);
+    internal OfficerAbilityRules Abilities => new(Treasures, Governance, OfficerGrowth);
     internal virtual TaskRule? FindTask(string kind) => kind is PersonnelMissions.RecruitKind or PersonnelMissions.MoveKind or PersonnelMissions.SearchKind
         ? new PersonnelMissionRule(this, kind) : kind == PersonnelReturns.Kind ? new PersonnelReturnRule(Personnel, Military)
         : kind == UnitStrategies.Kind ? new UnitStrategyRule(this) : kind == BurnStrategies.Kind ? new BurnRule(this)

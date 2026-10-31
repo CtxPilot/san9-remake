@@ -20,7 +20,7 @@ public sealed class ScholarReturnSessionTests
             new("actor", new(2, 1, 1, new(50, 99, 99, 50), false)),
             new("scholar", new(3, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Special })],
         SearchEvents = [new ScholarReturnSearchEventDefinition(3, 1, new(195, 1, 1), new(207, 12, 30),
-            115, 3, 300, 1000, 3000, 2, 2, 2, [101, 102], new("scholar"), new("scholar.accepted"))
+            3, 300, 1000, 3000, 2, 2, 2, [101, 102], new("scholar"), new("scholar.accepted"))
             { Id = "scholar", Consumption = EventConsumption.OnPresentation }],
         Military = new(2, 1, [0, 0], [new(0, 1, null)], [], [new(1, new(2, 2), new(1, 1))])
         { Tactics = [new(101, 7, TacticEffect.CounterConfusion, 0, 0, 0, false, false, []),

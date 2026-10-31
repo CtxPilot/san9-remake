@@ -209,6 +209,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         _holdings = null; _treasureEffects.Clear();
     }
 
+    internal OfficerGrowthRules OfficerGrowth => _abilityRules.Growth;
     internal OfficerAbilities Abilities(OfficerState person) => _abilityRules.EvaluateWithTreasureBonus(person, TreasureEffects(person.Id, _abilityRules.Treasures).Bonuses);
     internal ImmutableDictionary<int, OfficerAbilities> AbilitiesFor(IEnumerable<OfficerState> people) =>
         people.ToImmutableDictionary(p => p.Id, Abilities);

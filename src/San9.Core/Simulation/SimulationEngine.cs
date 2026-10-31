@@ -9,6 +9,7 @@ public sealed partial class SimulationEngine
     private readonly ResolutionPipeline _pipeline;
     private WorldMutation? _preparationWorld;
     private long _preparationRevision = -1;
+    public OfficerGrowthRules OfficerGrowth => _rules.OfficerGrowth;
 
     /// <summary>Branches the current runtime for an isolated operation, sharing immutable records and compiled rules.</summary>
     public SimulationEngine Fork() => new(_world.Fork(), _rules, new(_rules));
@@ -80,6 +81,8 @@ public sealed partial class SimulationEngine
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(rules.OfficerGrowth);
+        rules.OfficerGrowth.Validate();
         ValidateContent(world, rules.Treasures, rules.Governance);
         rules.Terminal?.Validate(world.CreateSnapshot().Settlements.Where(s => s.Kind == SettlementKind.City).Select(s => s.Id).ToHashSet());
         _world = world;

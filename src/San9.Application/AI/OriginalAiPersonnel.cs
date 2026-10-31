@@ -65,7 +65,7 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
             p.SettlementId is int home && _placeIds.Contains(home) && !_busy.Contains(p.Id);
     }
     private IEnumerable<OfficerState> Actors(int politics) => Own.Where(p => Available(p) && engine.CanStartSettlementWork(p.SettlementId!.Value) &&
-        _cityIds.Contains(p.SettlementId!.Value) && Ability(p).Politics >= politics && Ability(p).Politics <= 115)
+        _cityIds.Contains(p.SettlementId!.Value) && Ability(p).Politics >= politics)
         .OrderByDescending(p => Ability(p).Politics);
     private GameCommand Command(Func<Guid, int, long, GameCommand> create)
     {
@@ -101,8 +101,8 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
                 var ordinary = Own.Where(p => p.Status == OfficerStatus.Serving).ToArray();
                 if (ordinary.Length < 5) return Report(OriginalAiWorkEnd.PreparationFailed);
                 var current = World.Officers.FirstOrDefault(p => p.Id == Force.AdviserId);
-                int lower = Math.Max(80, Math.Min(current is null ? 80 : Ability(current).Intelligence + 1, 115));
-                var candidates = ordinary.Where(p => p.Loyalty >= 80 && Ability(p).Intelligence >= lower && Ability(p).Intelligence <= 115);
+                var candidates = ordinary.Where(p => p.Loyalty >= 80 && Ability(p).Intelligence >= 80 &&
+                    (current is null || Ability(p).Intelligence > Ability(current).Intelligence));
                 if (current is not null) candidates = candidates.Append(current);
                 var adviser = candidates.OrderByDescending(p => Ability(p).Intelligence)
                     .ThenByDescending(ServiceYears).FirstOrDefault();

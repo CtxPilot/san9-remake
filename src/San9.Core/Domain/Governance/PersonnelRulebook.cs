@@ -41,7 +41,7 @@ public sealed class PersonnelRulebook
                 _ = insult.Candidate(null);
                 if (insult.Consumption != EventConsumption.None || insult.ScholarOfficerId < 0 || insult.IntelligenceChanceDivisor <= 0 ||
                     insult.MaximumBaseTrustExclusive is < 1 or > 1001 || insult.MaximumInjuryExclusive is < 1 or > 15 ||
-                    insult.TrustRewardIntelligenceThreshold < 0 || insult.IntelligenceReward < 0 || insult.BaseTrustReward < 0 ||
+                    insult.IntelligenceReward < 0 || insult.BaseTrustReward < 0 ||
                     insult.RetaliationInjury is < 0 or > 14 || insult.BaseTrustPenalty < 0)
                     throw new ArgumentException("Invalid scholar insult definition.");
             }
@@ -124,7 +124,7 @@ public sealed class PersonnelRulebook
             {
                 _ = scholar.Candidate(scholar.ConsumptionKey);
                 if (scholar.ScholarOfficerId < 0 || !Places.ContainsKey(scholar.PlaceId) || scholar.EarliestDate.Year < 1 || scholar.LatestDate.Year < 1 ||
-                    scholar.EarliestDate.DayNumber > scholar.LatestDate.DayNumber || scholar.MaximumBaseAbilityExclusive <= 0 ||
+                    scholar.EarliestDate.DayNumber > scholar.LatestDate.DayNumber ||
                     scholar.PoliticsChanceDivisor <= 0 || scholar.MinimumTrustExclusive is < 0 or > 1000 ||
                     scholar.MaximumBaseTrustExclusive is < 1 or > 1001 || scholar.IntelligenceReward < 0 ||
                     scholar.FallbackPoliticsReward < 0 || scholar.BaseTrustReward < 0 || !ValidIds(scholar.RewardTacticIds) ||

@@ -109,8 +109,8 @@ public sealed class EventContentCompilerTests
     {
         var people = new[] { Person(1), Person(296) };
         var d = Assert.IsType<ScholarInsultSearchEventDefinition>(Assert.Single(EventContentCompiler.ScholarInsults(mode, people, [0, 1])));
-        Assert.Equal((1, 30, 200, 5, 115, 2, 2, 7, 2, -15), (d.ScholarOfficerId, d.IntelligenceChanceDivisor, d.MaximumBaseTrustExclusive,
-            d.MaximumInjuryExclusive, d.TrustRewardIntelligenceThreshold, d.IntelligenceReward, d.BaseTrustReward, d.RetaliationInjury, d.BaseTrustPenalty, d.Priority));
+        Assert.Equal((1, 30, 200, 5, 2, 2, 7, 2, -15), (d.ScholarOfficerId, d.IntelligenceChanceDivisor, d.MaximumBaseTrustExclusive,
+            d.MaximumInjuryExclusive, d.IntelligenceReward, d.BaseTrustReward, d.RetaliationInjury, d.BaseTrustPenalty, d.Priority));
         Assert.Equal(EventConsumption.None, d.Consumption);
         Assert.Empty(EventContentCompiler.ScholarInsults(2, [], [])); Assert.Empty(EventContentCompiler.ScholarInsults(9, [], []));
         Assert.Throws<InvalidDataException>(() => EventContentCompiler.ScholarInsults(mode, people, [0]));
@@ -322,7 +322,7 @@ public sealed class EventContentCompilerTests
         var people = new[] { Person(569), Person(497) };
         var definitions = EventContentCompiler.SearchEvents(0, people, [0, 1], new HashSet<int> { 5, 73, 178, 128, 96, 82 });
         var d = Assert.Single(definitions.OfType<ScholarReturnSearchEventDefinition>());
-        Assert.Equal((0, 96, 115, 3, 300, 1000, 3000u), (d.ScholarOfficerId, d.PlaceId, d.MaximumBaseAbilityExclusive,
+        Assert.Equal((0, 96, 3, 300, 1000, 3000u), (d.ScholarOfficerId, d.PlaceId,
             d.PoliticsChanceDivisor, d.MinimumTrustExclusive, d.MaximumBaseTrustExclusive, d.MinimumMoneyExclusive));
         Assert.Equal(new GameClock(195, 1, 1), d.EarliestDate); Assert.Equal(new GameClock(207, 12, 30), d.LatestDate);
         Assert.Equal(new[] { 10, 25, 22, 29 }, d.RewardTacticIds);

@@ -8,7 +8,7 @@ namespace San9.Core.Tests;
 public sealed class ScholarReturnTests
 {
     internal static ScholarReturnSearchEventDefinition Definition => new(3, 1, new(195, 1, 1), new(207, 12, 30),
-        115, 3, 300, 1000, 3000, 2, 2, 2, [10, 25, 22, 29], new("scholar-return"), new("scholar-return.accepted"))
+        3, 300, 1000, 3000, 2, 2, 2, [10, 25, 22, 29], new("scholar-return"), new("scholar-return.accepted"))
         { Id = "scholar-return", Consumption = EventConsumption.OnPresentation };
     private static ulong Seed(int roll) => TestSeeds.StateForRoll(roll);
     private static (WorldState World, SimulationEngine Engine, PersonnelRulebook Rules) Create(int intelligence = 99, int politics = 99,
@@ -82,6 +82,8 @@ public sealed class ScholarReturnTests
     [InlineData(99)]
     [InlineData(100)]
     [InlineData(114)]
+    [InlineData(115)]
+    [InlineData(125)]
     public void EveryTacticCombinationUsesFirstUnknownOrCappedPolitics(int ability)
     {
         for (int mask = 0; mask < 16; mask++)
@@ -103,8 +105,6 @@ public sealed class ScholarReturnTests
 
     [Theory]
     [InlineData("consumed", false)]
-    [InlineData("intelligence", false)]
-    [InlineData("politics", false)]
     [InlineData("place", false)]
     [InlineData("early", true)]
     [InlineData("late", true)]
@@ -120,8 +120,6 @@ public sealed class ScholarReturnTests
         switch (failure)
         {
             case "consumed": m.SetSimulation(m.Simulation with { ConsumedEventKeys = [Definition.ConsumptionKey] }); break;
-            case "intelligence": m.Replace(m.Officers[2] with { BaseAbilities = new(50, 115, 99, 50) }); break;
-            case "politics": m.Replace(m.Officers[2] with { BaseAbilities = new(50, 99, 115, 50) }); break;
             case "place": place = 30; break;
             case "early": m.SetClock(new(194, 12, 30)); break;
             case "late": m.SetClock(new(208, 1, 1)); break;

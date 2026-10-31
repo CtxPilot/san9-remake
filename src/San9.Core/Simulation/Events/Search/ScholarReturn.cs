@@ -14,8 +14,6 @@ internal static class ScholarReturn
         !world.Simulation.ConsumedEventKeys.Contains(d.ConsumptionKey) &&
         world.Forces.TryGetValue(task.ForceId, out var force) && !force.IsEliminated &&
         world.Simulation.Controls.Any(c => c.ForceId == force.Id && c.Kind == ControllerKind.Player) &&
-        world.Officers[task.OfficerId].BaseAbilities.Intelligence < d.MaximumBaseAbilityExclusive &&
-        world.Officers[task.OfficerId].BaseAbilities.Politics < d.MaximumBaseAbilityExclusive &&
         task.Journey?.DestinationPlaceId == d.PlaceId;
 
     private static bool AfterChance(WorldMutation world, PersistentTask task, ScholarReturnSearchEventDefinition d) =>

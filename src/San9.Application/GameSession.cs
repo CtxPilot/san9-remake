@@ -27,6 +27,7 @@ public sealed partial class GameSession
     /// <summary>Initial controller configuration, used to reconstruct command logs.</summary>
     public ImmutableArray<int> InitialPlayerForceIds { get; private set; } = [];
     public ControllerKind PlayerForceController { get; private set; } = ControllerKind.Player;
+    public OfficerGrowthRules OfficerGrowth => _simulation.OfficerGrowth;
     private OriginalAiState _originalAi;
     public OriginalAiState OriginalAi => _originalAi;
     public ImmutableArray<OriginalAiWorkReport> LastOriginalAiWork { get; private set; } = [];

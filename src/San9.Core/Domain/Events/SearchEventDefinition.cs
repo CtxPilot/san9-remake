@@ -66,7 +66,6 @@ public sealed record ScholarReturnSearchEventDefinition(
     [property: JsonRequired] int PlaceId,
     [property: JsonRequired] GameClock EarliestDate,
     [property: JsonRequired] GameClock LatestDate,
-    [property: JsonRequired] int MaximumBaseAbilityExclusive,
     [property: JsonRequired] int PoliticsChanceDivisor,
     [property: JsonRequired] int MinimumTrustExclusive,
     [property: JsonRequired] int MaximumBaseTrustExclusive,

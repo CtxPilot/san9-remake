@@ -18,7 +18,7 @@ public sealed class ScholarInsultSessionTests
         Officers = [new("ruler", new(1, 1, 1, new(0, 150, 0, 0), false) { Status = OfficerStatus.Ruler }),
             new("first", new(2, 1, 1, new(0, 150, 0, 0), false)), new("second", new(3, 1, 1, new(0, 150, 0, 0), false)),
             new("diviner", new(4, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Special })],
-        SearchEvents = [new ScholarInsultSearchEventDefinition(4, 1, 200, 5, 115, 2, 2, 7, 2)
+        SearchEvents = [new ScholarInsultSearchEventDefinition(4, 1, 200, 5, 2, 2, 7, 2)
             { Id = "insult", Consumption = EventConsumption.None }]
     , Information = new([], [], [], [new San9.Core.Domain.CorpsState(1, 1, 1, new(50000, 10000)) { IsRoot = true }], []) };
 
@@ -109,7 +109,7 @@ public sealed class ScholarInsultSessionTests
             Assert.Throws<InvalidDataException>(() => (d with { SearchEvents = [bad] }).Validate());
 
         var document = JsonNode.Parse(CanonicalJson.Encode(d))!;
-        document["searchEvents"]![0]!.AsObject().Remove("trustRewardIntelligenceThreshold");
+        document["searchEvents"]![0]!.AsObject().Remove("intelligenceReward");
         Assert.Throws<JsonException>(() => StrictJson.Deserialize<ScenarioInitialState>(Encoding.UTF8.GetBytes(document.ToJsonString())));
     }
 }

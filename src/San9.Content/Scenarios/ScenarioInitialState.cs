@@ -44,7 +44,8 @@ public sealed record SettlementInitialState(int Id, string NameKey, int? OwnerId
 public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements, Dictionary<int, string> RegionNameKeys, Dictionary<int, int> RegionCityIds)
 {
-    public const int CurrentSchemaVersion = 148;
+    public const int CurrentSchemaVersion = 150;
+    [JsonRequired] public San9.Core.Domain.OfficerGrowthRules OfficerGrowth { get; init; } = San9.Core.Domain.OfficerGrowthRules.Default;
     [JsonRequired] public int[] FictionalOfficerPlaceIds { get; init; } = [];
     [JsonRequired] public OriginalAiDefinition OriginalAi { get; init; } = OriginalAiDefinition.Default;
     [JsonRequired] public int FoodExchangeRate { get; init; } = 1;
@@ -94,6 +95,8 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
     [JsonRequired] public InformationDefinitions Information { get; init; } = InformationDefinitions.Empty;
     public void Validate()
     {
+        if (OfficerGrowth is null || OfficerGrowth.MaximumBaseAbility < San9.Core.Domain.OfficerGrowthRules.MinimumEditableAbility)
+            throw new InvalidDataException("Invalid officer growth rules.");
         San9.Content.Packages.ContentStructure.Validate(this);
         if (OriginalAi is null) throw new InvalidDataException("Missing original AI policy.");
         OriginalAi.Validate(Officers.Select(p => p.State.Id).ToHashSet(), Military);

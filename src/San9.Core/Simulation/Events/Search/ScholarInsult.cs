@@ -45,7 +45,7 @@ internal static class ScholarInsult
             OfficerInjuries.Apply(world, actor with { Injury = d.RetaliationInjury }, events);
             world.Replace(force with { BaseTrust = Math.Max(0, force.BaseTrust - d.BaseTrustPenalty) });
         }
-        else if (actor.BaseAbilities.Intelligence >= d.TrustRewardIntelligenceThreshold)
+        else if (!world.OfficerGrowth.CanIncrease(actor.BaseAbilities.Intelligence))
             world.Replace(force with { BaseTrust = (int)Math.Min(1000L, (long)force.BaseTrust + d.BaseTrustReward) });
         else OfficerAbilityGrowth.Increase(world, actor.Id, OfficerAbility.Intelligence, d.IntelligenceReward, events);
         var after = world.Officers[actor.Id];

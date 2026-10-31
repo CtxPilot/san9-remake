@@ -9,7 +9,7 @@ internal static class OfficerAbilityGrowth
     internal static void TryIncrease(WorldMutation world, int officerId, OfficerAbility ability,
         string stream, List<DomainEvent> events)
     {
-        if (Value(world.Officers[officerId].BaseAbilities, ability) >= 100) return;
+        if (!world.OfficerGrowth.CanIncrease(Value(world.Officers[officerId].BaseAbilities, ability))) return;
         if (world.NextRandom(stream) % 100 < 3) Increase(world, officerId, ability, 1, events);
     }
 
@@ -20,7 +20,7 @@ internal static class OfficerAbilityGrowth
         var officer = world.Officers[officerId];
         var abilities = officer.BaseAbilities;
         int before = Value(abilities, ability);
-        int next = before >= 100 ? before : (int)Math.Min(100L, (long)before + amount);
+        int next = world.OfficerGrowth.Increase(before, amount);
         if (next == before) return;
         var updated = ability switch
         {

@@ -3,8 +3,9 @@ using System.Collections.Immutable;
 namespace San9.Core.Domain;
 
 /// <summary>Derives effective abilities from a supplied state. Holds definitions, never mutable world state or cached results.</summary>
-public sealed class OfficerAbilityRules(TreasureRulebook treasures, GovernanceRulebook governance)
+public sealed class OfficerAbilityRules(TreasureRulebook treasures, GovernanceRulebook governance, OfficerGrowthRules? growth = null)
 {
+    public OfficerGrowthRules Growth { get; } = growth ?? OfficerGrowthRules.Default;
     internal GovernanceRulebook Governance => governance;
     internal TreasureRulebook Treasures => treasures;
     public static OfficerAbilityRules Empty { get; } = new(TreasureRulebook.Empty, new([]));
