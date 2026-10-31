@@ -177,9 +177,9 @@ public sealed partial class OriginalAiMilitaryTests
     }
 
     [Theory]
-    [InlineData(1000u, 1)]
-    [InlineData(100000u, 0)]
-    public void FailedSelectedTargetConsumesItsCityWithoutTryingAnotherTarget(uint defenders, int expected)
+    [InlineData(1000u, 2)]
+    [InlineData(100000u, 3)]
+    public void FailedSelectedTargetAllowsAnotherExecutableTargetFromTheSameCity(uint defenders, int target)
     {
         var basis = Fixture();
         var content = basis with
@@ -200,7 +200,8 @@ public sealed partial class OriginalAiMilitaryTests
         var other = new Harness(content);
         Assert.Equal(1, other.Military.Run(OriginalAiWork.Attack, 1, other.State, new(1, OriginalAiMode.TargetSettlement, null, 3)).Submitted);
         Assert.Equal(3, Assert.IsType<DeployUnitCommand>(Assert.Single(other.Commands)).Order.SettlementId);
-        Assert.Equal(expected, h.Military.Run(OriginalAiWork.Attack, 1, h.State, new(1, OriginalAiMode.TargetSettlement, null, 2)).Submitted);
+        Assert.Equal(1, h.Military.Run(OriginalAiWork.Attack, 1, h.State, new(1, OriginalAiMode.TargetSettlement, null, 2)).Submitted);
+        Assert.Equal(target, Assert.IsType<DeployUnitCommand>(Assert.Single(h.Commands)).Order.SettlementId);
     }
 
     [Theory]

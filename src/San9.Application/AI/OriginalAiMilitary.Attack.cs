@@ -129,51 +129,55 @@ internal sealed partial class OriginalAiMilitary
                     .Concat(all.Where(s => s.Kind == SettlementKind.City && s.OwnerId is null))
                     .Concat(all.Where(s => s.Kind != SettlementKind.City).OrderBy(Defense));
             }
-            // Target selection returns one candidate for this city. A failed plan
-            // consumes the city; it does not reopen the city's fallback target list.
-            var originalTarget = targets.FirstOrDefault();
-            if (originalTarget is null) continue;
-            var target = World.Settlements.FirstOrDefault(s => s.Id == originalTarget.Id && Target(s));
-            if (target is null) continue;
-            var sources = WorkSources.Where(s => (request ? Near(s.Id, target.Id) : City(s.Id) == city) && s.Soldiers >= (request ? 10000 : 1) &&
-                s.Morale >= (request ? 70 : 90) && People(s.Id).Length >= (request ? 2 : 1)).OrderByDescending(s => s.Soldiers).ToArray();
-            // City requests may reinforce an existing attack; other buildings reject an existing friendly assignment.
-            if (request && sources.Length > 0 && target.Kind != SettlementKind.City && World.Units.Any(u =>
-                FieldUnit(u) && u.OwnerId == Owner && u.EffectiveOrder?.SettlementId == target.Id)) return;
-            ImmutableArray<int> routeRegions = [];
-            SettlementState? routeSource = null;
-            if (request)
-                sources = sources.Where(s => HasClearAttackRoute(s, target)).ToArray();
-            else if (sources.Length > 0)
+            var evaluated = new HashSet<int>();
+            foreach (var originalTarget in targets.DistinctBy(s => s.Id).ToArray())
             {
-                routeSource = sources[0];
-                target = AttackTargetAlongRoute(routeSource, target, out routeRegions);
+                if (!More) break;
+                if (evaluated.Contains(originalTarget.Id)) continue;
+                var target = World.Settlements.FirstOrDefault(s => s.Id == originalTarget.Id && Target(s));
                 if (target is null) continue;
-                sources = AttackSources(target);
-            }
-            if (sources.Length == 0 || !request && !Strength(target, sources, group)) continue;
-            if (routeSource is not null && AlternateConstructionRegion(routeSource, routeRegions) is int region)
-            {
-                Construct(city, group, region);
-                continue;
-            }
-            var allocations = Allocate(target, sources, request);
-            if (allocations.Length == 0) continue;
-            long assigned = 0;
-            foreach (var allocation in allocations)
-            {
-                if (!More || request && assigned > 2 * Demand(target)) break;
-                if (request && !World.Simulation.AttackRequests.Contains(obligation!)) break;
-                var source = WorkSources.FirstOrDefault(s => s.Id == allocation.SourceId);
-                target = World.Settlements.FirstOrDefault(s => s.Id == target.Id && Target(s));
-                if (target is null) break;
-                if (source is null) continue;
-                var people = AttackPeople(source.Id, request);
-                if (people.Length == 0) { Send(null); continue; }
-                uint soldiers = (uint)Math.Max(0, Math.Min(allocation.Soldiers, Math.Min(source.Soldiers - Reserve(source), Capacity(people[0]))));
-                if (soldiers < MinimumAttack(source)) { Send(null); continue; }
-                var command = Deployment(source, people, soldiers, new(MilitaryOrderKind.AttackSettlement, null, target.Id), target, null, false);
-                if (Send(command)) assigned += command!.Soldiers;
+                var sources = WorkSources.Where(s => (request ? Near(s.Id, target.Id) : City(s.Id) == city) && s.Soldiers >= (request ? 10000 : 1) &&
+                    s.Morale >= (request ? 70 : 90) && People(s.Id).Length >= (request ? 2 : 1)).OrderByDescending(s => s.Soldiers).ToArray();
+                // City requests may reinforce an existing attack; other buildings reject an existing friendly assignment.
+                if (request && sources.Length > 0 && target.Kind != SettlementKind.City && World.Units.Any(u =>
+                    FieldUnit(u) && u.OwnerId == Owner && u.EffectiveOrder?.SettlementId == target.Id)) return;
+                ImmutableArray<int> routeRegions = [];
+                SettlementState? routeSource = null;
+                if (request)
+                    sources = sources.Where(s => HasClearAttackRoute(s, target)).ToArray();
+                else if (sources.Length > 0)
+                {
+                    routeSource = sources[0];
+                    target = AttackTargetAlongRoute(routeSource, target, out routeRegions);
+                    if (target is null) continue;
+                    if (!evaluated.Add(target.Id)) continue;
+                    sources = AttackSources(target);
+                }
+                if (sources.Length == 0 || !request && !Strength(target, sources, group)) continue;
+                if (routeSource is not null && AlternateConstructionRegion(routeSource, routeRegions) is int region)
+                {
+                    Construct(city, group, region);
+                    break;
+                }
+                var allocations = Allocate(target, sources, request);
+                if (allocations.Length == 0) continue;
+                long assigned = 0;
+                foreach (var allocation in allocations)
+                {
+                    if (!More || request && assigned > 2 * Demand(target)) break;
+                    if (request && !World.Simulation.AttackRequests.Contains(obligation!)) break;
+                    var source = WorkSources.FirstOrDefault(s => s.Id == allocation.SourceId);
+                    target = World.Settlements.FirstOrDefault(s => s.Id == target.Id && Target(s));
+                    if (target is null) break;
+                    if (source is null) continue;
+                    var people = AttackPeople(source.Id, request);
+                    if (people.Length == 0) { Send(null); continue; }
+                    uint soldiers = (uint)Math.Max(0, Math.Min(allocation.Soldiers, Math.Min(source.Soldiers - Reserve(source), Capacity(people[0]))));
+                    if (soldiers < MinimumAttack(source)) { Send(null); continue; }
+                    var command = Deployment(source, people, soldiers, new(MilitaryOrderKind.AttackSettlement, null, target.Id), target, null, false);
+                    if (Send(command)) assigned += command!.Soldiers;
+                }
+                break;
             }
         }
     }
