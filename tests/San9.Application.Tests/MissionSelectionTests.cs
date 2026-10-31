@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using San9.Tests;
 using San9.Application.Persistence;
 using San9.Application.Presentation;
@@ -115,6 +116,26 @@ public sealed class MissionSelectionTests
             Assert.Equal(entered, draft.SetTarget(target));
             Assert.Same(before, session.Capture());
         }
+    }
+
+    [Fact]
+    public void UnitStrategyTargetsUseCurrentRegionAndExcludeIndirectNeighbor()
+    {
+        var basis = MissionScenario.Create();
+        var content = basis with
+        {
+            CityConnections = [.. basis.CityConnections, new(2, 3)],
+            Units = basis.Units.Select(u => u.Id == 20 ? u with { ServicePlaceId = 2 } : u).ToArray(),
+            Military = basis.Military! with
+            {
+                RegionIds = Enumerable.Range(0, 90).Select(i => (int?)(i % 30 >= 5 ? 3 : 1)).ToImmutableArray()
+            }
+        };
+        var session = GameSession.Start(content, 42);
+        var draft = new MissionDraft(session, 1, "false-report");
+
+        Assert.Empty(draft.Targets);
+        Assert.False(draft.SetTarget(20));
     }
 
     [Theory]

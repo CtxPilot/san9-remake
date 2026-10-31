@@ -162,7 +162,8 @@ public sealed class UnitStrategyTests
         StateAssert.Equal(world.CreateSnapshot(), restored.Snapshot);
     }
 
-    internal static SimulationRules Rules(bool defensive = false, bool immune = false, bool reinforcementConnection = true, bool transport = false) => new()
+    internal static SimulationRules Rules(bool defensive = false, bool immune = false, bool reinforcementConnection = true,
+        bool transport = false, bool splitRegions = false) => new()
     {
         Personnel = new([new(1, new(2, 2)), new(2, new(997, 12))],
             new Dictionary<int, int> { [1] = 1, [2] = 2 }, reinforcementConnection ? [new(1, 2)] : []),
@@ -170,7 +171,8 @@ public sealed class UnitStrategyTests
             [new(9, 1, 0, 10000, 5, new(1, 1), TravelMode.Land)
                 { HalvesHostileStrategyChance = defensive, ImmuneToDisorder = immune }],
             [new(1, new(2, 2), new(1, 1)), new(2, new(997, 12), new(1, 1))])
-            { RegionIds = Enumerable.Repeat<int?>(2, 600).ToImmutableArray(), TransportFormations = transport ? new(9, null) : null })
+            { RegionIds = Enumerable.Range(0, 600).Select(i => (int?)(splitRegions && i % 200 < 50 ? 1 : 2)).ToImmutableArray(),
+                TransportFormations = transport ? new(9, null) : null })
     };
 
     internal static WorldState World(bool friendly = false, int distance = 31, int intelligence = 99) => WorldState.Create(new(190, 1, 1), 42,
@@ -446,17 +448,63 @@ public sealed class UnitStrategyTests
     }
 
     [Fact]
-    public void ReinforcementRequiresCostRangeAndCapacityAtSubmission()
+    public void TargetCityMustBeSameOrDirectedImmediateNeighbor()
+    {
+        (int? TargetCity, CityConnection[] Connections, bool Accepted)[] geography =
+        [
+            (1, [], true),
+            (2, [new(1, 2)], true),
+            (2, [new(2, 1)], false),
+            (2, [new(1, 3), new(3, 2)], false),
+            (null, [], false)
+        ];
+        foreach (var (targetCity, connections, accepted) in geography)
+        {
+            var regionCities = new Dictionary<int, int> { [1] = 1, [3] = 3 };
+            if (targetCity is int city) regionCities[2] = city;
+            var rules = new SimulationRules { Military = Rules().Military, Personnel = new(
+                [new(1, new(2, 2)), new(2, new(997, 12)), new(3, new(502, 12))], regionCities, connections) };
+            var world = World(distance: 900);
+            var engine = new SimulationEngine(world, rules);
+            Assert.Equal(accepted, engine.Execute(new("player"),
+                new UnitStrategyCommand(Guid.NewGuid(), 1, 0, 11, UnitStrategyKind.FalseReport, 5)).Submission.Accepted);
+        }
+    }
+
+    [Theory]
+    [InlineData(UnitStrategyKind.FalseReport)]
+    [InlineData(UnitStrategyKind.Disorder)]
+    [InlineData(UnitStrategyKind.Inspire)]
+    [InlineData(UnitStrategyKind.Reinforce)]
+    public void RangeRestrictsSubmissionButNotLaterExecution(UnitStrategyKind strategy)
+    {
+        var rules = Rules(reinforcementConnection: false, splitRegions: true);
+        var world = World(friendly: strategy is UnitStrategyKind.Inspire or UnitStrategyKind.Reinforce, distance: 300);
+        var engine = new SimulationEngine(world, rules);
+        var command = new UnitStrategyCommand(Guid.NewGuid(), 1, 0, 11, strategy, 5);
+        Assert.Equal(CommandRejection.InvalidTask,
+            engine.GetUnitStrategyAdvice(1, 11, strategy, 5).Rejection);
+        Assert.False(engine.Execute(new("player"), command).Submission.Accepted);
+
+        var state = world.BeginMutation();
+        state.Replace(state.Units[5] with { Position = new(32, 2) });
+        world.Commit(state);
+        Assert.True(engine.Execute(new("player"), command).Submission.Accepted);
+
+        state = world.BeginMutation(rules.Abilities);
+        state.Replace(state.Units[5] with { Position = new(302, 2) });
+        var result = Assert.Single(Day(state, rules).OfType<UnitStrategyResolvedEvent>());
+        Assert.Equal(new WorldPosition(302, 2), result.Target.Position);
+    }
+
+    [Fact]
+    public void ReinforcementRequiresCostAndCapacityAtSubmission()
     {
         var insufficient = World(friendly: true);
         var mutation = insufficient.BeginMutation();
         mutation.Replace(mutation.Settlements[1] with { Soldiers = 2999 });
         insufficient.Commit(mutation);
         Assert.False(new SimulationEngine(insufficient, Rules()).Execute(new("player"),
-            new UnitStrategyCommand(Guid.NewGuid(), 1, 0, 11, UnitStrategyKind.Reinforce, 5)).Submission.Accepted);
-
-        var outOfRange = new SimulationEngine(World(friendly: true), Rules(reinforcementConnection: false));
-        Assert.False(outOfRange.Execute(new("player"),
             new UnitStrategyCommand(Guid.NewGuid(), 1, 0, 11, UnitStrategyKind.Reinforce, 5)).Submission.Accepted);
 
         var full = World(friendly: true);

@@ -48,18 +48,20 @@ internal static class UnitStrategies
         if (strategy == UnitStrategyKind.Inspire && world.Units[targetId].Condition == UnitCondition.HighSpirits)
             return CommandRejection.InvalidTask;
         int origin = world.Officers[officerId].SettlementId!.Value;
+        if (!InTargetRange(world, origin, targetId, rules)) return CommandRejection.InvalidTask;
         if (strategy == UnitStrategyKind.Reinforce &&
-            (world.Settlements[origin].Soldiers < 3000 || !InReinforcementRange(world, origin, targetId, rules) ||
+            (world.Settlements[origin].Soldiers < 3000 ||
              Demobilization.City(world, origin, rules.Personnel) is null ||
              world.Units[targetId].Soldiers >= rules.Military!.Capacity(world.Units[targetId])))
             return CommandRejection.InvalidTask;
-        return rules.Personnel.Places.ContainsKey(origin) && rules.Military!.RegionAt(world.Units[targetId].Position) is int region &&
-            rules.Personnel.Places.ContainsKey(region) ? CommandRejection.None : CommandRejection.InvalidTask;
+        return CommandRejection.None;
     }
 
-    private static bool InReinforcementRange(WorldMutation world, int origin, int targetId, SimulationRules rules)
+    private static bool InTargetRange(WorldMutation world, int origin, int targetId, SimulationRules rules)
     {
-        if (rules.Military!.RegionAt(world.Units[targetId].Position) is not int targetRegion ||
+        if (!rules.Personnel.Places.ContainsKey(origin) ||
+            rules.Military!.RegionAt(world.Units[targetId].Position) is not int targetRegion ||
+            !rules.Personnel.Places.ContainsKey(targetRegion) ||
             !rules.Personnel.RegionCities.TryGetValue(origin, out int sourceCity) ||
             !rules.Personnel.RegionCities.TryGetValue(targetRegion, out int targetCity)) return false;
         return sourceCity == targetCity ||
