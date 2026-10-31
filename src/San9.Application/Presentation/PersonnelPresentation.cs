@@ -84,6 +84,7 @@ public static class PersonnelPresentation
         {
             if (outcome is SearchResolvedEvent search && search.Result != SearchResultKind.Person && Direct(search.OfficerId))
             {
+                if (before.Companion.HideRoutineSearchReports && search.Result is SearchResultKind.Money or SearchResultKind.None) continue;
                 var values = Values(before, search.OfficerId, search.PlaceId);
                 values["money"] = new(search.Money);
                 if (search.TreasureId is int item) values["treasure"] = MessageBinding.Reference(MessageEntityKind.Treasure, item);

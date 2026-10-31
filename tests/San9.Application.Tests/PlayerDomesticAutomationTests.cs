@@ -62,6 +62,49 @@ public sealed class PlayerDomesticAutomationTests
         Assert.Single(enabled.LastOriginalAiWork.Where(r => r.Submitted > 0));
     }
 
+    [Theory]
+    [InlineData(false, false, 0, 0)]
+    [InlineData(false, true, 0, 3)]
+    [InlineData(true, false, 1, 0)]
+    [InlineData(true, true, 1, 2)]
+    public void DomesticAndLocalSearchSwitchesAreIndependentAndDomesticRunsFirst(
+        bool domestic, bool search, int developments, int searches)
+    {
+        var session = GameSession.Start(Content(DomesticActivity.Train), 190, companionSettings: new()
+        {
+            PlayerAutoDomesticEnabled = domestic,
+            PlayerAutoSearchEnabled = search,
+        });
+        var result = session.EndControl(new("player"));
+        Assert.Equal(developments, result.Events.OfType<DevelopmentCompletedEvent>().Count());
+        var tasks = result.Events.OfType<TaskStartedEvent>().Select(e => e.Task).ToArray();
+        Assert.Equal(searches, tasks.Length);
+        Assert.All(tasks, task => Assert.Equal(session.Snapshot.Officers.Single(p => p.Id == task.OfficerId).SettlementId,
+            task.Journey!.DestinationPlaceId));
+        Assert.Equal(search, session.LastOriginalAiWork.Any(r => r.Work == OriginalAiWork.Search));
+    }
+
+    [Fact]
+    public void LocalSearchUsesConfiguredMinimumEffectivePolitics()
+    {
+        var content = Content(DomesticActivity.Train);
+        content = content with { Officers = content.Officers.Select(p => p.State.OwnerId == 1
+            ? p with { State = p.State with
+            {
+                BaseAbilities = p.State.BaseAbilities with { Politics = p.State.Id switch { 1 => 44, 2 => 50, _ => 70 } },
+                Injury = p.State.Id == 2 ? 1 : 0,
+            } } : p).ToArray() };
+        foreach (var (minimum, expected) in new (int Minimum, int[] Expected)[]
+            { (45, [2, 3]), (46, [3]), (0, [1, 2, 3]), (71, []) })
+        {
+            var session = GameSession.Start(content, 190, companionSettings: new()
+                { PlayerAutoSearchEnabled = true, PlayerAutoSearchMinimumPolitics = minimum });
+            var result = session.EndControl(new("player"));
+            Assert.Equal(expected, result.Events.OfType<TaskStartedEvent>().Select(e => e.Task.OfficerId));
+            Assert.Empty(result.Events.OfType<DevelopmentCompletedEvent>());
+        }
+    }
+
     [Fact]
     public void ManualWorkAndItsParticipantsAreNotRepeatedAtEndControl()
     {

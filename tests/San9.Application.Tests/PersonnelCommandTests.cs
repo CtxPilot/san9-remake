@@ -444,13 +444,17 @@ public sealed class PersonnelCommandTests
         Assert.DoesNotContain(2,search.Targets);
     }
     [Theory]
-    [InlineData(SearchResultKind.None)]
-    [InlineData(SearchResultKind.Money)]
-    [InlineData(SearchResultKind.Treasure)]
-    [InlineData(SearchResultKind.Person)]
-    public void SearchResultsNarrateOnceFromEventsAndPersonDecisionsAreNotDuplicated(SearchResultKind kind)
+    [InlineData(SearchResultKind.None, false)]
+    [InlineData(SearchResultKind.Money, false)]
+    [InlineData(SearchResultKind.Treasure, false)]
+    [InlineData(SearchResultKind.Person, false)]
+    [InlineData(SearchResultKind.None, true)]
+    [InlineData(SearchResultKind.Money, true)]
+    [InlineData(SearchResultKind.Treasure, true)]
+    [InlineData(SearchResultKind.Person, true)]
+    public void SearchResultsNarrateOnceFromEventsAndPersonDecisionsAreNotDuplicated(SearchResultKind kind, bool hideRoutineReports)
     {
-        var session = GameSession.Start(Definition(),3);
+        var session = GameSession.Start(Definition(),3, companionSettings: new() { HideRoutineSearchReports = hideRoutineReports });
         session.Execute(new("player"),new SearchCommand(Guid.NewGuid(),1,0,[1],1));
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion,[]) { Messages = new() {
             ["none"] = new([new MessageLiteral("none")]), ["empty"] = new([new MessageLiteral("empty")]),
@@ -461,9 +465,10 @@ public sealed class PersonnelCommandTests
         var before = session.Snapshot;
         var result = PersonnelPresentation.Results(session.View,session.Messages(texts),texts,content,
             [new SearchResolvedEvent(before.Clock,1,1,null,false) { Result = kind, Money = 123, TreasureId = kind == SearchResultKind.Treasure ? 99 : null }],_ => 0);
-        Assert.Equal(kind == SearchResultKind.None ? 2 : kind == SearchResultKind.Person ? 0 : 1,result.Count);
+        bool hidden = hideRoutineReports && kind is SearchResultKind.None or SearchResultKind.Money;
+        Assert.Equal(hidden ? 0 : kind == SearchResultKind.None ? 2 : kind == SearchResultKind.Person ? 0 : 1,result.Count);
         if (kind == SearchResultKind.Treasure) Assert.Equal("information-treasure-99",result[0].IllustrationRole);
-        if (kind == SearchResultKind.None) { Assert.Equal(1,result[0].SpeakerId); Assert.Equal("decrease",result[1].SoundRole); }
+        if (kind == SearchResultKind.None && !hidden) { Assert.Equal(1,result[0].SpeakerId); Assert.Equal("decrease",result[1].SoundRole); }
         Assert.Same(before,session.Snapshot);
     }
 }

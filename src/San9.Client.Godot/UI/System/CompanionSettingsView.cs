@@ -13,13 +13,19 @@ public partial class CompanionSettingsView : ModalView
 
     private static readonly ToggleOption[] Options =
     [
-        new("玩家自动内政", "系统", "每旬结束操作时，使用直辖军团的闲置武将依次安排训练、修筑、商业、开垦和巡察。按正常规则付费",
+        new("玩家自动内政", "系统", "每旬结束操作时，使用直辖军团的闲置武将依次安排训练、修筑、商业、开垦和巡察。",
             settings => settings.PlayerAutoDomesticEnabled,
             (settings, value) => settings with { PlayerAutoDomesticEnabled = value }),
-        new("自动探索所在地", "系统", "需开启玩家自动内政，在五项内政后使用剩余可行动武将探索其当前所在地；回报选择由玩家回答。",
+        new("自动探索所在地", "系统", "直辖军团可行动武将探索所在地，回报选择由玩家回答；同时开启自动内政时，先做内政再探索。",
             settings => settings.PlayerAutoSearchEnabled,
-            (settings, value) => settings with { PlayerAutoSearchEnabled = value }),
-        new("分档增加武将能力", "熟练成长", "基础能力越高，普通成长概率越低：低能力5%，每15点递减，最低1%；不属于玩家势力的人物再加1%。强制奖励除外，且仍受上限影响。",
+            (settings, value) => settings with { PlayerAutoSearchEnabled = value },
+            new("最低政治", "系统", "按当前有效政治筛选，包含伤势、宝物和官职影响。默认45，0不限制政治。",
+                0, int.MaxValue, settings => settings.PlayerAutoSearchMinimumPolitics,
+                (settings, value) => settings with { PlayerAutoSearchMinimumPolitics = value })),
+        new("过滤一般探索汇报", "系统", "隐藏探索获得金钱和无收获的汇报；宝物、人物及特殊事件提示保留，含手动探索和自动探索。",
+            settings => settings.HideRoutineSearchReports,
+            (settings, value) => settings with { HideRoutineSearchReports = value }),
+        new("分档增加武将能力", "熟练成长", "基础能力越高，普通成长概率越低：低能力5%，每15点递减，最低1%；不属于玩家势力的人物再加1%。",
             settings => settings.DynamicOfficerAbilityGrowth,
             (settings, value) => settings with { DynamicOfficerAbilityGrowth = value }),
         new("港口、城塞连射，阵齐射", "设施舰船", "按配置预设：港口、城塞发动连射，阵发动齐射。",
@@ -55,7 +61,7 @@ public partial class CompanionSettingsView : ModalView
         new("调整水军兵法发动率", "发动联动", "未习得当前船只对应技术的首发武将，有一半几率失去本次兵法机会；不影响智力兵法带动的后续兵法。",
             settings => settings.RequireNavalTacticTraining,
             (settings, value) => settings with { RequireNavalTacticTraining = value }),
-        new("箕形利于联动、雁行附加阻击", "效果阻击", "按配置预设交换阵型的兵法联动倍率和阻击加成。原版为锥行的联动优势移给箕形、箕形的阻击优势移给雁行，不改变单挑助战。",
+        new("箕形利于联动、雁行附加阻击", "效果阻击", "按配置预设交换阵型的兵法联动倍率和阻击加成。原版为锥行的联动优势移给箕形、箕形的阻击优势移给雁行。",
             settings => settings.RedistributeFormationTacticBonuses,
             (settings, value) => settings with { RedistributeFormationTacticBonuses = value }),
         new("君主都督交战时随机鼓舞", "效果阻击", "主动交战时，主将为无伤的君主或都督且士气低于70，有4%几率自鼓舞。士气增加至少6，按当前四项能力之和÷24计算。",
@@ -70,10 +76,10 @@ public partial class CompanionSettingsView : ModalView
         new("混乱威力影响持续时间", "效果阻击", "混乱的智力项除以max(16, 40−威力)；熟练档大于1且执行智力至少30时，档位减1。只影响混乱本体。",
             settings => settings.ConfusionPowerAffectsDuration,
             (settings, value) => settings with { ConfusionPowerAffectsDuration = value }),
-        new("首发与联动武将额外成长", "熟练成长", "全员基础熟练度+3，电脑势力+4；首发者额外加一倍基础值，首发者或联动者再+2。",
+        new("首发与联动武将额外成长", "熟练成长", "全员基础熟练度+3，电脑势力+4；首发者额外加一倍基础值，首发者或联动者额外再+2。",
             settings => settings.RewardTacticParticipants,
             (settings, value) => settings with { RewardTacticParticipants = value }),
-        new("智力兵法按亲密概率带动武力兵法", "发动联动", "每名候选按与智力发动者的相性、亲缘及关系独立筛选，不影响后续武力兵法联动。",
+        new("智力兵法按亲密概率带动武力兵法", "发动联动", "武力首发候选按与智力发动者的相性、亲缘及关系独立筛选，不影响后续武力兵法联动。",
             settings => settings.AffinityAffectsMartialChains,
             (settings, value) => settings with { AffinityAffectsMartialChains = value }),
         new("攻城熟练度影响器械攻城力", "战斗", "配置预设的攻城阵型，对守军和耐久的普通攻击系数乘以1+(部队最高攻城熟练度−600)÷2048；不缩放武力兵法伤害。",
@@ -88,7 +94,7 @@ public partial class CompanionSettingsView : ModalView
         new("阻击概率修正", "效果阻击", "熟练度平方项改为熟练度÷(40−2×阻击系数)，最多50；有效阵型加成大于0时减5。系数范围0～10、默认5。",
             settings => settings.AdjustSnipingChance,
             (settings, value) => settings with { AdjustSnipingChance = value },
-            new("阻击概率系数", "效果阻击", "仅在阻击概率修正开启时参与计算。范围0～10，默认5；熟练度除数为40−2×此值，默认除以30。",
+            new("系数", "效果阻击", "仅在阻击概率修正开启时参与计算。范围0～10，默认5；熟练度除数为40−2×此值，默认除以30。",
                 0, 10, settings => settings.SnipingChanceCoefficient,
                 (settings, value) => settings with { SnipingChanceCoefficient = value })),
     ];
@@ -167,7 +173,8 @@ public partial class CompanionSettingsView : ModalView
                 toggle.Toggled += value => Edit(option.Write(_settings, value));
                 if (option.Parameter is { } parameter)
                 {
-                    row.AddChild(new Label { Text = "系数", VerticalAlignment = VerticalAlignment.Center });
+                    row.AddChild(new Label { Text = parameter.Title, TooltipText = parameter.Note,
+                        MouseFilter = MouseFilterEnum.Pass, VerticalAlignment = VerticalAlignment.Center });
                     row.AddChild(NumberEditor(parameter, 88));
                 }
                 row.AddChild(toggle); _editors.Add((option, toggle));
@@ -187,7 +194,8 @@ public partial class CompanionSettingsView : ModalView
                 {
                     var field = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
                     numbers.AddChild(field);
-                    var label = new Label { Text = option.Title, HorizontalAlignment = HorizontalAlignment.Center };
+                    var label = new Label { Text = option.Title, TooltipText = option.Note,
+                        MouseFilter = MouseFilterEnum.Pass, HorizontalAlignment = HorizontalAlignment.Center };
                     label.AddThemeFontSizeOverride("font_size", 14); field.AddChild(label);
                     field.AddChild(NumberEditor(option, 80));
                 }
@@ -212,7 +220,9 @@ public partial class CompanionSettingsView : ModalView
     private SpinBox NumberEditor(NumericOption option, int width = 112)
     {
         var number = new SpinBox { MinValue = option.Minimum, MaxValue = option.Maximum, Step = 1,
-            Value = option.Read(_settings), CustomMinimumSize = new(width, 36), Suffix = option.Suffix };
+            Value = option.Read(_settings), CustomMinimumSize = new(width, 36), Suffix = option.Suffix,
+            TooltipText = option.Note };
+        number.GetLineEdit().TooltipText = option.Note;
         number.ValueChanged += value => Edit(option.Write(_settings, (int)value));
         _numericEditors.Add((option, number));
         return number;

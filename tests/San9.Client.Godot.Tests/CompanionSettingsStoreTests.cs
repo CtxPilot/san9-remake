@@ -16,16 +16,20 @@ public sealed class CompanionSettingsStoreTests : IDisposable
     {
         var store = new CompanionSettingsStore(FilePath);
         Assert.Equal(CompanionSettings.Default, store.Load());
+        Assert.Equal(45, store.Load().PlayerAutoSearchMinimumPolitics);
         Assert.False(Directory.Exists(_directory));
         var settings = new CompanionSettings
         {
             PlayerAutoDomesticEnabled = true, OfficerAbilityCap = 125,
             EnableNavalTacticFallback = true, TacticAllocation = new(0, 1, 2, 3, 4),
+            PlayerAutoSearchEnabled = true, PlayerAutoSearchMinimumPolitics = 60,
+            HideRoutineSearchReports = true,
         };
         store.Save(settings);
         Assert.Equal(settings, new CompanionSettingsStore(FilePath).Load());
         byte[] saved = File.ReadAllBytes(FilePath);
         Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { OfficerAbilityCap = 99 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { PlayerAutoSearchMinimumPolitics = -1 }));
         Assert.Equal(saved, File.ReadAllBytes(FilePath));
 
         var document = JsonNode.Parse(saved)!;

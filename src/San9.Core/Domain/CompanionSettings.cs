@@ -9,6 +9,8 @@ public sealed record CompanionSettings
 
     [JsonRequired] public bool PlayerAutoDomesticEnabled { get; init; }
     [JsonRequired] public bool PlayerAutoSearchEnabled { get; init; }
+    [JsonRequired] public int PlayerAutoSearchMinimumPolitics { get; init; } = 45;
+    [JsonRequired] public bool HideRoutineSearchReports { get; init; }
     [JsonRequired] public bool DynamicOfficerAbilityGrowth { get; init; }
     [JsonRequired] public int OfficerAbilityCap { get; init; } = 100;
     [JsonRequired] public bool UseFacilityTacticPreset { get; init; }
@@ -39,6 +41,7 @@ public sealed record CompanionSettings
 
     public void Validate()
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(PlayerAutoSearchMinimumPolitics);
         if (OfficerAbilityCap < 100)
             throw new ArgumentOutOfRangeException(nameof(OfficerAbilityCap), "The base ability cap must be at least 100.");
         if (MartialTacticDamageCoefficient is < 5 or > 10)
