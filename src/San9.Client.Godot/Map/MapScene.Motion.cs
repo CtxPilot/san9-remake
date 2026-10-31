@@ -43,18 +43,17 @@ internal sealed partial class MapScene
             foreach (int id in states.Keys)
                 if (previous._stateSampler(id, previous.LocalMotionTime)?.MovementVisionVisible == true)
                     retainedVision.Add(id);
-        var visionAngles = snapshot.Information.Formations.ToDictionary(f => f.Id, f => f.Presentation?.VisionAngleDegrees ?? 0);
         var values = day?.Battle?.Values.Where(v => !v.IsSettlement).GroupBy(v => v.TargetId)
             .ToDictionary(g => g.Key, g => g.ToArray()) ?? [];
         var displacements = day?.Battle?.MapChanges.Where(c => c.Displacement is not null).GroupBy(c => c.Displacement!.UnitId)
             .ToDictionary(g => g.Key, g => g.ToArray()) ?? [];
-        return (id, time) => SampleState(id, time, states, motions, snapshot, map, day, runtimeUnits, visionAngles, values, displacements, retainedVision);
+        return (id, time) => SampleState(id, time, states, motions, snapshot, map, day, runtimeUnits, values, displacements, retainedVision);
     }
     private static UnitVisualState? SampleState(int id, double milliseconds,
         Dictionary<int, UnitVisualState> states, Dictionary<int, MapUnitMotion> motions,
         San9.Application.Presentation.StrategySnapshot snapshot,
         MapPackage map, TurnDayPresentation? day, IReadOnlyDictionary<int, UnitState> runtimeUnits,
-        IReadOnlyDictionary<int, int> visionAngles, IReadOnlyDictionary<int, BattleValueCue[]> values,
+        IReadOnlyDictionary<int, BattleValueCue[]> values,
         IReadOnlyDictionary<int, BattleMapChangeCue[]> displacements, IReadOnlySet<int> retainedVision)
     {
         if (!states.TryGetValue(id, out var state)) return null;
@@ -108,7 +107,8 @@ internal sealed partial class MapScene
                 CellX = (sample.X - MapCoordinates.UnitsPerCell / 2) / MapCoordinates.UnitsPerCell,
                 CellY = (sample.Y - MapCoordinates.UnitsPerCell / 2) / MapCoordinates.UnitsPerCell,
                 Elevation = map.Squares[runtime.Cell.Y * map.Width + runtime.Cell.X].Elevation,
-                Direction = sample.Direction, FormationId = formation, VisionAngleDegrees = visionAngles[formation],
+                Direction = sample.Direction, FormationId = formation,
+                VisionAngleDegrees = snapshot.FormationVision(formation)?.ArcDegrees ?? 0,
                 HasCityInfluence = runtime.EffectiveOrderClass == UnitOrderClass.Military && snapshot.HasCityInfluence(runtime.OwnerId, position)
             };
         }
@@ -177,9 +177,12 @@ internal sealed partial class MapScene
                     _motionStart, _visualStart, _motions.TryGetValue(id, out var motion) && motion.HasDisplacement);
         }
     }
-    public long UnitAnimationRevision(UnitVisual unit, Rect2 viewport)
+    public (long Body, MapVisionOverlay? Vision) UnitAnimationRevision(UnitVisual unit, Rect2 viewport)
     {
-        return IsUnitVisible(unit, viewport) ? _unitPlayback[unit.Id].Revision : -1;
+        if (!IsUnitVisible(unit, viewport)) return (-1, null);
+        var playback = _unitPlayback[unit.Id];
+        var state = _stateSampler(unit.Id, MotionTime - _motionStart)!;
+        return (playback.Revision, UnitVisuals.ResolveMovementVision(state, playback.ActiveAttack is not null, ElevationAt));
     }
     public double PlaybackMilliseconds => MotionVisualTime;
     private double _playbackTime = -1, _playbackVisualTime = -1;

@@ -19,8 +19,7 @@ internal sealed partial class MapScene
         _unitMotionAssets = sameInputs ? previous!._unitMotionAssets : [];
         _sharedMotionAssets = Day?.Battle?.Values.Select(v => v.Condition).OfType<UnitCondition>().Distinct()
             .Where(Map.Units.Conditions.ContainsKey).Select(c => Map.Units.Conditions[c].ClipId)
-            .Concat(Map.Units.VisionSlices.Select(s => s.ClipId)).SelectMany(id => Clips[id].Frames).Distinct().ToArray()
-            ?? Map.Units.VisionSlices.SelectMany(s => Clips[s.ClipId].Frames).Distinct().ToArray();
+            .SelectMany(id => Clips[id].Frames).Distinct().ToArray() ?? [];
     }
 
     private IEnumerable<string> UnitMotionAssets(int id)

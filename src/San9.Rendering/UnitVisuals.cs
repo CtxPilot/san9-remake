@@ -5,6 +5,7 @@ namespace San9.Rendering;
 
 public sealed record UnitVisual(int Id, double CellX, double Depth, MapAnimatedSprite[] Animations)
 {
+    public MapVisionOverlay? MovementVision { get; init; }
     public double? AttackMilliseconds { get; init; }
     public string? AttackId { get; init; }
     public UnitVisualAction Action { get; init; }
@@ -42,6 +43,20 @@ public enum UnitVisualAction { Idle, Moving, Melee, Ranged, Construction }
 
 public static class UnitVisuals
 {
+    private static (double X, double Y) Ground(UnitVisualState state) =>
+        (32 * (state.CellX + state.MapHeight - state.CellY) + 96, 16 * (state.CellX + state.CellY + 1) + 112);
+
+    public static MapVisionOverlay? ResolveMovementVision(UnitVisualState state, bool attacking = false,
+        Func<double, double, double>? elevationAt = null)
+    {
+        if (!state.MovementVisionVisible || state.IsEngaged || attacking ||
+            state.Action is UnitVisualAction.Melee or UnitVisualAction.Ranged || state.VisionAngleDegrees <= 0) return null;
+        var ground = Ground(state);
+        double elevation = elevationAt?.Invoke(ground.X, ground.Y) ?? state.Elevation;
+        return new(Math.Round(ground.X), Math.Round(ground.Y - 10 * (elevation - 1)),
+            ground.Y + 20000, state.VisionAngleDegrees, state.Direction);
+    }
+
     public static bool IsConstructing(UnitVisualState state) => state.ConstructionTarget is not null &&
         state.Condition == UnitCondition.Normal && !state.IsEngaged && !state.IsMoving &&
         state.Action is not (UnitVisualAction.Melee or UnitVisualAction.Ranged);
@@ -95,7 +110,6 @@ public static class UnitVisuals
         var formation = catalog.Formations.Single(f => f.FormationId == state.FormationId);
         var bodies = catalog.Bodies.ToDictionary(b => b.Id);
         var layout = formation.Layouts.Where(l => l.MinimumSoldiers <= state.BodySoldiers).MaxBy(l => l.MinimumSoldiers)!;
-        static (double X, double Y) Ground(UnitVisualState s) => (32 * (s.CellX + s.MapHeight - s.CellY) + 96, 16 * (s.CellX + s.CellY + 1) + 112);
         var anchor = Ground(state);
         int x = (int)Math.Round(anchor.X), y = (int)Math.Round(anchor.Y - 10 * ((elevationAt?.Invoke(anchor.X, anchor.Y) ?? state.Elevation) - 1));
         uint MemberSeed(MapUnitMember m, int tick) => Seed(state.Id, m.Index, unchecked((int)Seed(m.Group, 0, tick)));
@@ -125,17 +139,6 @@ public static class UnitVisuals
             .OrderBy(m => m.Pose.GroundY).ThenBy(m => m.Pose.X).ToArray();
         foreach (var m in members)
             if (bodies[m.Member.BodyId].Wake is {} wake) Add(wake.ClipId, m.Pose.X + wake.X, m.Pose.Y + wake.Y, m.Pose.GroundY + 20000);
-        if (state.MovementVisionVisible && !state.IsEngaged &&
-            state.Action is not (UnitVisualAction.Melee or UnitVisualAction.Ranged) && catalog.VisionSlices.Length > 0)
-        {
-            int sectors = Math.Clamp(state.VisionAngleDegrees / 45, 0, 8);
-            int start = (2 * state.Direction - sectors + 17) % 16;
-            for (int i = 0; i < 2 * sectors; i++)
-            {
-                var slice = catalog.VisionSlices[(start + i) % 16];
-                Add(slice.ClipId, x + slice.X, y + slice.Y, anchor.Y + 20000);
-            }
-        }
         foreach (var m in members)
         {
             var body = bodies[m.Member.BodyId];
@@ -181,6 +184,7 @@ public static class UnitVisuals
         }
         return new(state.Id, state.CellX, state.CellX + state.CellY, animations.ToArray())
         {
+            MovementVision = ResolveMovementVision(state, elevationAt: elevationAt),
             AttackMilliseconds = attackAge,
             AttackId = attackAge is null ? null : playback.BodyAttack!.Id,
             Action = state.Action,

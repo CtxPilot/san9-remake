@@ -428,7 +428,12 @@ public partial class MapSceneView : Node2D
         }, waypointOverlay, (id, position, opacity) =>
         {
             if (frame.Assets.TryGetReadyResource(id, out var texture)) Add(texture, position, _outlineMaterial, opacity);
-        }, frame.ViewportBounds);
+        }, frame.ViewportBounds, vision =>
+        {
+            var bounds = new Rect2((float)(vision.X - vision.HalfWidth), (float)(vision.Y - vision.HalfHeight),
+                (float)(2 * vision.HalfWidth), (float)(2 * vision.HalfHeight));
+            if (frame.ViewportBounds.Intersects(bounds)) _objects.Add(vision);
+        });
         if (Targets is { } selection)
         {
             void Marker(MilitaryTarget target, Vector2 position)

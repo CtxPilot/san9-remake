@@ -124,6 +124,9 @@ internal sealed partial class MapScene
     public bool Intersects(UnitVisual unit, Rect2 bounds) =>
         Day is not null || _history.Length > 0 ? MotionBounds(unit).Intersects(bounds) :
         unit.Animations.Any(s => bounds.Intersects(Bounds(s))) ||
+        unit.MovementVision is { } vision && bounds.Intersects(new Rect2(
+            (float)(vision.X - vision.HalfWidth), (float)(vision.Y - vision.HalfHeight),
+            (float)(2 * vision.HalfWidth), (float)(2 * vision.HalfHeight))) ||
         bounds.Intersects(new Rect2(unit.LabelX, unit.LabelY, 76, 47));
     public MapSceneRegion Select(Rect2 bounds, bool boundaries)
     {
@@ -147,11 +150,13 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
     MapSprite[] Bridges, MapSprite[] Boundaries, MapSprite[] Clouds, MapAnimatedSprite[] Water)
 {
     private readonly record struct DrawCommand(double Depth, int Order, string? Asset, Vector2 Position,
-        MapObjectTarget? Target = null, MapBlendMode Blend = MapBlendMode.Alpha, bool Highlight = false, double Opacity = 1);
+        MapObjectTarget? Target = null, MapBlendMode Blend = MapBlendMode.Alpha, bool Highlight = false, double Opacity = 1,
+        MapVisionOverlay? Vision = null);
     // Scratch belongs to this camera region; immutable scene inputs can still be shared by other cameras.
     private readonly List<DrawCommand> _draws = [];
     private readonly List<(string Asset, Vector2 Position, double Opacity)> _outlines = [];
-    private readonly long[] _unitRevisions = Enumerable.Repeat(-1L, Units.Length).ToArray();
+    private readonly (long Body, MapVisionOverlay? Vision)[] _unitRevisions =
+        Enumerable.Repeat((Body: -1L, Vision: (MapVisionOverlay?)null), Units.Length).ToArray();
     private long _unitRevision;
     public long UnitAnimationRevision(Rect2 viewport)
     {
@@ -159,7 +164,7 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
         bool changed = false;
         for (int i = 0; i < Units.Length; i++)
         {
-            long revision = Scene.UnitAnimationRevision(Units[i], viewport);
+            var revision = Scene.UnitAnimationRevision(Units[i], viewport);
             changed |= _unitRevisions[i] != revision;
             _unitRevisions[i] = revision;
         }
@@ -189,7 +194,8 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
 
     public void Objects(double time, Action<string, Vector2, MapObjectTarget?, MapBlendMode, bool, double> emit,
         Action? groundOverlay = null, (double Depth, Action Draw)? objectOverlay = null,
-        Action<string, Vector2, double>? outline = null, Rect2? viewport = null)
+        Action<string, Vector2, double>? outline = null, Rect2? viewport = null,
+        Action<MapVisionOverlay>? visionOverlay = null)
     {
         foreach (var s in Bridges.Concat(Boundaries)) emit(s.AssetId, new(s.X, s.Y), null, MapBlendMode.Alpha, false, 1);
         groundOverlay?.Invoke();
@@ -211,12 +217,16 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
             foreach (var sprite in Scene.BuildingAnimations(building.Id)) Animated(sprite, null, time, false);
         }
         foreach (var unit in Units.Where(u => Scene.IsUnitVisible(u, viewport ?? Bounds)).Select(Scene.Sample))
+        {
+            if (unit.MovementVision is { } vision)
+                _draws.Add(new(vision.Depth, _draws.Count, null, default, Vision: vision));
             foreach (var sprite in unit.Animations)
             {
                 double clock = time;
                 if (sprite.IsBody && unit.AttackMilliseconds is { } attackTime) clock = attackTime;
                 Animated(sprite, new(unit.Id, true), clock, sprite.IsBody);
             }
+        }
         foreach (var sprite in Scene.RetiringSprites) Animated(sprite, null, time, false);
         if (objectOverlay is {} overlay) _draws.Add(new(16 * overlay.Depth + 128 + 30000, _draws.Count, null, default));
         foreach (var projectile in Scene.Projectiles(viewport ?? Bounds))
@@ -231,7 +241,8 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
         foreach (var draw in _draws)
         {
             if (!outlined && draw.Depth >= 40000) Outlines();
-            if (draw.Asset is { } asset) emit(asset, draw.Position, draw.Target, draw.Blend, draw.Highlight, draw.Opacity);
+            if (draw.Vision is { } vision) visionOverlay?.Invoke(vision);
+            else if (draw.Asset is { } asset) emit(asset, draw.Position, draw.Target, draw.Blend, draw.Highlight, draw.Opacity);
             else objectOverlay!.Value.Draw();
         }
         if (!outlined) Outlines();

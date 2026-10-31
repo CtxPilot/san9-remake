@@ -263,14 +263,20 @@ public sealed class UnitVisualsTests
     [Fact]
     public void MovingVisionUsesAngleAndDisappearsInCombat()
     {
-        var catalog = Catalog with { VisionSlices = Enumerable.Range(0,16).Select(_ => new MapUnitEffect("influence",0,0)).ToArray() };
-        var state = State with { IsMoving = true, Action = UnitVisualAction.Moving, MovementVisionVisible = true, VisionAngleDegrees = 180, HasCityInfluence = false };
-        var moving = Sample(state, catalog);
-        Assert.Equal(8, moving.Animations.Count(a => a.Depth < 30000));
-        Assert.DoesNotContain(Sample(state with { IsEngaged = true }, catalog).Animations, a => a.Depth < 30000);
-        Assert.Contains(Sample(state with { Action = UnitVisualAction.Idle, IsMoving = false }, catalog).Animations, a => a.Depth < 30000);
-        Assert.DoesNotContain(Sample(state with { MovementVisionVisible = false }, catalog).Animations, a => a.Depth < 30000);
-        Assert.DoesNotContain(Sample(state with { Action = UnitVisualAction.Melee }, catalog).Animations, a => a.Depth < 30000);
+        var state = State with { IsMoving = true, Action = UnitVisualAction.Moving, MovementVisionVisible = true,
+            VisionAngleDegrees = 180, HasCityInfluence = false };
+        var moving = Sample(state, Catalog);
+        var vision = Assert.IsType<MapVisionOverlay>(moving.MovementVision);
+        Assert.Equal(92, vision.HalfWidth);
+        Assert.Equal(48, vision.HalfHeight);
+        Assert.Equal(180, vision.ArcDegrees);
+        Assert.Equal(moving.AnchorX, vision.X);
+        Assert.Equal(moving.AnchorY, vision.Y);
+        Assert.Null(Sample(state with { IsEngaged = true }, Catalog).MovementVision);
+        Assert.NotNull(Sample(state with { Action = UnitVisualAction.Idle, IsMoving = false }, Catalog).MovementVision);
+        Assert.Null(Sample(state with { MovementVisionVisible = false }, Catalog).MovementVision);
+        Assert.Null(Sample(state with { Action = UnitVisualAction.Melee }, Catalog).MovementVision);
+        Assert.Null(Sample(state with { VisionAngleDegrees = 0 }, Catalog).MovementVision);
     }
 
     [Fact]

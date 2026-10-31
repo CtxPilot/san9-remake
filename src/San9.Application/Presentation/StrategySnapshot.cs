@@ -132,6 +132,7 @@ public sealed class StrategySnapshot
     public UnitPurpose UnitPurpose(UnitState unit) => unit.FormationId is int formation && military is not null
         ? military.Purpose(formation) : San9.Core.Domain.UnitPurpose.Combat;
     public int? FormationId(UnitState unit) => unit.FormationId is null ? null : military!.Formation(unit).Id;
+    public FormationVision? FormationVision(int formationId) => military?.Formations[formationId].Vision;
     public MapOccupancy? SettlementGeographicArea(int id)
     {
         var settlement = World.Settlements.FirstOrDefault(s => s.Id == id);

@@ -162,13 +162,12 @@ public sealed class MapDayPlanTests
         {
             Units = [new(10, 5, new(2, 2), 100) { FormationId = 10000 }],
             Military = new(3, 1, [0, 0, 0], [new(0, 1, null)],
-                [new(10000, 1, 50, 1000, 5, new(1, 1), TravelMode.Land)], [new(1, new(2, 2), new(1, 1))]),
+                [new(10000, 1, 50, 1000, 5, new(1, 1), TravelMode.Land) { Vision = new(5, 180) }], [new(1, new(2, 2), new(1, 1))]),
             Information = new([], [], [], [new CorpsState(5, 5, null, new(100, 100)) { IsRoot = true }], [])
                 { Formations = [new(10000, "formation") { Presentation = new(1, 1, [], 1, 180, null, null) }] }
         };
         var session = GameSession.Start(definition, 1);
-        var catalog = UnitVisualFixture.Catalog with
-            { VisionSlices = Enumerable.Repeat(new MapUnitEffect("influence", 0, 0), 16).ToArray() };
+        var catalog = UnitVisualFixture.Catalog;
         var map = new MapPackage(MapPackage.CurrentSchemaVersion, "fixture", "vision", "spring", 3, 1, 13056, 6656,
             Enumerable.Repeat(new MapSquare(0, 1, 0, 0), 3).ToArray(), [], [], [], [], [], [new(1, 0, 0, 0)],
             Enumerable.Range(1, 14).Select(id => new MapComposition(id, [])).ToArray(),
@@ -185,7 +184,7 @@ public sealed class MapDayPlanTests
         var day = new TurnDayPresentation(before, after, events, new MapDayPlan(map, before, events));
         MapScene Scene(San9.Application.Presentation.StrategySnapshot state, MapScene? previous = null, TurnDayPresentation? current = null) =>
             new(map, terrain, "spring", state, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, previous, current);
-        static bool HasVision(MapScene scene) => scene.Sample(Assert.Single(scene.Units)).Animations.Any(a => a.Depth < 30000);
+        static bool HasVision(MapScene scene) => scene.Sample(Assert.Single(scene.Units)).MovementVision is not null;
 
         var moving = Scene(before, current: day);
         var region = new MapSceneRegion(moving, new(-10000, -10000, 100000, 100000), [], moving.Units, [], [], [], []);

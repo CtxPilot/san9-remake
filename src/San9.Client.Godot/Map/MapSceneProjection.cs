@@ -55,7 +55,7 @@ internal sealed record MapSceneProjection(BuildingVisualState[] BuildingStates,
                 {
                     IsEngaged = state.IsUnitEngaged(u.Id),
                     ConstructionTarget = construction.TryGetValue(u.Id, out var target) ? target : null,
-                    VisionAngleDegrees = state.Information.Formations.Single(f => f.Id == state.FormationId(u)).Presentation?.VisionAngleDegrees ?? 0,
+                    VisionAngleDegrees = state.FormationVision(state.FormationId(u)!.Value)?.ArcDegrees ?? 0,
                     Morale = u.Morale, CommanderNameKey = commander?.NameKey,
                     IsRulerCommander = u.CommanderId is int leader && force.LeaderId == leader,
                     UsesImperialAppearance = force.UsesImperialAppearance
