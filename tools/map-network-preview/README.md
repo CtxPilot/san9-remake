@@ -41,6 +41,24 @@ python tools/map-network-preview/analyze.py --scenario 19 --days 65
 
 预览本身只提取地理定义；统计脚本额外读取当前军事城市关系及建筑身份、类别、启用／拆除、耐久、驻人资格，用于近似现有 `AttackSources` 的结构范围。它不读取势力、控制权、兵力、士气、武将或任务，不代表现有AI在某个局面会实际出兵，也不是严格的出兵资格上界。内存估算是假定的C#连续存储布局，不是Python进程内存；Python局部计时不代表正式AI整旬性能。
 
+全量建表初步计时：
+
+```powershell
+python tools/map-network-preview/benchmark.py --scenario 19 --runs 5
+```
+
+对比65日与不限时的同一Dijkstra实现；每种模式预热一次，交替次序各测5轮，搜索在所有设施端点确定后提前结束，存在不可达端点时则耗尽队列。计时包含通行图与工作区建立、全部来源搜索和结果排序，不含文件读取、JSON写出、完整路线构造或AI规则；工作量统计另测，避免诊断开销混入计时。输出 `local/generated/map-network-preview/full-table-benchmark-19.json`，记录样本／脚本哈希、环境、每轮耗时及确定性核对。结果与限制见[统一实验记录](../../research/experiments/EXP-SAN9PK-0002.md#full-table-timing)，不改变预览65日上限及60日默认值。
+
+C#独立探针只依赖.NET标准库，不引用或修改游戏Core／AI：
+
+```powershell
+python tools/map-network-preview/benchmark.py --scenario 19 --export-csharp
+dotnet build tools/map-network-preview/csharp/FacilityTravelBenchmark.csproj -c Release
+dotnet tools/map-network-preview/csharp/bin/Release/net10.0/FacilityTravelBenchmark.dll local/generated/map-network-preview/csharp-benchmark-input-19.json local/generated/map-network-preview/full-table-benchmark-csharp-19.json 10
+```
+
+输入包含相同静态地图及Python预期结果，输出全部关系的逐项核对、展开量、逐轮耗时、累计线程分配量和环境／源码哈希。C#每模式首次调用另记，随后预热3次，交替次序各计时10轮；验证在计时之外，进程启动、编译、加载和序列化不计入。通行图每次建表时建立，距离数组和优先队列在该次建表的各来源间复用；仅保存设施端点代价，不构造完整路线。分配量不是常驻或峰值内存，首次调用按65日后全量的顺序执行，不是两次独立冷启动。
+
 ## 验证
 
 ```powershell

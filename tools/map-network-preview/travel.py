@@ -51,6 +51,7 @@ def estimate_connections(width, height, terrain_ids, terrains, blocked_cells, no
         distance[start] = 0
         queue = [(0, start)]
         hops = [0] * count if statistics is not None else None
+        remaining_targets = len(nodes) - 1
 
         while queue:
             cost, at = heapq.heappop(queue)
@@ -65,6 +66,9 @@ def estimate_connections(width, height, terrain_ids, terrains, blocked_cells, no
                                    "days": round(cost / ticks_per_day, 6)})
                     if hops is not None:
                         path_cells.append(hops[at] + 1)
+                    remaining_targets -= 1
+            if remaining_targets == 0:
+                break
             if at != start and at in blocked:
                 continue
             for nxt in neighbors[at]:
