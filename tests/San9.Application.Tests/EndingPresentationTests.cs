@@ -1,5 +1,6 @@
 using San9.Application.Presentation;
 using San9.Content.Interface;
+using San9.Content.Packages;
 using San9.Content.Text;
 using San9.Core.Domain;
 
@@ -7,6 +8,33 @@ namespace San9.Application.Tests;
 
 public sealed class EndingPresentationTests
 {
+    [Fact]
+    public async Task AuthoredEndingMessagesResolveEveryStageAndOutcomeAfterPolicyConfirmation()
+    {
+        if (Environment.GetEnvironmentVariable("SAN9_PRESENTATION_CONTENT") is not { Length: > 0 } root) return;
+        var package = await ClientContentFiles.LoadAsync(root);
+        var content = EndingSessionTests.Fixture();
+        var entries = content.Officers.ToDictionary(o => o.NameKey, o => "Officer" + o.State.Id);
+        foreach (var place in content.Settlements) entries.Add(place.NameKey, "City" + place.Id);
+        foreach (var force in content.Forces) entries.Add(force.NameKey, "Force" + force.Id);
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, entries) { Messages = package.Text.Messages };
+        foreach (var policy in Enum.GetValues<EndingPolicy>())
+        {
+            var session = GameSession.Start(content, 1);
+            var draft = new EndingDraft(session, texts, package.Presentation.Decisions) { Policy = policy };
+            foreach (int person in new[] { 2, 3, 7, 8 }) draft.Select(person);
+            _ = draft.Message(policy == EndingPolicy.ContinentalExpansion ? "confirm-expansion" : "confirm-domestic");
+            Assert.Equal(SessionDisposition.Accepted, session.Apply(session.Request(draft.CreateOperation())).Disposition);
+
+            var succession = Assert.Single(draft.Sequence(), entry => entry.Role == "succession-year").Message;
+            Assert.Contains("Officer1", succession.Message.BbCode);
+            Assert.Contains((content.Year + 15).ToString(), succession.Message.BbCode);
+            // Bind every authored alternative, including later stages and outcomes that this fixture does not reach.
+            foreach (string role in package.Presentation.Decisions.Shared.Keys.Where(role => role.StartsWith("ending-", StringComparison.Ordinal)))
+                Assert.NotEmpty(draft.Message(role["ending-".Length..]).Message.BbCode);
+        }
+    }
+
     [Fact]
     public void EndingChronicleCanTargetTheWinnerWithoutChangingTheObservedForce()
     {

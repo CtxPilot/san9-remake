@@ -109,7 +109,7 @@ internal static class DecisionPresentationCompiler
         Chapter("domestic-culture-ready", 7625);
         Chapter("domestic-order-shortage", 7626);
         Chapter("domestic-treasure-shortage", 7627, ("person.0", "ruler"));
-        shared["ending-succession-year"] = M(7628, inputs: [("number.0", "succession-year")]);
+        shared["ending-succession-year"] = M(7628, inputs: [("person.0", "ruler"), ("number.0", "succession-year")]);
         shared["ending-stable-succession"] = M(7629, inputs: [("person.0", "ruler"), ("person.1", "successor"), ("person.2", "chancellor")]);
         shared["ending-unstable-succession"] = M(7630, inputs: [("person.0", "ruler"), ("person.1", "chancellor")]);
         shared["ending-successor-conflict"] = M(7631, inputs: [("person.0", "ruler"), ("person.1", "successor"), ("person.2", "chancellor")]);
