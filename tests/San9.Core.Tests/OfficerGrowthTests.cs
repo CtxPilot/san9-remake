@@ -1,19 +1,51 @@
 using San9.Core.Domain;
 using San9.Core.Simulation;
+using San9.Tests;
 
 namespace San9.Core.Tests;
 
 public sealed class OfficerGrowthTests
 {
-    private static WorldMutation World(int ability = 99, ulong seed = 52)
+    private static WorldMutation World(int ability = 99, ulong seed = 52, CompanionSettings? companion = null)
     {
         var world = WorldState.Create(new(190, 1, 1), 42,
             [new(1, 0) { LeaderId = 1 }],
             [new(1, 1, 0, 100, 100, 0, 0, 0, 100, 0, 100)],
             [new(1, 1, 1, new(ability, ability, ability, ability), false) { Status = OfficerStatus.Ruler }], corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(1000, 1000)) { IsRoot = true }]);
-        var mutation = world.BeginMutation();
+        var mutation = world.BeginMutation(companion: companion);
         mutation.SetSimulation(mutation.Simulation with { RandomStreams = [new("growth", seed)] });
         return mutation;
+    }
+
+    [Fact]
+    public void CompanionCapAppliesToDirectRewardsAndPreservesExistingExcess()
+    {
+        var settings = new CompanionSettings { OfficerAbilityCap = 125 };
+        foreach (int before in new[] { 124, 130 })
+        {
+            var world = World(before, companion: settings);
+            List<DomainEvent> events = [];
+            OfficerAbilityGrowth.Increase(world, 1, OfficerAbility.War, int.MaxValue, events);
+            Assert.Equal(before == 124 ? 125 : before, world.Officers[1].BaseAbilities.War);
+            Assert.Equal(52UL, Assert.Single(world.Simulation.RandomStreams).State);
+        }
+    }
+
+    [Theory]
+    [InlineData(94, true, 95)]
+    [InlineData(95, true, 95)]
+    [InlineData(95, false, 96)]
+    [InlineData(125, false, 125)]
+    public void DynamicGrowthUsesBaseAbilityAndPlayerForceAndSkipsRandomAtConfiguredCap(int before, bool player, int expected)
+    {
+        ulong seed = TestSeeds.StateForRoll(1);
+        var world = World(before, seed, new() { DynamicOfficerAbilityGrowth = true, OfficerAbilityCap = 125 });
+        world.Replace(world.Officers[1] with { Injury = 14 });
+        world.SetSimulation(world.Simulation with { Controls = [new("owner", 1, player ? ControllerKind.Player : ControllerKind.Automatic)] });
+        List<DomainEvent> events = [];
+        OfficerAbilityGrowth.TryIncrease(world, 1, OfficerAbility.War, "growth", events);
+        Assert.Equal(expected, world.Officers[1].BaseAbilities.War);
+        Assert.Equal(before == 125, Assert.Single(world.Simulation.RandomStreams).State == seed);
     }
 
     [Fact]

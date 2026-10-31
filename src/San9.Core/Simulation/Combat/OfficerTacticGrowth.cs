@@ -16,6 +16,8 @@ internal static class OfficerTacticGrowth
         if (category is < 0 or > 8 || amount <= 0) return;
         var officer = world.Officers[officerId];
         int before = officer.TacticProficiencies[category];
+        if (world.Companion.DynamicTacticProficiencyGrowth)
+            amount = (int)Math.Min(int.MaxValue, (long)amount * Math.Clamp(4 - before / 250, 1, 4) / 3);
         int next = before >= 1000 ? before : (int)Math.Min(1000L, before + (long)amount);
         if (next == before) return;
         world.Replace(officer with { TacticProficiencies = officer.TacticProficiencies.SetItem(category, next) });

@@ -1,4 +1,5 @@
 using San9.Importer.San9PkTc101;
+using San9.Importer.San9PkTc101.Packages;
 
 namespace San9.Importer.San9PkTc101.Tests;
 
@@ -27,5 +28,21 @@ public sealed class San9PkTc101DetectorTests
         Assert.Equal(San9PkTc101Detector.ExpectedSize, result.Size);
         Assert.Equal(64, result.Sha256.Length);
         Assert.Contains("SHA-256", result.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WorldRebuildRejectsUnregisteredExecutableBeforeReadingPackages()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "san9-world-source-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            await File.WriteAllBytesAsync(Path.Combine(root, "San9PK.exe"), new byte[San9PkTc101Detector.ExpectedSize]);
+            string output = Path.Combine(root, "output");
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => ScenarioWorldImporter.RebuildAsync(root, output));
+            Assert.Contains("SHA-256", error.Message, StringComparison.Ordinal);
+            Assert.False(Directory.Exists(output));
+        }
+        finally { Directory.Delete(root, recursive: true); }
     }
 }

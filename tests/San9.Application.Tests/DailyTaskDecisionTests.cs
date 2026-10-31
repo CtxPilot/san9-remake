@@ -174,6 +174,9 @@ public sealed class DailyTaskDecisionTests
         Assert.Equal(SessionRejection.NotStable, settings.Rejection);
         StateAssert.Equal(beforeSettings, session.Snapshot);
         Assert.Equal(beforeSettingsSequence, session.NextOperationSequence);
+        Assert.Throws<InvalidOperationException>(() => session.ConfigureCompanion(new() { PlayerAutoDomesticEnabled = true }));
+        StateAssert.Equal(beforeSettings, session.Snapshot);
+        Assert.Equal(beforeSettingsSequence, session.NextOperationSequence);
         Assert.Equal(97, session.Snapshot.Forces[0].BaseTrust);
         Assert.DoesNotContain(advance.Events, e => e is XunAdvancedEvent);
         Assert.Equal(3, advance.Events.OfType<StageCompletedEvent>().Count(e => e.Stage == ResolutionStage.BeforeDailyCommands));

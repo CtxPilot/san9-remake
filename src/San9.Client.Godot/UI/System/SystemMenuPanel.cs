@@ -27,6 +27,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     public Action ControlDelegated { get; init; } = null!;
     public Func<Settings.UserSettings> ReadSettings { get; init; } = null!;
     public Action<Settings.UserSettings> ApplySettings { get; init; } = null!;
+    public Action<CompanionSettings> ApplyCompanionSettings { get; init; } = null!;
     public SaveLoadBrowser Browser { get; } = new();
     private TextureScope? _textures;
     private Control? _page;
@@ -51,6 +52,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         Show();
         ReplacePage(new FunctionsMenuView { AnchorControl = MenuAnchor, Textures = _textures, Texts = Texts, Open = Open,
             OpenEnvironment = OpenEnvironment, OpenPkSettings = OpenPkSettings, OpenExit = OpenExit, Closed = Close,
+            OpenCompanionSettings = OpenCompanionSettings, CanConfigureCompanion = () => Session.CanEditWorld,
             ReturnToOpening = RequestReturnToOpening,
             OpenEditor = OpenEditor, CanEdit = kind => Session.CanEditWorld && WorldEditing.Candidates(Session.Snapshot, kind).Count > 0 });
     }
@@ -73,6 +75,14 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         ReplacePage(new PkSettingsView { Textures = _textures, Initial = Session.Snapshot.Simulation,
             InitialSettings = ReadSettings(), ApplySettings = ApplySettings,
             ApplyWorld = settings => Session.Apply(Session.Request(settings)), Closed = Close });
+    }
+    public void OpenCompanionSettings()
+    {
+        if (_busy || !Session.CanEditWorld) return;
+        Browser.Close();
+        Show();
+        ReplacePage(new CompanionSettingsView { Initial = Session.Companion,
+            SaveAndApply = ApplyCompanionSettings, Closed = Close });
     }
     public async void Open(SaveLoadMode mode)
     {
@@ -231,6 +241,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         {
             null => null,
             FunctionsMenuView => page,
+            CompanionSettingsView => page,
             _ => OverlayPage.Create(page, page is SaveLoadView ? Colors.Black : Colors.Transparent)
         };
         if (_pageRoot is not null) AddChild(_pageRoot);
@@ -240,7 +251,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     {
         if (!IsVisibleInTree()) return;
         if (_busy) { GetViewport().SetInputAsHandled(); return; }
-        if (_page is WorldEditorView) return;
+        if (_page is WorldEditorView or CompanionSettingsView) return;
         if (_page is SettingsView settingsPage && input is InputEventMouseButton { ButtonIndex: MouseButton.Right } right)
         {
             GetViewport().SetInputAsHandled();

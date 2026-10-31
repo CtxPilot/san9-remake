@@ -43,7 +43,7 @@ internal static class BattleLearning
 
     internal static void Daily(WorldMutation world, MilitaryRulebook? military, List<DomainEvent> events)
     {
-        if (military is null) return;
+        if (military is null || world.Companion.DisableDailyCombatProficiencyGain) return;
         foreach (var unit in world.Units.Values.OrderBy(u => u.Id))
         {
             if (unit.FormationId is not int id || !military.Formation(unit).GainsDailyCombatProficiency ||

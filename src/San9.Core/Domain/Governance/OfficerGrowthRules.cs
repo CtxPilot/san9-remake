@@ -12,6 +12,12 @@ public sealed record OfficerGrowthRules([property: JsonRequired] int MaximumBase
 
     public bool CanIncrease(int current) => current < MaximumBaseAbility;
 
+    public OfficerGrowthRules Resolve(CompanionSettings companion) => MaximumBaseAbility == companion.OfficerAbilityCap
+        ? this : this with { MaximumBaseAbility = companion.OfficerAbilityCap };
+
+    public static int GrowthChance(int current, bool dynamic, bool belongsToPlayer) => !dynamic ? 3 :
+        (int)Math.Max(1, 5 - Math.Max(0L, (long)current - 35) / 15) + (belongsToPlayer ? 0 : 1);
+
     public int Increase(int current, int amount)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(amount);

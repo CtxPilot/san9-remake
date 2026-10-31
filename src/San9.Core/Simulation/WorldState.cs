@@ -142,8 +142,9 @@ public sealed class WorldState
         return builder.ToImmutable();
     }
 
-    internal WorldMutation BeginMutation(OfficerAbilityRules? abilities = null, EconomyRulebook? economy = null) => new(this, abilities ?? OfficerAbilityRules.Empty, economy ?? EconomyRulebook.Empty, Revision, Clock, Simulation, _forces, _settlements,
-        _officers, _units, _unitOrder, _corps, _treasures, _relations, _activeRecords);
+    internal WorldMutation BeginMutation(OfficerAbilityRules? abilities = null, EconomyRulebook? economy = null,
+        CompanionSettings? companion = null) => new(this, abilities ?? OfficerAbilityRules.Empty, economy ?? EconomyRulebook.Empty, Revision, Clock, Simulation, _forces, _settlements,
+        _officers, _units, _unitOrder, _corps, _treasures, _relations, _activeRecords, companion ?? CompanionSettings.Default);
 
     // Loading reconstructs derived totals without creating another gameplay transaction or revision.
     internal void RestoreDerivedTrust(WorldMutation mutation)

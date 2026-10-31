@@ -17,7 +17,7 @@ public sealed partial class GameSession
         _originalAi = OriginalAiState.Create(definition.Content);
         _initialEvents = simulation.InitialEvents;
         _snapshotSource = new(definition.Content, definition.Rules);
-        _view = _snapshotSource.Project(simulation.Snapshot);
+        _view = _snapshotSource.Project(simulation.Snapshot, simulation.Companion);
         _initialView = _view;
         _strategicContexts = simulation.Snapshot.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player)
             .ToImmutableDictionary(c => c.ForceId, _ => StrategicContextState.Empty with { Clock = simulation.Snapshot.Clock.IsXunBoundary ? simulation.Snapshot.Clock : null });
@@ -30,16 +30,18 @@ public sealed partial class GameSession
         new ScenarioRules(definition).CreateEngine;
 
     public static GameSession Start(ScenarioInitialState definition, ulong seed, int computerDamageBonusPercent = 0,
-        bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null)
+        bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null)
     {
         if (!Enum.IsDefined(playerForceController)) throw new ArgumentOutOfRangeException(nameof(playerForceController));
-        return Start(definition, seed, null, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, enableXunStartCheckpoints, settings, playerForceIds);
+        return Start(definition, seed, null, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, enableXunStartCheckpoints, settings, playerForceIds, companionSettings);
     }
 
-    internal static GameSession Start(ScenarioInitialState definition, ulong seed, Func<WorldState, SimulationEngine>? factory, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null)
+    internal static GameSession Start(ScenarioInitialState definition, ulong seed, Func<WorldState, SimulationEngine>? factory, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null)
     {
         var owned = new ScenarioSessionDefinition(definition, playerForceIds);
-        var session = new GameSession(owned, (factory ?? owned.Rules.CreateEngine)(owned.CreateWorld(seed, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, settings)))
+        var simulation = (factory ?? owned.Rules.CreateEngine)(owned.CreateWorld(seed, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, settings));
+        if (companionSettings is not null) simulation.ConfigureCompanion(companionSettings);
+        var session = new GameSession(owned, simulation)
             { PlayerForceController = playerForceController, InitialPlayerForceIds = owned.InitialPlayerForceIds };
         session.History = ChronicleHistory.Initialize(session.View);
         if (enableXunStartCheckpoints)

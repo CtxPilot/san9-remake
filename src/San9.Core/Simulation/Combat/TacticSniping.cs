@@ -22,9 +22,10 @@ internal static class TacticSniping
         if (actors.Length == 0 || targets.Length == 0) return null;
         var actor = actors[(int)(world.NextRandom("military-sniping-actor") % (uint)actors.Length)];
         int bonus = !source.IsSettlement && world.Units[source.Id].FormationId is int formation
-            ? rules.Formation(world.Units[source.Id]).SnipingChanceBonus : 0;
-        long proficiency = actor.TacticProficiencies[category] / 100;
-        if (!TacticCombat.Roll(world, "military-sniping", (int)Math.Min(100, bonus + proficiency * proficiency / 2))) return null;
+            ? CompanionBattleRules.SnipingBonus(world, rules.Formation(world.Units[source.Id]), rules) : 0;
+        int snipingChance = TacticMath.SnipingChance(actor.TacticProficiencies[category], bonus,
+            world.Companion.AdjustSnipingChance, world.Companion.SnipingChanceCoefficient);
+        if (!TacticCombat.Roll(world, "military-sniping", snipingChance)) return null;
         var person = targets[(int)(world.NextRandom("military-sniping-target") % (uint)targets.Length)];
         int attack = world.Abilities(actor).War, defense = world.Abilities(person).War;
         long delta = DuelStrike.Score(attack) - DuelStrike.Score(defense);

@@ -5,6 +5,7 @@ public sealed class ClientDataPaths
 {
     public string Root { get; }
     public string Settings => Path.Combine(Root, "user-settings.json");
+    public string CompanionSettings => Path.Combine(Root, "companion-settings.json");
     public string Profile => Path.Combine(Root, "profile.json");
     public string QuickSave => Path.Combine(Root, "saves", "quick.save.json");
     public string SaveSlots => Path.Combine(Root, "saves", "slots");

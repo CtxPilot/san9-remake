@@ -36,9 +36,14 @@ internal static class MilitaryCombat
             { Intensity = MilitaryEngagements.Intensity(world, actor, opponent, military) };
         CombatProfile Profile(BattleSource actor) => actor.IsSettlement ? military.Place(world.Settlements[actor.Id]).Combat! :
             military.CombatFormation(world.Units[actor.Id])!;
-        return CombatMath.TroopDamage(StrengthOf(source, target), StrengthOf(target, source), Profile(source), Profile(target),
+        var attackProfile = Profile(source);
+        if (!source.IsSettlement && target.IsSettlement)
+            attackProfile = attackProfile with { AgainstGarrison = CompanionBattleRules.SiegeCoefficient(world,
+                world.Units[source.Id], attackProfile.AgainstGarrison, military) };
+        return CombatMath.TroopDamage(StrengthOf(source, target), StrengthOf(target, source), attackProfile, Profile(target),
             target.IsSettlement, target.IsSettlement ? world.Settlements[target.Id].Durability : 0,
-            source.IsSettlement && military.FacilityAttack(world.Settlements[source.Id]).UsesRockfallPower);
+            source.IsSettlement && military.FacilityAttack(world.Settlements[source.Id]).UsesRockfallPower,
+            world.Companion.IncreaseDurabilityDefense);
     }
 
     internal static bool ValidTarget(IWorldQuery world, int owner, MilitaryOrder order, FormationRule formation, MilitaryRulebook rules)
@@ -84,7 +89,7 @@ internal static class MilitaryCombat
         bool close = Area(unit, rules).IntersectsExpanded(new BattleSource(target.Id, true).Area(world, rules), MapCoordinates.UnitsPerCell);
         if (!close && !attack.RangedSiege) return 0;
         int damage = CombatMath.DurabilityDamage(unit.Soldiers, Strength(world, unit).Leadership,
-            rules.CombatFormation(unit)!.AgainstWalls, target.Durability);
+            CompanionBattleRules.SiegeCoefficient(world, unit, rules.CombatFormation(unit)!.AgainstWalls, rules), target.Durability);
         return close ? damage : Math.Min(damage, Math.Max(0, target.Durability - 1));
     }
 
@@ -228,6 +233,7 @@ internal static class MilitaryCombat
     private static bool FinishOpportunities(WorldMutation world, SimulationRules rules, List<DomainEvent> events,
         Exchange exchange, CombatExchangeDamage damage, bool counterAllowed, bool counterOnly = false)
     {
+        if (!counterOnly) CompanionBattleRules.InspireLeader(world, exchange.Source, exchange.Target, rules, events);
         for (int opportunity = counterOnly ? 1 : 0; opportunity < (counterAllowed ? 2 : 1) && world.Simulation.TerminalReason is null; opportunity++)
         {
             bool counter = opportunity == 1;
@@ -372,7 +378,8 @@ internal static class MilitaryCombat
     {
         walls = Math.Clamp(walls, 0, settlement.Durability);
         damage = FinalDamage(world, new(attacker, attackerIsSettlement), settlement.OwnerId, damage, settlement.Soldiers);
-        var loss = CombatMath.Loss(settlement.Soldiers, damage, profile.WoundedPercent, settlement.Wounded, MilitaryRulebook.WoundedCapacity);
+        var loss = CombatMath.Loss(settlement.Soldiers, damage, profile.WoundedPercent, settlement.Wounded,
+            MilitaryRulebook.WoundedCapacity, world.Companion.ReduceBattleWounded ? 12 : 10);
         int morale = 0;
         var damaged = settlement with
         {
@@ -405,7 +412,8 @@ internal static class MilitaryCombat
         BattleSource source, List<DomainEvent> events, int? tacticId = null, uint? calculatedSoldierLoss = null, bool isTacticExchange = false, bool continuesSiege = false)
     {
         damage = Math.Min(damage, unit.Soldiers);
-        var loss = CombatMath.Loss(unit.Soldiers, damage, profile.WoundedPercent, unit.Wounded, MilitaryRulebook.WoundedCapacity);
+        var loss = CombatMath.Loss(unit.Soldiers, damage, profile.WoundedPercent, unit.Wounded,
+            MilitaryRulebook.WoundedCapacity, world.Companion.ReduceBattleWounded ? 13 : 10);
         world.Replace(unit with { Soldiers = loss.RemainingSoldiers, Wounded = unit.Wounded + loss.AddedWounded, Morale = unit.Morale - morale });
         events.Add(new BattleDamageEvent(world.Clock, source.Id, unit.Id, null, damage, loss.AddedWounded, loss.Dead, 0, morale, source.IsSettlement)
         { TacticId = tacticId, IsTacticExchange = isTacticExchange, ContinuesSiege = continuesSiege, CalculatedSoldierLoss = calculatedSoldierLoss, Source = BattleObjectContext.Capture(world, source), Target = BattleObjectContext.Capture(unit) });

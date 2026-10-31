@@ -383,6 +383,18 @@ public sealed partial class OriginalAiPersonnelTests
     }
 
     [Fact]
+    public void SearchChecksJourneyLimitForTheChosenDestination()
+    {
+        var content = Fixture();
+        content = content with { Forces = content.Forces.Select(f => f with { AdviserId = null }).ToArray(),
+            Settlements = [.. content.Settlements, content.Settlements[0] with { Id = 3, X = 1537, Y = 1 }] };
+        var h = new Harness(content);
+        Assert.Equal(256, h.Engine.GetPersonnelJourney(1, 2, 3, PersonnelJourneyKind.Search, includeAdvice: false).DistanceDays);
+        Assert.Equal(1, h.Personnel.Search(1, [3, 1]).Submitted);
+        Assert.Equal(1, Assert.IsType<SearchCommand>(Assert.Single(h.Commands)).DestinationId);
+    }
+
+    [Fact]
     public void SearchDoesNotSelectTreasureOnlyPlacesOrAlreadyDiscoveredPeople()
     {
         var content = Fixture();

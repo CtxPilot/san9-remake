@@ -9,8 +9,13 @@ internal static class OfficerAbilityGrowth
     internal static void TryIncrease(WorldMutation world, int officerId, OfficerAbility ability,
         string stream, List<DomainEvent> events)
     {
-        if (!world.OfficerGrowth.CanIncrease(Value(world.Officers[officerId].BaseAbilities, ability))) return;
-        if (world.NextRandom(stream) % 100 < 3) Increase(world, officerId, ability, 1, events);
+        var officer = world.Officers[officerId];
+        int current = Value(officer.BaseAbilities, ability);
+        if (!world.OfficerGrowth.CanIncrease(current)) return;
+        bool belongsToPlayer = officer.OwnerId is int force && world.Simulation.Controls.Any(c =>
+            c.ForceId == force && c.Kind == ControllerKind.Player);
+        int chance = OfficerGrowthRules.GrowthChance(current, world.Companion.DynamicOfficerAbilityGrowth, belongsToPlayer);
+        if (world.NextRandom(stream) % 100 < (uint)chance) Increase(world, officerId, ability, 1, events);
     }
 
     internal static void Increase(WorldMutation world, int officerId, OfficerAbility ability,

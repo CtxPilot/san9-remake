@@ -19,19 +19,23 @@ public sealed record TacticLinkRules(bool RelationshipsEnabled, int KinshipBonus
 
     public int Chance(OfficerState source, OfficerState partner, FormationTactics formation, bool historical = true) => Chance(source, partner, formation.LinkMultiplier, historical);
 
-    public int Chance(OfficerState source, OfficerState partner, int multiplier, bool historical = true)
+    public int Chance(OfficerState source, OfficerState partner, int multiplier, bool historical = true) =>
+        RelationshipBonus(source, partner, historical) + partner.TacticLinkBonus + AffinityBase(source, partner) * multiplier / 2;
+
+    // Cross-category primary selection uses relationship and affinity, without formation or responder-only link bonuses.
+    public int ChainChance(OfficerState source, OfficerState candidate, bool historical = true) =>
+        RelationshipBonus(source, candidate, historical) + AffinityBase(source, candidate);
+
+    private int RelationshipBonus(OfficerState source, OfficerState partner, bool historical)
     {
-        int bonus = 0;
-        if (RelationshipsEnabled && historical)
-        {
-            int first = Math.Min(source.Id, partner.Id), second = Math.Max(source.Id, partner.Id);
-            var pair = Pairs.FirstOrDefault(p => p.FirstId == first && p.SecondId == second);
-            bonus = pair?.Bonus ?? 0;
-            if (source.ParentId is int parent && parent == partner.ParentId && pair?.SuppressesSiblingBonus != true ||
-                source.ParentId == partner.Id || partner.ParentId == source.Id)
-                bonus = KinshipBonus;
-        }
-        int affinity = PersonnelRulebook.AffinityDistance(source, partner);
-        return bonus + partner.TacticLinkBonus + (25 + Math.Max(0, 5 * (5 - affinity))) * multiplier / 2;
+        if (!RelationshipsEnabled || !historical) return 0;
+        int first = Math.Min(source.Id, partner.Id), second = Math.Max(source.Id, partner.Id);
+        var pair = Pairs.FirstOrDefault(p => p.FirstId == first && p.SecondId == second);
+        if (source.ParentId is int parent && parent == partner.ParentId && pair?.SuppressesSiblingBonus != true ||
+            source.ParentId == partner.Id || partner.ParentId == source.Id) return KinshipBonus;
+        return pair?.Bonus ?? 0;
     }
+
+    private static int AffinityBase(OfficerState source, OfficerState partner) =>
+        25 + Math.Max(0, 5 * (5 - PersonnelRulebook.AffinityDistance(source, partner)));
 }

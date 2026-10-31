@@ -106,11 +106,12 @@ internal sealed class StrategySnapshotSource
     }
     public SettlementInitialState? Settlement(int id) => _settlements.GetValueOrDefault(id);
     public IReadOnlyList<string> SettlementIcons(int id) => _settlementIcons.GetValueOrDefault(id) ?? [];
-    public StrategySnapshot Project(WorldSnapshot world) => new(this, world);
+    public StrategySnapshot Project(WorldSnapshot world, CompanionSettings? companion = null) => new(this, world, companion);
 }
 
 public sealed class StrategySnapshot
 {
+    public CompanionSettings Companion { get; }
     private readonly StrategySnapshotSource _source;
     internal ScenarioRules Rules => _source.Rules;
     // Pending encounters can introduce people before they enter the visible officer catalog.
@@ -171,9 +172,10 @@ public sealed class StrategySnapshot
     {
     }
 
-    internal StrategySnapshot(StrategySnapshotSource source, WorldSnapshot world)
+    internal StrategySnapshot(StrategySnapshotSource source, WorldSnapshot world, CompanionSettings? companion = null)
     {
         _source = source;
+        Companion = companion ?? CompanionSettings.Default;
         military = source.Military;
         arrivalTreasures = source.Treasures;
         Information = source.Information;
@@ -269,7 +271,7 @@ public sealed class StrategySnapshot
                 IsWork = facilityRule?.IsWork == true,
                 HasMapContextMenu = facilityRule is null || !source.Information.MapContextExcludedFacilityIds.Contains(facilityRule.Id),
                 EnabledTacticIds = militaryPlace?.EnabledTacticIds ?? [],
-                ConfiguredTacticId = source.Military?.FacilityTactic(s)?.Id,
+                ConfiguredTacticId = source.Military?.FacilityTactic(s, Companion)?.Id,
                 BaseAttackRange = attack?.Attack?.Range,
                 UsesRockfallPower = attack?.UsesRockfallPower == true,
                 Reprisal = facilityRule?.Reprisal,
@@ -283,7 +285,7 @@ public sealed class StrategySnapshot
     public MapCell? PlaceCell(int id) => Settlements.FirstOrDefault(p=>p.Id==id) is { } place ? new(place.X,place.Y) :
         _source.PlacePositions.TryGetValue(id,out var position) ? MapCoordinates.Cell(position) : null;
     /// <summary>Projects a world from the same scenario, reusing definitions and this view when the world is unchanged.</summary>
-    public StrategySnapshot ForWorld(WorldSnapshot world) => ReferenceEquals(World, world) ? this : _source.Project(world);
+    public StrategySnapshot ForWorld(WorldSnapshot world) => ReferenceEquals(World, world) ? this : _source.Project(world, Companion);
     public int? EmperorId { get; }
     public int? EmperorCityId { get; }
     public bool ImperialCourtEnded => World.Simulation.ImperialCourtEnded;

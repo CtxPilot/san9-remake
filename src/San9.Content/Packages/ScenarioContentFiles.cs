@@ -69,6 +69,28 @@ public static class ScenarioContentFiles
         finally { File.Delete(pending); }
     }
 
+    /// <summary>Publishes a newly compiled world without rebuilding unchanged presentation, map or texture resources.</summary>
+    public static async Task WriteScenarioAsync(string root, ScenarioInitialState scenario, CancellationToken token = default)
+    {
+        // Authoring reads the manifest layout directly: the rebuilt world establishes the new package version.
+        var manifest = await PackageFiles.ReadAsync<ScenarioContentManifest>(Path.Combine(root, "content.json"), token);
+        scenario.Validate();
+        if (manifest.Preview is { } preview && (preview.Id != scenario.ScenarioId || preview.Year != scenario.Year || preview.Month != scenario.Month))
+            throw new InvalidDataException("Rebuilt world differs from scenario selection metadata.");
+        string resourceRoot = ResolveResourceRoot(root, manifest.ResourceRoot);
+        string worldTarget = PackageFiles.Resolve(resourceRoot, manifest.Scenario), manifestTarget = Path.Combine(root, "content.json");
+        List<(string Pending, string Target)> files = [(worldTarget + ".pending", worldTarget), (manifestTarget + ".pending", manifestTarget)];
+        try
+        {
+            await File.WriteAllTextAsync(files[0].Pending, JsonSerializer.Serialize(scenario, DataJsonOptions), System.Text.Encoding.UTF8, token);
+            await File.WriteAllTextAsync(files[1].Pending, JsonSerializer.Serialize(manifest with
+                { SchemaVersion = ScenarioContent.CurrentSchemaVersion }, PackageFiles.JsonOptions), System.Text.Encoding.UTF8, token);
+            token.ThrowIfCancellationRequested();
+            Publish(files);
+        }
+        finally { foreach (var (pending, _) in files) File.Delete(pending); }
+    }
+
     /// <summary>Reads the authored state needed for force selection without unrelated rules or presentation data.</summary>
     public static async Task<ScenarioSelectionContent> LoadSelectionAsync(string root, CancellationToken token = default)
     {

@@ -8,6 +8,7 @@ namespace San9.Application.Persistence;
 public sealed record CommandLogHeader(int FormatVersion, string RulesVersion, ulong Seed)
 {
     [System.Text.Json.Serialization.JsonRequired] public San9.Core.Domain.NewGameSettings NewGame { get; init; } = new();
+    [System.Text.Json.Serialization.JsonRequired] public San9.Core.Domain.CompanionSettings Companion { get; init; } = San9.Core.Domain.CompanionSettings.Default;
     [System.Text.Json.Serialization.JsonRequired] public ImmutableArray<int> PlayerForceIds { get; init; } = [];
     [System.Text.Json.Serialization.JsonRequired] public int ComputerDamageBonusPercent { get; init; }
     [System.Text.Json.Serialization.JsonRequired] public bool BattleDeathsEnabled { get; init; }
@@ -30,7 +31,7 @@ public static class CommandLogService
     {
         var simulation = session.Snapshot.Simulation;
         return new(SessionProtocol.LogFormatVersion, SessionProtocol.RulesVersion, simulation.InitialSeed)
-            { NewGame = simulation.NewGame, PlayerForceIds = session.InitialPlayerForceIds, BattleDeathsEnabled = simulation.BattleDeathsEnabled,
+            { NewGame = simulation.NewGame, Companion = session.Companion, PlayerForceIds = session.InitialPlayerForceIds, BattleDeathsEnabled = simulation.BattleDeathsEnabled,
                 ComputerDamageBonusPercent = simulation.ComputerDamageBonusPercent,
                 PlayerForceController = session.PlayerForceController, OriginalAi = session.OriginalAi.Policy };
     }
@@ -51,9 +52,9 @@ public static class CommandLogService
     private static CommandLogHeader ReadHeader(StreamReader reader)
     {
         var header = Parse<CommandLogHeader>(reader.ReadLine(), 1);
-        if (header.NewGame is null || header.PlayerForceIds.IsDefault || header.PlayerForceIds.Any(id => id < 0) ||
+        if (header.NewGame is null || header.Companion is null || header.PlayerForceIds.IsDefault || header.PlayerForceIds.Any(id => id < 0) ||
             header.PlayerForceIds.Distinct().Count() != header.PlayerForceIds.Length) throw new CommandLogException(1, "Invalid new-game configuration.");
-        try { header.NewGame.Validate(); }
+        try { header.NewGame.Validate(); header.Companion.Validate(); }
         catch (ArgumentException error) { throw new CommandLogException(1, "Invalid new-game settings.", error); }
         if (!Enum.IsDefined(header.PlayerForceController) || header.OriginalAi is null)
             throw new CommandLogException(1, "Invalid player force controller.");
@@ -68,6 +69,7 @@ public static class CommandLogService
             header.ComputerDamageBonusPercent != session.Snapshot.Simulation.ComputerDamageBonusPercent ||
             header.Seed != session.Snapshot.Simulation.InitialSeed || header.BattleDeathsEnabled != session.Snapshot.Simulation.BattleDeathsEnabled ||
             header.PlayerForceController != session.PlayerForceController || header.NewGame != session.Snapshot.Simulation.NewGame ||
+            header.Companion != session.Companion ||
             !header.PlayerForceIds.SequenceEqual(session.InitialPlayerForceIds) ||
             CanonicalJson.Text(header.OriginalAi) != CanonicalJson.Text(session.OriginalAi.Policy))
             throw new CommandLogException(1, "Log version, seed or session configuration mismatch.");

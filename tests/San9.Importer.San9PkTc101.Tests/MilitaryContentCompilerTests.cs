@@ -43,6 +43,8 @@ public sealed class MilitaryContentCompilerTests
             0, 0, 0, (ushort)(i >= 39 ? 9 : 0), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)).ToArray();
         tactics[12] = tactics[12] with { CompatibleArrayTypeMaskHigh = (1 << 5) | (1 << 10) };
         tactics[15] = tactics[15] with { CompatibleArrayTypeMaskLow = 1 << 8 };
+        tactics[31] = tactics[31] with { AffectsFacilitiesCode = 1 };
+        tactics[33] = tactics[33] with { CompatibleArrayTypeMaskHigh = 1 << 5 };
         var definition = MilitaryContentCompiler.Compile(squares, terrains, formations, places, [], buildings, tactics, places.ToDictionary(p => p.Id, _ => System.Collections.Immutable.ImmutableArray<int>.Empty));
         Assert.Equal(27, definition.UnformedFormationId);
         Assert.Equal(20, definition.BasicNavalFormationId);

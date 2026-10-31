@@ -37,8 +37,13 @@ internal static class IntelligenceTactics
         if (counter is not null && formation?.BypassesPassiveCounters != true && owner is int force &&
             defenders.Any(p => p.EquippedTacticId is int equipped && military.Tactics[equipped].Effect == counter &&
                 MilitaryTactics.HasTactic(world, force, [p.Id], equipped, rules.Treasures))) return 0;
+        var learnedCounterEffect = tactic.Effect == TacticEffect.Trap ? TacticEffect.CounterTrap : TacticEffect.CounterConfusion;
+        bool learnedCounter = world.Companion.AdjustIntelligenceTacticSuccess && owner is int defenderOwner &&
+            military.Tactics.Values.Where(t => t.Effect == learnedCounterEffect).Any(t =>
+                MilitaryTactics.HasTactic(world, defenderOwner, defenders.Select(p => p.Id), t.Id, rules.Treasures));
         int chance = TacticMath.IntelligenceSuccessChance(world.Abilities(actor).Intelligence,
-            defenders.Select(p => world.Abilities(p).Intelligence).DefaultIfEmpty(0).Max());
+            defenders.Select(p => world.Abilities(p).Intelligence).DefaultIfEmpty(0).Max(),
+            world.Companion.AdjustIntelligenceTacticSuccess, learnedCounter);
         if (!TacticCombat.Roll(world, "military-tactic-intelligence", chance)) return 0;
         if (confused && TacticCombat.Roll(world, "military-tactic-formation-resistance", formation?.ConfusionResistanceChance ?? 0)) return 0;
         int category = tactic.Category!.Value;
@@ -118,7 +123,8 @@ internal static class IntelligenceTactics
         switch (tactic.Effect)
         {
             case TacticEffect.Confusion:
-                MilitaryConditions.Confuse(world, target, TacticMath.ConfusionDays(proficiency, intelligence, effect), events);
+                MilitaryConditions.Confuse(world, target, TacticMath.ConfusionDays(proficiency, intelligence, effect,
+                    world.Companion.ConfusionPowerAffectsDuration ? tactic.Power : null), events);
                 BattleLearning.Passive(world, Defenders(world, target), TacticEffect.CounterConfusion, military, events);
                 break;
             case TacticEffect.Taunt:

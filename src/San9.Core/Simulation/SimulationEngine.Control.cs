@@ -23,7 +23,7 @@ public sealed partial class SimulationEngine
         _world.EnterExecution();
         try
         {
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             var controls = mutation.Simulation.Controls.Select(c =>
                 forceIds.Contains(c.ForceId) ? new ControlSeat(kind == ControllerKind.Player ? "player" : $"ai:{c.ForceId}", c.ForceId, kind) :
                 c).ToArray();

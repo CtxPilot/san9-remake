@@ -135,11 +135,13 @@ internal sealed partial class WorldMutation : IWorldQuery
         ImmutableDictionary<int, CorpsState> corps,
         ImmutableDictionary<int, TreasureState> treasures,
         ImmutableDictionary<(int FirstId, int SecondId), ForceRelation> relations,
-        ActiveWorldRecords activeRecords)
+        ActiveWorldRecords activeRecords, CompanionSettings companion)
     {
         _owner = owner;
+        Companion = companion;
         _leadershipConsistent = owner.LeadershipConsistent;
         _abilityRules = abilityRules;
+        OfficerGrowth = abilityRules.Growth.Resolve(companion);
         _economy = economy;
         _expectedRevision = expectedRevision;
         Clock = clock;
@@ -157,6 +159,8 @@ internal sealed partial class WorldMutation : IWorldQuery
         Officers = activeRecords.Officers;
     }
 
+    /// <summary>Immutable rules for this transaction, never part of world snapshots or persistence.</summary>
+    internal CompanionSettings Companion { get; }
     public GameClock Clock { get; private set; }
     // Ephemeral presentation samples; these are not stable save boundaries.
     internal WorldSnapshot CapturePresentation() => new(Clock, Simulation)
@@ -209,7 +213,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         _holdings = null; _treasureEffects.Clear();
     }
 
-    internal OfficerGrowthRules OfficerGrowth => _abilityRules.Growth;
+    internal OfficerGrowthRules OfficerGrowth { get; }
     internal OfficerAbilities Abilities(OfficerState person) => _abilityRules.EvaluateWithTreasureBonus(person, TreasureEffects(person.Id, _abilityRules.Treasures).Bonuses);
     internal ImmutableDictionary<int, OfficerAbilities> AbilitiesFor(IEnumerable<OfficerState> people) =>
         people.ToImmutableDictionary(p => p.Id, Abilities);

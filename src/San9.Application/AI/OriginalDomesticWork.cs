@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using San9.Content.Scenarios;
 using San9.Core.Domain;
 
 namespace San9.Application.AI;
@@ -30,7 +31,19 @@ internal sealed record OriginalDomesticStep(int SettlementId, OriginalDomesticAt
 {
     internal bool ProbabilityFailed { get; init; }
 }
-internal sealed record OriginalDomesticResult(OriginalDomesticEnd End, ImmutableArray<OriginalDomesticStep> Steps);
+internal sealed record OriginalDomesticResult(OriginalDomesticEnd End, ImmutableArray<OriginalDomesticStep> Steps)
+{
+    internal OriginalAiWorkReport ToReport(int corpsId, OriginalAiWork work) => new(corpsId, work, End switch
+    {
+        OriginalDomesticEnd.PreparationFailed => Steps.Any(s => s.ProbabilityFailed)
+            ? OriginalAiWorkEnd.ProbabilityFailed : OriginalAiWorkEnd.PreparationFailed,
+        OriginalDomesticEnd.AttemptsExhausted => OriginalAiWorkEnd.AttemptsExhausted,
+        OriginalDomesticEnd.ReserveReached => OriginalAiWorkEnd.ReserveReached,
+        _ => OriginalAiWorkEnd.NoCandidates,
+    }, Steps.Count(s => s.Outcome != OriginalDomesticAttempt.PreparationFailed),
+        Steps.Count(s => s.Outcome == OriginalDomesticAttempt.Submitted))
+        { Rejected = Steps.Count(s => s.Outcome == OriginalDomesticAttempt.Rejected) };
+}
 
 /// <summary>
 /// Original works 0–5. The host owns authority projection, planning randomness and public submission.

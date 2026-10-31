@@ -34,8 +34,8 @@ internal static class TacticSupport
                     (source.Condition == UnitCondition.HighSpirits ? 5 : 0)))) continue;
             foreach (var candidate in candidates)
             {
-                if (!TacticCombat.Roll(world, "military-tactic-support-member", TacticMath.AllocationChance(
-                    military.Rank(source, candidate.Officer.Id), members.Length, false))) continue;
+                if (!TacticCombat.Roll(world, "military-tactic-support-member", TacticCombat.AllocationChance(world,
+                    military.Rank(source, candidate.Officer.Id), members.Length, false, candidate.Officer, candidate.Tactic))) continue;
                 Resolve(world, new(id, false), candidate.Officer, candidate.Tactic, candidate.Targets, members, military, events);
                 break;
             }
@@ -46,7 +46,7 @@ internal static class TacticSupport
         int[] targets, OfficerState[] members, MilitaryRulebook military, List<DomainEvent> events,
         BattleSource? opponent = null, CombatExchangeDamage? damage = null)
     {
-        world.Replace(world.Officers[actor.Id] with { TacticCooldown = tactic.MinimumInterval });
+        world.Replace(world.Officers[actor.Id] with { TacticCooldown = CompanionBattleRules.Cooldown(world, source, tactic) });
         bool inspireGarrison = tactic.Effect == TacticEffect.Inspire && source.IsSettlement;
         var activation = TacticOccurrence.Capture(world, source,
             new(inspireGarrison ? MilitaryOrderKind.AttackSettlement : MilitaryOrderKind.AttackUnit,

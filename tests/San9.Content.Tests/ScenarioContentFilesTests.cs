@@ -406,6 +406,28 @@ public sealed class ScenarioContentFilesTests : IDisposable
     }
 
     [Fact]
+    public async Task WorldRebuildUpdatesOnlyWorldAndManifestVersion()
+    {
+        var content = Fixture();
+        await ScenarioContentFiles.WriteAsync(_root, content);
+        string manifestPath = Path.Combine(_root, "content.json");
+        string worldPath = PublishedPath("scenario.json");
+        var manifest = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
+        manifest["schemaVersion"] = ScenarioContent.CurrentSchemaVersion - 1;
+        await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString(), System.Text.Encoding.UTF8);
+        var resources = Directory.GetFiles(_root, "*", SearchOption.AllDirectories)
+            .Where(path => path != worldPath && path != manifestPath).ToDictionary(path => path, File.ReadAllBytes);
+
+        await ScenarioContentFiles.WriteScenarioAsync(_root, content.Scenario with { Year = 191, PlayerForceId = null });
+
+        var rebuilt = await ScenarioContentFiles.LoadAsync(_root);
+        Assert.Equal(191, rebuilt.Scenario.Year);
+        Assert.Equal(ScenarioContent.CurrentSchemaVersion, rebuilt.SchemaVersion);
+        foreach (var (path, bytes) in resources) Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
+        Assert.Equal(resources.Count + 2, Directory.GetFiles(_root, "*", SearchOption.AllDirectories).Length);
+    }
+
+    [Fact]
     public async Task FailedManifestReplacementRestoresPreviouslyPublishedFiles()
     {
         var content = Fixture();

@@ -8,7 +8,7 @@ using San9.Rendering;
 
 try
 {
-    if(args.Length==0)throw new ArgumentException("Commands: import-content --game-dir PATH --output PATH [--rebuild opening]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
+    if(args.Length==0)throw new ArgumentException("Commands: import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
     Dictionary<string,string> options=[];
     for(int i=1;i<args.Length;i+=2)
         if(i+1>=args.Length||!args[i].StartsWith("--",StringComparison.Ordinal)||!options.TryAdd(args[i],args[i+1]))throw new ArgumentException("Invalid or duplicate option.");
@@ -18,8 +18,12 @@ try
     var watch=Stopwatch.StartNew();
     if (args[0] == "import-content")
     {
-        if (options.TryGetValue("--rebuild", out var unit) && unit != "opening") throw new ArgumentException("Content rebuild unit must be opening.");
-        await ContentCatalogImporter.ImportAsync(Required("--game-dir"), Required("--output"), Console.WriteLine, openingOnly: unit == "opening");
+        if (options.TryGetValue("--rebuild", out var unit) && unit is not ("opening" or "worlds"))
+            throw new ArgumentException("Content rebuild unit must be opening or worlds.");
+        if (unit == "worlds")
+            await ScenarioWorldImporter.RebuildAsync(Required("--game-dir"), Required("--output"), Console.WriteLine);
+        else
+            await ContentCatalogImporter.ImportAsync(Required("--game-dir"), Required("--output"), Console.WriteLine, openingOnly: unit == "opening");
     }
     else if (args[0] == "verify-content")
     {

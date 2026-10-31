@@ -46,6 +46,31 @@ public sealed class HeadlessHostTests : IDisposable
     }
 
     [Fact]
+    public void CommandScriptRestoresCompanionConfigurationAndRunsPlayerDomesticWork()
+    {
+        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "player-domestic", 190, 1, 1, 1,
+            [new(1, "force", 1, 50) { LeaderId = 1 }],
+            [new(1, "city", 1, 0, 0, 100, 100, 100, 50, [])], [], [])
+        {
+            Officers = [new("officer", new(1, 1, 1, new(100, 100, 100, 100), false))],
+            Information = new([], [], [], [new(1, 1, 1, new(1000, 2000)) { IsRoot = true }], []),
+        };
+        File.WriteAllBytes(FilePath("scenario.json"), CanonicalJson.Encode(definition));
+        var session = GameSession.Start(definition, 42, companionSettings: new() { PlayerAutoDomesticEnabled = true });
+        var header = CommandLogService.CreateHeader(session);
+        var end = session.Request(new EndControlOperation());
+        Assert.Equal(SessionDisposition.Accepted, session.Apply(end).Disposition);
+        CommandLogService.Write(FilePath("commands.jsonl"), header, [end]);
+        var result = Run("run", "--scenario", FilePath("scenario.json"), "--log", FilePath("commands.jsonl"),
+            "--report", FilePath("report.json"), "--save", FilePath("result.save.json"));
+        Assert.True(result.Code == 0, result.Report.ToString());
+        var saved = ReadSession("result.save.json");
+        StateAssert.Equal(session.Capture(), saved);
+        Assert.Equal(DomesticActivity.Train, Assert.Single(saved.Records).Activity);
+        Assert.True(session.Companion.PlayerAutoDomesticEnabled);
+    }
+
+    [Fact]
     public void DefaultRunDoesNotWriteAutomaticSavesAndOnlyExplicitSaveWritesAFile()
     {
         var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "no-auto-save", 190, 1, 1, 1,

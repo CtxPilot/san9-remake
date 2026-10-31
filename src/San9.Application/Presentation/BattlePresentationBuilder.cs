@@ -139,6 +139,7 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
                     CorpsLeaderChangedEvent or CorpsDissolvedEvent or OfficerAppearedEvent or
                     TreasuryCapturedEvent or PrisonerEscapedEvent or BattlePersonnelResolvedEvent or DiplomaticConflictsEndedEvent: PresentOutcome(); break;
                 case TacticMoraleChangedEvent morale: PresentMorale(morale); break;
+                case LeaderInspiredEvent inspired: PresentLeaderInspiration(inspired); break;
                 case TacticDefectionEvent defection: PresentDefection(defection); break;
                 case TacticHealingEvent healing: PresentHealing(healing); break;
                 case BurnResolvedEvent or SeizeResolvedEvent or UnitStrategyResolvedEvent or AlienateResolvedEvent or GossipResolvedEvent:

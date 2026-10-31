@@ -19,7 +19,7 @@ public sealed partial class SimulationEngine
         _world.EnterExecution();
         try
         {
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             foreach (var edit in edits)
             {
                 switch (edit)

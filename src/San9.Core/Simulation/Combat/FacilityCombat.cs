@@ -51,17 +51,17 @@ internal static class FacilityCombat
     {
         var military = rules.Military!;
         var settlement = world.Settlements[settlementId];
-        if (!Active(settlement) || !military.TryPlace(settlement, out var place) || place.FacilityTypeId is not int typeId ||
-            military.Facilities[typeId].Tactics is not { } profile) return false;
-        var selected = military.FacilityTactic(settlement);
+        if (!Active(settlement) || !military.TryPlace(settlement, out var place) ||
+            military.FacilityTacticProfile(settlement, world.Companion) is not { } profile) return false;
+        var selected = military.FacilityTactic(settlement, world.Companion);
         if (selected is null) return false;
         var source = new BattleSource(settlementId, true);
         if (selected.Effect is TacticEffect.Heal or TacticEffect.Inspire)
         {
             var targets = TacticSupport.Targets(world, source, selected, military);
             if (targets.Length == 0) return false;
-            var supportActor = TacticActor(world, settlementId);
-            if (supportActor is null || !PassesOpportunity(world, profile, military, counter)) return false;
+            var supportActor = TacticActor(world, settlementId, selected);
+            if (supportActor is null || !PassesOpportunity(world, profile, military, counter, settlement.Morale)) return false;
             TacticSupport.Resolve(world, source, supportActor, selected, targets,
                 IntelligenceTactics.Defenders(world, MilitaryCombat.TargetOrder(source)), military, events,
                 target?.UnitId is int opponent ? new BattleSource(opponent, false) : null, damage);
@@ -75,8 +75,8 @@ internal static class FacilityCombat
             !source.Area(world, military).IntersectsExpanded(MilitaryCombat.Area(unit, military), MilitaryCombat.FacilityRange(world, settlement, unit, military))) return false;
         var tactic = selected.Effect == TacticEffect.TrapSelection ? military.TrapAt(unit.Position) : selected;
         if (tactic is null) return false;
-        var actor = TacticActor(world, settlementId);
-        if (actor is null || !PassesOpportunity(world, profile, military, counter)) return false;
+        var actor = TacticActor(world, settlementId, tactic);
+        if (actor is null || !PassesOpportunity(world, profile, military, counter, settlement.Morale)) return false;
         if (tactic.Effect != TacticEffect.Martial)
         {
             int intelligenceEffect = IntelligenceTactics.Effect(world, actor, tactic, target, rules);
@@ -106,13 +106,22 @@ internal static class FacilityCombat
     }
 
     // Garrison defensive opportunities use the global entrance before their authored base chance.
-    private static bool PassesOpportunity(WorldMutation world, FacilityTactics profile, MilitaryRulebook military, bool counter) =>
-        (!counter || TacticCombat.Roll(world, "military-tactic-counter", military.DefensiveTacticChance)) &&
+    private static bool PassesOpportunity(WorldMutation world, FacilityTactics profile, MilitaryRulebook military, bool counter, int morale) =>
+        (!counter || TacticCombat.Roll(world, "military-tactic-counter", military.DefensiveTacticChance +
+            (world.Companion.MoraleAffectsTacticCounters ? morale - 80 : 0))) &&
         TacticCombat.Roll(world, "military-facility-tactic-opportunity", profile.OpportunityChance);
 
-    private static OfficerState? TacticActor(WorldMutation world, int settlementId)
+    private static OfficerState? TacticActor(WorldMutation world, int settlementId, TacticRule tactic)
     {
-        var actor = LeadershipMaintenance.Commander(world, settlementId);
-        return actor is { Injury: 0, TacticCooldown: 0 } ? actor : null;
+        if (LeadershipMaintenance.Commander(world, settlementId) is not { Injury: 0 }) return null;
+        // Score the actual selected effect and category, independently of original tactic IDs and enabled-ID ranges.
+        return world.ServingSettlementMembers(settlementId).Where(p => p.OwnerId == world.Settlements[settlementId].OwnerId &&
+                p.Injury == 0 && p.TacticCooldown == 0)
+            .OrderByDescending(p =>
+            {
+                var ability = world.Abilities(p);
+                return (tactic.Effect == TacticEffect.Martial ? (long)ability.War * 25 : (long)ability.Intelligence * 12) +
+                    p.TacticProficiencies[tactic.Category!.Value];
+            }).ThenBy(p => p.Id).FirstOrDefault();
     }
 }

@@ -72,6 +72,63 @@ public sealed class NavalTacticOpportunityTests
     }
 
     [Theory]
+    [InlineData(false, false, 5000)]
+    [InlineData(false, true, 5100)]
+    [InlineData(true, false, 5100)]
+    public void CompanionShipFallbackUsesContactAndTargetEligibility(bool settlement, bool distant, int expected)
+    {
+        var definition = Definition();
+        definition = definition with
+        {
+            Tactics = definition.Tactics.Add(new(5100, 4, TacticEffect.Martial, 2, 9, 0, false, true, [200])),
+            CompanionTactics = new([], new(100, 5000, 5100, 5), null),
+        };
+        var settings = new CompanionSettings { EnableNavalTacticFallback = true };
+        var m = World(settlement: settlement).BeginMutation(companion: settings);
+        if (distant) m.Replace(m.Units[2] with { Position = new(16, 2) });
+        Rolls(m, 0);
+        List<DomainEvent> events = [];
+        var military = new MilitaryRulebook(definition);
+        Assert.True(TacticCombat.TryUnit(m, 1, settlement ? new(MilitaryOrderKind.AttackSettlement, null, 2) : Target,
+            new() { Military = military }, events));
+        Assert.Equal(expected, Assert.Single(events.OfType<TacticActivatedEvent>()).TacticId);
+        Assert.Equal(new[] { 5000, 5100 }, military.AutomaticTacticIds(military.Formations[100], settings));
+        Assert.Equal(new[] { 5000 }, military.Formations[100].Tactics!.AutomaticTactics);
+    }
+
+    [Fact]
+    public void SuppressingShipTacticPreservesThePersonalPhase()
+    {
+        var definition = Definition() with { CompanionTactics = new([], null, new(100, 5000)) };
+        var m = World().BeginMutation(companion: new() { SuppressAdvancedNavalTactic = true });
+        Rolls(m, 0);
+        List<DomainEvent> events = [];
+        Assert.True(TacticCombat.TryUnit(m, 1, Target, new() { Military = new(definition) }, events));
+        Assert.Equal(6100, Assert.Single(events.OfType<TacticActivatedEvent>()).TacticId);
+    }
+
+    [Fact]
+    public void FailedNavalTrainingSpendsOpportunityWithoutCooldownGrowthOrPersonalRetry()
+    {
+        var definition = Definition();
+        definition = definition with
+        {
+            Tactics = definition.Tactics.Add(new(7000, 4, TacticEffect.FormationTechnology, 0, 0, 0, false, false, [100])),
+            CompanionCombat = new(null, null, [new(100, [7000])], null, [], null),
+        };
+        var m = World().BeginMutation(companion: new() { RequireNavalTacticTraining = true });
+        Rolls(m, 0);
+        m.SetSimulation(m.Simulation with { RandomStreams = m.Simulation.RandomStreams.Add(
+            new("military-tactic-naval-training", TestSeeds.StateForRoll(0))) });
+        var before = m.Officers[11];
+        List<DomainEvent> events = [];
+        Assert.False(TacticCombat.TryUnit(m, 1, Target, new() { Military = new(definition) }, events));
+        Assert.Empty(events);
+        Assert.Equal(before, m.Officers[11]);
+        Assert.Equal(TestSeeds.StateForRoll(14), m.Simulation.RandomStreams.Single(s => s.Name == "military-tactic-opportunity").State);
+    }
+
+    [Theory]
     [InlineData(19, true)]
     [InlineData(20, false)]
     public void HighSpiritsBonusAppliesToPersonalPhaseRatherThanTheShipRoll(int personal, bool expected)

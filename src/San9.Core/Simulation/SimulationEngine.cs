@@ -9,10 +9,24 @@ public sealed partial class SimulationEngine
     private readonly ResolutionPipeline _pipeline;
     private WorldMutation? _preparationWorld;
     private long _preparationRevision = -1;
-    public OfficerGrowthRules OfficerGrowth => _rules.OfficerGrowth;
+    public CompanionSettings Companion { get; private set; } = CompanionSettings.Default;
+    public OfficerGrowthRules OfficerGrowth => _rules.OfficerGrowth.Resolve(Companion);
+
+    public void ConfigureCompanion(CompanionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        settings.Validate();
+        if (_world.IsExecuting || !_world.Simulation.CanPersist)
+            throw new InvalidOperationException("Companion configuration requires an idle persistence boundary.");
+        Companion = settings;
+        _preparationWorld = null;
+        _preparationRevision = -1;
+    }
+
+    private WorldMutation BeginMutation() => _world.BeginMutation(_rules.Abilities, _rules.Economy, Companion);
 
     /// <summary>Branches the current runtime for an isolated operation, sharing immutable records and compiled rules.</summary>
-    public SimulationEngine Fork() => new(_world.Fork(), _rules, new(_rules));
+    public SimulationEngine Fork() => new(_world.Fork(), _rules, new(_rules), Companion);
 
     /// <summary>Observes immutable phase boundaries on this calculation branch only.</summary>
     public IDisposable ObserveResolution(Action<ResolutionTransition> observer)
@@ -41,7 +55,7 @@ public sealed partial class SimulationEngine
         _world.EnterExecution();
         try
         {
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             mutation.SetSimulation(mutation.Simulation with
             {
                 OtherForceOrdersVisible = otherOrders,
@@ -53,8 +67,8 @@ public sealed partial class SimulationEngine
         finally { _world.ExitExecution(); }
     }
 
-    private SimulationEngine(WorldState world, SimulationRules rules, ResolutionPipeline pipeline)
-        => (_world, _rules, _pipeline) = (world, rules, pipeline);
+    private SimulationEngine(WorldState world, SimulationRules rules, ResolutionPipeline pipeline, CompanionSettings companion)
+        => (_world, _rules, _pipeline, Companion) = (world, rules, pipeline, companion);
 
     public SimulationEngine(WorldState world) : this(world, new SimulationRules()) { }
     public SimulationEngine(WorldState world, EconomyRulebook economy) : this(world, new SimulationRules { Economy = economy }) { }
@@ -142,7 +156,7 @@ public sealed partial class SimulationEngine
     public TacticStudyPrompt? GetTacticStudyPrompt()
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
-        return TacticStudy.Prompt(_world.BeginMutation(_rules.Abilities, _rules.Economy), _rules);
+        return TacticStudy.Prompt(BeginMutation(), _rules);
     }
 
     public DuelSuccessionPrompt? GetDuelSuccessionPrompt()
@@ -150,7 +164,7 @@ public sealed partial class SimulationEngine
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         return _world.Simulation.PendingDuel is { } pending
             ? new(pending.Aftermath.PendingRulerId!.Value, pending.RespondingForceId,
-                DuelAftermath.Successors(_world.BeginMutation(_rules.Abilities, _rules.Economy), pending.Aftermath.PendingRulerId.Value)) : null;
+                DuelAftermath.Successors(BeginMutation(), pending.Aftermath.PendingRulerId.Value)) : null;
     }
 
     public SnipingSuccessionPrompt? GetSnipingSuccessionPrompt()
@@ -158,7 +172,7 @@ public sealed partial class SimulationEngine
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         return _world.Simulation.PendingSniping is { } pending
             ? new(pending.RulerId, pending.RespondingForceId,
-                RulerSuccession.Candidates(_world.BeginMutation(_rules.Abilities, _rules.Economy), pending.RulerId)) : null;
+                RulerSuccession.Candidates(BeginMutation(), pending.RulerId)) : null;
     }
 
     public CapturedRulerPrompt? GetCapturedRulerPrompt()
@@ -170,7 +184,7 @@ public sealed partial class SimulationEngine
 
     private CapturedRulerPrompt CreateCapturedRulerPrompt(CapturedRulerDecision pending)
     {
-        var world = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+        var world = BeginMutation();
         var ruler = world.Officers[pending.RulerId];
         return new(pending.RulerId, pending.CaptorId, ruler.OwnerId!.Value)
         {
@@ -187,7 +201,7 @@ public sealed partial class SimulationEngine
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         return _world.Simulation.PendingExecutionSuccession is { } pending
             ? new(pending.ExecutingForceId, pending.RulerId, pending.RespondingForceId,
-                PrisonerExecution.Candidates(_world.BeginMutation(_rules.Abilities, _rules.Economy), pending.RespondingForceId)) : null;
+                PrisonerExecution.Candidates(BeginMutation(), pending.RespondingForceId)) : null;
     }
     public CommandAdvice GetSurrenderAdvice(int forceId, int officerId, int targetForceId)
     {
@@ -201,7 +215,7 @@ public sealed partial class SimulationEngine
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         if (_preparationWorld is null || _preparationRevision != _world.Revision)
         {
-            _preparationWorld = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            _preparationWorld = BeginMutation();
             _preparationRevision = _world.Revision;
         }
         return _preparationWorld;
@@ -266,7 +280,7 @@ public sealed partial class SimulationEngine
     public AllianceFormationCandidates GetAllianceCandidates()
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
-        return AllianceEligibility.Find(_world.BeginMutation(_rules.Abilities, _rules.Economy), _rules);
+        return AllianceEligibility.Find(BeginMutation(), _rules);
     }
 
     public CountryTitlePrompt? GetCountryTitlePrompt()
@@ -305,7 +319,7 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is ShanyangGongEncounter encounter && _rules.ShanyangGong is { } definition
             ? new(task.Id, task.ResolutionStep, task.ForceId, task.OfficerId, definition.EmperorId, definition.PlaceId,
                 encounter.ChoosingCountryTitle, encounter.ChoosingCountryTitle
-                    ? ShanyangGong.Candidates(_world.BeginMutation(_rules.Abilities, _rules.Economy), _rules, task.ForceId) : []) : null;
+                    ? ShanyangGong.Candidates(BeginMutation(), _rules, task.ForceId) : []) : null;
     }
 
     public MysticBookOfferPrompt? GetMysticBookOfferPrompt()
@@ -316,7 +330,7 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is MysticBookOfferEncounter encounter &&
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is MysticBookOfferSearchEventDefinition d
             ? new(task.Id, task.ResolutionStep, d.Id, task.ForceId, task.OfficerId, d.MysticOfficerId, d.PlaceId,
-                d.TreasureId, d.AcceptCost, d.DeclineCost, SearchEventResources.Account(_world.BeginMutation(_rules.Abilities, _rules.Economy), task)) : null;
+                d.TreasureId, d.AcceptCost, d.DeclineCost, SearchEventResources.Account(BeginMutation(), task)) : null;
     }
 
     public MysticBookReturnPrompt? GetMysticBookReturnPrompt()
@@ -327,7 +341,7 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is MysticBookReturnEncounter encounter &&
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is MysticBookReturnSearchEventDefinition d
             ? new(task.Id, task.ResolutionStep, d.Id, task.ForceId, task.OfficerId, d.MysticOfficerId, d.PlaceId,
-                d.TreasureId, MysticBook.FirstUnknown(_world.BeginMutation(_rules.Abilities, _rules.Economy).Officers[task.OfficerId], d)) : null;
+                d.TreasureId, MysticBook.FirstUnknown(BeginMutation().Officers[task.OfficerId], d)) : null;
     }
 
     public ScholarInsultPrompt? GetScholarInsultPrompt()
@@ -349,7 +363,7 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is LongevityEncounter encounter &&
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is LongevitySearchEventDefinition definition
             ? new(task.Id, task.ResolutionStep, encounter.EventId, task.ForceId, task.OfficerId, definition.PlaceId,
-                definition.Cost, definition.MinimumLifespanTier, SearchEventResources.Account(_world.BeginMutation(_rules.Abilities, _rules.Economy), task)) : null;
+                definition.Cost, definition.MinimumLifespanTier, SearchEventResources.Account(BeginMutation(), task)) : null;
     }
 
     public TreasureMonumentPrompt? GetTreasureMonumentPrompt()
@@ -360,7 +374,7 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is TreasureMonumentEncounter encounter &&
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is TreasureMonumentSearchEventDefinition definition
             ? new(task.Id, task.ResolutionStep, encounter.EventId, task.ForceId, task.OfficerId, definition.PlaceId,
-                definition.TreasureId, definition.Cost, SearchEventResources.Account(_world.BeginMutation(_rules.Abilities, _rules.Economy), task)) : null;
+                definition.TreasureId, definition.Cost, SearchEventResources.Account(BeginMutation(), task)) : null;
     }
 
     public ScholarReturnPrompt? GetScholarReturnPrompt()
@@ -376,7 +390,7 @@ public sealed partial class SimulationEngine
     public FoodTradeQuote GetFoodTradeQuote(int forceId, int settlementId, System.Collections.Immutable.ImmutableArray<int> officerIds, FoodTradeDirection direction)
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
-        return FoodTrade.Quote(_world.BeginMutation(_rules.Abilities, _rules.Economy), forceId, settlementId, officerIds, direction, _rules.Military);
+        return FoodTrade.Quote(BeginMutation(), forceId, settlementId, officerIds, direction, _rules.Military);
     }
 
     public MerchantInvestmentPrompt? GetMerchantInvestmentPrompt()
@@ -386,7 +400,7 @@ public sealed partial class SimulationEngine
         var task = _world.Simulation.Tasks.Single(t => t.Id == pending.RemainingTaskIds[0]);
         if (task.SearchEncounter is not MerchantInvestmentEncounter encounter ||
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is not MerchantInvestmentDefinition d) return null;
-        var world = _world.BeginMutation(_rules.Abilities, _rules.Economy); var category = MerchantInvestment.Category(task, d)!;
+        var world = BeginMutation(); var category = MerchantInvestment.Category(task, d)!;
         return new(task.Id, task.ResolutionStep, d.Id, task.ForceId, task.OfficerId, task.Journey!.DestinationPlaceId, category.Id,
             MerchantInvestment.Account(world, task), category.RewardResource, d.MinimumInvestment, MerchantInvestment.MaximumInvestment(world, task, d),
             MerchantInvestment.SuccessChance(world, task, d), world.Simulation.FoodExchangeRate);
@@ -399,7 +413,7 @@ public sealed partial class SimulationEngine
         var task = _world.Simulation.Tasks.Single(t => t.Id == pending.RemainingTaskIds[0]);
         if (task.SearchEncounter is not CommunitySearchEncounter encounter ||
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is not CommunitySearchEventDefinition d) return null;
-        var world = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+        var world = BeginMutation();
         return new(task.Id, task.ResolutionStep, d.Id, task.ForceId, task.OfficerId, task.Journey!.DestinationPlaceId,
             (world.Clock.Month - 1) / 3, SearchEventResources.Account(world, task),
             d is CommemorationSearchEventDefinition memorial ? CommunitySearch.Site(task, memorial)?.RequiredTreasureId : null,
@@ -419,7 +433,7 @@ public sealed partial class SimulationEngine
         var task = _world.Simulation.Tasks.Single(t => t.Id == pending.RemainingTaskIds[0]);
         if (task.SearchEncounter is not ConflictSearchEncounter encounter ||
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is not ConflictSearchEventDefinition d) return null;
-        var world = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+        var world = BeginMutation();
         return new(task.Id, task.ResolutionStep, d.Id, task.ForceId, task.OfficerId, task.Journey!.DestinationPlaceId,
             encounter.OtherOfficerId, SearchEventResources.Account(world, task), SearchConflicts.Options(world, task, d));
     }
@@ -432,7 +446,7 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is TigerSearchEncounter encounter &&
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is TigerSearchEventDefinition d
             ? new(task.Id, task.ResolutionStep, d.Id, task.ForceId, task.OfficerId, task.Journey!.DestinationPlaceId,
-                TigerSearch.BattleChance(_world.BeginMutation(_rules.Abilities, _rules.Economy), task.OfficerId, d)) : null;
+                TigerSearch.BattleChance(BeginMutation(), task.OfficerId, d)) : null;
     }
 
     public BeastSearchPrompt? GetBeastSearchPrompt()
@@ -443,13 +457,13 @@ public sealed partial class SimulationEngine
         return task.SearchEncounter is BeastSearchEncounter encounter &&
             _rules.Personnel.SearchEvents.GetValueOrDefault(encounter.EventId) is BeastSearchEventDefinition definition
             ? new(task.Id, task.ResolutionStep, encounter.EventId, task.ForceId, task.OfficerId, task.Journey!.DestinationPlaceId,
-                SearchEvents.BattleChance(_world.BeginMutation(_rules.Abilities, _rules.Economy), task.OfficerId, definition)) : null;
+                SearchEvents.BattleChance(BeginMutation(), task.OfficerId, definition)) : null;
     }
 
     public AllianceParticipationPrompt? GetAllianceParticipationPrompt()
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
-        return AllianceFormation.Prompt(_world.BeginMutation(_rules.Abilities, _rules.Economy), _rules);
+        return AllianceFormation.Prompt(BeginMutation(), _rules);
     }
 
     public CommandAdvice GetBurnAdvice(int forceId, int officerId, int targetSettlementId)
@@ -489,7 +503,7 @@ public sealed partial class SimulationEngine
     public AttackWarning GetAttackWarning(int forceId, MilitaryOrder order)
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
-        return MilitaryDiplomacy.Warning(_world.BeginMutation(_rules.Abilities, _rules.Economy), forceId, order, _rules.Military);
+        return MilitaryDiplomacy.Warning(BeginMutation(), forceId, order, _rules.Military);
     }
 
     public CommandExecutionResult Execute(CommandContext context, GameCommand command) =>
@@ -504,7 +518,7 @@ public sealed partial class SimulationEngine
         _world.EnterExecution();
         try
         {
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             List<DomainEvent> events = [];
             DevelopmentOutcome? development = null;
             if (PendingResponseCoordinator.IsResponse(command))
@@ -755,7 +769,7 @@ public sealed partial class SimulationEngine
         _world.EnterExecution();
         try
         {
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             List<DomainEvent> events = [new ControlEndedEvent(seat.ControllerId, seat.ForceId)];
             mutation.SetSimulation(simulation with { ActiveControl = simulation.ActiveControl + 1 });
             ThreeVisits.EnterControl(mutation, _rules, events);
@@ -777,7 +791,7 @@ public sealed partial class SimulationEngine
         try
         {
             GameClock previous = _world.Clock;
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             List<DomainEvent> events = [];
             MilitaryDiplomacy.BeginAdvance(mutation, _rules, events);
             ContinueXun(mutation, previous, events);
@@ -802,7 +816,7 @@ public sealed partial class SimulationEngine
         _world.EnterExecution();
         try
         {
-            var mutation = _world.BeginMutation(_rules.Abilities, _rules.Economy);
+            var mutation = BeginMutation();
             List<DomainEvent> events = [];
             var started = state.DailyAdvanceStarted ?? _world.Clock;
             mutation.SetSimulation(state with { DailyAdvanceStarted = started, Boundary = SimulationBoundary.Advancing });

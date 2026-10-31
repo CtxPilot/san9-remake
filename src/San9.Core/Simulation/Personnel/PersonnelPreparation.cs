@@ -48,7 +48,8 @@ public sealed partial class SimulationEngine
     }
 
     /// <summary>Validates against the submission rules without creating tasks or consuming random streams.</summary>
-    public PersonnelJourneyPreview GetPersonnelJourney(int forceId, int officerId, int targetId, PersonnelJourneyKind kind)
+    public PersonnelJourneyPreview GetPersonnelJourney(int forceId, int officerId, int targetId, PersonnelJourneyKind kind,
+        bool includeAdvice = true)
     {
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         var world = PreparationWorld();
@@ -70,9 +71,10 @@ public sealed partial class SimulationEngine
         if (kind == PersonnelJourneyKind.Recruit)
         {
             threshold = RecruitmentRules.Threshold(world, officerId, targetId, _rules);
-            advice = AdviserJudgment.Evaluate(world, forceId, ConditionalRandomPurpose.Recruitment, officerId, targetId, threshold.Value);
+            if (includeAdvice)
+                advice = AdviserJudgment.Evaluate(world, forceId, ConditionalRandomPurpose.Recruitment, officerId, targetId, threshold.Value);
         }
-        if (kind == PersonnelJourneyKind.Search)
+        if (kind == PersonnelJourneyKind.Search && includeAdvice)
         {
             long score = PersonnelSearchChances.PoliticsScore(world.Abilities(world.Officers[officerId]).Politics);
             int people = world.Officers.Values.Count(p => p.Status == OfficerStatus.Undiscovered && (p.SettlementId ?? p.RegionId) == targetId);

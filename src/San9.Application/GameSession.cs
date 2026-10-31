@@ -27,7 +27,18 @@ public sealed partial class GameSession
     /// <summary>Initial controller configuration, used to reconstruct command logs.</summary>
     public ImmutableArray<int> InitialPlayerForceIds { get; private set; } = [];
     public ControllerKind PlayerForceController { get; private set; } = ControllerKind.Player;
+    /// <summary>Host configuration captured for each operation; never included in a game save.</summary>
+    public CompanionSettings Companion => _simulation.Companion;
     public OfficerGrowthRules OfficerGrowth => _simulation.OfficerGrowth;
+    public void ConfigureCompanion(CompanionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (_executing || _originalAi.Continuation is not null ||
+            Snapshot.Simulation.Boundary is not (SimulationBoundary.Stable or SimulationBoundary.Terminal))
+            throw new InvalidOperationException("Companion settings require an idle stable session.");
+        _simulation.ConfigureCompanion(settings);
+        _view = _snapshotSource.Project(Snapshot, Companion);
+    }
     private OriginalAiState _originalAi;
     public OriginalAiState OriginalAi => _originalAi;
     public ImmutableArray<OriginalAiWorkReport> LastOriginalAiWork { get; private set; } = [];
@@ -43,7 +54,7 @@ public sealed partial class GameSession
     public ImmutableList<ChronicleFact> History { get; private set; } = [];
     public WorldSnapshot Snapshot => _simulation.Snapshot;
     public StrategySnapshot InitialView => _initialView;
-    public StrategySnapshot View => _view.World.Revision == Snapshot.Revision ? _view : _view = _snapshotSource.Project(Snapshot);
+    public StrategySnapshot View => _view.World.Revision == Snapshot.Revision ? _view : _view = _snapshotSource.Project(Snapshot, Companion);
 
     public SessionRequest Request(SessionOperation operation, string controllerId = "player", Guid? id = null)
     {

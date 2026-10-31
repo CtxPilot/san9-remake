@@ -6,6 +6,13 @@
 
 本目录保存可供实现与测试直接使用的 `BEH-*` 文档。
 
+- [BEH-COMPANION-0001：优化伴侣设定与玩家自动内政](BEH-COMPANION-0001-settings-and-player-domestic.md)（已确认；仅玩家直辖军团）
+- [BEH-COMPANION-0002：优化伴侣基础战斗规则](BEH-COMPANION-0002-combat-rules.md)（已确认；004～009六项可选规则）
+- [BEH-COMPANION-0003：优化伴侣兵法发动、联动与成长](BEH-COMPANION-0003-tactic-rules.md)（已确认；025～037，最佳守将内置，其余可选）
+- [BEH-COMPANION-0004：优化伴侣熟练度、阻击与人数系数](BEH-COMPANION-0004-proficiency-and-tactic-coefficients.md)（已接入；110、111、117、118～122）
+- [BEH-COMPANION-0005：玩家自动探索所在地](BEH-COMPANION-0005-player-local-search.md)（已接入；074，仅所在地探索、玩家回报）
+- [BEH-COMPANION-0006：能力成长与设施、舰船兵法预设](BEH-COMPANION-0006-ability-growth-and-naval-presets.md)（已接入；013、021、041～043）
+
 跨领域实现从[核心领域依赖图与实现入口](core-domain-dependency-map.md)开始；其机器可校验源为 [`core-domain-contracts.json`](core-domain-contracts.json)。
 
 - [BEH-ECONOMY-0001：经营命令与周期经济](BEH-ECONOMY-0001-domestic-and-economic-cycle.md)（已确认）

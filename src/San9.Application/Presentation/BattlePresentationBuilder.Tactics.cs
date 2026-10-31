@@ -69,6 +69,26 @@ internal sealed partial class BattlePresentationBuilder
             MapRecordColors.Resolve(before, after, colorForce)), produced.SoundRole));
     }
 
+    private void PresentLeaderInspiration(LeaderInspiredEvent inspired)
+    {
+        _impact = _cursor;
+        var occurrence = inspired.Occurrence;
+        var source = occurrence.Source;
+        Capture(source, inspired.Opponent);
+        if (content.Battle is not { } battle || !battle.Tactics.TryGetValue(inspired.TacticId, out var definition)) return;
+
+        if (Player(source.ForceId) || Player(inspired.Opponent.ForceId))
+        {
+            var message = TacticMessage("leader-inspiration", definition.Messages["announcement"],
+                TacticContext(inspired.Clock, occurrence), TacticBindings(inspired.ActorId, inspired.TacticId, occurrence));
+            AddMessageCue(new(Identity("leader-inspiration"), _cursor, message, BattleMessageChannel.Dialogue));
+        }
+
+        // The native effect has its own viewport and spatial-audio admission, independent of the dialogue gate.
+        if (definition.MapEffect is { } sprite)
+            _mapEffects.Add(new(Identity("leader-inspiration-effect"), _impact, source, sprite));
+    }
+
     private void PresentMorale(TacticMoraleChangedEvent morale)
     {
         _stateValues.Add(new(_impact, morale.TargetId, morale.TargetIsSettlement, 0, morale.Current - morale.Previous, 0));

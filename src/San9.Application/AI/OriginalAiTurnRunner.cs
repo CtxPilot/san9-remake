@@ -23,6 +23,7 @@ internal static class OriginalAiTurnRunner
         if (cursor is null)
         {
             state = OriginalAiStrategy.PrepareGlobal(engine.Snapshot, state);
+            PlayerDomesticAutomation.Run(engine, definition, seat, state, events, reports);
             cursor = new(seat, engine.Snapshot.Corps.Where(c => c.OwnerId == seat.ForceId)
                 .OrderByDescending(c => c.IsRoot).Select(c => c.Id).ToImmutableArray(), [], 0, false, 0,
                 ImmutableDictionary<int, long>.Empty, null);
@@ -125,16 +126,7 @@ internal static class OriginalAiTurnRunner
                         _ => throw new InvalidOperationException("Unsupported domestic work."),
                     };
                     var result = OriginalDomesticWork.Run(activity, limit, Capture, () => random.Next(100), Develop);
-                    var end = result.End switch
-                    {
-                        OriginalDomesticEnd.PreparationFailed => result.Steps.Any(s => s.ProbabilityFailed) ? OriginalAiWorkEnd.ProbabilityFailed : OriginalAiWorkEnd.PreparationFailed,
-                        OriginalDomesticEnd.AttemptsExhausted => OriginalAiWorkEnd.AttemptsExhausted,
-                        OriginalDomesticEnd.ReserveReached => OriginalAiWorkEnd.ReserveReached,
-                        _ => OriginalAiWorkEnd.NoCandidates,
-                    };
-                    Report(new(corps.Id, work, end, result.Steps.Count(s => s.Outcome != OriginalDomesticAttempt.PreparationFailed),
-                        result.Steps.Count(s => s.Outcome == OriginalDomesticAttempt.Submitted))
-                        { Rejected = result.Steps.Count(s => s.Outcome == OriginalDomesticAttempt.Rejected) });
+                    Report(result.ToReport(corps.Id, work));
                 }
                 else if (work == OriginalAiWork.Trade)
                     Report(OriginalAiEconomy.Trade(corps.Id, limit, Capture, () => engine.Snapshot,

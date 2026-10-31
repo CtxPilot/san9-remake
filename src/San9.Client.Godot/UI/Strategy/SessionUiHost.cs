@@ -6,6 +6,7 @@ using San9.Client.Godot.Persistence;
 using San9.Client.Godot.Settings;
 using San9.Content.Packages;
 using San9.Content.Scenarios;
+using San9.Core.Domain;
 using San9.Rendering;
 
 namespace San9.Client.Godot;
@@ -39,6 +40,8 @@ public partial class SessionUiHost : Node
     private GameSession? _pending;
     private SessionReplacementKind _pendingKind;
     private UserSettingsSession _settings = null!;
+    private CompanionSettingsStore _companionStore = null!;
+    private CompanionSettings _companionSettings = CompanionSettings.Default;
     private WindowDisplay _windowDisplay = null!;
     private SceneTransitionOverlay _transition = null!;
     private SceneReplacementTransition? _replacement;
@@ -62,6 +65,8 @@ public partial class SessionUiHost : Node
         _transition = new() { MouseFilter = Control.MouseFilterEnum.Stop };
         transitionLayer.AddChild(_transition);
         _settings = new(new UserSettingsStore(DataPaths.Settings));
+        _companionStore = new(DataPaths.CompanionSettings);
+        LoadCompanionSettings();
         try { _settings.Load(); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or System.Text.DecoderFallbackException or InvalidDataException) { }
         Music.SetEnabled(_settings.Current.MusicEnabled);
@@ -73,6 +78,8 @@ public partial class SessionUiHost : Node
     public void Activate(GameSession next, SessionReplacementKind kind)
     {
         if (IsSwitching) return;
+        if (kind == SessionReplacementKind.NewGame) LoadCompanionSettings();
+        next.ConfigureCompanion(_companionSettings);
         next.EnableXunStartCheckpoints();
         _pending = next;
         _pendingKind = kind;
@@ -85,6 +92,17 @@ public partial class SessionUiHost : Node
             return;
         }
         BindPendingScene();
+    }
+
+    private void LoadCompanionSettings()
+    {
+        try { _companionSettings = _companionStore.Load(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or
+            System.Text.DecoderFallbackException or InvalidDataException)
+        {
+            _companionSettings = CompanionSettings.Default;
+            GD.PushWarning($"优化伴侣配置读取失败，已使用默认值：{error.Message}");
+        }
     }
 
     private void BindPendingScene()
@@ -168,6 +186,13 @@ public partial class SessionUiHost : Node
             StartNewGame = () => Callable.From(() => Activate(CreateNewSession(), SessionReplacementKind.NewGame)).CallDeferred(),
             Music = Music, OverlayHost = overlayHost,
             ReadSettings = () => _settings.Current,
+            ApplyCompanionSettings = draft =>
+            {
+                if (!Session.CanEditWorld) throw new InvalidOperationException("当前阶段不能应用优化伴侣配置。");
+                _companionStore.Save(draft);
+                Session.ConfigureCompanion(draft);
+                _companionSettings = draft;
+            },
             ApplySettings = draft =>
             {
                 _settings.Apply(draft);

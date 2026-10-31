@@ -85,6 +85,8 @@ public sealed record MilitaryDefinition(int Width, int Height, ImmutableArray<in
     ImmutableArray<TerrainPassage> Terrains, ImmutableArray<FormationRule> Formations,
     ImmutableArray<BattlefieldPlace> Places)
 {
+    [JsonRequired] public CompanionCombatDefinition? CompanionCombat { get; init; }
+    [JsonRequired] public CompanionTacticPresets? CompanionTactics { get; init; }
     [JsonRequired] public FixedUnitFormations? ConstructionFormations { get; init; }
     [JsonRequired] public FixedUnitFormations? TransportFormations { get; init; }
     [JsonRequired] public int? BasicNavalFormationId { get; init; }
@@ -116,6 +118,8 @@ public sealed partial class MilitaryRulebook
     public int DefensiveTacticChance { get; }
     public bool BattleDeathsAllowed { get; }
     public bool DuelCapturesAllowed { get; }
+    public CompanionCombatDefinition? CompanionCombat { get; }
+    public CompanionTacticPresets? CompanionTactics { get; }
     public MilitaryRulebook(MilitaryDefinition definition)
     {
         if (definition.DefensiveTacticChance is < 0 or > 100)
@@ -179,10 +183,14 @@ public sealed partial class MilitaryRulebook
         if (definition.Tactics.IsDefault) throw new ArgumentException("Missing tactic definitions.");
         Tactics = definition.Tactics.ToImmutableDictionary(t => t.Id);
         foreach (var tactic in Tactics.Values) tactic.Validate(Formations);
+        CompanionCombat = definition.CompanionCombat;
+        CompanionCombat?.Validate(Formations, Tactics);
         if (definition.Facilities.IsDefault || definition.ConstructionSites.IsDefault)
             throw new ArgumentException("Missing construction definitions.");
         Facilities = definition.Facilities.ToImmutableDictionary(f => f.Id);
         foreach (var facility in Facilities.Values) facility.Validate(Tactics);
+        CompanionTactics = definition.CompanionTactics;
+        CompanionTactics?.Validate(Facilities, Formations, Tactics);
         ConstructionSites = definition.ConstructionSites.ToImmutableDictionary(s => (s.RegionId, s.Position));
         foreach (var site in ConstructionSites.Values)
         {
@@ -361,9 +369,9 @@ public sealed partial class MilitaryRulebook
     public ImmutableDictionary<int, FacilityRule> Facilities { get; }
     public ImmutableDictionary<(int RegionId, WorldPosition Position), ConstructionSite> ConstructionSites { get; }
 
-    public TacticRule? FacilityTactic(SettlementState settlement)
+    public TacticRule? FacilityTactic(SettlementState settlement, CompanionSettings? companion = null)
     {
-        if (!TryPlace(settlement, out var place) || place.FacilityTypeId is not int type || Facilities[type].Tactics is not { } profile) return null;
+        if (!TryPlace(settlement, out var place) || FacilityTacticProfile(settlement, companion) is not { } profile) return null;
         return profile.TacticPriority.Where(id => !profile.RequiresEnabledTactic || place.EnabledTacticIds.Contains(id))
             .Select(id => Tactics[id]).FirstOrDefault();
     }

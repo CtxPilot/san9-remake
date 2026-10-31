@@ -92,6 +92,10 @@ public static class MilitaryContentCompiler
                     }).ToImmutableArray() }).ToImmutableArray(), places)
         {
             BasicNavalFormationId = BasicNavalFormationId,
+            CompanionCombat = new(new(2, 5), new(5, 4),
+                [new(21, [12, 14]), new(22, [13, 14]), new(23, [14])], new(5, [8, 9, 10, 11]), [8], 28),
+            CompanionTactics = new([new(1, new(10, 3, false, [10])), new(6, new(10, 3, false, [9])),
+                new(9, new(10, 3, false, [10]))], new(21, 33, 31, 5), new(23, 32)),
             DefaultDeploymentFormationId = 6,
             ConstructionFormations = new(13, 24),
             TransportFormations = new(14, 25),

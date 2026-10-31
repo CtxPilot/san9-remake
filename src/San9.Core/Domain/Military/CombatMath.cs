@@ -45,7 +45,8 @@ public static class CombatMath
     }
 
     public static uint TroopDamage(CombatStrength attacker, CombatStrength defender,
-        CombatProfile attackingFormation, CombatProfile defendingFormation, bool targetIsGarrison, int durability, bool usesRockfallPower = false)
+        CombatProfile attackingFormation, CombatProfile defendingFormation, bool targetIsGarrison, int durability,
+        bool usesRockfallPower = false, bool increaseDurabilityDefense = false)
     {
         ArgumentNullException.ThrowIfNull(attackingFormation);
         ArgumentNullException.ThrowIfNull(defendingFormation);
@@ -53,11 +54,12 @@ public static class CombatMath
         defendingFormation.Validate();
         if (!targetIsGarrison && durability != 0) throw new ArgumentException("Field troops cannot receive wall defense.");
         return TroopDamage(attacker, defender, targetIsGarrison ? attackingFormation.AgainstGarrison : attackingFormation.AgainstUnits,
-            defendingFormation.Defense, durability, usesRockfallPower);
+            defendingFormation.Defense, durability, usesRockfallPower, increaseDurabilityDefense);
     }
 
     public static uint TroopDamage(CombatStrength attacker, CombatStrength defender,
-        int attackCoefficient, int defenseCoefficient, int durability, bool usesRockfallPower = false)
+        int attackCoefficient, int defenseCoefficient, int durability, bool usesRockfallPower = false,
+        bool increaseDurabilityDefense = false)
     {
         attacker.Validate();
         defender.Validate();
@@ -66,7 +68,8 @@ public static class CombatMath
         ArgumentOutOfRangeException.ThrowIfNegative(durability);
         if (attacker.Soldiers == 0 || defender.Soldiers == 0) return 0;
         var attack = BigInteger.Max(1, usesRockfallPower ? RockfallPower(attacker) : FormationPower(attacker, attackCoefficient, 25));
-        var defense = BigInteger.Max(1, FormationPower(defender, defenseCoefficient, 15) + (long)durability * 2 / 5);
+        var defense = BigInteger.Max(1, FormationPower(defender, defenseCoefficient, 15) +
+            (long)durability * (increaseDurabilityDefense ? 3 : 2) / 5);
         var margin = BigInteger.Max(0, attack - defense + 900);
         var a = BigInteger.Max(1, margin * margin / 2000);
         ulong b = ((ulong)attacker.Soldiers + defender.Soldiers) / 70 + 400;
@@ -90,12 +93,14 @@ public static class CombatMath
         return (int)Math.Min(durability, Math.Max(1, strength / 3));
     }
 
-    public static CombatLoss Loss(uint soldiers, uint requested, int woundedPercent, uint wounded, uint woundedCapacity)
+    public static CombatLoss Loss(uint soldiers, uint requested, int woundedPercent, uint wounded, uint woundedCapacity,
+        int woundedRateDivisor = 10)
     {
         if (woundedPercent is < 0 or > 100 || wounded > woundedCapacity)
             throw new ArgumentException("Invalid wounded allocation.");
+        if (woundedRateDivisor < 10) throw new ArgumentOutOfRangeException(nameof(woundedRateDivisor));
         uint actual = Math.Min(soldiers, requested);
-        uint intended = (uint)((ulong)actual * (uint)woundedPercent / 100);
+        uint intended = (uint)((ulong)actual * (uint)woundedPercent * 10 / (100UL * (uint)woundedRateDivisor));
         uint added = Math.Min(intended, woundedCapacity - wounded);
         return new(soldiers - actual, added, actual - added, intended - added);
     }

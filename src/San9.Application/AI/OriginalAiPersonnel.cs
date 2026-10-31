@@ -6,11 +6,10 @@ using San9.Core.Simulation;
 namespace San9.Application.AI;
 
 /// <summary>One ordered personnel work. Candidate lists belong to the work, commands belong to Core.</summary>
-internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioInitialState content, int corpsId,
+internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, ScenarioInitialState content, int corpsId,
     OriginalAiGeography geography, CommandContext context, OriginalAiRandom random,
     Func<GameCommand, bool> submit)
 {
-    private const int MaximumSearchJourneyDays = 255;
     private WorldSnapshot World => engine.Snapshot;
     // Reuse each projection while its immutable input collections remain unchanged.
     // Commands still refresh current records, abilities and task availability before the next candidate.
@@ -159,10 +158,13 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
                 }
                 break;
             case OriginalAiWork.Search:
+                var undiscoveredPlaces = World.Officers.Where(p => !p.IsDormant && p.Status == OfficerStatus.Undiscovered)
+                    .Select(p => p.SettlementId ?? p.RegionId).OfType<int>().ToHashSet();
+                return Search(limit, engine.GetSearchPlaces(Owner).Where(undiscoveredPlaces.Contains));
             case OriginalAiWork.RecruitLocal:
             case OriginalAiWork.RecruitEnemy:
                 var ownGroup = state.Forces.Single(f => f.ForceId == Owner).Group;
-                if (work != OriginalAiWork.Search && ownGroup == OriginalAiGroup.ReducedActivity && random.Percent(50))
+                if (ownGroup == OriginalAiGroup.ReducedActivity && random.Percent(50))
                     return Report(OriginalAiWorkEnd.ProbabilityFailed);
                 var strategy = state.Corps.Single(c => c.CorpsId == corpsId);
                 int? opponent = strategy.TargetForceId ?? World.Settlements.FirstOrDefault(s => s.Id == strategy.TargetSettlementId)?.OwnerId;
@@ -174,18 +176,10 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
                 }
                 // A source with an available actor necessarily has a nonempty physical member list.
                 var actors = Actors(work == OriginalAiWork.RecruitLocal ? 35 : 45).Select(p => p.Id).ToList();
-                // Original work 23 filters actual undiscovered people before probing the shared search command.
-                var undiscoveredPlaces = work == OriginalAiWork.Search ? World.Officers
-                    .Where(p => !p.IsDormant && p.Status == OfficerStatus.Undiscovered)
-                    .Select(p => p.SettlementId ?? p.RegionId).OfType<int>().ToHashSet() : null;
-                var targets = work == OriginalAiWork.Search ? engine.GetSearchPlaces(Owner).Where(undiscoveredPlaces!.Contains).ToList() :
-                    World.Officers.Where(p => !p.IsDormant && p.IsVisible && (work == OriginalAiWork.RecruitEnemy
+                var targets = World.Officers.Where(p => !p.IsDormant && p.IsVisible && (work == OriginalAiWork.RecruitEnemy
                         ? p.OwnerId == opponent && p.Status is OfficerStatus.Governor or OfficerStatus.Strategist or OfficerStatus.Serving && p.Loyalty <= 90
                         : p.Status == OfficerStatus.Free || Detained(p)))
                     .OrderBy(p => work == OriginalAiWork.RecruitEnemy ? p.Loyalty : -Maximum(Ability(p))).Select(p => p.Id).ToList();
-                if (work == OriginalAiWork.Search)
-                    actors = actors.Where(actor => targets.Any(target => engine.GetPersonnelJourney(Owner, actor, target,
-                        PersonnelJourneyKind.Search).DistanceDays is >= 0 and <= MaximumSearchJourneyDays)).ToList();
                 while (used < limit && targets.Count != 0 && actors.Count != 0)
                 {
                     (int Actor, int Target)? pair = null;
@@ -193,16 +187,13 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
                     {
                         var feasible = actors.Select(actor =>
                         {
-                            var preview = engine.GetPersonnelJourney(Owner, actor, target,
-                                work == OriginalAiWork.Search ? PersonnelJourneyKind.Search : PersonnelJourneyKind.Recruit);
-                            int threshold = preview.Available && work != OriginalAiWork.Search ? preview.RecruitmentThreshold!.Value : 0;
-                            int score = !preview.Available ? 0 : work == OriginalAiWork.Search
-                                ? preview.Advice.Opinion == AdviserOpinion.Unfavorable ? 0 : 100
-                                : preview.Advice.Opinion switch { AdviserOpinion.Favorable => 100, AdviserOpinion.Unfavorable => 0, _ => threshold };
+                            var preview = engine.GetPersonnelJourney(Owner, actor, target, PersonnelJourneyKind.Recruit);
+                            int threshold = preview.Available ? preview.RecruitmentThreshold!.Value : 0;
+                            int score = !preview.Available ? 0 : preview.Advice.Opinion switch
+                                { AdviserOpinion.Favorable => 100, AdviserOpinion.Unfavorable => 0, _ => threshold };
                             return (Actor: actor, Score: score, Threshold: threshold);
                         }).Where(p => p.Score >= 20);
-                        var selected = feasible.OrderByDescending(p => work == OriginalAiWork.Search
-                            ? Ability(World.Officers.Single(o => o.Id == p.Actor)).Politics : p.Threshold).FirstOrDefault();
+                        var selected = feasible.OrderByDescending(p => p.Threshold).FirstOrDefault();
                         if (selected.Score < 20) continue;
                         pair = (selected.Actor, target); break;
                     }
@@ -215,9 +206,7 @@ internal sealed class OriginalAiPersonnel(SimulationEngine engine, ScenarioIniti
                         break;
                     }
                     actors.Remove(chosen.Actor); targets.Remove(chosen.Target);
-                    Send(Command((id, f, seq) => work == OriginalAiWork.Search
-                        ? new SearchCommand(id, f, seq, [chosen.Actor], chosen.Target)
-                        : new RecruitOfficerCommand(id, f, seq, chosen.Actor, chosen.Target)));
+                    Send(Command((id, f, seq) => new RecruitOfficerCommand(id, f, seq, chosen.Actor, chosen.Target)));
                 }
                 break;
         }

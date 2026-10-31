@@ -52,6 +52,7 @@ public partial class StrategyHud : Control
     public bool SoundEnabled => ReadSettings().SoundEnabled;
     public Func<Settings.UserSettings> ReadSettings { get; init; } = () => Settings.UserSettings.Default;
     public Action<Settings.UserSettings> ApplySettings { get; init; } = _ => { };
+    public Action<San9.Core.Domain.CompanionSettings> ApplyCompanionSettings { get; init; } = null!;
     private TextureButton _functionsButton = null!;
     private StrategyOverviewPanel _overviewPanel = null!;
     private bool _built;
@@ -209,6 +210,7 @@ public partial class StrategyHud : Control
             ReturnToOpening = ReturnToOpening, LoadGame = LoadGame,
             ControlDelegated = ControlDelegated,
             ReadSettings = ReadSettings,
+            ApplyCompanionSettings = ApplyCompanionSettings,
             ApplySettings = ApplyUserSettings
         };
         OverlayHost.AddChild(SystemMenu);
@@ -521,6 +523,13 @@ public partial class StrategyHud : Control
     }
     public override void _Input(InputEvent @event)
     {
+        if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F10 } &&
+            _built && Interaction.CanSave && Session.CanEditWorld)
+        {
+            SystemMenu.OpenCompanionSettings();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
         if (@event is InputEventMouseMotion motion) _hoverPosition = motion.Position;
         if (_built) _feedback.HandleInput(@event);
     }

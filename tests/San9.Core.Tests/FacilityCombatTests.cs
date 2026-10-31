@@ -12,7 +12,7 @@ public sealed class FacilityCombatTests
     private static SimulationEngine Engine(TacticEffect effect = TacticEffect.Martial, bool attacking = false,
         int injury = 0, int cooldown = 0, bool requiresEnabled = false, bool enabled = true, uint targetSoldiers = 10000,
         int confusion = 0, Action<MilitaryRulebook>? captureRules = null, bool area = false, int? vulnerableCategory = null,
-        int opportunity = 100, int defensiveChance = 50)
+        int opportunity = 100, int defensiveChance = 50, bool readyReserve = false)
     {
         bool support = effect is TacticEffect.Heal or TacticEffect.Inspire;
         var profile = new CombatProfile(0, 0, 0, 1000, 50);
@@ -41,7 +41,8 @@ public sealed class FacilityCombatTests
                 new(2, 2, 10000, 100, 100, 100, 0, 0, 100, 0, 100),
                 ..(area ? new SettlementState[] { new(3, 2, 1, 100, 100, 100, 0, 0, 100, 0, 100) } : [])],
             [new(11, 1, 1, new(200, 200, 100, 100), false) { Status = OfficerStatus.Ruler, IsCommander = true, Injury = injury, TacticCooldown = cooldown },
-                new(12, 1, 1, new(200, 200, 100, 200), false) { LearnedTactics = [9000], EquippedTacticId = 9000 },
+                new(12, 1, 1, new(200, 200, 100, 200), false)
+                    { LearnedTactics = [9000], EquippedTacticId = 9000, TacticCooldown = readyReserve ? 0 : 100 },
                 new(21, support ? 1 : 2, null, new(0, 0, 0, 0), false) { UnitId = 1, Injury = support ? 3 : 0 },
                 new(22, 2, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler }],
             units: [new(1, support ? 1 : 2, new(8, 2), targetSoldiers) { FormationId = 700, Morale = support ? 79 : 100,
@@ -97,7 +98,7 @@ public sealed class FacilityCombatTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CommanderFiresAloneWithThreeDayCooldownForAttackAndRetaliation(bool attacking)
+    public void SoleReadyOfficerUsesThreeDayCooldownForAttackAndRetaliation(bool attacking)
     {
         var engine = Engine(attacking: attacking);
         var result = Advance(engine);
@@ -113,13 +114,15 @@ public sealed class FacilityCombatTests
     }
 
     [Theory]
-    [InlineData(10, 0, 0)]
-    [InlineData(0, 100, 0)]
-    [InlineData(0, 0, 100)]
-    public void IneligibleCommanderOrConfusedSettlementCannotBeReplacedByReadyOfficer(int injury, int cooldown, int confusion)
+    [InlineData(10, 0, 0, false)]
+    [InlineData(0, 100, 0, true)]
+    [InlineData(0, 0, 100, false)]
+    public void ReadyReserveBypassesCommanderCooldownButNotInjuryOrConfusion(int injury, int cooldown, int confusion, bool fires)
     {
-        var result = Advance(Engine(injury: injury, cooldown: cooldown, confusion: confusion));
-        Assert.Empty(result.Events.OfType<TacticActivatedEvent>());
+        var result = Advance(Engine(injury: injury, cooldown: cooldown, confusion: confusion, readyReserve: true));
+        var activations = result.Events.OfType<TacticActivatedEvent>().ToArray();
+        Assert.Equal(fires, activations.Length > 0);
+        Assert.All(activations, e => Assert.Equal(12, Assert.Single(e.Participants).OfficerId));
     }
 
     [Theory]
@@ -238,9 +241,9 @@ public sealed class FacilityCombatTests
     }
     [Theory]
     [InlineData(12, 0, true)]
-    [InlineData(12, 100, false)]
+    [InlineData(12, 100, true)]
     [InlineData(null, 0, false)]
-    public void TacticReadsAppointedCommanderWithoutSelectingTheHigherPriorityRuler(int? appointed, int cooldown, bool fires)
+    public void AppointedCommanderSuppliesHealthGateWhileBestReadyOfficerCasts(int? appointed, int cooldown, bool fires)
     {
         MilitaryRulebook military = null!;
         var engine = Engine(captureRules: rules => military = rules);
@@ -251,8 +254,30 @@ public sealed class FacilityCombatTests
         FacilityCombat.TryTactic(mutation, 1, new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 },
             new SimulationRules { Military = military }, events);
         var activations = events.OfType<TacticActivatedEvent>().ToArray();
-        if (fires) Assert.Equal(appointed, Assert.Single(Assert.Single(activations).Participants).OfficerId);
+        if (fires) Assert.Equal(11, Assert.Single(Assert.Single(activations).Participants).OfficerId);
         else Assert.Empty(activations);
+    }
+
+    [Theory]
+    [InlineData(TacticEffect.Martial, 11)]
+    [InlineData(TacticEffect.Taunt, 12)]
+    public void FacilityScoresActualEffectAndRotatesReadyCasters(TacticEffect effect, int firstActor)
+    {
+        MilitaryRulebook military = null!;
+        var engine = Engine(effect, readyReserve: true, captureRules: rules => military = rules);
+        var mutation = WorldState.Restore(engine.Snapshot).BeginMutation();
+        mutation.Replace(mutation.Officers[12] with { BaseAbilities = new(200, 300, 100, 200) });
+        List<DomainEvent> events = [];
+        var rules = new SimulationRules { Military = military };
+        Assert.True(FacilityCombat.TryTactic(mutation, 1,
+            new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 }, rules, events));
+        Assert.Equal(firstActor, Assert.Single(Assert.Single(events.OfType<TacticActivatedEvent>()).Participants).OfficerId);
+        events.Clear();
+        Assert.True(FacilityCombat.TryTactic(mutation, 1,
+            new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 }, rules, events));
+        Assert.NotEqual(firstActor, Assert.Single(Assert.Single(events.OfType<TacticActivatedEvent>()).Participants).OfficerId);
+        Assert.False(FacilityCombat.TryTactic(mutation, 1,
+            new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 }, rules, events));
     }
 
     [Theory]

@@ -88,7 +88,7 @@ public static class ForceCapabilityCatalog
                 {
                     if (category == InformationCategory.Formations)
                         return Row(f.Id, texts.Resolve(f.NameKey), FormationEffect(rule));
-                    var tactics = rule.Tactics?.AutomaticTactics ?? [];
+                    var tactics = military.AutomaticTacticIds(rule, session.Companion);
                     return Row(f.Id, texts.Resolve(f.NameKey), tactics.Length == 0 ? "" :
                         "可发动兵法" + string.Concat(tactics.Select(id => $"「{Tactic(id)}」")) + "。");
                 }
