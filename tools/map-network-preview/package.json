@@ -1,0 +1,6 @@
+{
+  "name": "san9-map-network-preview",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "python serve.py", "test": "node --test graph.test.js" }
+}
