@@ -274,6 +274,9 @@ public sealed class TurnPresentationTests
         ready = true; turn.Update(.1);
         Assert.Same(day, turn.Day);
         Assert.Equal(.7, day.Elapsed, 6);
+        turn.Update(.15);
+        Assert.Equal(.1, turn.Progress, 8);
+        Assert.False(day.IsComplete);
         StateAssert.Equal(initial, session.Snapshot);
         Assert.Throws<ArgumentOutOfRangeException>(() => turn.PlaybackSpeed = (PlaybackSpeed)3);
     }
@@ -804,6 +807,58 @@ public sealed class TurnPresentationTests
         Assert.NotSame(firstFrame, turn.Display);
         Ready(turn); turn.Update(0.1);
         Assert.Equal(0.11, turn.Progress, 8);
+    }
+
+    [Fact]
+    public void SameDayDecisionsPreserveTheCompletedVisualDayAcrossResultPublications()
+    {
+        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "turn-decisions", 190, 1, 1, 1,
+            [new(1, "force", 1, 100) { LeaderId = 1, BaseTrust = 100 }],
+            [new(1, "home", 1, 0, 0, 1000, 100, 100, 0, [])], new() { [1] = "home" }, new() { [1] = 1 })
+        {
+            Officers = [new("ruler", new(1, 1, 1, new(50, 50, 50, 50), false)
+                { Status = San9.Core.Domain.OfficerStatus.Ruler }),
+                new("first", new(2, 1, 1, new(60, 30, 100, 100), false)),
+                new("second", new(3, 1, 1, new(60, 30, 100, 100), false))],
+            SearchEvents = [new San9.Core.Domain.CivicSearchEventDefinition(San9.Core.Domain.CivicSearchKind.Festival)
+                { Id = "festival", ChanceAbility = San9.Core.Domain.CommunityAbility.Politics, ChanceDivisor = 1, TrustReward = 2 }],
+            Information = new([], [], [], [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }], [])
+        };
+        var session = GameSession.Start(definition, 20);
+        Assert.True(session.Execute(new("player"), new SearchCommand(Guid.NewGuid(), 1, 0, [2, 3], 1)).Submission.Accepted);
+        bool resultsComplete = true;
+        var turn = new TurnPresentation(session) { CanContinue = _ => resultsComplete, CanPresentClosing = () => false };
+        Enter(turn);
+        for (int i = 0; i < 9; i++) { Ready(turn); turn.Update(1); }
+        Assert.Equal(10, session.Snapshot.Clock.Day);
+        Assert.Equal(.9, turn.Progress, 8);
+        Ready(turn); turn.Update(.5);
+        Assert.Equal(.95, turn.Progress, 8);
+        turn.TogglePause(); turn.Update(10);
+        Assert.Equal(.95, turn.Progress, 8);
+        turn.TogglePause(); turn.Update(.5);
+        Assert.Equal(TurnScreen.AwaitingDecision, turn.Screen);
+        Assert.Equal(10, session.Snapshot.Clock.Day);
+        Assert.Equal(1, turn.Progress);
+
+        for (int answer = 0; answer < 2; answer++)
+        {
+            var prompt = Assert.IsType<CommunitySearchPrompt>(session.GetCommunitySearchPrompt());
+            resultsComplete = false;
+            Assert.True(turn.Respond(new RespondDailyTaskCommand(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence,
+                prompt.TaskId, prompt.Step, false) { CommunitySearch = CommunitySearchChoice.Decline }));
+            Ready(turn); turn.Update(0);
+            Assert.Equal(TurnScreen.Presenting, turn.Screen);
+            Assert.Equal(1, turn.Progress);
+            turn.Update(100);
+            Assert.Equal(1, turn.Progress);
+            Assert.Equal(answer == 0 ? 10 : 11, session.Snapshot.Clock.Day);
+            resultsComplete = true;
+            turn.Update(0);
+            if (answer == 0) Assert.Equal(TurnScreen.AwaitingDecision, turn.Screen);
+        }
+        Assert.Equal(ResolutionPhase.XunClosing, turn.Phase);
+        Assert.False(turn.IsExecutionPresentation);
     }
 
     [Fact]

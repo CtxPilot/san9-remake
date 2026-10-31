@@ -163,7 +163,8 @@ public sealed class TurnDayPresentation(StrategySnapshot before, StrategySnapsho
         Advance(scene.End - previous);
         if (Elapsed > previous) SkippedSceneTime = Elapsed;
     }
-    public double Progress => Math.Clamp(Elapsed / Duration, 0, 1);
+    // Later attacks and event scenes extend playback, not the day's progress segment.
+    public double Progress => Math.Clamp(Elapsed / DayDuration, 0, 1);
     public void Advance(double seconds, bool paused = false, double? readingSeconds = null)
     {
         seconds = Math.Max(0, seconds);

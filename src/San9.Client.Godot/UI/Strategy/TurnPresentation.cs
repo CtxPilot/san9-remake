@@ -221,7 +221,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
             return;
         }
         if (_pending is not { IsCompleted: true }) return;
-        // Progress follows the prepared day (a choice may stop before the date advances).
+        // The visual day progresses independently of date advancement and event responses.
         // Publication is delayed until its presentation time; pause never launches another day.
         StrategySnapshot prepared;
         IReadOnlyList<DomainEvent> events;
@@ -236,10 +236,9 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
             if (CanPlayDay?.Invoke() == false) { Day.EndSceneFastForward(); return; }
             Day.Advance(seconds, readingSeconds: readingSeconds);
             PresentDay?.Invoke(Day);
-            double completed = Display!.World.Clock.DayNumber - _startedDay;
-            double next = _pending.PreparedSnapshot.Clock.DayNumber - _startedDay;
+            double completed = Day.Before.World.Clock.DayNumber - _startedDay;
             int step = Math.Clamp((int)Math.Floor(Day.Progress * 10), 0, 10);
-            Progress = Math.Clamp((completed + (next - completed) * step / 10) / 10, 0, 1);
+            Progress = Math.Clamp((completed + step / 10.0) / 10, 0, 1);
         }
         catch (Exception error)
         {
@@ -362,7 +361,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
         Publication++; _frameEmitted = true;
         if (Phase == ResolutionPhase.Daily)
         {
-            Progress = Math.Clamp((frame.After.World.Clock.DayNumber - _startedDay) / 10.0, 0, 1);
+            // Publishing results or answering another event does not replay the visual day.
             if (!frame.After.World.Clock.IsXunBoundary || frame.After.World.Clock == CalendarDate)
                 CalendarDate = frame.After.World.Clock;
         }

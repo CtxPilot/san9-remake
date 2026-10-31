@@ -149,7 +149,7 @@ public partial class StrategyHud
             _turnBanner.Material = frame < 3 ? _titleFlashMaterial : null;
             _turnBanner.SelfModulate = new Color(1, 1, 1, frame < 3 ? 128f / 256 : 1);
         }
-        _turnProgress.Visible = _pauseTurn.Visible = Turn.IsExecutionPresentation;
+        _turnProgress.Visible = _pauseTurn.Visible = Turn.IsExecutionPresentation && !OverlayHost.HasModal && !_notice.Visible;
         _turnProgress.Value = Math.Floor(304 * Turn.Progress);
         _pauseTurn.SetPressedNoSignal(Turn.Paused);
         var clock = _seasonChange?.ShowsNewBadge == true ? Turn.Display!.World.Clock : Turn.CalendarDate;
