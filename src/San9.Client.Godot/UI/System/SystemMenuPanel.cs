@@ -27,7 +27,8 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     public Action ControlDelegated { get; init; } = null!;
     public Func<Settings.UserSettings> ReadSettings { get; init; } = null!;
     public Action<Settings.UserSettings> ApplySettings { get; init; } = null!;
-    public Action<CompanionSettings> ApplyCompanionSettings { get; init; } = null!;
+    public Func<bool> ReadFormationAppearance { get; init; } = () => false;
+    public Action<Settings.CompanionConfiguration> ApplyCompanionSettings { get; init; } = null!;
     public SaveLoadBrowser Browser { get; } = new();
     private TextureScope? _textures;
     private Control? _page;
@@ -81,7 +82,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         if (_busy || !Session.CanEditWorld) return;
         Browser.Close();
         Show();
-        ReplacePage(new CompanionSettingsView { Initial = Session.Companion,
+        ReplacePage(new CompanionSettingsView { Initial = new(Session.Companion, ReadFormationAppearance()),
             SaveAndApply = ApplyCompanionSettings, Closed = Close });
     }
     public async void Open(SaveLoadMode mode)

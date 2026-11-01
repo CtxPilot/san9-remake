@@ -1,4 +1,5 @@
 using Godot;
+using San9.Client.Godot.Settings;
 using San9.Core.Domain;
 
 namespace San9.Client.Godot;
@@ -6,17 +7,18 @@ namespace San9.Client.Godot;
 /// <summary>Edits a draft; closing saves and applies only an actual configuration change.</summary>
 public partial class CompanionSettingsView : ModalView
 {
-    public CompanionSettings Initial { get; init; } = CompanionSettings.Default;
-    public Action<CompanionSettings> SaveAndApply { get; init; } = null!;
+    public CompanionConfiguration Initial { get; init; } = CompanionConfiguration.Default;
+    public Action<CompanionConfiguration> SaveAndApply { get; init; } = null!;
     public Action Closed { get; init; } = null!;
     private CompanionSettings _settings = CompanionSettings.Default;
     private readonly List<(ToggleOption Option, Button Control)> _toggleEditors = [];
     private readonly List<(NumericOption Option, SpinBox Control)> _numericEditors = [];
     private Label _failure = null!;
+    private Button _formationAppearance = null!;
 
     public override void _Ready()
     {
-        _settings = Initial;
+        _settings = Initial.Rules;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
         Theme = CompanionPanelStyle.Create(GetThemeFont("font"));
@@ -46,6 +48,17 @@ public partial class CompanionSettingsView : ModalView
             foreach (var section in page.Sections) AddSection(list, section);
             if (page.HasStrategyPermissions) StrategyPermissions(list);
         }
+        var appearance = new VBoxContainer { Name = "外观" };
+        tabs.AddChild(appearance);
+        _formationAppearance = new Button { Name = "FormationAppearance", ToggleMode = true, CustomMinimumSize = new(96, 36) };
+        CompanionPanelStyle.Toggle(_formationAppearance);
+        SetFormationAppearance(Initial.FormationAppearanceEnabled);
+        _formationAppearance.Toggled += value =>
+        {
+            _formationAppearance.Text = value ? "开启" : "关闭";
+            _failure.Hide();
+        };
+        OptionRow(appearance, "阵型差异外观", "普通八阵的中央兵群使用不同兵模，锥行、锋矢中央复用原版骑兵数量与站位，外围保留普通士兵。关闭面板后生效。").AddChild(_formationAppearance);
         _failure = Note(""); _failure.Visible = false;
         _failure.AddThemeColorOverride("font_color", new("ffb4ab")); column.AddChild(_failure);
         var divider = new ColorRect { Color = new("343e4b"), CustomMinimumSize = new(0, 1), MouseFilter = MouseFilterEnum.Ignore };
@@ -59,7 +72,7 @@ public partial class CompanionSettingsView : ModalView
         preset.Pressed += ApplyPreset; actions.AddChild(preset);
         var reset = new Button { Text = "原版配置", CustomMinimumSize = new(104, 38),
             TooltipText = "恢复原版对应配置。" };
-        reset.Pressed += () => RefreshEditors(CompanionSettings.Default); actions.AddChild(reset);
+        reset.Pressed += () => { RefreshEditors(CompanionSettings.Default); SetFormationAppearance(false); }; actions.AddChild(reset);
         var close = new Button { Text = "关闭", CustomMinimumSize = new(96, 38) };
         CompanionPanelStyle.Primary(close);
         close.Pressed += Back; actions.AddChild(close);
@@ -203,6 +216,7 @@ public partial class CompanionSettingsView : ModalView
 
     private void ApplyPreset()
     {
+        SetFormationAppearance(true);
         foreach (var (_, control) in _numericEditors) control.Apply();
         var settings = _settings;
         foreach (var (option, _) in _toggleEditors) settings = option.Write(settings, option.PresetValue);
@@ -215,6 +229,12 @@ public partial class CompanionSettingsView : ModalView
     {
         _settings = settings;
         _failure.Hide();
+    }
+
+    private void SetFormationAppearance(bool enabled)
+    {
+        _formationAppearance.SetPressedNoSignal(enabled);
+        _formationAppearance.Text = enabled ? "开启" : "关闭";
     }
 
     private void RefreshEditors(CompanionSettings settings)
@@ -240,7 +260,8 @@ public partial class CompanionSettingsView : ModalView
         try
         {
             foreach (var (_, control) in _numericEditors) control.Apply();
-            if (_settings != Initial) SaveAndApply(_settings);
+            var configuration = new CompanionConfiguration(_settings, _formationAppearance.ButtonPressed);
+            if (configuration != Initial) SaveAndApply(configuration);
             Closed();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or

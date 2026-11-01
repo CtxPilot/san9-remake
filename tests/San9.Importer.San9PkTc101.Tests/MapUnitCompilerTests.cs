@@ -4,6 +4,29 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class MapUnitCompilerTests
 {
+    [Fact]
+    public void AppearanceReusesCavalryCentralLayoutsWhilePreservingOrdinaryEscortsAcrossAllScales()
+    {
+        var formations = Compile();
+        var bindings = MapUnitCompiler.CompileFormationAppearance();
+        var preset = (new MapUnitCatalog([], formations, [], -1) { FormationAppearance = bindings })
+            .WithFormationAppearance().Formations.Take(8).ToArray();
+        Assert.Equal(Enumerable.Range(0, 8), preset.Select(f => f.FormationId));
+        Assert.Equal(new[] { 2, 1, 7, 5, 8, 9, 0, 3 }.Select(b => $"unit-body-{b}"), preset.Select(f => f.Layouts[0].Members[0].BodyId));
+        foreach (var formation in preset)
+        {
+            bool cavalry = formation.FormationId is 2 or 3;
+            Assert.Equal(cavalry ? [5, 13, 17, 21, 29, 41, 49] : new[] { 5, 17, 21, 29, 37, 45, 53 },
+                formation.Layouts.Select(l => l.Members.Length));
+            for (int scale = 0; scale < 7; scale++)
+            {
+                var after = formation.Layouts[scale];
+                var central = after.Members.Where(m => m.Group == 0).ToArray();
+                var template = formations[cavalry ? 16 : formation.FormationId].Layouts[scale].Members.Where(m => m.Group == 0);
+                Assert.Equal(template.Select(m => m with { BodyId = central[0].BodyId }), central);
+            }
+        }
+    }
     [Theory]
     [InlineData(0, 5016)]
     [InlineData(3, 5136)]

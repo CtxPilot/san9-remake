@@ -125,6 +125,7 @@ public sealed class TextureRebuildTests : IDisposable
     [InlineData("skin")]
     [InlineData("cursors")]
     [InlineData("map")]
+    [InlineData("map/formation-appearance")]
     [InlineData("portraits")]
     [InlineData("library/g_common")]
     public void RecognizesExplicitRebuildUnits(string scope) => TexturePackageRebuilder.ValidateScope(scope);

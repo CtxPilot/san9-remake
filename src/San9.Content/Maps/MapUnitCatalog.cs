@@ -43,20 +43,49 @@ public sealed record MapUnitMember(string BodyId, int X, int Y)
 }
 public sealed record MapUnitLayout(uint MinimumSoldiers, MapUnitMember[] Members, MapUnitEffect Influence);
 public sealed record MapUnitFormation(int FormationId, MapUnitLayout[] Layouts, int StatusY);
+public sealed record MapUnitFormationAppearance(int FormationId, string CentralBodyId, int CentralFormationId);
 public sealed record MapUnitEffect(string ClipId, int X, int Y);
 
 // Complete projected layouts: ranks and influence always select the same display scale.
 public sealed record MapUnitCatalog(MapUnitBody[] Bodies, MapUnitFormation[] Formations,
     Dictionary<UnitCondition, MapUnitEffect> Conditions, int RulerFlagGlyph)
 {
+    [JsonRequired] public MapUnitFormationAppearance[] FormationAppearance { get; init; } = [];
     [JsonRequired] public Dictionary<MapProjectileKind, MapProjectile> Projectiles { get; init; } = [];
     [JsonRequired] public MapUnitEffect[] VisionSlices { get; init; } = [];
     public static MapUnitCatalog Empty { get; } = new([], [], [], -1);
 
+    /// <summary>Compose central groups from authored references, retaining the base catalog.</summary>
+    public MapUnitCatalog WithFormationAppearance()
+    {
+        if (FormationAppearance.Length == 0) return this;
+        var replacements = FormationAppearance.ToDictionary(a => a.FormationId);
+        var formations = Formations.ToDictionary(f => f.FormationId);
+        return this with
+        {
+            Formations = Formations.Select(f => !replacements.TryGetValue(f.FormationId, out var appearance) ? f : f with
+            {
+                Layouts = f.Layouts.Select(layout => layout with
+                {
+                    Members = [
+                        .. formations[appearance.CentralFormationId].Layouts
+                            .Where(l => l.MinimumSoldiers <= layout.MinimumSoldiers).MaxBy(l => l.MinimumSoldiers)!
+                            .Members.Where(m => m.Group == 0).Select(m => m with { BodyId = appearance.CentralBodyId }),
+                        .. layout.Members.Where(m => m.Group != 0)]
+                }).ToArray()
+            }).ToArray()
+        };
+    }
+
     public void Validate(IReadOnlyDictionary<string, MapAnimationClip> clips, IReadOnlySet<string>? assets = null)
     {
         var bodies = Bodies.ToDictionary(b => b.Id);
-        _ = Formations.ToDictionary(f => f.FormationId);
+        var formations = Formations.ToDictionary(f => f.FormationId);
+        if (FormationAppearance.Select(a => a.FormationId).Distinct().Count() != FormationAppearance.Length ||
+            FormationAppearance.Any(a => !formations.ContainsKey(a.FormationId) ||
+                !formations.TryGetValue(a.CentralFormationId, out var central) || !bodies.ContainsKey(a.CentralBodyId) ||
+                central.Layouts.Any(l => !l.Members.Any(m => m.Group == 0))))
+            throw new InvalidDataException("Invalid formation appearance preset.");
         if (RulerFlagGlyph < -1 ||
             Bodies.Any(b => string.IsNullOrWhiteSpace(b.Id) || b.DirectionClips.Length != 8 ||
                 b.DirectionClips.Any(c => !clips.ContainsKey(c)) ||

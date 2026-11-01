@@ -65,7 +65,7 @@ public sealed record MapPackage(
     MapComposition[] Compositions, MapSprite[] Clouds, int?[] LeftEdge, int?[] RightEdge,
     ContentSource[] Sources, MapAnimations Animations, MapSprite[] Boundaries)
 {
-    public const int CurrentSchemaVersion = 19;
+    public const int CurrentSchemaVersion = 20;
     [JsonRequired] public MapUnitCatalog Units { get; init; } = MapUnitCatalog.Empty;
     public byte[] MinimapColors { get; init; } = new byte[32];
     [JsonRequired] public MapBuildingType[] BuildingTypes { get; init; } = [];

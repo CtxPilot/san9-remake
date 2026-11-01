@@ -15,19 +15,8 @@ public sealed class CompanionSettingsStoreTests : IDisposable
     public void StandaloneConfigurationRoundTripsAndInvalidDraftCannotReplaceIt()
     {
         var store = new CompanionSettingsStore(FilePath);
-        Assert.Equal(CompanionSettings.Default, store.Load());
-        Assert.Equal(45, store.Load().PlayerAutoSearchMinimumPolitics);
-        Assert.False(store.Load().DisableComputerForceConsolidation);
-        Assert.False(store.Load().DisableComputerPrisonerExecution);
-        Assert.False(store.Load().DisablePlayerPrisonerExecution);
-        Assert.False(store.Load().InfiniteLifespan);
-        Assert.Equal(100, store.Load().CityBattleDamagePercent);
-        Assert.Equal(100, store.Load().NoRetreatCaptureBonus);
-        Assert.False(store.Load().UseHighestAbilityForCapture);
-        Assert.False(store.Load().ConfigureTacticsOnFormationSelection);
-        Assert.Equal(80, store.Load().BattleDeathProtectionThreshold);
-        Assert.False(store.Load().AllowCommanderBattleDeaths);
-        Assert.Equal(0, store.Load().DuelDeathCoefficient);
+        Assert.Equal(CompanionConfiguration.Default, store.Load());
+        Assert.False(store.Load().FormationAppearanceEnabled);
         Assert.False(Directory.Exists(_directory));
         var settings = new CompanionSettings
         {
@@ -50,24 +39,27 @@ public sealed class CompanionSettingsStoreTests : IDisposable
             ComputerStrategyPermissions = new() { Alienate = false, Burn = false },
             PlayerDelegatedStrategyPermissions = new() { Seize = false, Gossip = false },
         };
-        store.Save(settings);
-        Assert.Equal(settings, new CompanionSettingsStore(FilePath).Load());
+        store.Save(new(settings, true));
+        Assert.Equal(new CompanionConfiguration(settings, true), new CompanionSettingsStore(FilePath).Load());
         byte[] saved = File.ReadAllBytes(FilePath);
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { OfficerAbilityCap = 99 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { PlayerAutoSearchMinimumPolitics = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { ComputerRevenuePercent = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { ComputerHarvestPercent = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { CityBattleDamagePercent = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { NoRetreatCaptureBonus = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { NoRetreatCaptureBonus = 101 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { BattleDeathProtectionThreshold = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { DuelDeathCoefficient = -1 }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { DuelDeathCoefficient = 11 }));
-        Assert.Throws<ArgumentNullException>(() => store.Save(settings with { ComputerStrategyPermissions = null! }));
-        Assert.Throws<ArgumentNullException>(() => store.Save(settings with { PlayerDelegatedStrategyPermissions = null! }));
+        foreach (var invalid in new[] {
+            settings with { OfficerAbilityCap = 99 }, settings with { PlayerAutoSearchMinimumPolitics = -1 },
+            settings with { ComputerRevenuePercent = -1 }, settings with { ComputerHarvestPercent = -1 },
+            settings with { CityBattleDamagePercent = -1 }, settings with { NoRetreatCaptureBonus = -1 },
+            settings with { NoRetreatCaptureBonus = 101 }, settings with { BattleDeathProtectionThreshold = -1 },
+            settings with { DuelDeathCoefficient = -1 }, settings with { DuelDeathCoefficient = 11 } })
+            Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(new(invalid, false)));
+        foreach (var invalid in new[] {
+            settings with { ComputerStrategyPermissions = null! }, settings with { PlayerDelegatedStrategyPermissions = null! } })
+            Assert.Throws<ArgumentNullException>(() => store.Save(new(invalid, false)));
         Assert.Equal(saved, File.ReadAllBytes(FilePath));
 
         var document = JsonNode.Parse(saved)!;
+        document.AsObject().Remove("formationAppearanceEnabled");
+        File.WriteAllText(FilePath, document.ToJsonString(), Encoding.UTF8);
+        Assert.Throws<JsonException>(() => store.Load());
+
+        document = JsonNode.Parse(saved)!;
         document["settings"]!.AsObject().Remove("officerAbilityCap");
         string incomplete = document.ToJsonString();
         File.WriteAllText(FilePath, incomplete, Encoding.UTF8);

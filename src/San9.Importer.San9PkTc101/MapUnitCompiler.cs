@@ -148,6 +148,7 @@ public static class MapUnitCompiler
         }
         return new(bodies, formations, conditions, 0)
         {
+            FormationAppearance = CompileFormationAppearance(),
             VisionSlices = Enumerable.Range(0, 16).Select(i => new MapUnitEffect(
                 Export($"unit-vision-{i}", 1222 + i, 125, 128, frameCount: 1),
                 -markers.Images[2 + i].Width / 2, -markers.Images[2 + i].Height / 2)).ToArray(),
@@ -165,6 +166,11 @@ public static class MapUnitCompiler
     internal static MapAttackTiming[] CompileAttackTimings(int body) => body == 13
         ? Enumerable.Range(0, 5).Select(n => new MapAttackTiming(n * 100, (n + 5) * 100)).ToArray()
         : [new(0, 0)];
+
+    // Both cavalry bodies share Wuwan's source category; content resolves the layout references.
+    internal static MapUnitFormationAppearance[] CompileFormationAppearance() =>
+        new[] { 2, 1, 7, 5, 8, 9, 0, 3 }.Select((body, id) =>
+            new MapUnitFormationAppearance(id, $"unit-body-{body}", body is 5 or 7 ? 16 : id)).ToArray();
 
     internal static int[] CompileConstructionResources(Func<int, int> at, int body)
     {

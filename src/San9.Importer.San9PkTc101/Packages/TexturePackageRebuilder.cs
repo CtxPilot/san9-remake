@@ -27,19 +27,16 @@ internal static class TexturePackageRebuilder
 
     internal static void ValidateScope(string scope)
     {
-        if (scope is "cursors" or "skin" or "map" or "portraits") return;
+        if (scope is "cursors" or "skin" or "map" or "map/formation-appearance" or "portraits") return;
         if (scope.StartsWith("library/", StringComparison.Ordinal) &&
             TextureLibraryCompiler.ArchiveIds.Contains(scope[8..], StringComparer.Ordinal)) return;
-        throw new ArgumentException($"Unknown texture rebuild unit '{scope}'. Use all, cursors, skin, map, portraits or library/ARCHIVE (for example library/g_common).");
+        throw new ArgumentException($"Unknown texture rebuild unit '{scope}'. Use all, cursors, skin, map, map/formation-appearance, portraits or library/ARCHIVE (for example library/g_common).");
     }
 
     public static async Task<TexturePackage> RebuildAsync(string gameDirectory, string output, string scope,
         Action<string>? progress, CancellationToken token)
     {
         ValidateScope(scope);
-        var source = new San9SourceDirectory(gameDirectory);
-        var identity = await San9PkTc101Detector.DetectAsync(source.Executable, token);
-        if (!identity.IsMatch) throw new InvalidDataException(identity.Reason);
         output = Path.GetFullPath(output);
         // Validate the completed package after replacing the selected unit. The old unit can be
         // precisely what is missing a newly required role or contains an incorrect definition.
@@ -47,6 +44,22 @@ internal static class TexturePackageRebuilder
             ?? throw new InvalidDataException("Empty texture package.");
         if (manifest["schemaVersion"]?.GetValue<int>() != 5 || manifest["sourceBuild"]?.GetValue<string>() != San9PkTc101Detector.SourceBuildId)
             throw new InvalidDataException("Targeted rebuilding requires a matching texture package schema and source build.");
+        if (scope == "map/formation-appearance")
+        {
+            var units = manifest["map"]?["units"]?.AsObject()
+                ?? throw new InvalidDataException("Missing unit visual catalog.");
+            units["formationAppearance"] = JsonSerializer.SerializeToNode(
+                MapUnitCompiler.CompileFormationAppearance(), PackageFiles.JsonOptions);
+            var rebuilt = manifest.Deserialize<TexturePackage>(PackageFiles.JsonOptions)
+                ?? throw new InvalidDataException("Empty texture package.");
+            using var metadata = new TexturePublication();
+            await TexturePackageImporter.PublishAsync(output, rebuilt, token, metadata);
+            progress?.Invoke("Rebuilt map/formation-appearance; retained all images and other resource definitions.");
+            return rebuilt;
+        }
+        var source = new San9SourceDirectory(gameDirectory);
+        var identity = await San9PkTc101Detector.DetectAsync(source.Executable, token);
+        if (!identity.IsMatch) throw new InvalidDataException(identity.Reason);
         byte[] Read(string path)
         {
             token.ThrowIfCancellationRequested();

@@ -17,6 +17,53 @@ public sealed class MapUnitAttackContractTests
     { Projectiles = new() { [MapProjectileKind.Arrow] = new(["arrow"], 64, false, 0, 0) } };
 
     [Fact]
+    public void FormationAppearanceResolvesReferencesAndPreservesTheBaseCatalog()
+    {
+        var clips = new Dictionary<string, MapAnimationClip>(Clips);
+        foreach (int direction in Enumerable.Range(0, 8))
+            foreach (string layer in new[] { "pole-back", "pole-front" })
+            {
+                string id = $"unit-flag-{direction}-{layer}";
+                clips.Add(id, new(id, ["frame"], 100, []));
+            }
+        var escort = new MapUnitMember(Body.Id, 30, 10) { Group = 1 };
+        var influence = new MapUnitEffect("body", -7, -9);
+        var formation = new MapUnitFormation(900, [new(1, [new(Body.Id, 0, 0), escort], influence),
+            new(100, [new(Body.Id, 1, 1), escort], influence)], -50);
+        var central = new MapUnitFormation(901, [new(50, [new(Body.Id, 7, 9), new(Body.Id, -7, -9) { Index = 1 }], influence),
+            new(1, [new(Body.Id, 2, 3)], influence)], -60);
+        var preset = new MapUnitFormationAppearance(900, "alternate", 901);
+        var catalog = Catalog(Body) with
+        {
+            Bodies = [Body, Body with { Id = "alternate" }],
+            Formations = [formation, central], FormationAppearance = [preset]
+        };
+        catalog.Validate(clips);
+        var selected = catalog.WithFormationAppearance();
+        selected.Validate(clips);
+        Assert.Equal(new[] { new MapUnitMember("alternate", 2, 3), escort }, selected.Formations[0].Layouts[0].Members);
+        Assert.Equal(new[] { new MapUnitMember("alternate", 7, 9), new("alternate", -7, -9) { Index = 1 }, escort },
+            selected.Formations[0].Layouts[1].Members);
+        Assert.Equal(formation.StatusY, selected.Formations[0].StatusY);
+        Assert.Equal(formation.Layouts.Select(l => l.MinimumSoldiers), selected.Formations[0].Layouts.Select(l => l.MinimumSoldiers));
+        Assert.All(selected.Formations[0].Layouts, l => Assert.Same(influence, l.Influence));
+        Assert.Same(central, selected.Formations[1]);
+        Assert.Same(formation, catalog.Formations[0]);
+        Assert.All(formation.Layouts.SelectMany(l => l.Members), m => Assert.Equal(Body.Id, m.BodyId));
+        foreach (var bindings in new MapUnitFormationAppearance[][] {
+            [preset with { FormationId = 902 }], [preset with { CentralBodyId = "absent" }],
+            [preset with { CentralFormationId = 902 }], [preset, preset] })
+            Assert.Throws<InvalidDataException>(() => (catalog with { FormationAppearance = bindings }).Validate(clips));
+        Assert.Throws<InvalidDataException>(() => (catalog with
+        {
+            Formations = [formation, central with { Layouts = [new(1, [escort], influence)] }]
+        }).Validate(clips));
+        var node = JsonSerializer.SerializeToNode(catalog, PackageFiles.JsonOptions)!.AsObject();
+        node.Remove("formationAppearance");
+        Assert.Throws<JsonException>(() => node.Deserialize<MapUnitCatalog>(PackageFiles.JsonOptions));
+    }
+
+    [Fact]
     public void AuthoredContentSupportsMultipleFlagsAndAnIndependentVolleyAndRejectsInvalidRecipes()
     {
         Catalog(Body).Validate(Clips);

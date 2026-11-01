@@ -11,6 +11,8 @@ public partial class MapWorld : Node2D
 {
     private Camera2D _camera = null!;
     private MapPackage? _map;
+    private MapPackage? _sourceMap;
+    private bool _formationAppearanceEnabled;
     private readonly MapSceneProjectionCache _projections = new();
     private MapViewport _requested = new(0, 0, 1);
     private MapSceneView? _display;
@@ -124,7 +126,9 @@ public partial class MapWorld : Node2D
     }
     public void LoadMap(MapPackage map, string root, string? season = null, double? animationTime = null)
     {
-        _map = map; _packageRoot = root; _fixedAnimationTime = animationTime;
+        _sourceMap = map;
+        _map = _formationAppearanceEnabled ? map with { Units = map.Units.WithFormationAppearance() } : map;
+        _packageRoot = root; _fixedAnimationTime = animationTime;
         _requested = _requested.Clamp(map.Squares, map.Width, map.Height);
         _terrain ??= new(Textures.UploadGenerated, texture => Textures.Defer(texture.Dispose));
         if (_display is null)
@@ -138,6 +142,20 @@ public partial class MapWorld : Node2D
         BeginLoad(DesiredSeason);
     }
     private string DesiredSeason => PresentationSeason ?? PreviewSeasonOverride ?? CalendarSeason.ForMonth(View.Month);
+
+    public void ConfigureFormationAppearance(bool enabled)
+    {
+        if (_formationAppearanceEnabled == enabled) return;
+        if (Day is not null) throw new InvalidOperationException("不能在日段演出期间切换阵型外观。");
+        _formationAppearanceEnabled = enabled;
+        if (_sourceMap is null) return;
+        _map = enabled ? _sourceMap with { Units = _sourceMap.Units.WithFormationAppearance() } : _sourceMap;
+        if (Scene is null) return;
+        // All views, attack plans, audio and resource leases consume the same selected catalog.
+        Scene = new(_map, Scene.Terrain, Scene.Season, View, Textures.MapAssets, () => UnitPositionTime,
+            projection: _projections.Get(View, _map));
+        RequestDisplay();
+    }
     private void SynchronizeSeason()
     {
         if (_map is not null && DesiredSeason != _requestedSeason) BeginLoad(DesiredSeason);

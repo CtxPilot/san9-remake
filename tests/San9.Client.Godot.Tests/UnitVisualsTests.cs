@@ -224,7 +224,9 @@ public sealed class UnitVisualsTests
     [Fact]
     public void ImperialBodiesAndRulerFlagsAreIndependentAndReversible()
     {
-        var imperial = Resolve(State with { UsesImperialAppearance = true });
+        var preset = (Catalog with { FormationAppearance = [new(10000, "body", 20000)] }).WithFormationAppearance();
+        var imperial = Sample(State with { UsesImperialAppearance = true }, preset);
+        Assert.Equal(2, imperial.Animations.Count(a => a.IsBody));
         Assert.Contains(imperial.Animations, s => s.ClipId == "imperial-0");
         Assert.Contains(imperial.Animations, s => s.ClipId == "unit-flag-0-glyph-0-2");
         var ruler = Resolve(State with { IsRulerCommander = true });

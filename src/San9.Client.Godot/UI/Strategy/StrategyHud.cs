@@ -52,7 +52,8 @@ public partial class StrategyHud : Control
     public bool SoundEnabled => ReadSettings().SoundEnabled;
     public Func<Settings.UserSettings> ReadSettings { get; init; } = () => Settings.UserSettings.Default;
     public Action<Settings.UserSettings> ApplySettings { get; init; } = _ => { };
-    public Action<San9.Core.Domain.CompanionSettings> ApplyCompanionSettings { get; init; } = null!;
+    public Func<bool> ReadFormationAppearance { get; init; } = () => false;
+    public Action<Settings.CompanionConfiguration> ApplyCompanionSettings { get; init; } = null!;
     private TextureButton _functionsButton = null!;
     private StrategyOverviewPanel _overviewPanel = null!;
     private bool _built;
@@ -211,6 +212,7 @@ public partial class StrategyHud : Control
             ControlDelegated = ControlDelegated,
             ReadSettings = ReadSettings,
             ApplyCompanionSettings = ApplyCompanionSettings,
+            ReadFormationAppearance = ReadFormationAppearance,
             ApplySettings = ApplyUserSettings
         };
         OverlayHost.AddChild(SystemMenu);

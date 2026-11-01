@@ -1,4 +1,5 @@
 using Godot;
+using San9.Client.Godot.Settings;
 using San9.Core.Domain;
 
 namespace San9.Client.Godot;
@@ -7,7 +8,7 @@ public partial class WorkflowLifecycleVerification
 {
     private void CheckCompanionDraft()
     {
-        CompanionSettings? saved = null;
+        CompanionConfiguration? saved = null;
         int writes = 0, closes = 0;
         bool failSave = false;
         var view = new CompanionSettingsView
@@ -42,24 +43,31 @@ public partial class WorkflowLifecycleVerification
             Check(writes == 0 && closes == 1, "A failed companion save closed the draft.");
             failSave = false;
             view.Back();
-            Check(saved is { ComputerRevenuePercent: 175, ComputerHarvestPercent: 225, PlayerAutoDomesticEnabled: true },
+            Check(saved?.Rules is { ComputerRevenuePercent: 175, ComputerHarvestPercent: 225, PlayerAutoDomesticEnabled: true },
                 "Editing another control or applying numeric fields lost pending companion input.");
 
             battle.GetLineEdit().Text = "75";
             preset.EmitSignal(BaseButton.SignalName.Pressed);
             view.Back();
-            Check(saved is { ComputerRevenuePercent: 200, ComputerHarvestPercent: 200, OfficerAbilityCap: 125,
+            Check(saved?.Rules is { ComputerRevenuePercent: 200, ComputerHarvestPercent: 200, OfficerAbilityCap: 125,
                 NoRetreatCaptureBonus: 0, CityBattleDamagePercent: 75, DisableComputerPrisonerExecution: true,
                 DisablePlayerPrisonerExecution: true,
                 ConfigureTacticsOnFormationSelection: true, BattleDeathProtectionThreshold: 125,
                 AllowCommanderBattleDeaths: true, DuelDeathCoefficient: 0, InfiniteLifespan: true } &&
-                saved.ComputerStrategyPermissions is { Alienate: false, Burn: false, FalseReport: true } &&
-                saved.PlayerDelegatedStrategyPermissions == saved.ComputerStrategyPermissions,
+                saved.Rules.ComputerStrategyPermissions is { Alienate: false, Burn: false, FalseReport: true } &&
+                saved.Rules.PlayerDelegatedStrategyPermissions == saved.Rules.ComputerStrategyPermissions,
                 $"The companion preset discarded a retained numeric draft or applied incorrect policies: {saved}.");
+            Check(saved?.FormationAppearanceEnabled == true, "The companion preset did not enable formation appearance.");
 
             reset.EmitSignal(BaseButton.SignalName.Pressed);
             view.Back();
             Check(writes == 2 && closes == 4, "Restoring the original settings wrote an unchanged draft.");
+            var appearance = (Button)view.FindChild("FormationAppearance", true, false);
+            Check(!appearance.ButtonPressed, "Original settings did not reset formation appearance.");
+            appearance.ButtonPressed = true;
+            view.Back();
+            Check(writes == 3 && closes == 5 && saved == new CompanionConfiguration(CompanionSettings.Default, true),
+                "A visual-only draft must save without changing simulation settings.");
             GD.Print("COMPANION_DRAFT_OK pending-input,preset,reset,save-failure");
         }
         finally { view.Free(); }
