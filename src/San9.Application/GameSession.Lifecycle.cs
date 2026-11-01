@@ -95,6 +95,7 @@ public sealed partial class GameSession
         session._records.AddRange(snapshot.Records);
         session._chronicle.AddRange(snapshot.Chronicle);
         session.History = snapshot.History;
+        session.DeploymentPresets = snapshot.DeploymentPresets;
         session.NextOperationSequence = snapshot.NextOperationSequence;
         session._ending = snapshot.Ending;
         session._strategicContexts = snapshot.StrategicContexts;

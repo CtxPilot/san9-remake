@@ -6,7 +6,7 @@ using San9.Core.Domain;
 
 namespace San9.Client.Godot;
 
-/// <summary>Preparation only. The draft remains local until a future destination workflow commits it.</summary>
+/// <summary>Edits a local preparation; only the destination workflow submits a deployment.</summary>
 public partial class DeploymentView : FixedPage
 {
     protected override Color PageBackground => new(0, 0, 0, .35f);
@@ -22,6 +22,7 @@ public partial class DeploymentView : FixedPage
     private StyleBoxTexture _fieldStyle = null!;
     private float _facilityWidth;
     private CommandWindow? _window;
+    private DeploymentPresetBar? _presetBar;
     public override void _Ready()
     {
         Size = new(1024, 768); MouseFilter = MouseFilterEnum.Stop;
@@ -49,19 +50,24 @@ public partial class DeploymentView : FixedPage
         alignment: HorizontalAlignment.Right, style: new GameTextStyle(16, new Color("f0f0f0"), GameTextEffect.None, Colors.Transparent));
     private void Button(string title, string skin, Rect2 bounds, Action action, bool enabled = true)
     {
-        var button = new InformationMenuButton { Title = title, SkinPrefix = "deployment-" + skin, Textures = Textures, Position = bounds.Position, Size = bounds.Size, Disabled = !enabled,
-            TextStyle = (hovered, pressed, disabled) => new GameTextStyle(skin == "edit" ? 16 : 24,
-                new Color(disabled ? hovered ? "000000" : "a4a4a4" : hovered || pressed ? "f0f0f0" : "d8d8d8"),
-                GameTextEffect.Outline, new Color(disabled ? hovered ? "f0f0f0" : "000000" : hovered || pressed
-                    ? skin == "edit" ? "800090" : skin == "cancel" ? "983810" : "005028" : "000000")) };
-        button.Pressed += action; _body!.AddChild(button);
+        var window = _window!;
+        var button = window.ActionButton(title, skin, new(bounds.Position - window.Position, bounds.Size), action);
+        button.Disabled = !enabled;
     }
     private string Person(int? id) => id is int person ? Texts.Resolve(Draft.View.Officers.Single(o => o.Id == person).NameKey) : "";
     private string Formation(int? id) => id is int formation ? Texts.Resolve(Draft.View.Information.Formations.Single(f => f.Id == formation).NameKey) : "";
     private void Rebuild()
     {
+        int presetScroll = _presetBar?.ScrollPosition ?? 0;
         if (_body is not null) { RemoveChild(_body); _body.QueueFree(); }
         _body = new Control { MouseFilter = MouseFilterEnum.Ignore }; AddChild(_body);
+        _presetBar = new DeploymentPresetBar
+        {
+            Draft = Draft, Presets = Session.DeploymentPresets, Texts = Texts, Textures = Textures,
+            InitialScroll = presetScroll, Position = new(4, 112), Size = new(88, 600),
+            Activated = ApplyPresetShortcut, SaveRequested = SavePresetShortcut, UpdateRequested = UpdatePresetShortcut
+        };
+        _body.AddChild(_presetBar);
         if (_window is not null) { RemoveChild(_window); _window.QueueFree(); }
         _window = new CommandWindow { Texts = Texts, Textures = Textures, Position = new(136, 100), Size = new(752, 568),
             Title = "出征", ShowBehindParent = true, Closed = Closed, Accepted = Proceed, CanAccept = Draft.CanProceed,
@@ -71,6 +77,7 @@ public partial class DeploymentView : FixedPage
         _facilityWidth = facility.Sum(c => c < 128 ? 8 : 16) + 32;
         Label(facility, new(136, 100, _facilityWidth, 32));
         Button("执行武将", "edit", new(136, 148, 104, 40), SelectOfficers);
+        Button("常用编队", "edit", new(248, 148, 104, 40), OpenPresets);
         bool selected = !Draft.Members.IsEmpty;
         Button("阵形", "edit", new(136, 228, 104, 40), () => SelectFormation(false), selected && Draft.Formations(false).Count > 1);
         Button("船", "edit", new(136, 268, 104, 40), () => SelectFormation(true), selected && Draft.Formations(true).Count > 1);
@@ -109,8 +116,43 @@ public partial class DeploymentView : FixedPage
         QueueRedraw();
     }
     private void RebuildDeferred() => Rebuild();
+    private void OpenPresets() => OpenChild(new DeploymentPresetView
+    {
+        Draft = Draft, Session = Session, Texts = Texts, Textures = Textures, Closed = CloseChild
+    });
+    private void ApplyPresetShortcut(DeploymentPreset preset)
+    {
+        var result = Draft.ApplyPreset(preset);
+        if (!result.CanApply) { Notice(result.Describe(Draft.View, Texts) + "。\n当前出征配置保持原样。 "); return; }
+        Rebuild();
+    }
+    private void SavePresetShortcut()
+    {
+        if (!Draft.CanProceed) return;
+        string name = DeploymentPresetStyle.DefaultName(Draft, Texts);
+        var preset = Draft.CreatePreset(Guid.NewGuid(), name, DeploymentSoldierMode.Fixed);
+        var result = Session.Apply(Session.Request(new SaveDeploymentPresetOperation(preset)));
+        if (result.Disposition != SessionDisposition.Accepted) { Notice("当前无法保存编队，请稍后重试。 "); return; }
+        Draft.MarkPresetSaved(preset);
+        Rebuild();
+    }
+    private void UpdatePresetShortcut(DeploymentPreset source)
+    {
+        if (source.Id != Draft.SourcePresetId || !Draft.HasPresetChanges || !Draft.CanProceed) return;
+        var current = Session.DeploymentPresets.FirstOrDefault(p => p.Id == source.Id);
+        if (current is null) { Notice("来源编队已删除，当前配置仍可另存为新编队。 "); return; }
+        var updated = Draft.CreatePresetUpdate(current);
+        var result = Session.Apply(Session.Request(new SaveDeploymentPresetOperation(updated)));
+        if (result.Disposition != SessionDisposition.Accepted) { Notice("当前无法更新编队，已保留本次修改。 "); return; }
+        Draft.MarkPresetSaved(updated);
+        Rebuild();
+    }
     private void OpenChild(Control child)
-    { _child = child; AddChild(child); }
+    {
+        _child = child;
+        if (child is DeploymentPresetView) { _body?.Hide(); _window?.Hide(); QueueRedraw(); }
+        AddChild(child);
+    }
     private void CloseChild()
     { if (_child is not null) { RemoveChild(_child); _child.QueueFree(); _child = null; } Rebuild(); }
     private void Notice(string message)
@@ -216,6 +258,7 @@ public partial class DeploymentView : FixedPage
     }
     public override void _Draw()
     {
+        if (_child is DeploymentPresetView) return;
         DrawTexture(Textures.Get("formation-panel-deployment", this), new(368, 148));
         Strip("facility", new(136, 100, _facilityWidth, 32));
         foreach (int x in new[] { 240, 296 })

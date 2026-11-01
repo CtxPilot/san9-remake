@@ -9,7 +9,8 @@ namespace San9.Application.Diagnostics;
 
 public sealed record SessionDiagnosticSnapshot(WorldDiagnosticSnapshot World, ImmutableArray<SessionRecord> Records,
     ImmutableArray<ChronicleEntry> Chronicle, ImmutableList<ChronicleFact> History, EndingSelection? Ending, ImmutableDictionary<int, Presentation.StrategicContextState> StrategicContexts,
-    long NextOperationSequence, ControllerKind PlayerForceController, AI.OriginalAiState OriginalAi);
+    long NextOperationSequence, ControllerKind PlayerForceController, AI.OriginalAiState OriginalAi,
+    ImmutableArray<DeploymentPreset> DeploymentPresets);
 
 public static class SessionDiagnostics
 {
@@ -19,7 +20,7 @@ public static class SessionDiagnostics
 
     public static SessionDiagnosticSnapshot Capture(SessionSnapshot session) => new(WorldDiagnostics.Capture(session.World),
         session.Records, session.Chronicle, session.History, session.Ending, session.StrategicContexts,
-        session.NextOperationSequence, session.PlayerForceController, session.OriginalAi);
+        session.NextOperationSequence, session.PlayerForceController, session.OriginalAi, session.DeploymentPresets);
 
     public static JsonElement Serialize(SessionSnapshot session) =>
         JsonSerializer.SerializeToElement(Capture(session), SessionDiagnosticJsonContext.Default.SessionDiagnosticSnapshot);
@@ -41,6 +42,7 @@ public static class SessionDiagnostics
         var comparison = new DiagnosticComparison(SessionDiagnosticJsonContext.Default, describeDifference);
         // Keep diagnostic paths in ordinal order; World owns its own normalization and comparison.
         bool equal = comparison.Check(expected.Chronicle, actual.Chronicle, "$.chronicle") &&
+            comparison.Check(expected.DeploymentPresets, actual.DeploymentPresets, "$.deploymentPresets") &&
             comparison.Check(expected.Ending, actual.Ending, "$.ending") &&
             comparison.Check(expected.History, actual.History, "$.history") &&
             comparison.Check(expected.NextOperationSequence, actual.NextOperationSequence, "$.nextOperationSequence") &&

@@ -8,8 +8,8 @@ namespace San9.Application;
 public static class SessionProtocol
 {
     public const string RulesVersion = "san9-core-g10-v230";
-    public const int SaveFormatVersion = 132;
-    public const int LogFormatVersion = 154;
+    public const int SaveFormatVersion = 133;
+    public const int LogFormatVersion = 155;
 }
 
 /// <summary>Non-authoritative load diagnostics; never included in saves or deterministic hashes.</summary>
@@ -30,7 +30,11 @@ public sealed record RulesVersionWarning(string SavedVersion, string CurrentVers
 [JsonDerivedType(typeof(ForceControlOperation), "force-control")]
 [JsonDerivedType(typeof(HandOverAllForcesOperation), "hand-over-all-forces")]
 [JsonDerivedType(typeof(WorldEditOperation), "world-edit")]
+[JsonDerivedType(typeof(SaveDeploymentPresetOperation), "save-deployment-preset")]
+[JsonDerivedType(typeof(DeleteDeploymentPresetOperation), "delete-deployment-preset")]
 public abstract record SessionOperation;
+public sealed record SaveDeploymentPresetOperation(DeploymentPreset Preset) : SessionOperation;
+public sealed record DeleteDeploymentPresetOperation(Guid PresetId) : SessionOperation;
 public sealed record WorldEditOperation(WorldEditorKind Kind, ImmutableArray<WorldEdit> Edits) : SessionOperation;
 public sealed record ForceControlOperation(int ForceId, ControllerKind Kind) : SessionOperation;
 public sealed record HandOverAllForcesOperation : SessionOperation;
@@ -56,6 +60,7 @@ public sealed record SessionResult(SessionDisposition Disposition, SessionReject
 public sealed record SessionSnapshot(WorldSnapshot World, ImmutableArray<SessionRecord> Records,
     ImmutableArray<ChronicleEntry> Chronicle, long NextOperationSequence)
 {
+    [JsonRequired] public ImmutableArray<DeploymentPreset> DeploymentPresets { get; init; } = [];
     [JsonRequired] public ImmutableList<ChronicleFact> History { get; init; } = [];
     [JsonRequired] public EndingSelection? Ending { get; init; }
     [JsonRequired] public ImmutableDictionary<int, Presentation.StrategicContextState> StrategicContexts { get; init; } = ImmutableDictionary<int, Presentation.StrategicContextState>.Empty;

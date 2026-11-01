@@ -6,7 +6,7 @@ using San9.Core.Domain;
 namespace San9.Application.Presentation;
 
 /// <summary>A revision-bound preparation draft. Editing never issues commands or changes the world.</summary>
-public sealed class DeploymentDraft
+public sealed partial class DeploymentDraft
 {
     public StrategySnapshot View { get; }
     public MilitaryRulebook Rules { get; }
@@ -104,8 +104,11 @@ public sealed class DeploymentDraft
     { if (value == 0 || value > MaximumSoldiers) return false; Soldiers = value; return true; }
 
     public FormationPresentation? Presentation(bool naval) => View.Information.Formations.FirstOrDefault(f => f.Id == (naval ? NavalFormationId : FormationId))?.Presentation;
-    public ImmutableArray<FormationSlot> Slots => Presentation(false) is { Slots.IsEmpty: false } presentation ? presentation.Slots : (FormationId is int id
-        ? Enumerable.Range(0, Rules.Formations[id].OfficerCapacity).Select(i => new FormationSlot(i, 1)).ToImmutableArray() : []);
+    public ImmutableArray<FormationSlot> Slots => FormationId is int id ? FormationSlots(View, id) : [];
+    internal static ImmutableArray<FormationSlot> FormationSlots(StrategySnapshot view, int id) =>
+        view.Information.Formations.FirstOrDefault(f => f.Id == id)?.Presentation is { Slots.IsEmpty: false } presentation
+            ? presentation.Slots
+            : Enumerable.Range(0, view.MilitaryRules!.Formations[id].OfficerCapacity).Select(i => new FormationSlot(i, 1)).ToImmutableArray();
     private void Arrange(bool retain)
     {
         var slots = Slots;

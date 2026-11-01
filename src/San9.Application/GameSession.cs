@@ -20,6 +20,7 @@ public sealed partial class GameSession
     private readonly List<ChronicleEntry> _chronicle = [];
     public const int RecentRecordLimit = 128;
     public long NextOperationSequence { get; private set; }
+    public ImmutableArray<DeploymentPreset> DeploymentPresets { get; private set; } = [];
     private bool _executing;
     internal bool IsExecuting => _executing;
     public bool CanEditWorld => !_executing && Snapshot.Simulation.Boundary == SimulationBoundary.Stable && _originalAi.Continuation is null;

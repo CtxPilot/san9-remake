@@ -104,7 +104,7 @@ public sealed class DeploymentDraftTests
         Assert.Throws<ArgumentException>(() => new UnitCommandTargets(view, 7, UnitCommandKind.Attack));
     }
 
-    private static StrategySnapshot View(Func<San9.Core.Simulation.WorldSnapshot, San9.Core.Simulation.WorldSnapshot>? change = null, bool work = false)
+    internal static StrategySnapshot View(Func<San9.Core.Simulation.WorldSnapshot, San9.Core.Simulation.WorldSnapshot>? change = null, bool work = false)
     {
         var definition = G01ScenarioTests.Fixture();
         var world = GameSession.Start(definition, 1).Snapshot;

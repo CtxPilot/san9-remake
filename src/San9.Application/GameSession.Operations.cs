@@ -11,11 +11,12 @@ public sealed partial class GameSession
     // Captured on the owner thread. Calculation forks the engine and never accesses the live session.
     internal sealed record OperationInput(SimulationEngine Simulation, ScenarioSessionDefinition Definition,
         StrategySnapshot View, long Sequence, OriginalAiState OriginalAi,
-        EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts, ImmutableList<ChronicleFact> History);
+        EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts, ImmutableList<ChronicleFact> History,
+        ImmutableArray<DeploymentPreset> DeploymentPresets);
 
     internal sealed record OperationCommit(SimulationEngine Simulation, OriginalAiState OriginalAi,
         ImmutableArray<OriginalAiWorkReport> AiReports, EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts,
-        ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note);
+        ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note, ImmutableArray<DeploymentPreset> DeploymentPresets);
 
     internal sealed record PreparedOperation(SessionResult Result, StrategySnapshot View,
         OperationCommit? Commit = null)
@@ -24,7 +25,7 @@ public sealed partial class GameSession
     }
 
     private OperationInput CaptureOperationInput() => new(_simulation, _definition, View,
-        NextOperationSequence, _originalAi, _ending, _strategicContexts, History);
+        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets);
 
     public SessionResult Apply(SessionRequest request)
     {
@@ -70,8 +71,31 @@ public sealed partial class GameSession
             DevelopmentOutcome? development = null;
             ChronicleEntry? note = null;
             var ending = input.Ending;
+            var deploymentPresets = input.DeploymentPresets;
             switch (request.Operation)
             {
+                case SaveDeploymentPresetOperation savePreset:
+                    if (request.ControllerId != "player" || savePreset.Preset is null ||
+                        input.View.PlayerForceId != savePreset.Preset.ForceId)
+                        return Rejected(SessionRejection.InvalidRequest);
+                    if (candidate.Snapshot.Simulation.Boundary != SimulationBoundary.Stable || originalAi.Continuation is not null)
+                        return Rejected(SessionRejection.NotStable);
+                    try { savePreset.Preset.Validate(input.View); }
+                    catch (ArgumentException) { return Rejected(SessionRejection.InvalidRequest); }
+                    var previousPreset = deploymentPresets.FirstOrDefault(p => p.Id == savePreset.Preset.Id);
+                    if (previousPreset is not null && previousPreset.ForceId != savePreset.Preset.ForceId)
+                        return Rejected(SessionRejection.InvalidRequest);
+                    deploymentPresets = previousPreset is null ? deploymentPresets.Add(savePreset.Preset)
+                        : deploymentPresets.Replace(previousPreset, savePreset.Preset);
+                    break;
+                case DeleteDeploymentPresetOperation deletePreset:
+                    var removedPreset = deploymentPresets.FirstOrDefault(p => p.Id == deletePreset.PresetId);
+                    if (request.ControllerId != "player" || removedPreset is null || input.View.PlayerForceId != removedPreset.ForceId)
+                        return Rejected(SessionRejection.InvalidRequest);
+                    if (candidate.Snapshot.Simulation.Boundary != SimulationBoundary.Stable || originalAi.Continuation is not null)
+                        return Rejected(SessionRejection.NotStable);
+                    deploymentPresets = deploymentPresets.Remove(removedPreset);
+                    break;
                 case WorldEditOperation edit:
                     if (request.ControllerId != "player") return Rejected(SessionRejection.InvalidRequest);
                     if (candidate.Snapshot.Simulation.Boundary != SimulationBoundary.Stable || originalAi.Continuation is not null)
@@ -176,7 +200,7 @@ public sealed partial class GameSession
                     strategicContexts.GetValueOrDefault(force, StrategicContextState.Empty)));
             var publishedEvents = events.ToImmutableArray();
             var commit = new OperationCommit(candidate, originalAi.Reconcile(snapshot), aiReports.ToImmutableArray(),
-                ending, strategicContexts, history, completed, note);
+                ending, strategicContexts, history, completed, note, deploymentPresets);
             return new(new(SessionDisposition.Accepted, SessionRejection.None, publishedEvents, snapshot, Development: development),
                 view, commit) { Transitions = transitions.ToArray() };
         }
@@ -201,6 +225,7 @@ public sealed partial class GameSession
                 _ending = commit.Ending;
                 _strategicContexts = commit.StrategicContexts;
                 History = commit.History;
+                DeploymentPresets = commit.DeploymentPresets;
                 _records.AddRange(commit.Records);
                 if (_records.Count > RecentRecordLimit) _records.RemoveRange(0, _records.Count - RecentRecordLimit);
                 if (commit.Note is not null) _chronicle.Add(commit.Note);

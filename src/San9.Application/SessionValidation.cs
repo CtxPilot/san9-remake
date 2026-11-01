@@ -9,6 +9,14 @@ internal static class SessionValidation
     {
         if (!snapshot.World.Simulation.CanPersist)
             throw new ArgumentException("Session is not at a save boundary.");
+        if (snapshot.DeploymentPresets.IsDefault || snapshot.DeploymentPresets.Any(p => p is null) ||
+            snapshot.DeploymentPresets.Select(p => p.Id).Distinct().Count() != snapshot.DeploymentPresets.Length)
+            throw new ArgumentException("Invalid deployment preset collection.");
+        if (!snapshot.DeploymentPresets.IsEmpty)
+        {
+            var presetView = new Presentation.StrategySnapshot(definition.Content, snapshot.World);
+            foreach (var preset in snapshot.DeploymentPresets) preset.Validate(presetView);
+        }
         if (snapshot.Records.IsDefault || snapshot.Chronicle.IsDefault || snapshot.History is null || snapshot.Records.Length > GameSession.RecentRecordLimit ||
             snapshot.NextOperationSequence < 0)
             throw new ArgumentException("Missing session state.");
