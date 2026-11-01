@@ -102,7 +102,8 @@ internal static class OriginalAiTurnRunner
                     Report(new(corps.Id, work, OriginalAiWorkEnd.PreparationFailed, 0, 0));
                     continue;
                 }
-                if (force.IsBarbarian && !rule.AllowsBarbarians || !corps.IsRoot && !rule.AllowsChildCorps)
+                if (force.IsBarbarian && !rule.AllowsBarbarians || !corps.IsRoot && !rule.AllowsChildCorps ||
+                    !OriginalAiStrategyPermissions.Allows(engine.Snapshot, engine.Companion, seat.ForceId, work))
                 {
                     Report(new(corps.Id, work, OriginalAiWorkEnd.Permission, 0, 0));
                     continue;

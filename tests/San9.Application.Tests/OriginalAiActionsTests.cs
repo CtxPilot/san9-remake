@@ -13,6 +13,11 @@ public sealed partial class OriginalAiActionsTests
     private static ScenarioInitialState Fixture()
     {
         var basis = G01ScenarioTests.Fixture();
+        OfficerInitialState Opponent(int id, int? home, OfficerStatus status = OfficerStatus.Serving)
+        {
+            var person = Person(id, 2, home, 30, status);
+            return person with { State = person.State with { BaseAbilities = person.State.BaseAbilities with { War = 60 } } };
+        }
         return basis with
         {
             Forces = [new(1, "one", 1, 1000) { LeaderId = 1 }, new(2, "two", 2, 0) { LeaderId = 2 },
@@ -21,9 +26,9 @@ public sealed partial class OriginalAiActionsTests
                 basis.Settlements[1] with { X = 7, Y = 1, Soldiers = 10000, Durability = 500, MaxDurability = 500 },
                 basis.Settlements[1] with { Id = 3, OwnerId = 3, X = 13, Y = 1, Soldiers = 20000, NameKey = "three" }],
             Officers = [Person(1, 1, 1, 100, OfficerStatus.Ruler), Person(11, 1, 1, 100), Person(12, 1, 1, 90),
-                Person(2, 2, 2, 30, OfficerStatus.Ruler), Person(4, 2, 2, 30), Person(3, 3, 3, 30, OfficerStatus.Ruler),
+                Opponent(2, 2, OfficerStatus.Ruler), Opponent(4, 2), Person(3, 3, 3, 30, OfficerStatus.Ruler),
                 Person(8, 1, null, 70) with { State = Person(8, 1, null, 70).State with { UnitId = 10 } },
-                Person(9, 2, null, 30) with { State = Person(9, 2, null, 30).State with { UnitId = 20 } }],
+                Opponent(9, null) with { State = Opponent(9, null).State with { UnitId = 20 } }],
             Units = [new UnitState(10, 1, new(17, 7), 5000) { FormationId = 400, ServicePlaceId = 1, CommanderId = 8,
                 Morale = 60, Order = new(MilitaryOrderKind.Move, new(32, 7), null),
                 MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(8, BattleRank.Middle) },

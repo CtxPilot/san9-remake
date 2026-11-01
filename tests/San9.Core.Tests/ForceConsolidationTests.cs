@@ -37,6 +37,30 @@ public sealed class ForceConsolidationTests
         return mutation;
     }
 
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    public void HostProhibitionAndScenarioEligibilityRemainIndependent(bool scenarioEnabled, bool prohibited, bool merges)
+    {
+        var world = World().BeginMutation(companion: new() { DisableComputerForceConsolidation = prohibited });
+        world.SetSimulation(world.Simulation with { ForceConsolidationEnabled = scenarioEnabled, ForceConsolidationPending = true });
+        List<DomainEvent> events = [];
+        ForceConsolidation.Apply(world, Rules(), events);
+        Assert.Equal(merges, events.OfType<ForcesConsolidatedEvent>().Any());
+        Assert.Equal(scenarioEnabled, world.Simulation.ForceConsolidationEnabled);
+        Assert.Equal(!merges, world.Simulation.ForceConsolidationPending);
+        if (!merges)
+        {
+            Assert.Empty(events);
+            Assert.Empty(world.Simulation.RandomStreams);
+            Assert.False(world.Forces[2].IsEliminated);
+            Assert.False(world.Forces[3].IsEliminated);
+            Assert.Equal(10000u, world.Settlements[3].Soldiers);
+        }
+    }
+
     [Fact]
     public void MergeReturnsForeignEnvoyBeforeDailyCommandsAcrossRestore()
     {

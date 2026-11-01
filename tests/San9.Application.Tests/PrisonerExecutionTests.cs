@@ -28,8 +28,10 @@ public sealed class PrisonerExecutionTests
         };
     }
 
-    [Fact]
-    public void ExecutionAppliesKinshipPenaltiesCancelsRecruitmentAndTransfersSealExactlyOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExecutionAppliesKinshipPenaltiesCancelsRecruitmentAndTransfersSealExactlyOnce(bool prohibitComputerExecution)
     {
         var original = Fixture();
         var definition = original with { Officers = original.Officers.Select(p => p.State.Id switch
@@ -41,6 +43,7 @@ public sealed class PrisonerExecutionTests
             _ => p
         }).ToArray() };
         var session = GameSession.Start(definition, 190);
+        session.ConfigureCompanion(new() { DisableComputerPrisonerExecution = prohibitComputerExecution });
         Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 2, 7)).Submission.Accepted);
         var command = new ExecutePrisonerCommand(Guid.NewGuid(), 1, 1, 7);
         var result = session.Execute(new("player"), command);

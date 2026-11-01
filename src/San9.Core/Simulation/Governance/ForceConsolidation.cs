@@ -13,7 +13,8 @@ internal static class ForceConsolidation
 
     internal static void Apply(WorldMutation world, SimulationRules rules, List<DomainEvent> events)
     {
-        if (!world.Simulation.ForceConsolidationEnabled || !world.Simulation.ForceConsolidationPending) return;
+        if (world.Companion.DisableComputerForceConsolidation ||
+            !world.Simulation.ForceConsolidationEnabled || !world.Simulation.ForceConsolidationPending) return;
         var players = world.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player).Select(c => c.ForceId).ToHashSet();
         var forces = world.Forces.Values.Where(f => !f.IsEliminated && !f.IsBarbarian && f.LeaderId is not null).OrderBy(f => f.Id).ToArray();
         int Cities(int id) => world.Settlements.Values.Count(s => s.OwnerId == id && s.Kind == SettlementKind.City && !s.IsDestroyed);

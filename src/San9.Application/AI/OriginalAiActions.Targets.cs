@@ -49,7 +49,7 @@ internal sealed partial class OriginalAiActions
                     .OrderBy(u => u.Soldiers).Select(u => new Target(u.Id)).ToArray();
             case OriginalAiWork.Alienate:
                 var targets = World.Officers.Where(p => p.OwnerId == opponent && p.IsVisible && p.IsServing && !p.IsDormant &&
-                    p.Loyalty >= 70 && Ability(p).Intelligence <= 90).Select(p => new Target(p.Id)).ToArray();
+                    p.Loyalty >= 70 && Ability(p).Intelligence <= 90 && Best(p) >= 60).Select(p => new Target(p.Id)).ToArray();
                 // Remove record-order bias before the existing first-feasible-target selection.
                 for (int i = targets.Length - 1; i > 0; i--)
                 {

@@ -92,13 +92,15 @@ public sealed class PlayerDomesticAutomationTests
             ? p with { State = p.State with
             {
                 BaseAbilities = p.State.BaseAbilities with { Politics = p.State.Id switch { 1 => 44, 2 => 50, _ => 70 } },
-                Injury = p.State.Id == 2 ? 1 : 0,
+                // First-xun preparation heals one level; keep one level for effective politics 45.
+                Injury = p.State.Id == 2 ? 2 : 0,
             } } : p).ToArray() };
         foreach (var (minimum, expected) in new (int Minimum, int[] Expected)[]
             { (45, [2, 3]), (46, [3]), (0, [1, 2, 3]), (71, []) })
         {
             var session = GameSession.Start(content, 190, companionSettings: new()
                 { PlayerAutoSearchEnabled = true, PlayerAutoSearchMinimumPolitics = minimum });
+            Assert.Equal(45, session.View.Officers.Single(p => p.Id == 2).Abilities.Politics);
             var result = session.EndControl(new("player"));
             Assert.Equal(expected, result.Events.OfType<TaskStartedEvent>().Select(e => e.Task.OfficerId));
             Assert.Empty(result.Events.OfType<DevelopmentCompletedEvent>());

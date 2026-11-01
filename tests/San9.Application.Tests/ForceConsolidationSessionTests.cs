@@ -58,6 +58,37 @@ public sealed class ForceConsolidationSessionTests
             .Snapshot.Simulation.ForceConsolidationEnabled);
     }
 
+    [Fact]
+    public void HostProhibitionPreservesPendingEventAndResumesAfterSaveWithTheSameConfiguration()
+    {
+        var scenario = Scenario();
+        var initial = GameSession.Start(scenario, 17).Capture();
+        var session = GameSession.Restore(scenario, initial with
+        { World = initial.World with { Simulation = initial.World.Simulation with { ForceConsolidationPending = true } } });
+        var before = session.Capture();
+        var disabled = new CompanionSettings { DisableComputerForceConsolidation = true };
+        session.ConfigureCompanion(disabled);
+        StateAssert.Equal(before, session.Capture());
+        Assert.Empty(session.AdvanceXun().Events.OfType<ForcesConsolidatedEvent>());
+        Assert.True(session.Snapshot.Simulation.ForceConsolidationEnabled);
+        Assert.True(session.Snapshot.Simulation.ForceConsolidationPending);
+        var restored = SaveService.Decode(SaveService.Encode(session), scenario);
+        Assert.False(restored.Companion.DisableComputerForceConsolidation);
+        restored.ConfigureCompanion(disabled);
+        EventAssert.Equal(session.AdvanceXun().Events, restored.AdvanceXun().Events);
+        Assert.True(restored.Snapshot.Simulation.ForceConsolidationPending);
+
+        session.ConfigureCompanion(CompanionSettings.Default);
+        restored.ConfigureCompanion(CompanionSettings.Default);
+        var resumed = session.AdvanceXun();
+        Assert.Single(resumed.Events.OfType<ForcesConsolidatedEvent>());
+        EventAssert.Equal(resumed.Events, restored.AdvanceXun().Events);
+        StateAssert.Equal(session.Capture(), restored.Capture());
+        var merged = session.Capture();
+        session.ConfigureCompanion(disabled);
+        StateAssert.Equal(merged, session.Capture());
+    }
+
     [Theory]
     [InlineData("forceConsolidationEnabled")]
     [InlineData("forceConsolidationPending")]

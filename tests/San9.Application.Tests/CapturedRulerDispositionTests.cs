@@ -23,13 +23,18 @@ public sealed class CapturedRulerDispositionTests
     }
 
     [Theory]
-    [InlineData(CapturedRulerAction.Release)]
-    [InlineData(CapturedRulerAction.Execute)]
-    public void PlayerDispositionResumesDayAndReplaysFromStableSave(CapturedRulerAction action)
+    [InlineData(CapturedRulerAction.Release, false)]
+    [InlineData(CapturedRulerAction.Execute, false)]
+    [InlineData(CapturedRulerAction.Release, true)]
+    [InlineData(CapturedRulerAction.Execute, true)]
+    public void PlayerDispositionResumesDayAndReplaysFromStableSave(CapturedRulerAction action, bool prohibitComputerExecution)
     {
         var definition = Fixture();
         var session = GameSession.Start(definition, 190);
         var restored = SaveService.Decode(SaveService.Encode(session), definition);
+        var companion = new CompanionSettings { DisableComputerPrisonerExecution = prohibitComputerExecution };
+        session.ConfigureCompanion(companion);
+        restored.ConfigureCompanion(companion);
         var advance = session.Request(new AdvanceOperation(), "player");
         var result = session.Apply(advance);
         restored.Apply(advance);
@@ -239,6 +244,30 @@ public sealed class CapturedRulerDispositionTests
                 ? p with { State = p.State with { Status = OfficerStatus.Captive, SettlementId = 2 } } : p).ToArray(),
             Alliance = execute ? new(3, 1, [1, 2], 10) : null
         };
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ComputerExecutionProhibitionDoesNotAffectCapturedRulersOrRestoredResults(bool alliance, bool disabled)
+    {
+        var definition = ComputerFixture(alliance);
+        var companion = new CompanionSettings { DisableComputerPrisonerExecution = disabled };
+        var session = GameSession.Start(definition, 190, companionSettings: companion);
+        var restored = SaveService.Decode(SaveService.Encode(session), definition);
+        Assert.False(restored.Companion.DisableComputerPrisonerExecution);
+        restored.ConfigureCompanion(companion);
+        bool execute = alliance;
+        var result = session.Apply(session.Request(new AdvanceOperation()));
+        Assert.Equal(SessionDisposition.Accepted, result.Disposition);
+        Assert.Null(session.GetPendingResponse());
+        Assert.Equal(execute ? 1 : 0, result.Events.OfType<PrisonerExecutedEvent>().Count());
+        Assert.Equal(execute ? 0 : 1, result.Events.OfType<PrisonerReleasedEvent>().Count());
+        Assert.Equal(execute ? 8 : 7, session.Snapshot.Forces.Single(f => f.Id == 3).LeaderId);
+        EventAssert.Equal(result.Events, restored.AdvanceXun().Events);
+        StateAssert.Equal(session.Capture(), restored.Capture());
     }
 
     [Theory]
