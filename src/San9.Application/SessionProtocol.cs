@@ -7,9 +7,9 @@ namespace San9.Application;
 
 public static class SessionProtocol
 {
-    public const string RulesVersion = "san9-core-g10-v221";
+    public const string RulesVersion = "san9-core-g10-v230";
     public const int SaveFormatVersion = 132;
-    public const int LogFormatVersion = 147;
+    public const int LogFormatVersion = 154;
 }
 
 /// <summary>Non-authoritative load diagnostics; never included in saves or deterministic hashes.</summary>

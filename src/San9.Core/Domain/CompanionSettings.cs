@@ -11,6 +11,12 @@ public sealed record CompanionSettings
     [JsonRequired] public bool PlayerAutoSearchEnabled { get; init; }
     [JsonRequired] public int PlayerAutoSearchMinimumPolitics { get; init; } = 45;
     [JsonRequired] public bool HideRoutineSearchReports { get; init; }
+    [JsonRequired] public bool DisableComputerForceConsolidation { get; init; }
+    [JsonRequired] public bool DisableComputerPrisonerExecution { get; init; }
+    [JsonRequired] public int ComputerRevenuePercent { get; init; } = 100;
+    [JsonRequired] public int ComputerHarvestPercent { get; init; } = 100;
+    [JsonRequired] public AutomaticStrategyPermissions ComputerStrategyPermissions { get; init; } = AutomaticStrategyPermissions.All;
+    [JsonRequired] public AutomaticStrategyPermissions PlayerDelegatedStrategyPermissions { get; init; } = AutomaticStrategyPermissions.All;
     [JsonRequired] public bool DynamicOfficerAbilityGrowth { get; init; }
     [JsonRequired] public int OfficerAbilityCap { get; init; } = 100;
     [JsonRequired] public bool UseFacilityTacticPreset { get; init; }
@@ -22,6 +28,9 @@ public sealed record CompanionSettings
     [JsonRequired] public int MartialTacticDamageCoefficient { get; init; } = 10;
     [JsonRequired] public bool ReduceBattleWounded { get; init; }
     [JsonRequired] public bool IncreaseDurabilityDefense { get; init; }
+    [JsonRequired] public int CityBattleDamagePercent { get; init; } = 100;
+    [JsonRequired] public int NoRetreatCaptureBonus { get; init; } = 100;
+    [JsonRequired] public bool UseHighestAbilityForCapture { get; init; }
     [JsonRequired] public bool AbilitiesAffectTacticAllocation { get; init; }
     [JsonRequired] public bool MoraleAffectsTacticCounters { get; init; }
     [JsonRequired] public bool RequireNavalTacticTraining { get; init; }
@@ -42,6 +51,13 @@ public sealed record CompanionSettings
     public void Validate()
     {
         ArgumentOutOfRangeException.ThrowIfNegative(PlayerAutoSearchMinimumPolitics);
+        ArgumentOutOfRangeException.ThrowIfNegative(ComputerRevenuePercent);
+        ArgumentOutOfRangeException.ThrowIfNegative(ComputerHarvestPercent);
+        ArgumentOutOfRangeException.ThrowIfNegative(CityBattleDamagePercent);
+        if (NoRetreatCaptureBonus is < 0 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(NoRetreatCaptureBonus), "The capture bonus must be between 0 and 100 percentage points.");
+        ArgumentNullException.ThrowIfNull(ComputerStrategyPermissions);
+        ArgumentNullException.ThrowIfNull(PlayerDelegatedStrategyPermissions);
         if (OfficerAbilityCap < 100)
             throw new ArgumentOutOfRangeException(nameof(OfficerAbilityCap), "The base ability cap must be at least 100.");
         if (MartialTacticDamageCoefficient is < 5 or > 10)

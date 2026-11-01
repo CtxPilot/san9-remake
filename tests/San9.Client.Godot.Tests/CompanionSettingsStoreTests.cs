@@ -17,19 +17,39 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         var store = new CompanionSettingsStore(FilePath);
         Assert.Equal(CompanionSettings.Default, store.Load());
         Assert.Equal(45, store.Load().PlayerAutoSearchMinimumPolitics);
+        Assert.False(store.Load().DisableComputerForceConsolidation);
+        Assert.False(store.Load().DisableComputerPrisonerExecution);
+        Assert.Equal(100, store.Load().CityBattleDamagePercent);
+        Assert.Equal(100, store.Load().NoRetreatCaptureBonus);
+        Assert.False(store.Load().UseHighestAbilityForCapture);
         Assert.False(Directory.Exists(_directory));
         var settings = new CompanionSettings
         {
             PlayerAutoDomesticEnabled = true, OfficerAbilityCap = 125,
+            DisableComputerForceConsolidation = true,
+            DisableComputerPrisonerExecution = true,
             EnableNavalTacticFallback = true, TacticAllocation = new(0, 1, 2, 3, 4),
             PlayerAutoSearchEnabled = true, PlayerAutoSearchMinimumPolitics = 60,
             HideRoutineSearchReports = true,
+            ComputerRevenuePercent = 125, ComputerHarvestPercent = 200,
+            CityBattleDamagePercent = 50,
+            NoRetreatCaptureBonus = 20,
+            UseHighestAbilityForCapture = true,
+            ComputerStrategyPermissions = new() { Alienate = false, Burn = false },
+            PlayerDelegatedStrategyPermissions = new() { Seize = false, Gossip = false },
         };
         store.Save(settings);
         Assert.Equal(settings, new CompanionSettingsStore(FilePath).Load());
         byte[] saved = File.ReadAllBytes(FilePath);
         Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { OfficerAbilityCap = 99 }));
         Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { PlayerAutoSearchMinimumPolitics = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { ComputerRevenuePercent = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { ComputerHarvestPercent = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { CityBattleDamagePercent = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { NoRetreatCaptureBonus = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { NoRetreatCaptureBonus = 101 }));
+        Assert.Throws<ArgumentNullException>(() => store.Save(settings with { ComputerStrategyPermissions = null! }));
+        Assert.Throws<ArgumentNullException>(() => store.Save(settings with { PlayerDelegatedStrategyPermissions = null! }));
         Assert.Equal(saved, File.ReadAllBytes(FilePath));
 
         var document = JsonNode.Parse(saved)!;
@@ -38,6 +58,11 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         File.WriteAllText(FilePath, incomplete, Encoding.UTF8);
         Assert.Throws<JsonException>(() => store.Load());
         Assert.Equal(incomplete, File.ReadAllText(FilePath, Encoding.UTF8));
+
+        document = JsonNode.Parse(saved)!;
+        document["settings"]!["computerStrategyPermissions"]!.AsObject().Remove("burn");
+        File.WriteAllText(FilePath, document.ToJsonString(), Encoding.UTF8);
+        Assert.Throws<JsonException>(() => store.Load());
     }
 
     public void Dispose()
