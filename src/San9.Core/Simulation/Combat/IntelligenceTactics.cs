@@ -74,6 +74,9 @@ internal static class IntelligenceTactics
         // Area effects finish on the selected primary target, which owns the subsequent chain request.
         targets.Add(primary);
         List<int> defeatedSettlements = [];
+        var learning = tactic.Effect == TacticEffect.Trap
+            ? military.Tactics.Values.FirstOrDefault(t => t.Effect == TacticEffect.TrapSelection) ?? tactic : tactic;
+        bool hasEffect = false;
         foreach (var target in targets)
         {
             int? owner = target.UnitId is int enemy ? world.Units[enemy].OwnerId : world.Settlements[target.SettlementId!.Value].OwnerId;
@@ -83,16 +86,14 @@ internal static class IntelligenceTactics
                 target.UnitId is null, tactic.Id, effect)
             { ActorId = actor.Id, Occurrence = TacticOccurrence.Capture(world, source, target, tactic, military, rules.Treasures) });
             if (effect == 0) continue;
+            hasEffect = true;
             Apply(world, source, actor, tactic, target, effect, rules, events, defeatedSettlements, deferPrimaryDefeat && target == primary);
-            var learning = tactic.Effect == TacticEffect.Trap
-                ? military.Tactics.Values.FirstOrDefault(t => t.Effect == TacticEffect.TrapSelection) ?? tactic : tactic;
             var survivors = target.UnitId is int survived ? world.Units.TryGetValue(survived, out var survivor) && survivor.Soldiers > 0 && survivor.Morale > 0 :
                 !MilitaryCombat.Defeated(world.Settlements[target.SettlementId!.Value]);
             var targetMembers = survivors ? Defenders(world, target) : [];
             if (learning.Selectable) BattleLearning.Learn(world, targetMembers, learning, events);
             var sourceMembers = source.IsCombatant(world) ? Defenders(world, source.IsSettlement ?
                 new(MilitaryOrderKind.AttackSettlement, null, source.Id) : new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = source.Id }) : [];
-            if (sourceMembers.Any(p => p.Id == actor.Id)) TacticCombat.Grow(world, sourceMembers, [actor.Id], learning, events);
             if (tactic.Effect == TacticEffect.Trap)
             {
                 BattleLearning.Passive(world, targetMembers, TacticEffect.CounterTrap, military, events);
@@ -104,6 +105,12 @@ internal static class IntelligenceTactics
                 BattleLearning.Passive(world, targetMembers, TacticEffect.CounterConfusion, military, events);
                 BattleLearning.Passive(world, sourceMembers, TacticEffect.CounterConfusion, military, events);
             }
+        }
+        if (hasEffect && source.IsCombatant(world))
+        {
+            var sourceMembers = Defenders(world, source.IsSettlement ? new(MilitaryOrderKind.AttackSettlement, null, source.Id) :
+                new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = source.Id });
+            if (sourceMembers.Any(p => p.Id == actor.Id)) TacticCombat.Grow(world, sourceMembers, [actor.Id], learning, events);
         }
         if (!MilitaryCombat.IsDefeated(world, source))
             BattleAftermath.ResolveSettlementDefeats(world, defeatedSettlements, source, rules, events);
