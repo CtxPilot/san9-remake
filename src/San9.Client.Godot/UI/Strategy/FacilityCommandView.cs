@@ -52,8 +52,8 @@ public partial class FacilityCommandView : FixedPage
         string Change(long current, long next, uint amount) => $"{current}→" +
             (amount > 0 ? next.ToString() : Draft.IsTrade ? "   " : "    ");
         (string Name,string Value)[] fields = Draft.Kind switch {
-            "commerce" => [(CommandText.Resolve(Texts, "label.money"),$"{Draft.Cost}/{Draft.Money}"),(CommandText.Resolve(Texts, "title.commerce"),$"{home.Commerce}/{home.MaxCommerce}"),(CommandText.Resolve(Texts, "label.revenue"),EconomyMath.Revenue(home).ToString())],
-            "cultivate" => [(CommandText.Resolve(Texts, "label.money"),$"{Draft.Cost}/{Draft.Money}"),(CommandText.Resolve(Texts, "title.cultivate"),$"{home.Cultivation}/{home.MaxCultivation}"),(CommandText.Resolve(Texts, "label.harvest"),EconomyMath.Harvest(home).ToString())],
+            "commerce" => [(CommandText.Resolve(Texts, "label.money"),$"{Draft.Cost}/{Draft.Money}"),(CommandText.Resolve(Texts, "title.commerce"),$"{home.Commerce}/{home.MaxCommerce}"),(CommandText.Resolve(Texts, "label.revenue"),Draft.View.CityIncomeRates(home.OwnerId).Revenue(home).ToString())],
+            "cultivate" => [(CommandText.Resolve(Texts, "label.money"),$"{Draft.Cost}/{Draft.Money}"),(CommandText.Resolve(Texts, "title.cultivate"),$"{home.Cultivation}/{home.MaxCultivation}"),(CommandText.Resolve(Texts, "label.harvest"),Draft.View.CityIncomeRates(home.OwnerId).Harvest(home).ToString())],
             "repair" => [(CommandText.Resolve(Texts, "label.money"),$"{Draft.Cost}/{Draft.Money}"),(CommandText.Resolve(Texts, "label.durability"),$"{home.Durability}/{home.MaxDurability}")],
             "train" => [(CommandText.Resolve(Texts, "label.morale"),$"{home.Morale}/100")],
             "recruit" => [("",Quantity(Draft.RecruitAmount)),(CommandText.Resolve(Texts, "label.soldiers"),Change(home.Soldiers,home.Soldiers + Draft.RecruitAmount,Draft.RecruitAmount)),

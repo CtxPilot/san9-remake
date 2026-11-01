@@ -19,6 +19,7 @@ public static class FacilityCommandPresentation
         var members = development?.Command.OfficerIds ?? trade!.OfficerIds;
         var home = before.World.Settlements.Single(s => s.Id == homeId);
         var force = before.World.Forces.Single(f => f.Id == forceId);
+        var income = before.CityIncomeRates(home.OwnerId);
         var ordered = DomesticDevelopment.OrderParticipants(before.World.Officers.Where(p => members.Contains(p.Id)),
             before.Officers.ToDictionary(o => o.Id,o => o.Abilities),development?.Command.Activity ?? DomesticActivity.Commerce);
         int first = ordered[0].Id, ruler = force.LeaderId ?? first;
@@ -56,10 +57,10 @@ public static class FacilityCommandPresentation
             {
                 case DomesticActivity.Commerce:
                     var commerce = home with { Commerce = home.Commerce + increment };
-                    Result("result","commerce-result",commerce.Commerce,increment,EconomyMath.Revenue(commerce),EconomyMath.Revenue(commerce)-EconomyMath.Revenue(home)); break;
+                    Result("result","commerce-result",commerce.Commerce,increment,income.Revenue(commerce),income.Revenue(commerce)-income.Revenue(home)); break;
                 case DomesticActivity.Cultivation:
                     var cultivated = home with { Cultivation = home.Cultivation + increment };
-                    Result("result","cultivation-result",cultivated.Cultivation,increment,EconomyMath.Harvest(cultivated),EconomyMath.Harvest(cultivated)-EconomyMath.Harvest(home)); break;
+                    Result("result","cultivation-result",cultivated.Cultivation,increment,income.Harvest(cultivated),income.Harvest(cultivated)-income.Harvest(home)); break;
                 case DomesticActivity.Repair: Result("result","facility-result",home.Durability+increment,increment); break;
                 case DomesticActivity.Train: Result("result","facility-result",home.Morale+increment,increment); break;
                 case DomesticActivity.Recruit: Result("result","recruit-result",home.Soldiers+increment,increment); break;

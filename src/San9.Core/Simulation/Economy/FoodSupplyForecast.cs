@@ -89,9 +89,10 @@ public static class FoodSupplyForecast
     }
 
     /// <summary>Projection of the observer's own account; all carried values have public economic meaning.</summary>
-    public static FoodSupplyInput Capture(WorldSnapshot world, int forceId, int accountId)
+    public static FoodSupplyInput Capture(WorldSnapshot world, int forceId, int accountId, CompanionSettings companion)
     {
         var force = world.Forces.Single(f => f.Id == forceId && !f.IsDormant && !f.IsEliminated);
+        var rates = EconomicIncomeRates.ForForce(world.Simulation, force, companion);
         var account = world.Corps.Single(c => c.Id == accountId && c.OwnerId == forceId);
         int root = world.Corps.Single(c => c.OwnerId == forceId && c.IsRoot).Id;
         int Account(int? id) => id ?? root;
@@ -104,7 +105,7 @@ public static class FoodSupplyForecast
                 Account(ReinforcementTransport.Corps(query, t)) == accountId)
                 .Sum(t => DailyRations.Field(t.Reinforcements!.Soldiers, t.Reinforcements.Wounded));
         var cities = places.Where(s => s.Kind == SettlementKind.City).ToArray();
-        return new(world.Clock, world.Simulation.Started, account.Treasury.Food, rations, cities.Sum(EconomyMath.Harvest),
+        return new(world.Clock, world.Simulation.Started, account.Treasury.Food, rations, cities.Sum(rates.Harvest),
             force.IsBarbarian && cities.Length > 0 ? EconomyMath.BarbarianAnnualFood(SoldierTotals.Living(query, forceId)) : null);
     }
 }

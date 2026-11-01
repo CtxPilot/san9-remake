@@ -23,7 +23,7 @@ public sealed class CorpsTreasuryTests
         var force = session.View.Forces.Single(f => f.Id == 1);
         Assert.Equal(root.Treasury.Money + 3000L, force.Money);
         Assert.Equal(root.Treasury.Food + 4000L, force.Food);
-        Assert.Equal(force.Money, EconomicOutlook.Read(session.Snapshot, new Dictionary<int, int>(), 1).Money.Balance);
+        Assert.Equal(force.Money, EconomicOutlook.Read(session.Snapshot, new Dictionary<int, int>(), 1, CompanionSettings.Default).Money.Balance);
         var result = session.Execute(new("player"), new DevelopCommand(Guid.NewGuid(), 1, 0, new(1, 1, [2], DomesticActivity.Commerce)));
         Assert.True(result.Submission.Accepted);
         Assert.Contains(result.Events.OfType<ResourceChangedEvent>(), e => e.Account == new ResourceAccount(ResourceOwnerKind.Corps, 101) && e.Actual < 0);

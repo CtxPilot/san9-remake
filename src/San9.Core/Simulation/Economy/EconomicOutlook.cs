@@ -10,9 +10,11 @@ public sealed record EconomicOutlook(ResourceOutlook Money, ResourceOutlook Food
 {
     /// <summary>Static current-state estimate to the next quarterly revenue / July harvest.
     /// Each account retains its own capacity and shortage floor. No simulation or RNG is advanced.</summary>
-    public static EconomicOutlook Read(WorldSnapshot world, IReadOnlyDictionary<int, int> salaries, int forceId, int? corpsId = null)
+    public static EconomicOutlook Read(WorldSnapshot world, IReadOnlyDictionary<int, int> salaries, int forceId,
+        CompanionSettings companion, int? corpsId = null)
     {
         var force = world.Forces.Single(f => f.Id == forceId && !f.IsDormant && !f.IsEliminated);
+        var rates = EconomicIncomeRates.ForForce(world.Simulation, force, companion);
         var query = new WorldQuery(world);
         var corps = world.Corps.Where(c => c.OwnerId == forceId).ToDictionary(c => c.Id);
         if (corpsId is int requested && !corps.ContainsKey(requested)) throw new ArgumentOutOfRangeException(nameof(corpsId));
@@ -36,9 +38,9 @@ public sealed record EconomicOutlook(ResourceOutlook Money, ResourceOutlook Food
             long salary = payroll[account].Sum();
             var treasury = corps[account].Treasury;
             bool supplied = force.IsBarbarian && cities.Length > 0;
-            money.Add(Project(treasury.Money, salary * salaryPayments, cities.Sum(EconomyMath.Revenue),
+            money.Add(Project(treasury.Money, salary * salaryPayments, cities.Sum(rates.Revenue),
                 supplied ? EconomyRulebook.BarbarianQuarterlyFunds : null));
-            food.Add(FoodSupplyForecast.Evaluate(FoodSupplyForecast.Capture(world, forceId, account)));
+            food.Add(FoodSupplyForecast.Evaluate(FoodSupplyForecast.Capture(world, forceId, account, companion)));
         }
         return new(Sum(money), Sum(food));
     }

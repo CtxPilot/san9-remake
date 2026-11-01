@@ -25,9 +25,9 @@ public sealed class EconomicOutlookTests
                 new(3, 5, 16, new(50, 50, 50, 50), false)]
         };
         var salaries = new Dictionary<int, int> { [1] = 7, [2] = 3 };
-        var root = EconomicOutlook.Read(world, salaries, 5, 10);
-        var branch = EconomicOutlook.Read(world, salaries, 5, 11);
-        var force = EconomicOutlook.Read(world, salaries, 5);
+        var root = EconomicOutlook.Read(world, salaries, 5, CompanionSettings.Default, 10);
+        var branch = EconomicOutlook.Read(world, salaries, 5, CompanionSettings.Default, 11);
+        var force = EconomicOutlook.Read(world, salaries, 5, CompanionSettings.Default);
         Assert.Equal(7, root.Money.Expenditure);
         Assert.Equal(4, branch.Money.Expenditure); // Includes the returning transport's officer.
         Assert.Equal(40, root.Food.Expenditure);
@@ -48,12 +48,12 @@ public sealed class EconomicOutlookTests
             Officers = [new(1, 5, 15, new(50, 50, 50, 50), false) { IsDormant = true }]
         };
         var before = snapshot;
-        var supplied = EconomicOutlook.Read(snapshot, new Dictionary<int, int>(), 5, 10);
+        var supplied = EconomicOutlook.Read(snapshot, new Dictionary<int, int>(), 5, CompanionSettings.Default, 10);
         Assert.Equal(0, supplied.Money.Expenditure);
         Assert.Equal(30000, supplied.Money.Forecast);
         Assert.Equal(-60000, supplied.Money.Income);
         Assert.Equal(100000, supplied.Food.Forecast);
-        var withoutCity = EconomicOutlook.Read(snapshot, new Dictionary<int, int>(), 5, 11);
+        var withoutCity = EconomicOutlook.Read(snapshot, new Dictionary<int, int>(), 5, CompanionSettings.Default, 11);
         Assert.Equal(40000, withoutCity.Money.Forecast);
         Assert.Equal(200000, withoutCity.Food.Forecast);
         StateAssert.Equal(before, snapshot);
@@ -74,7 +74,7 @@ public sealed class EconomicOutlookTests
             Officers=[new(1,5,15,new(50,50,50,50),false) { Status=OfficerStatus.Ruler },new(2,5,15,new(50,50,50,50),false) { Status=OfficerStatus.Serving }]
         };
         var before=world;
-        var forecast=EconomicOutlook.Read(world,new Dictionary<int,int>(),5);
+        var forecast=EconomicOutlook.Read(world,new Dictionary<int,int>(), 5,CompanionSettings.Default);
         Assert.Equal(salaryCount,forecast.Money.Expenditure);
         Assert.Equal(foodDays,forecast.Food.Expenditure);
         Assert.Equal(1000-salaryCount,forecast.Money.Forecast);
@@ -91,7 +91,7 @@ public sealed class EconomicOutlookTests
             Settlements = [new(15, 5, 500, 100, 100, 50, 800, 100, 100, 100, 100) { CorpsId = 10 }],
             Officers = [new(1, 5, 15, new(50, 50, 50, 50), false)]
         };
-        var result = EconomicOutlook.Read(world, new Dictionary<int, int>(), 5);
+        var result = EconomicOutlook.Read(world, new Dictionary<int, int>(), 5, CompanionSettings.Default);
         Assert.Equal(10, result.Money.Expenditure);
         Assert.Equal(370, result.Food.Expenditure);
         var engineWorld = WorldState.Create(started, 1, world.Forces, world.Settlements, world.Officers, corps: world.Corps);
@@ -118,10 +118,10 @@ public sealed class EconomicOutlookTests
             Settlements=[new(15,5,0,1000,1000,0,100,100,1000,100,1000) { CorpsId=10,Kind=SettlementKind.City },new(16,5,0,1000,1000,0,100,100,1000,100,1000) { CorpsId=11,Kind=SettlementKind.City }]
         };
         var salaries = new Dictionary<int,int> { [7] = 0 };
-        var forecast = EconomicOutlook.Read(world, salaries, 5);
+        var forecast = EconomicOutlook.Read(world, salaries, 5, CompanionSettings.Default);
         Assert.Equal(2 * expected, forecast.Money.Forecast);
         Assert.Equal(2 * expected, forecast.Food.Forecast);
-        var branch = EconomicOutlook.Read(world, salaries, 5, 11);
+        var branch = EconomicOutlook.Read(world, salaries, 5, CompanionSettings.Default, 11);
         Assert.Equal(expected, branch.Money.Forecast);
         Assert.Equal(expected, branch.Food.Forecast);
         var mutation = WorldState.Create(world.Simulation.Started, 1, world.Forces, world.Settlements,

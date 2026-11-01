@@ -50,8 +50,17 @@ public static class EconomyMath
     public static int RecruitMorale(int trust) => (int)Math.Min(100, SquareRoot(trust) + 40);
     public static long DraftIncrease(long population, long militaryPopulation, long totalOrder, int cityOrder) =>
         totalOrder == 0 ? 0 : (Math.Max(0, population - militaryPopulation + 99999) / 100000 * (population / 100) / 10) * cityOrder / totalOrder;
-    public static long Revenue(SettlementState city) =>
-        ((SquareRoot((long)city.Population + city.DraftPopulation) + 600) * city.Commerce * 6 / 1000) * (2500 - city.Commerce) / 2500;
-    public static long Harvest(SettlementState city) =>
-        ((SquareRoot((long)city.Population + city.DraftPopulation) + 300) * city.Cultivation / 10) * (4000 - city.Cultivation) / 4000;
+    public static long Revenue(SettlementState city, int percent = 100)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(percent);
+        Int128 production = (Int128)(SquareRoot((long)city.Population + city.DraftPopulation) + 600) * city.Commerce * 6;
+        return checked((long)(production * percent / 100000 * (2500 - city.Commerce) / 2500));
+    }
+
+    public static long Harvest(SettlementState city, int percent = 100)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(percent);
+        Int128 production = (SquareRoot((long)city.Population + city.DraftPopulation) + 300) * city.Cultivation / 10;
+        return checked((long)(production * (4000 - city.Cultivation) * percent / 400000));
+    }
 }

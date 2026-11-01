@@ -50,7 +50,7 @@ public sealed record ScenarioForceSelection(string Title, int Year, int Month, O
                 Wounded = scenario.Settlements.Where(s => s.OwnerId == f.Id).Sum(s => (long)s.Wounded) + scenario.Units.Where(u => u.OwnerId == f.Id).Sum(u => (long)u.Wounded),
                 AllianceDays = scenario.Alliance is { } alliance && (alliance.TargetForceId == f.Id || alliance.MemberForceIds.Contains(f.Id)) ? alliance.RemainingXun * 10 : 0,
                 IsAllianceLeader = scenario.Alliance?.LeaderForceId == f.Id, IsAllianceTarget = scenario.Alliance?.TargetForceId == f.Id,
-                Outlook = EconomicOutlook.Read(world, salaries, f.Id)
+                Outlook = EconomicOutlook.Read(world, salaries, f.Id, CompanionSettings.Default)
             };
         }).Where(f => f.CityIds.Length > 0).ToArray();
         return new(text.Resolve("scenario.title"), scenario.Year, scenario.Month, forces, cities.ToDictionary(c => c.Id,

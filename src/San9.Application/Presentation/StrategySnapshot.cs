@@ -311,8 +311,10 @@ public sealed class StrategySnapshot
         return null;
     }
     public CorpsState? PlayerCorps => World.Corps.SingleOrDefault(c => c.OwnerId == PlayerForceId && c.IsRoot);
+    public EconomicIncomeRates CityIncomeRates(int? ownerId) => EconomicIncomeRates.ForForce(World.Simulation,
+        World.Forces.SingleOrDefault(f => f.Id == ownerId), Companion);
     public EconomicOutlook? PlayerEconomicOutlook => PlayerCorps is {} corps
-        ? EconomicOutlook.Read(World, Information.Offices.ToDictionary(o => o.Id, o => o.Salary), corps.OwnerId, corps.Id)
+        ? EconomicOutlook.Read(World, Information.Offices.ToDictionary(o => o.Id, o => o.Salary), corps.OwnerId, Companion, corps.Id)
         : null;
     public IReadOnlyList<CityTacticCourse> TacticCourses { get; }
     public IReadOnlyDictionary<int, string> ProvinceNameKeys { get; }

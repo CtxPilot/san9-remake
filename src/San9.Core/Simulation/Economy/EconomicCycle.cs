@@ -40,9 +40,10 @@ internal static class EconomicCycle
 
     private static void OrdinaryIncome(WorldMutation world, SettlementState city, ResourceAccount account, List<DomainEvent> events)
     {
-        ResourceAccounts.Change(world, account, ResourceKind.Money, EconomyMath.Revenue(city), "quarterly-revenue", city.Id, events);
+        var rates = EconomicIncomeRates.ForForce(world.Simulation, world.Forces[city.OwnerId!.Value], world.Companion);
+        ResourceAccounts.Change(world, account, ResourceKind.Money, rates.Revenue(city), "quarterly-revenue", city.Id, events);
         if (world.Clock.Month != 7) return;
-        ResourceAccounts.Change(world, account, ResourceKind.Food, EconomyMath.Harvest(city), "annual-harvest", city.Id, events);
+        ResourceAccounts.Change(world, account, ResourceKind.Food, rates.Harvest(city), "annual-harvest", city.Id, events);
     }
 
     private static void BarbarianSupply(WorldMutation world, SettlementState city, ResourceAccount account,

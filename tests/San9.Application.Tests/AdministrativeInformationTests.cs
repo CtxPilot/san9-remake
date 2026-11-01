@@ -11,6 +11,31 @@ namespace San9.Application.Tests;
 public sealed class AdministrativeInformationTests
 {
     [Fact]
+    public void IncomeCatalogUsesTheCapturedHostRatesAndCurrentForceControl()
+    {
+        var (session, text, _) = Fixture();
+        var original = session.Capture();
+        session.ConfigureCompanion(new() { ComputerRevenuePercent = 125, ComputerHarvestPercent = 200 });
+        var view = session.View;
+        var projected = view.World with
+        {
+            Settlements = view.World.Settlements.Select(s => s with { Population = 100, DraftPopulation = 0,
+                Commerce = 101, Cultivation = 101 }).ToArray()
+        };
+        var player = new AdministrativeCatalog(view.ForWorld(projected), text);
+        Assert.Equal("354", player.Cell(InformationCategory.Cities, 15, "money-income").Text);
+        var computer = view.ForWorld(projected with { Simulation = projected.Simulation with
+            { Controls = [.. projected.Simulation.Controls.Select(c => c with { Kind = ControllerKind.Automatic })] } });
+        var catalog = new AdministrativeCatalog(computer, text);
+        Assert.Equal("443", catalog.Cell(InformationCategory.Cities, 15, "money-income").Text);
+        Assert.Equal("6103", catalog.Cell(InformationCategory.Cities, 15, "food-income").Text);
+        session.ConfigureCompanion(CompanionSettings.Default);
+        Assert.Equal(443, computer.CityIncomeRates(5).Revenue(computer.World.Settlements[0]));
+        Assert.Equal(354, session.View.CityIncomeRates(5).Revenue(computer.World.Settlements[0]));
+        StateAssert.Equal(original, session.Capture());
+    }
+
+    [Fact]
     public void MapModeSurvivesDetailsAndRelatedListsWithoutReplacingCatalogState()
     {
         var browser = new InformationBrowser();
