@@ -11,6 +11,7 @@
 - [研究疑点与处理结果](research-open-questions.md)：已纠错结论、证据边界和后置实验；历史“待验证”不直接作为当前待办。
 - [来源登记](SOURCES.md)、[S9 文件清单](sources/s9-file-inventory.md)、[EXE 外部 DLL 契约](sources/exe-dll-analysis-inventory.md)、[第三方仓库](sources/upstream-repositories.md)。
 - [军事邻城、设施行程与实际进攻范围实验](experiments/EXP-SAN9PK-0002.md)：统一保存校准、简单通道、动态前线与设施时间表研究，以及当前采用、内存／性能边界和后续AI改造方向。
+- [原版与重制版旬初性能对照](experiments/original-turn-performance/README.md)：原版六轮同档采集与重制版历史预热数据，保留计时边界、侧栏动画归因及逐势力明细；现有证据只能判定同量级。
 - [旗帜基础素材与动态生成](notes/2026-10-28-procedural-flags.md)：共用母材、字样和连续变形的八向对照，支持原版 51 色及自定义配色；布料模拟已撤销，未接入游戏。[实验入口](experiments/flag-generation/README.md)。
 - [开局专项](../docs/scenario-startup.md)：跨主题证据、重制接入状态及未采用边界。
 - [程序分析归档](archive/program-analysis/program-analysis-roadmap.md)、[来源覆盖账本](archive/program-analysis/program-analysis-coverage.md)。
