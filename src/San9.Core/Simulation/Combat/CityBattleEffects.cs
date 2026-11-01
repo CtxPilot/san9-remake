@@ -25,8 +25,13 @@ internal static class CityBattleEffects
         if (!world.Units.TryGetValue(attackerId, out var attacker) || attacker.Soldiers == 0 || attacker.Morale == 0 ||
             !world.Settlements.TryGetValue(cityId, out var city) || city.Kind != SettlementKind.City ||
             city.OwnerId != previousOwner || MilitaryCombat.Defeated(city) || city.IsDestroyed) return;
-        var next = city with { PublicOrder = city.PublicOrder * 99 / 100,
-            Commerce = city.Commerce * 99 / 100, Cultivation = city.Cultivation * 99 / 100 };
+        int percent = world.Companion.CityBattleDamagePercent;
+        if (percent == 0) return;
+        // Baseline loss is 1%; round the retained value once, as in the original rule.
+        long retained = 10000L - Math.Min(percent, 10000);
+        int Remaining(int value) => (int)((long)value * retained / 10000);
+        var next = city with { PublicOrder = Remaining(city.PublicOrder),
+            Commerce = Remaining(city.Commerce), Cultivation = Remaining(city.Cultivation) };
         world.Replace(next);
         events.Add(new CityBattleDamageEvent(world.Clock, cityId, attackerId, city.PublicOrder - next.PublicOrder,
             city.Commerce - next.Commerce, city.Cultivation - next.Cultivation));

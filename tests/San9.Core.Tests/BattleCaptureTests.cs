@@ -20,6 +20,35 @@ public sealed class BattleCaptureTests
         [new(7, 10, 0, 10000, 1, new(1, 1), TravelMode.Land)],
         [new(1, new(2, 7), new(1, 1)), new(2, new(37, 7), new(1, 1))]));
 
+    [Theory]
+    [InlineData((int)OfficerAbility.Leadership)]
+    [InlineData((int)OfficerAbility.Intelligence)]
+    [InlineData((int)OfficerAbility.Politics)]
+    public void HighestAbilityOptionUsesEachNonMartialSpecialtyAndCurrentInjury(int specialty)
+    {
+        bool Capture(bool enabled, int injury)
+        {
+            var world = World().BeginMutation(companion: new() { UseHighestAbilityForCapture = enabled });
+            var person = world.Officers[11];
+            var abilities = (OfficerAbility)specialty switch
+            {
+                OfficerAbility.Leadership => person.BaseAbilities with { Leadership = 106 },
+                OfficerAbility.Intelligence => person.BaseAbilities with { Intelligence = 106 },
+                OfficerAbility.Politics => person.BaseAbilities with { Politics = 106 },
+                _ => throw new ArgumentOutOfRangeException(nameof(specialty))
+            };
+            world.Replace(person with { BaseAbilities = abilities, Injury = injury });
+            List<DomainEvent> events = [];
+            bool captured = BattlePersonnel.Resolve(world, 11, new(1, false), 1, 1, BattleRank.Middle, false, false,
+                PersonnelRulebook.Empty, events, true, new(2, 7), Rules());
+            Assert.Equal(captured ? OfficerStatus.Captive : OfficerStatus.Strategist, world.Officers[11].Status);
+            return captured;
+        }
+        Assert.True(Capture(false, 0));
+        Assert.False(Capture(true, 0));
+        Assert.True(Capture(true, 5));
+    }
+
     [Fact]
     public void FieldCaptureClearsOldUnitAndOfficeThenReturnsWithoutChangingAllegiance()
     {
@@ -102,24 +131,29 @@ public sealed class BattleCaptureTests
         Assert.Single(events.OfType<OfficerEscapedBattleEvent>());
     }
 
-    [Fact]
-    public void ProbabilisticOutcomeAndTerminationRepeatAfterStableRestore()
+    [Theory]
+    [InlineData(true, 100)]
+    [InlineData(false, 20)]
+    [InlineData(false, 100)]
+    public void CaptureOutcomeAndTerminationRepeatWithTheSameExternalConfigurationAfterStableRestore(bool hasRetreatCity, int bonus)
     {
         var world = World();
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: Rules());
         var restored = WorldState.Restore(engine.CaptureStableState());
+        var companion = new CompanionSettings { NoRetreatCaptureBonus = bonus, UseHighestAbilityForCapture = true };
         List<DomainEvent> Resolve(WorldState state)
         {
-            var mutation = state.BeginMutation();
+            var mutation = state.BeginMutation(companion: companion);
             var events = new List<DomainEvent>();
             BattlePersonnel.Resolve(mutation, 11, new(1, false), 1, 1, BattleRank.Middle, false, false,
-                PersonnelRulebook.Empty, events, true, new(2, 7), Rules());
+                PersonnelRulebook.Empty, events, hasRetreatCity, new(2, 7), Rules());
             UnitTerminationService.Complete(mutation, 0, new(1, false), 1, new([]), events);
             state.Commit(mutation);
             return events;
         }
         Assert.Equal(CanonicalJson.Text(Resolve(world)), CanonicalJson.Text(Resolve(restored)));
         StateAssert.Equal(world.CreateSnapshot(), restored.CreateSnapshot());
-        Assert.Contains(world.CreateSnapshot().Simulation.RandomStreams, s => s.Name == "battle-personnel-capture");
+        Assert.Equal(hasRetreatCity || bonus < 100,
+            world.CreateSnapshot().Simulation.RandomStreams.Any(s => s.Name == "battle-personnel-capture"));
     }
 }

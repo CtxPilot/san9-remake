@@ -18,8 +18,12 @@ internal static class BattlePersonnel
         if (retreatSettlementId is int id && (!world.Settlements.TryGetValue(id, out var retreat) ||
             retreat.OwnerId != person.OwnerId || !retreat.CanHostPersons || retreat.Durability <= 0))
             throw new ArgumentException("Invalid retreat destination.");
-        int chance = BattleCaptureRules.Chance(world.Abilities(person).War, nearbyAttackers, rank,
-            hasRetreatCity, hasEscapeMount, doublesCapture);
+        var abilities = world.Abilities(person);
+        int captureAbility = world.Companion.UseHighestAbilityForCapture
+            ? Math.Max(Math.Max(abilities.Leadership, abilities.War), Math.Max(abilities.Intelligence, abilities.Politics))
+            : abilities.War;
+        int chance = BattleCaptureRules.Chance(captureAbility, nearbyAttackers, rank,
+            hasRetreatCity, hasEscapeMount, doublesCapture, world.Companion.NoRetreatCaptureBonus);
         bool exempt = world.Forces[person.OwnerId.Value].IsBarbarian || world.Forces[captor.Owner(world)].IsBarbarian ||
             captor.IsSettlement && !world.ServingSettlementMembers(captor.Id).Any(p => p.OwnerId == captor.Owner(world));
         bool captured = !exempt && (chance == 100 || chance > 0 && (int)(world.NextRandom("battle-personnel-capture") % 100) < chance);
