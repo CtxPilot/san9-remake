@@ -99,9 +99,12 @@ public partial class FormationBoardView : Control
         var held = _held!; var target = _target;
         held.Position = _start; held.ZIndex = 0; held.Highlighted = false;
         bool moved = _dragging && commit && target is not null;
+        bool tacticClicked = !_dragging && commit && held.IsTacticPoint(_grab) &&
+            held.IsTacticPoint(held.GetLocalMousePosition());
         _held = null; _target = null; _dragging = false; QueueRedraw();
         GetViewport().SetInputAsHandled();
         if (moved) OfficerMoved?.Invoke(held.Member.OfficerId, target!.Value);
+        else if (tacticClicked) OfficerActivated?.Invoke(held.Member.OfficerId);
     }
 
     public override void _Process(double delta)
@@ -136,18 +139,21 @@ public partial class FormationBoardView : Control
 /// <summary>Text follows the two interiors of the native 120×80 member plaque.</summary>
 public partial class FormationMemberButton : BaseButton
 {
+    private static readonly Rect2 TacticInterior = new(24, 8, 72, 28);
     public FormationMemberView Member { get; init; } = null!;
     public TextureScope Textures { get; init; } = null!;
     private bool _highlighted;
     public bool Highlighted { get => _highlighted; set { if (_highlighted == value) return; _highlighted = value; QueueRedraw(); ApplyText(); } }
     private readonly List<Label> _labels = [];
     private readonly GameTextPresenter _text = new();
+    public bool IsTacticPoint(Vector2 point) =>
+        TacticInterior.HasPoint(point * new Vector2(120, 80) / Size);
     public override void _Draw() => DrawTextureRectRegion(Textures.Get(Member.IsCommander ? "formation-commander" : "formation-member", this), new(Vector2.Zero, Size), new(Highlighted ? 120 : 0, 0, 120, 80));
 
     public override void _Ready()
     {
         FocusMode = FocusModeEnum.None;
-        AddText(Member.Tactic, new(24, 8, 72, 28));
+        AddText(Member.Tactic, TacticInterior);
         AddText(Member.Name, new(8, 42, 104, 28));
     }
 

@@ -22,6 +22,7 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         Assert.Equal(100, store.Load().CityBattleDamagePercent);
         Assert.Equal(100, store.Load().NoRetreatCaptureBonus);
         Assert.False(store.Load().UseHighestAbilityForCapture);
+        Assert.False(store.Load().ConfigureTacticsOnFormationSelection);
         Assert.False(Directory.Exists(_directory));
         var settings = new CompanionSettings
         {
@@ -31,6 +32,7 @@ public sealed class CompanionSettingsStoreTests : IDisposable
             EnableNavalTacticFallback = true, TacticAllocation = new(0, 1, 2, 3, 4),
             PlayerAutoSearchEnabled = true, PlayerAutoSearchMinimumPolitics = 60,
             HideRoutineSearchReports = true,
+            ConfigureTacticsOnFormationSelection = true,
             ComputerRevenuePercent = 125, ComputerHarvestPercent = 200,
             CityBattleDamagePercent = 50,
             NoRetreatCaptureBonus = 20,

@@ -11,6 +11,7 @@ public sealed record CompanionSettings
     [JsonRequired] public bool PlayerAutoSearchEnabled { get; init; }
     [JsonRequired] public int PlayerAutoSearchMinimumPolitics { get; init; } = 45;
     [JsonRequired] public bool HideRoutineSearchReports { get; init; }
+    [JsonRequired] public bool ConfigureTacticsOnFormationSelection { get; init; }
     [JsonRequired] public bool DisableComputerForceConsolidation { get; init; }
     [JsonRequired] public bool DisableComputerPrisonerExecution { get; init; }
     [JsonRequired] public int ComputerRevenuePercent { get; init; } = 100;

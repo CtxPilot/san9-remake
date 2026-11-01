@@ -56,7 +56,15 @@ public partial class CommandWindow : Control
 
     public InformationMenuButton ActionButton(string title, string skin, Rect2 bounds, Action action)
     {
-        var button = new InformationMenuButton { Title = title, SkinPrefix = "deployment-" + skin, Textures = Textures,
+        var button = CreateActionButton(Textures, title, skin, bounds, action);
+        AddChild(button);
+        return button;
+    }
+
+    /// <summary>Creates an unparented button so page content can own its drawing and input layer.</summary>
+    public static InformationMenuButton CreateActionButton(TextureScope textures, string title, string skin, Rect2 bounds, Action action)
+    {
+        var button = new InformationMenuButton { Title = title, SkinPrefix = "deployment-" + skin, Textures = textures,
             Position = bounds.Position, Size = bounds.Size,
             // The edit skin reserves transparent space beyond its visible button plate.
             TextInsets = skin == "edit" ? new(0, 0, 8, 6) : Vector4.Zero,
@@ -64,7 +72,8 @@ public partial class CommandWindow : Control
                 new Color(disabled ? hovered ? "000000" : "a4a4a4" : hovered || pressed ? "f0f0f0" : "d8d8d8"),
                 GameTextEffect.Outline, new Color(disabled ? hovered ? "f0f0f0" : "000000" : hovered || pressed
                     ? skin == "edit" ? "800090" : skin == "cancel" ? "983810" : "005028" : "000000")) };
-        button.Pressed += action; AddChild(button); return button;
+        button.Pressed += action;
+        return button;
     }
 
     private TextureButton Icon(string role, Vector2 at, Action action, bool disabled = false)

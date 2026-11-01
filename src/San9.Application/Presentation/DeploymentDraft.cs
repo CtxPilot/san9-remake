@@ -97,6 +97,7 @@ public sealed partial class DeploymentDraft
         {
             if (!Rules.ValidFormationPair(id, NavalFormationId)) return false;
             FormationId = id; Arrange(false);
+            if (View.Companion.ConfigureTacticsOnFormationSelection) ConfigureTactics();
         }
         Soldiers = Math.Min(Soldiers, MaximumSoldiers); return true;
     }
@@ -139,12 +140,15 @@ public sealed partial class DeploymentDraft
         ? presentation : new(Math.Max(1, Slots.Length), 3, Slots, 0, 0, null, null), Members.Select(id =>
         {
             var person = View.Officers.Single(o => o.Id == id);
+            bool compatible = IsTacticCompatible(id);
             return new FormationMemberView(id, texts.Resolve(person.NameKey), Tactics[id] is int tactic
                 ? texts.Resolve(View.Information.Tactics.Single(t => t.Id == tactic).NameKey) : "—",
                 (BattleRank)Math.Min(2, Positions[id].Row), id == CommanderId)
             {
                 Position = Positions[id],
-                HoverText = $"武力{person.Abilities.War}、智力{person.Abilities.Intelligence}、兵法数{AvailableTactics(id).Count}"
+                TacticAvailable = Tactics[id] is null || compatible,
+                HoverText = $"武力{person.Abilities.War}、智力{person.Abilities.Intelligence}、兵法数{AvailableTactics(id).Count}" +
+                    (Tactics[id] is null ? "\n尚未配置兵法" : compatible ? "" : "\n当前兵法不适配陆上阵形")
             };
         }).ToArray());
     public CatalogCell[] Combat(bool naval) => UnitCombatPreview.Read(new(0, Force.Id, new(0, 0), Soldiers)

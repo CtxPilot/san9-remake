@@ -49,7 +49,8 @@ public partial class WorkflowLifecycleVerification
             preset.EmitSignal(BaseButton.SignalName.Pressed);
             view.Back();
             Check(saved is { ComputerRevenuePercent: 200, ComputerHarvestPercent: 200, OfficerAbilityCap: 125,
-                NoRetreatCaptureBonus: 0, CityBattleDamagePercent: 75, DisableComputerPrisonerExecution: true } &&
+                NoRetreatCaptureBonus: 0, CityBattleDamagePercent: 75, DisableComputerPrisonerExecution: true,
+                ConfigureTacticsOnFormationSelection: true } &&
                 saved.ComputerStrategyPermissions is { Alienate: false, Burn: false, FalseReport: true } &&
                 saved.PlayerDelegatedStrategyPermissions == saved.ComputerStrategyPermissions,
                 $"The companion preset discarded a retained numeric draft or applied incorrect policies: {saved}.");

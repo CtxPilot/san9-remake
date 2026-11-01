@@ -9,6 +9,14 @@ namespace San9.Client.Godot;
 /// <summary>Edits a local preparation; only the destination workflow submits a deployment.</summary>
 public partial class DeploymentView : FixedPage
 {
+    private const int RowHeight = 40;
+    private const int FormationRowY = 228;
+    private const int ShipRowY = FormationRowY + RowHeight;
+    private const int SoldiersRowY = ShipRowY + RowHeight;
+    private const int MoneyRowY = SoldiersRowY + RowHeight;
+    private const int MoraleRowY = MoneyRowY + RowHeight;
+    private const int CombatHeaderY = MoraleRowY + 48;
+    private const int CombatStartY = CombatHeaderY + 32;
     protected override Color PageBackground => new(0, 0, 0, .35f);
     public DeploymentDraft Draft { get; init; } = null!;
     public GameSession Session { get; init; } = null!;
@@ -48,11 +56,12 @@ public partial class DeploymentView : FixedPage
     }
     private void Field(string value, Rect2 bounds) => Label(value, new(bounds.Position + new Vector2(4, 0), bounds.Size - new Vector2(8, 0)),
         alignment: HorizontalAlignment.Right, style: new GameTextStyle(16, new Color("f0f0f0"), GameTextEffect.None, Colors.Transparent));
-    private void Button(string title, string skin, Rect2 bounds, Action action, bool enabled = true)
+    private InformationMenuButton Button(string title, string skin, Rect2 bounds, Action action, bool enabled = true)
     {
-        var window = _window!;
-        var button = window.ActionButton(title, skin, new(bounds.Position - window.Position, bounds.Size), action);
+        var button = CommandWindow.CreateActionButton(Textures, title, skin, bounds, action);
         button.Disabled = !enabled;
+        _body!.AddChild(button);
+        return button;
     }
     private string Person(int? id) => id is int person ? Texts.Resolve(Draft.View.Officers.Single(o => o.Id == person).NameKey) : "";
     private string Formation(int? id) => id is int formation ? Texts.Resolve(Draft.View.Information.Formations.Single(f => f.Id == formation).NameKey) : "";
@@ -71,7 +80,7 @@ public partial class DeploymentView : FixedPage
         if (_window is not null) { RemoveChild(_window); _window.QueueFree(); }
         _window = new CommandWindow { Texts = Texts, Textures = Textures, Position = new(136, 100), Size = new(752, 568),
             Title = "出征", ShowBehindParent = true, Closed = Closed, Accepted = Proceed, CanAccept = Draft.CanProceed,
-            Help = () => Notice("选择执行武将后，可选择阵形、船和士兵。\n拖拽武将牌交换阵位，双击选择兵法。\n执行进入选目标；中止会放弃本次设置。") };
+            Help = () => Notice("选择执行武将后，可选择阵形、船和士兵。\n拖拽武将牌交换阵位，点击兵法名称或双击武将选择兵法。\n阵形名称右侧的兵法菜单可选择按当前阵形或指定类别，选中后立即配置全队。\n选阵后自动配置由优化伴侣开关控制；灰色兵法不适配当前陆阵。\n执行进入选目标；中止会放弃本次设置。") };
         AddChild(_window);
         string facility = "执行设施　" + Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts);
         _facilityWidth = facility.Sum(c => c < 128 ? 8 : 16) + 32;
@@ -79,22 +88,23 @@ public partial class DeploymentView : FixedPage
         Button("执行武将", "edit", new(136, 148, 104, 40), SelectOfficers);
         Button("常用编队", "edit", new(248, 148, 104, 40), OpenPresets);
         bool selected = !Draft.Members.IsEmpty;
-        Button("阵形", "edit", new(136, 228, 104, 40), () => SelectFormation(false), selected && Draft.Formations(false).Count > 1);
-        Button("船", "edit", new(136, 268, 104, 40), () => SelectFormation(true), selected && Draft.Formations(true).Count > 1);
-        Button("士兵", "edit", new(136, 308, 104, 40), SelectSoldiers, selected && Draft.MaximumSoldiers > 0);
+        Button("阵形", "edit", new(136, FormationRowY, 104, 40), () => SelectFormation(false), selected && Draft.Formations(false).Count > 1);
+        AddTacticControls(selected);
+        Button("船", "edit", new(136, ShipRowY, 104, 40), () => SelectFormation(true), selected && Draft.Formations(true).Count > 1);
+        Button("士兵", "edit", new(136, SoldiersRowY, 104, 40), SelectSoldiers, selected && Draft.MaximumSoldiers > 0);
         Label("大将", new(136, 188, 96, 32)); Field(Person(Draft.CommanderId), new(240, 188, 80, 32));
-        Field(Formation(Draft.FormationId), new(240, 228, 48, 32)); Field(Formation(Draft.NavalFormationId), new(240, 268, 48, 32));
-        Field($"{(selected ? Draft.Soldiers.ToString() : "")}/{Draft.Home.Soldiers}", new(240, 308, 120, 32));
-        Label("资金", new(136, 348, 96, 32)); Field($"{(selected ? Draft.Cost.ToString() : "")}/{Draft.Money}", new(240, 348, 120, 32));
-        Label("士气", new(136, 388, 96, 32)); Field(Draft.Home.Morale.ToString(), new(240, 388, 40, 32));
-        Label("陆上", new(240, 436, 48, 24)); Label("水上", new(296, 436, 48, 24));
+        Field(Formation(Draft.FormationId), new(240, FormationRowY, 48, 32)); Field(Formation(Draft.NavalFormationId), new(240, ShipRowY, 48, 32));
+        Field($"{(selected ? Draft.Soldiers.ToString() : "")}/{Draft.Home.Soldiers}", new(240, SoldiersRowY, 120, 32));
+        Label("资金", new(136, MoneyRowY, 96, 32)); Field($"{(selected ? Draft.Cost.ToString() : "")}/{Draft.Money}", new(240, MoneyRowY, 120, 32));
+        Label("士气", new(136, MoraleRowY, 96, 32)); Field(Draft.Home.Morale.ToString(), new(240, MoraleRowY, 40, 32));
+        Label("陆上", new(240, CombatHeaderY, 48, 24)); Label("水上", new(296, CombatHeaderY, 48, 24));
         var land = Draft.Combat(false); var water = Draft.Combat(true);
         string[] labels = ["对部队", "对守兵", "对城壁", "守备力", "机动力"];
         for (int i = 0; i < labels.Length; i++)
-        { int y = 468 + i * 40; Label(labels[i], new(136, y, 96, 32)); Field(selected ? land[i].Text : "", new(240, y, 40, 32)); Field(selected ? water[i].Text : "", new(296, y, 40, 32)); }
+        { int y = CombatStartY + i * RowHeight; Label(labels[i], new(136, y, 96, 32)); Field(selected ? land[i].Text : "", new(240, y, 40, 32)); Field(selected ? water[i].Text : "", new(296, y, 40, 32)); }
         var sectionStyle = GameTextStyles.CatalogRow with { EffectColor = new Color("005028") };
         Label("布阵", new(384, 166, 48, 24), alignment: HorizontalAlignment.Left, style: sectionStyle);
-        Label("可拖曳武将以变更配置，双击鼠标可变更兵法。", new(440, 166, 432, 24), alignment: HorizontalAlignment.Left);
+        Label("拖曳武将调整阵位；点击兵法名称更换。", new(440, 166, 432, 24), alignment: HorizontalAlignment.Left);
         if (selected)
         {
             _body.AddChild(new FormationBoardView
@@ -114,6 +124,16 @@ public partial class DeploymentView : FixedPage
         Label("水上视野", new(645, 555, 80, 24), alignment: HorizontalAlignment.Left, style: sectionStyle);
         _body.AddChild(new GameMessageBar { Textures = Textures, Text = Draft.Cost > Draft.Money ? "出征资金不足。" : "命令部队出征。" });
         QueueRedraw();
+    }
+    private void AddTacticControls(bool selected)
+    {
+        InformationMenuButton menu = null!;
+        menu = Button("兵法", "edit", new(296, FormationRowY, 72, 40), () => OpenChild(new DeploymentTacticMenu
+        {
+            AnchorControl = menu, Textures = Textures,
+            Selected = mode => { Draft.ConfigureTactics(mode); CloseChild(); }, Closed = CloseChild
+        }), selected);
+        menu.TooltipText = "选择按当前阵形或指定类别，立即配置全队兵法。";
     }
     private void RebuildDeferred() => Rebuild();
     private void OpenPresets() => OpenChild(new DeploymentPresetView
@@ -266,13 +286,18 @@ public partial class DeploymentView : FixedPage
             // These labels crop eight pixels from the outer end caps in the original skin.
             var left = Textures.Get("deployment-mode-left", this); var right = Textures.Get("deployment-mode-right", this);
             float l = left.GetWidth() - 8, r = right.GetWidth() - 8;
-            DrawTextureRectRegion(left, new(x, 436, l, 24), new(8, 0, l, 24));
-            Tile("mode-middle", new(x + l, 436, 48 - l - r, 24));
-            DrawTextureRectRegion(right, new(x + 48 - r, 436, r, 24), new(0, 0, r, 24));
+            DrawTextureRectRegion(left, new(x, CombatHeaderY, l, 24), new(8, 0, l, 24));
+            Tile("mode-middle", new(x + l, CombatHeaderY, 48 - l - r, 24));
+            DrawTextureRectRegion(right, new(x + 48 - r, CombatHeaderY, r, 24), new(0, 0, r, 24));
         }
-        foreach (int y in new[] { 188, 348, 388, 468, 508, 548, 588, 628 }) Strip("label", new(136, y, 96, 32));
-        foreach (var rect in new[] { new Rect2(240, 188, 80, 32), new(240, 228, 48, 32), new(240, 268, 48, 32), new(240, 308, 120, 32), new(240, 348, 120, 32), new(240, 388, 40, 32) }) DrawField(rect);
-        for (int i = 0; i < 5; i++) { DrawField(new(240, 468 + i * 40, 40, 32)); DrawField(new(296, 468 + i * 40, 40, 32)); }
+        foreach (int y in new[] { 188, MoneyRowY, MoraleRowY }) Strip("label", new(136, y, 96, 32));
+        foreach (var rect in new[] { new Rect2(240, 188, 80, 32), new(240, FormationRowY, 48, 32), new(240, ShipRowY, 48, 32), new(240, SoldiersRowY, 120, 32), new(240, MoneyRowY, 120, 32), new(240, MoraleRowY, 40, 32) }) DrawField(rect);
+        for (int i = 0; i < 5; i++)
+        {
+            int y = CombatStartY + i * RowHeight;
+            Strip("label", new(136, y, 96, 32));
+            DrawField(new(240, y, 40, 32)); DrawField(new(296, y, 40, 32));
+        }
         DrawLine(new(136, 140), new(888, 140), new Color("755635"), 2);
     }
     private void DrawField(Rect2 rect)

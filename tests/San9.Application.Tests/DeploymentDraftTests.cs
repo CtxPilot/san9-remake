@@ -104,7 +104,8 @@ public sealed class DeploymentDraftTests
         Assert.Throws<ArgumentException>(() => new UnitCommandTargets(view, 7, UnitCommandKind.Attack));
     }
 
-    internal static StrategySnapshot View(Func<San9.Core.Simulation.WorldSnapshot, San9.Core.Simulation.WorldSnapshot>? change = null, bool work = false)
+    internal static StrategySnapshot View(Func<San9.Core.Simulation.WorldSnapshot, San9.Core.Simulation.WorldSnapshot>? change = null, bool work = false,
+        Func<ScenarioInitialState, ScenarioInitialState>? configure = null, CompanionSettings? companion = null)
     {
         var definition = G01ScenarioTests.Fixture();
         var world = GameSession.Start(definition, 1).Snapshot;
@@ -150,7 +151,8 @@ public sealed class DeploymentDraftTests
                 _ => o
             }).ToArray()
         };
-        return new(definition, change is null ? world : change(world));
+        definition = configure is null ? definition : configure(definition);
+        return new(new StrategySnapshotSource(definition, new ScenarioRules(definition)), change is null ? world : change(world), companion);
     }
     [Fact]
     public void PreparationKeepsWorldUntouchedAndUsesCommanderAndCurrentMembers()

@@ -9,7 +9,7 @@ public static class SessionProtocol
 {
     public const string RulesVersion = "san9-core-g10-v230";
     public const int SaveFormatVersion = 133;
-    public const int LogFormatVersion = 155;
+    public const int LogFormatVersion = 156;
 }
 
 /// <summary>Non-authoritative load diagnostics; never included in saves or deterministic hashes.</summary>
