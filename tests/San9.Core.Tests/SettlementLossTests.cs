@@ -33,10 +33,21 @@ public sealed class SettlementLossTests
              new(20, new(22, 2), new(1, 1)), new(30, new(32, 2), new(1, 1))]))
     };
 
-    [Fact]
-    public void RootWithoutDirectCityShouldMergeASurvivingChildIntoIt()
+    private static WorldMutation ReconciledBranch()
     {
-        var world = State().BeginMutation();
+        var state = State();
+        var initial = state.BeginMutation();
+        GovernanceLifecycle.Reconcile(initial, new HashSet<int> { 1, 2, 3 }, Rules(), [], false);
+        state.Commit(initial);
+        return state.Fork().BeginMutation();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RootWithoutDirectCityShouldMergeASurvivingChildIntoIt(bool reconciled)
+    {
+        var world = reconciled ? ReconciledBranch() : State().BeginMutation();
         world.AddCorps(new(110, 1, 102, new(300, 400)));
         world.Replace(world.Settlements[10] with { OwnerId = 2, CorpsId = 200, Soldiers = 100 });
         world.Replace(world.Settlements[11] with { CorpsId = 110 });
@@ -53,10 +64,12 @@ public sealed class SettlementLossTests
         Assert.Equal(OfficerStatus.Serving, world.Officers[102].Status);
     }
 
-    [Fact]
-    public void BattleSuccessionMergesTheSuccessorsCorpsEvenWhenTheRootStillHasACity()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BattleSuccessionMergesTheSuccessorsCorpsEvenWhenTheRootStillHasACity(bool reconciled)
     {
-        var world = State().BeginMutation();
+        var world = reconciled ? ReconciledBranch() : State().BeginMutation();
         world.AddCorps(new(110, 1, 102, new(300, 400)));
         world.Replace(world.Settlements[10] with { CorpsId = 110, Soldiers = 100 });
         world.Replace(world.Officers[102] with { Status = OfficerStatus.Governor, SuccessionPriority = 100 });
@@ -73,6 +86,38 @@ public sealed class SettlementLossTests
         Assert.Equal(1300u, world.Corps[100].Treasury.Money);
         Assert.Equal(world.Clock.Year, world.Officers[102].StatusStartYear);
         Assert.Single(events.OfType<ForceLeaderChangedEvent>());
+        WorldInvariants.Validate(world);
+    }
+
+    [Theory]
+    [InlineData("owner")]
+    [InlineData("durability")]
+    [InlineData("hosting")]
+    public void ReconciledGovernanceRepairsServiceAgainWhenItsHomeBecomesUnavailable(string change)
+    {
+        var world = ReconciledBranch();
+        world.Replace(world.Officers[102] with { SettlementId = 11 });
+        world.Replace(world.Officers[103] with { SettlementId = 11 });
+        world.AddUnit(new(901, 1, new(7, 2), 100) { CorpsId = 100, ServicePlaceId = 10 });
+        world.SetSimulation(world.Simulation with { NextUnitId = 902 });
+        GovernanceLifecycle.Reconcile(world, new HashSet<int> { 1 }, Rules(), [], false);
+        Assert.Equal(10, world.Units[901].ServicePlaceId);
+
+        // Ordinary casualties and cooldowns leave the administrative relationships intact.
+        world.Replace(world.Units[901] with { Soldiers = 90, Wounded = 10 });
+        world.Replace(world.Officers[101] with { Acted = true, TacticCooldown = 2 });
+        GovernanceLifecycle.Reconcile(world, new HashSet<int> { 1 }, Rules(), [], false);
+        var home = world.Settlements[10];
+        world.Replace(change switch
+        {
+            "owner" => home with { OwnerId = 2, CorpsId = 200 },
+            "durability" => home with { Durability = 0 },
+            _ => home with { CanHostPersons = false }
+        });
+        GovernanceLifecycle.Reconcile(world, new HashSet<int> { 1 }, Rules(), [], false);
+
+        Assert.Equal(11, world.Units[901].ServicePlaceId);
+        Assert.Equal((1, 100), (world.Units[901].OwnerId, world.Units[901].CorpsId));
         WorldInvariants.Validate(world);
     }
 

@@ -61,6 +61,16 @@ internal sealed partial class WorldMutation : IWorldQuery
     private HashSet<int>? _leadershipOfficers;
     internal bool LeadershipConsistentAtCommit => _leadershipConsistent && _leadershipBefore is null;
 
+    // Certified by an unchanged governance pass; only membership, survival and service inputs invalidate it.
+    // New/load entry is uncertified. Commits and internal forks carry the fact, never the save format.
+    internal bool GovernanceConsistent { get; private set; }
+    internal bool BeginGovernanceMaintenance()
+    {
+        if (GovernanceConsistent) return false;
+        GovernanceConsistent = true;
+        return true;
+    }
+
     private void LeadershipChanged(int? firstPlace = null, int? secondPlace = null, int? firstOfficer = null, int? secondOfficer = null)
     {
         if (!_leadershipConsistent)
@@ -140,6 +150,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         _owner = owner;
         Companion = companion;
         _leadershipConsistent = owner.LeadershipConsistent;
+        GovernanceConsistent = owner.GovernanceConsistent;
         _abilityRules = abilityRules;
         OfficerGrowth = abilityRules.Growth.Resolve(companion);
         _economy = economy;
@@ -285,6 +296,8 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal void Replace(ForceState value)
     {
         var previous = AllForces[value.Id];
+        if (previous.IsDormant != value.IsDormant || previous.IsEliminated != value.IsEliminated || previous.LeaderId != value.LeaderId)
+            GovernanceConsistent = false;
         if (previous.IsEliminated != value.IsEliminated) _engagements = null;
         bool activationChanged = previous.IsDormant != value.IsDormant;
         // Callers may hold a record from before another input changed. Its derived total is not an input.
@@ -298,6 +311,10 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal void Replace(SettlementState value)
     {
         var previous = AllSettlements[value.Id];
+        if (previous.OwnerId != value.OwnerId || previous.CorpsId != value.CorpsId || previous.Kind != value.Kind ||
+            previous.IsDormant != value.IsDormant || previous.IsDestroyed != value.IsDestroyed ||
+            previous.CanHostPersons != value.CanHostPersons || (previous.Durability > 0) != (value.Durability > 0) || previous.Facility != value.Facility)
+            GovernanceConsistent = false;
         if (previous.OwnerId != value.OwnerId || value.IsDestroyed || value.IsDormant)
             value = value with { CombatTargetUnitId = null, SiegeContributions = null };
         bool courtChanged = !_economy.ImperialCourt.SuccessionOrder.IsEmpty &&
@@ -327,6 +344,7 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal void AddSettlement(SettlementState value)
     {
         EnsureOpen();
+        GovernanceConsistent = false;
         int? previousEmperorOwner = ForceTrust.EmperorOwner(this, _economy);
         AllSettlements = AllSettlements.Add(value.Id, value);
         if (!value.IsDormant) Settlements = Settlements.Add(value.Id, value);
@@ -339,6 +357,10 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal void Replace(OfficerState value)
     {
         var previous = AllOfficers[value.Id];
+        if (previous.IsServing != value.IsServing || (previous.IsServing || value.IsServing) &&
+            (previous.IsDormant != value.IsDormant || previous.OwnerId != value.OwnerId ||
+             previous.SettlementId != value.SettlementId || previous.UnitId != value.UnitId))
+            GovernanceConsistent = false;
         bool courtChanged = _economy.ImperialCourt.SuccessionOrder.Contains(value.Id) &&
             (previous.IsDormant != value.IsDormant || previous.Status != value.Status ||
              previous.SettlementId != value.SettlementId || previous.RegionId != value.RegionId || previous.UnitId != value.UnitId);
@@ -383,13 +405,20 @@ internal sealed partial class WorldMutation : IWorldQuery
     private void StoreUnit(UnitState value)
     {
         var previous = Units[value.Id];
+        if (previous.OwnerId != value.OwnerId || previous.CorpsId != value.CorpsId || previous.ServicePlaceId != value.ServicePlaceId ||
+            previous.IsEmbedded != value.IsEmbedded || TransportDestination(previous) != TransportDestination(value))
+            GovernanceConsistent = false;
         if (_engagements is not null && MilitaryEngagements.UnitChanged(previous, value, _engagementRules!)) _engagements = null;
         Units = Replace(Units, value.Id, value);
         _movementOccupancy?.Set(value);
     }
+    private static int? TransportDestination(UnitState unit) =>
+        unit.EffectiveOrder is { Kind: MilitaryOrderKind.Transport } order ? order.SettlementId : null;
+
     internal void AddUnit(UnitState unit)
     {
         EnsureOpen();
+        GovernanceConsistent = false;
         Units = Units.Add(unit.Id, unit);
         UnitOrder = UnitOrder.Add(unit.Id);
         _movementOccupancy?.Set(unit);
@@ -399,6 +428,7 @@ internal sealed partial class WorldMutation : IWorldQuery
     {
         EnsureOpen();
         if (!Units.ContainsKey(id)) throw new InvalidOperationException("Unknown unit.");
+        GovernanceConsistent = false;
         Units = Units.Remove(id);
         UnitOrder = UnitOrder.Remove(id);
         foreach (var place in Settlements.Values.Where(s => s.CombatTargetUnitId == id).ToArray())
@@ -408,13 +438,19 @@ internal sealed partial class WorldMutation : IWorldQuery
     }
     internal void Replace(CorpsState value)
     {
-        AllCorps = Replace(AllCorps, value.Id, value);
+        var records = Replace(AllCorps, value.Id, value);
+        if (ReferenceEquals(AllCorps, records)) return;
+        var previous = AllCorps[value.Id];
+        if (previous.OwnerId != value.OwnerId || previous.IsRoot != value.IsRoot || previous.LeaderId != value.LeaderId)
+            GovernanceConsistent = false;
+        AllCorps = records;
         _activeCorps = null;
     }
     internal void RemoveCorps(int id)
     {
         EnsureOpen();
         if (!AllCorps.ContainsKey(id)) throw new InvalidOperationException("Unknown corps.");
+        GovernanceConsistent = false;
         AllCorps = AllCorps.Remove(id); _activeCorps = null;
     }
     // Retired forces remain in the world, so allocation never reuses a previous identity.
@@ -424,6 +460,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         if (force.Origin is null || force.Id != checked(AllForces.Keys.DefaultIfEmpty(-1).Max() + 1))
             throw new ArgumentException("Invalid generated force identity or origin.");
         AllForces = AllForces.Add(force.Id, force);
+        GovernanceConsistent = false;
         if (!force.IsDormant) Forces = Forces.Add(force.Id, force);
         InvalidateParticipationQueries();
         RefreshForceTrust(force.Id);
@@ -433,6 +470,7 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal void AddCorps(CorpsState corps)
     {
         EnsureOpen();
+        GovernanceConsistent = false;
         AllCorps = AllCorps.Add(corps.Id, corps); _activeCorps = null;
     }
     internal void Replace(TreasureState value)

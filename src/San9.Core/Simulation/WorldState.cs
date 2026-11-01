@@ -19,6 +19,7 @@ public sealed class WorldState
     /// <summary>Every commander follows from the current selection inputs (set by a full reselection, kept by the partial
     /// ones; not saved: a loaded world reselects everything once, as before).</summary>
     internal bool LeadershipConsistent { get; private set; }
+    internal bool GovernanceConsistent { get; private set; }
     private ActiveWorldRecords _activeRecords = new(
         ImmutableDictionary<int, ForceState>.Empty, ImmutableDictionary<int, SettlementState>.Empty,
         ImmutableDictionary<int, OfficerState>.Empty);
@@ -121,6 +122,7 @@ public sealed class WorldState
             _corps = _corps, _treasures = _treasures, _relations = _relations,
             _activeRecords = _activeRecords,
             Simulation = Simulation, Revision = Revision, _snapshot = _snapshot, LeadershipConsistent = LeadershipConsistent,
+            GovernanceConsistent = GovernanceConsistent,
             _publishedForces = _publishedForces,
             _publishedSettlements = _publishedSettlements,
             _publishedOfficers = _publishedOfficers,
@@ -183,6 +185,7 @@ public sealed class WorldState
         _relations = mutation.AllRelations;
         _activeRecords = mutation.ActiveRecords;
         LeadershipConsistent = mutation.LeadershipConsistentAtCommit;
+        GovernanceConsistent = mutation.GovernanceConsistent;
         Clock = mutation.Clock;
         Simulation = mutation.Simulation;
         Revision++;
