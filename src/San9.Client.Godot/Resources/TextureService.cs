@@ -9,6 +9,7 @@ namespace San9.Client.Godot;
 public partial class TextureService : Node
 {
     private Dictionary<string, PortraitDefinition> _portraits = [];
+    public IReadOnlyDictionary<string, PortraitDefinition> Portraits => _portraits;
     private TextureCache<ImageTexture> _cache = null!;
     private readonly Dictionary<ImageAsset, AlphaMask> _masks = [];
     private readonly Dictionary<ImageFile, ImageAsset[]> _maskSources = [];

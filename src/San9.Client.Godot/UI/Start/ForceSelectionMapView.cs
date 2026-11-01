@@ -33,7 +33,8 @@ public partial class ForceSelectionMapView : ModalView
         _textures = Service.CreateScope(assets);
         _textures.RequestPrefixes("information-", "catalog-", "opening-");
         _mapTextures = Service.CreateScope(Service.LibraryAssets); _mapTextures.Request(Definition.Assets);
-        _map = new OpeningMapView { Name = "Map", Definition = Definition, CityColors = Scenario.CityColors, Forces = Scenario.Forces, Textures = _mapTextures,
+        _map = new OpeningMapView { Name = "Map", Definition = Definition, CityColors = Scenario.CityColors,
+            Targets = Scenario.Forces.SelectMany(f => f.CityIds.Select(id => (City: id, Force: f.Id))).ToDictionary(p => p.City, p => p.Force), Textures = _mapTextures,
             SelectionTextures = _textures,
             Position = new(108, 112), Selected = Selection.Selected, Hovered = Summary, Activated = id => { Selection.Toggle(id); Refresh(); } };
         AddChild(_map);

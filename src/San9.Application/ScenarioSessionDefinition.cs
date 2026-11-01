@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using San9.Content.Scenarios;
+using San9.Application.Presentation;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
@@ -8,17 +9,20 @@ namespace San9.Application;
 internal sealed class ScenarioSessionDefinition
 {
     private readonly HashSet<int> _playerForces;
-    internal ScenarioSessionDefinition(ScenarioInitialState definition, IReadOnlyCollection<int>? playerForceIds = null)
+    internal ScenarioSessionDefinition(ScenarioInitialState definition, IReadOnlyCollection<int>? playerForceIds = null,
+        SessionDefinitions? definitions = null)
     {
+        Definitions = definitions ?? SessionDefinitions.Empty;
+        Definitions.Validate();
         definition.Validate();
         _playerForces = (playerForceIds ?? (definition.PlayerForceId is int player ? [player] : [])).ToHashSet();
-        if (_playerForces.Any(id => !definition.Forces.Any(f => f.Id == id)) ||
+        if (_playerForces.Any(id => !definition.Forces.Any(f => f.Id == id) && !Definitions.Forces.Any(f => f.Id == id)) ||
             playerForceIds is not null && _playerForces.Count != playerForceIds.Count)
             throw new ArgumentException("Invalid player force selection.");
         InitialPlayerForceIds = _playerForces.Order().ToImmutableArray();
         foreach (int id in InitialPlayerForceIds)
             definition = InitializePlayerActivation(definition with { PlayerForceId = id });
-        if (_playerForces.Any(id => definition.Forces.Single(f => f.Id == id).IsDormant))
+        if (_playerForces.Any(id => definition.Forces.Any(f => f.Id == id && f.IsDormant)))
             throw new ArgumentException("Selected force cannot be activated.");
         definition = definition with { PlayerForceId = InitialPlayerForceIds.IsEmpty ? null : InitialPlayerForceIds[0] };
         if (definition.Day is not (1 or 11 or 21)) throw new ArgumentException("Expected a stable xun boundary.");
@@ -35,6 +39,7 @@ internal sealed class ScenarioSessionDefinition
     }
 
     internal ScenarioInitialState Content { get; }
+    internal SessionDefinitions Definitions { get; }
     internal ImmutableArray<int> InitialPlayerForceIds { get; }
 
     private static ScenarioInitialState InitializePlayerActivation(ScenarioInitialState definition)
@@ -56,6 +61,17 @@ internal sealed class ScenarioSessionDefinition
     }
     internal ScenarioRules Rules { get; }
     internal MilitaryRulebook? MilitaryRules => Rules.Military;
+    internal StrategySnapshot CreatePreview()
+    {
+        var clock = new GameClock(Content.Year, Content.Month, Content.Day);
+        var world = new WorldSnapshot(clock, new(clock, 0))
+        {
+            Forces = Forces().ToArray(), Settlements = Settlements().ToArray(),
+            Officers = Content.Officers.Select(o => o.CreateState(Content.Year)).ToArray(), Units = Content.Units,
+            Corps = Content.Information.Corps, Relations = Content.Information.Relations, Treasures = Content.Information.TreasureStates
+        };
+        return new StrategySnapshotSource(Content, Rules, Definitions).Project(world);
+    }
     internal WorldState CreateWorld(ulong seed, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false,
         ControllerKind playerForceController = ControllerKind.Player, NewGameSettings? settings = null) => WorldState.Create(new(Content.Year, Content.Month, Content.Day), seed,
         Forces(),
@@ -67,7 +83,7 @@ internal sealed class ScenarioSessionDefinition
                 _playerForces.Contains(f.Id) ? playerForceController : ControllerKind.Automatic)), computerDamageBonusPercent, Content.Alliance,
         Content.AttackRequests.Select(r => new AttackRequestState(r.RequestedForceId, r.RequesterForceId, r.TargetSettlementId,
             Content.Settlements.Single(s => s.Id == r.TargetSettlementId).OwnerId!.Value, r.RemainingXun)), Content.AnnualAppearancesEnabled, Content.NaturalDeathsEnabled, Content.FreeOfficerMigrationEnabled, battleDeathsEnabled, Content.OfficeRequestsEnabled, Content.ConsumedEventKeys, Content.ForceConsolidationEnabled, Content.ForceEmergenceEnabled, Content.CityIndependenceEnabled, Content.ImperialCourtEnded, Content.ThreeVisitsStarted, Content.FoodExchangeRate, Content.SettlementDefectionsEnabled, Content.UnitDefectionsEnabled,
-        settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces);
+        settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces, Definitions.Forces.Select(f => f.Id).ToHashSet());
 
     private IEnumerable<ForceState> Forces() => Content.Forces.Select(f => new ForceState(f.Id, f.Trust)
     {

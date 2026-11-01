@@ -7,6 +7,8 @@ namespace San9.Content.Packages;
 
 public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, ScenarioInitialState Scenario, TextCatalog Text, InterfaceSkin Skin, San9.Content.Images.TextureLibrary Textures)
 {
+    [System.Text.Json.Serialization.JsonIgnore] public SessionDefinitions Definitions { get; init; } = SessionDefinitions.Empty;
+
     [System.Text.Json.Serialization.JsonIgnore] public string TextureRoot { get; init; } = "";
 
     [System.Text.Json.Serialization.JsonIgnore] public San9.Content.Images.PortraitDefinition[] Portraits { get; init; } = [];
@@ -17,7 +19,8 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
     public void ValidateLinks()
     {
         if (SchemaVersion != ScenarioContent.CurrentSchemaVersion) throw new InvalidDataException("Unsupported client content version.");
-        if (Text.MessagePeople.Keys.Except(Scenario.Officers.Select(o => o.State.Id)).Any())
+        Definitions.Validate(Scenario);
+        if (Text.MessagePeople.Keys.Except(Scenario.Officers.Select(o => o.State.Id).Concat(Definitions.Officers.Select(o => o.Id))).Any())
             throw new InvalidDataException("Message person profiles must reference scenario officers.");
         var images = Map.Assets.Concat(Map.Seasons.SelectMany(s => s.Textures)).Concat(Skin.Assets).Concat(Textures.Assets).ToArray();
         San9.Content.Images.ImageAssetFiles.ValidateCatalog(images);
@@ -89,9 +92,18 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
         _ = Text.ResolveRich(WorldEditorText.ConfirmDiscardKey);
         foreach (string role in SpecialDeploymentText.Roles) _ = Text.ResolveRich(SpecialDeploymentText.Key(role));
         foreach (string column in ExecutionPanelSkin.Columns) _ = Text.ResolveRich(ExecutionPanelSkin.HeaderKey(column));
-        foreach (string role in Scenario.Officers.SelectMany(o => new[] { $"information-person-{o.State.Id}", $"catalog-person-{o.State.Id}" })
+        foreach (string role in Scenario.Officers.Where(o => !Text.MessagePeople.TryGetValue(o.State.Id, out var person) || person.PortraitKey is not null)
+                     .SelectMany(o => new[] { $"information-person-{o.State.Id}", $"catalog-person-{o.State.Id}" })
+                     .Concat(Definitions.Officers.Where(p => p.PortraitKey is not null).SelectMany(p => new[] { $"information-person-{p.Id}", $"catalog-person-{p.Id}" }))
                      .Concat(Scenario.Information.Treasures.Select(t => $"information-treasure-{t.Id}")))
             if (!Skin.Roles.ContainsKey(role)) throw new InvalidDataException($"Missing information illustration: {role}");
+        foreach (var person in Definitions.Officers)
+        {
+            if (!Text.MessagePeople.TryGetValue(person.Id, out var profile) || profile.PortraitKey != person.PortraitKey ||
+                person.PortraitKey is { } portrait && !Portraits.Any(p => p.Image.Id == portrait))
+                throw new InvalidDataException($"Invalid session person profile or portrait: {person.Id}.");
+            foreach (string key in new[] { person.NameKey, person.CourtesyNameKey, person.BiographyKey }.OfType<string>()) _ = Text.ResolveRich(key);
+        }
         if (Scenario.Military is { } geography && (geography.Width != Map.Width || geography.Height != Map.Height))
             throw new InvalidDataException("Scenario and map dimensions differ.");
         if (Map.ScenarioId != Scenario.ScenarioId ||

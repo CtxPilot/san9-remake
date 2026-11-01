@@ -6,6 +6,17 @@ namespace San9.Importer.San9PkTc101.Images;
 
 public static class TextureLibraryCompiler
 {
+    internal static bool UsesPaletteAlpha(string archive, int image) =>
+        archive == "G_LocSPK" || archive == "G_StrtPK" && image is 0 or 1 or 2 or 15 ||
+        archive == "G_Start" && (image is 20 or 21 or 23 or 24 or 38 or 39 || image is >= 27 and <= 36 || image >= 45) ||
+        archive == "G_Start2" && (image is >= 4 and <= 7 || image == 52 || image is >= 66 and <= 81 || image >= 161) ||
+        archive == "G_Ikki" && (image < 9 || image is >= 11 and <= 18) ||
+        archive == "G_ZoomIn" && (image < 58 || image is 141 or 142) ||
+        archive == "G_Gaikou" && image >= 19 || archive == "G_Ending" && image is 1 or 2 or 7 or 8 or 9;
+
+    internal static PngImage Decode(string archive, int index, IndexedImage image, byte[] palette, bool opaque) =>
+        IndexedImageArchive.Decode(image, palette, !opaque, UsesPaletteAlpha(archive, index));
+
     // Offsets identify source data; the loader evidence is recorded in RE-SAN9PK-0169.
     private sealed record Recipe(string Category, string? Palette = null, int Table = 0, int Count = 0,
         int FirstImage = 0, int FirstPalette = 0);
@@ -121,18 +132,14 @@ public static class TextureLibraryCompiler
                     // Zoom terrain, transitions, edges, facilities and both panels also use palette alpha.
                     // RE-0200/0201: opening and scenario-selection frames, previews and controls use mode 64.
                     // RE-0071: settings illustration, choice highlight/bars and expert dialog also use mode 64.
-                    bool paletteAlpha = name == "G_LocSPK" || name == "G_StrtPK" && b.Image is 0 or 1 or 2 or 15 ||
-                        name == "G_Start" && (b.Image is 20 or 21 or 23 or 24 or 38 or 39 || b.Image is >= 27 and <= 36 || b.Image >= 45) ||
-                        name == "G_Start2" && (b.Image == 52 || b.Image is >= 66 and <= 81 || b.Image >= 161) ||
-                        name == "G_Ikki" && (b.Image < 9 || b.Image is >= 11 and <= 18) ||
-                        name == "G_ZoomIn" && (b.Image < 58 || b.Image is 141 or 142) ||
-                        name == "G_Gaikou" && b.Image >= 19 || name == "G_Ending" && b.Image is 1 or 2 or 7 or 8 or 9;
+                    // RE-0202: the new-force buttons and face frame (4..7) also use mode64.
+                    bool paletteAlpha = UsesPaletteAlpha(name, b.Image);
                     bool openingLayer = openingLayers.TryGetValue(b.Image, out var layer);
                     return new TextureVariant(b.Image, b.Palette,
                         save($"library/{id}/variant-{b.Palette:D3}/{b.Image:D4}",
                             TextureSourcePath.Image(name, b.Image, b.Palette, !opaque, paletteAlpha, recipe.Palette,
                                 transform: openingLayer ? "opening-framed-island" : null),
-                            openingLayer ? layer! : IndexedImageArchive.Decode(images[b.Image], palettes[b.Palette], !opaque, paletteAlpha)));
+                            openingLayer ? layer! : Decode(name, b.Image, images[b.Image], palettes[b.Palette], opaque)));
                 }).ToArray();
                 variants.AddRange(converted);
             }

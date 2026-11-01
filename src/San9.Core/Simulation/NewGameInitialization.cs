@@ -5,6 +5,22 @@ namespace San9.Core.Simulation;
 
 internal static class NewGameInitialization
 {
+    internal static void PrepareFoundedForces(WorldMutation world, IReadOnlySet<int> forceIds)
+    {
+        foreach (int id in forceIds.Order())
+        {
+            if (!world.Forces.TryGetValue(id, out var force) || force.LeaderId is not int leader ||
+                !world.Officers.TryGetValue(leader, out var ruler) || ruler.Status != OfficerStatus.Ruler ||
+                ruler.OwnerId != id || ruler.SettlementId is not int home || !world.Settlements.TryGetValue(home, out var city) ||
+                city.Kind != SettlementKind.City || city.OwnerId != id)
+                throw new ArgumentException("A founded force requires a ruler in its city.");
+            uint transfer = city.DraftPopulation / 10;
+            uint increase = Math.Min(12000u, transfer + 5000);
+            world.Replace(city with { DraftPopulation = city.DraftPopulation - transfer,
+                Soldiers = (uint)Math.Min(city.SoldierCapacity, (long)city.Soldiers + increase) });
+        }
+    }
+
     internal static void Apply(WorldMutation world, NewGameSettings settings, IReadOnlyList<int> officerPlaces, IReadOnlySet<int> players)
     {
         settings.Validate();

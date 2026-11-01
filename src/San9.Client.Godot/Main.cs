@@ -1,4 +1,6 @@
 using Godot;
+using San9.Application.Authoring;
+using San9.Content.Authoring;
 using San9.Client.Godot.Diagnostics;
 using San9.Client.Godot.Persistence;
 using San9.Content.Images;
@@ -45,6 +47,11 @@ public partial class Main : Node
             var options = ClientOptions.Parse(OS.GetCmdlineUserArgs(), _directories.ContentRoot);
             _options = options;
             _directories = _directories.ApplyOverrides(options);
+            if (options.OfficerEditor)
+            {
+                ui.AddChild(new CreatedOfficerEditor { Store = new(DataPaths.CreatedOfficers), ContentRoot = options.ContentRoot, Closed = () => GetTree().Quit() });
+                return;
+            }
             if (options.PackageRoot is null && options.ScenarioId is null)
             {
                 if (options.RequiresWorldVerification || options.TextSmoke)
@@ -85,8 +92,8 @@ public partial class Main : Node
     private async Task<Node> PrepareOpening()
     {
         var opening = new StartMenuPreview { ContentRoot = _options.ContentRoot, DataPaths = DataPaths, InitiallyVisible = false,
-            BeginGame = (id, players, settings, damage) => SwitchScene(() => PrepareWorld(
-                _options with { PackageRoot = null, ScenarioId = id, ComputerDamageBonusPercent = damage }, players, settings)),
+            BeginGame = (id, players, settings, damage, setup) => SwitchScene(() => PrepareWorld(
+                _options with { PackageRoot = null, ScenarioId = id, ComputerDamageBonusPercent = damage }, players, settings, setup: setup)),
             LoadGame = document => LoadGame(document, transition: true) };
         GetNode<Control>("%UiRoot").AddChild(opening);
         try { await opening.Prepared; return opening; }
@@ -165,8 +172,9 @@ public partial class Main : Node
     }
 
     private async Task<Node> PrepareWorld(ClientOptions options, int[]? players = null, San9.Core.Domain.NewGameSettings? settings = null,
-        SlotSaveDocument? save = null)
+        SlotSaveDocument? save = null, NewGameSetup? setup = null)
     {
+        setup ??= NewGameSetup.Empty;
         var token = _startup.Token;
         var startup = System.Diagnostics.Stopwatch.StartNew();
         var runtime = GD.Load<PackedScene>("res://GameRuntime.tscn").Instantiate();
@@ -186,7 +194,7 @@ public partial class Main : Node
                     : System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(
                         System.Security.Cryptography.RandomNumberGenerator.GetBytes(sizeof(ulong)));
                 return San9.Application.GameSession.Start(definition, seed, options.ComputerDamageBonusPercent,
-                    enableXunStartCheckpoints: true, settings: settings, playerForceIds: players);
+                    enableXunStartCheckpoints: true, settings: settings, playerForceIds: players, setup: setup);
             }
             string packageRoot = options.PackageRoot ?? PackageFiles.Resolve(options.ContentRoot,
                 (await ContentCatalogFiles.LoadAsync(options.ContentRoot, token)).RequireScenario(options.ScenarioId!).Package);
@@ -201,6 +209,13 @@ public partial class Main : Node
                 if (options.RuntimeSmoke) initial = ClientVerificationScenario.Create(initial);
                 var session = save is null ? CreateNewSession(initial) : SlotSaveStore.Restore(save, initial);
                 token.ThrowIfCancellationRequested();
+                var definitions = session.Definitions;
+                if (!definitions.Officers.IsEmpty)
+                {
+                    package = package with { Definitions = definitions, Text = definitions.AddText(package.Text),
+                        Skin = package.Skin with { Roles = definitions.AddPortraits(package.Skin.Roles) } };
+                    package.ValidateLinks();
+                }
                 return (Content: package, Definition: initial, Session: session, ValidationMs: validationMs,
                     SessionMs: startup.Elapsed.TotalMilliseconds - validationMs);
             }, token);
@@ -251,7 +266,7 @@ public partial class Main : Node
             {
                 World = world, Textures = textures, Content = content, Definition = initial,
                 DataPaths = dataPaths, SaveStore = saveStore, Music = music, InitialSession = session,
-                CreateNewSession = () => CreateNewSession(initial), InitialSessionKind = save is null ? SessionReplacementKind.Startup : SessionReplacementKind.Load,
+                InitialSessionKind = save is null ? SessionReplacementKind.Startup : SessionReplacementKind.Load,
                 ReturnToOpening = () => SwitchScene(PrepareOpening),
                 LoadGame = document => LoadGame(document, transition: false)
             };

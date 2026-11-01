@@ -473,7 +473,9 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
             DrawTexture(Textures.Get("information-frame-ornament", this),new(x-56,y-16));
             Strip("information-footer",new(right-(HasPairedActions ? 324 : 236),bottom-64),HasPairedActions ? 348 : 260);
         }
-        var tabs = new Rect2(_body.Position.X+40,_body.Position.Y+64,TabStripFollowsPage ? Pages[_page].Columns.Sum(c => c.Width) : _body.Size.X-80,Pages.Count>7?80:48);
+        var tabs = new Rect2(_body.Position.X+40,_body.Position.Y+64,TabStripFollowsPage
+            ? Math.Max(Pages[_page].Columns.Sum(c => c.Width), Math.Min(Pages.Count, 7) * 62 + 52)
+            : _body.Size.X-80,Pages.Count>7?80:48);
         Tile("catalog-tabs-top",new(tabs.Position+new Vector2(12,0),new(tabs.Size.X-24,8)));
         Tile("catalog-tabs-bottom",new(tabs.Position+new Vector2(12,tabs.Size.Y-8),new(tabs.Size.X-24,8)));
         Tile("catalog-tabs-left",new(tabs.Position+new Vector2(0,24),new(12,tabs.Size.Y-48)));

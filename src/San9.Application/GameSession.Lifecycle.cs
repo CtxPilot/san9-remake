@@ -16,7 +16,7 @@ public sealed partial class GameSession
         _lastXunStartDay = simulation.Snapshot.Clock.DayNumber;
         _originalAi = OriginalAiState.Create(definition.Content);
         _initialEvents = simulation.InitialEvents;
-        _snapshotSource = new(definition.Content, definition.Rules);
+        _snapshotSource = new(definition.Content, definition.Rules, definition.Definitions);
         _view = _snapshotSource.Project(simulation.Snapshot, simulation.Companion);
         _initialView = _view;
         _strategicContexts = simulation.Snapshot.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player)
@@ -30,15 +30,17 @@ public sealed partial class GameSession
         new ScenarioRules(definition).CreateEngine;
 
     public static GameSession Start(ScenarioInitialState definition, ulong seed, int computerDamageBonusPercent = 0,
-        bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null)
+        bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null, San9.Content.Authoring.NewGameSetup? setup = null)
     {
         if (!Enum.IsDefined(playerForceController)) throw new ArgumentOutOfRangeException(nameof(playerForceController));
-        return Start(definition, seed, null, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, enableXunStartCheckpoints, settings, playerForceIds, companionSettings);
+        return Start(definition, seed, null, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, enableXunStartCheckpoints, settings, playerForceIds, companionSettings, setup);
     }
 
-    internal static GameSession Start(ScenarioInitialState definition, ulong seed, Func<WorldState, SimulationEngine>? factory, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null)
+    internal static GameSession Start(ScenarioInitialState definition, ulong seed, Func<WorldState, SimulationEngine>? factory, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null, San9.Content.Authoring.NewGameSetup? setup = null)
     {
-        var owned = new ScenarioSessionDefinition(definition, playerForceIds);
+        var input = setup ?? San9.Content.Authoring.NewGameSetup.Empty;
+        var composition = Authoring.NewGameComposer.Compose(definition, input);
+        var owned = new ScenarioSessionDefinition(composition.Scenario, playerForceIds, composition.Definitions);
         var simulation = (factory ?? owned.Rules.CreateEngine)(owned.CreateWorld(seed, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, settings));
         if (companionSettings is not null) simulation.ConfigureCompanion(companionSettings);
         var session = new GameSession(owned, simulation)
@@ -77,7 +79,8 @@ public sealed partial class GameSession
 
     internal static GameSession Restore(ScenarioInitialState definition, SessionSnapshot snapshot, Func<WorldState, SimulationEngine>? factory)
     {
-        return Restore(new ScenarioSessionDefinition(definition, snapshot.InitialPlayerForceIds), snapshot, factory);
+        snapshot.Definitions.Validate(definition);
+        return Restore(new ScenarioSessionDefinition(definition, snapshot.InitialPlayerForceIds, snapshot.Definitions), snapshot, factory);
     }
 
     internal static GameSession Restore(ScenarioSessionDefinition owned, SessionSnapshot snapshot, Func<WorldState, SimulationEngine>? factory)

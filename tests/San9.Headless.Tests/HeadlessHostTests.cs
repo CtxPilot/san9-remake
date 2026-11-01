@@ -25,6 +25,38 @@ public sealed class HeadlessHostTests : IDisposable
     private SessionSnapshot ReadSession(string name) => StrictJson.Deserialize<SaveEnvelope>(File.ReadAllBytes(FilePath(name))).Session;
 
     [Fact]
+    public void CommandScriptRestoresAuthoredWorldFromAnExplicitStartingSave()
+    {
+        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "authored-start", 190, 1, 1, 1,
+            [new(1, "old", 5, 100) { LeaderId = 10 }],
+            [new(1, "owned", 1, 0, 0, 10000, 100, 100, 50, []) { Kind = SettlementKind.City },
+             new(2, "empty", null, 1, 0, 10000, 100, 100, 50, []) { Kind = SettlementKind.City }], [], [])
+        {
+            Officers = [new("old.ruler", new(10, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler })],
+            Information = new([], [], [], [new(1, 1, 10, new(1000, 10000)) { IsRoot = true }], []),
+            ForceEmergenceEnabled = false, ForceConsolidationEnabled = false, CityIndependenceEnabled = false
+        };
+        var person = new San9.Content.Authoring.CreatedOfficer(Guid.NewGuid(), "新君主") { BirthYear = 160, AppearanceYear = 180 };
+        var setup = new San9.Content.Authoring.NewGameSetup
+        {
+            Library = San9.Content.Authoring.CreatedOfficerLibrary.Empty with { Officers = [person] }, Forces = [new(person.Id, 2)]
+        };
+        var session = GameSession.Start(definition, 42, playerForceIds: [2], setup: setup);
+        File.WriteAllBytes(FilePath("scenario.json"), CanonicalJson.Encode(definition));
+        CommandLogService.Write(FilePath("commands.jsonl"), CommandLogService.CreateHeader(session), []);
+        SaveService.Write(FilePath("start.save.json"), session);
+        var missingStart = Run("run", "--scenario", FilePath("scenario.json"), "--log", FilePath("commands.jsonl"),
+            "--report", FilePath("missing-start.json"));
+        Assert.Equal(2, missingStart.Code);
+        var result = Run("run", "--scenario", FilePath("scenario.json"), "--restore", FilePath("start.save.json"), "--log", FilePath("commands.jsonl"),
+            "--report", FilePath("report.json"), "--save", FilePath("authored.save.json"));
+        Assert.True(result.Code == 0, result.Report.ToString());
+        var actual = ReadSession("authored.save.json");
+        Assert.Equal(person.Name, Assert.Single(actual.Definitions.Officers).Name);
+        StateAssert.Equal(session.Capture(), actual);
+    }
+
+    [Fact]
     public async Task PublishedPackageUsesDeclaredResourceRootAndExplicitPlayerSelection()
     {
         var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "custom-package", 281, 1, 1, null,

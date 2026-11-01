@@ -5,7 +5,7 @@ namespace San9.Client.Godot;
 /// <summary>Opening catalog chrome, composed around one body rectangle with native transparent margins.</summary>
 public static class OpeningWindowPainter
 {
-    public static void Draw(CanvasItem canvas, TextureScope textures, Rect2 body)
+    public static void Draw(CanvasItem canvas, TextureScope textures, Rect2 body, bool pairedActions = true)
     {
         Texture2D T(string role) => textures.Get("opening-" + role, canvas);
         void Tile(string role, Rect2 rect) => SkinPainter.Tile(canvas, T(role), rect);
@@ -25,6 +25,6 @@ public static class OpeningWindowPainter
         canvas.DrawTexture(T("frame-bottom-left"), new(x - 56, bottom - 216));
         canvas.DrawTexture(T("frame-bottom-right"), new(right - 240, bottom - 216));
         Strip("title", new(x - 40, y - 16), 264);
-        Strip("footer", new(right - 324, bottom - 64), 348);
+        Strip("footer", new(right - (pairedActions ? 324 : 236), bottom - 64), pairedActions ? 348 : 260);
     }
 }

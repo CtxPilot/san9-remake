@@ -7,6 +7,12 @@ internal static class SessionValidation
 {
     internal static void Validate(ScenarioSessionDefinition definition, SessionSnapshot snapshot)
     {
+        if (snapshot.Definitions is null) throw new ArgumentException("Missing session definitions.");
+        snapshot.Definitions.Validate();
+        var addedPeople = snapshot.Definitions.Officers.Select(p => p.Id).ToHashSet();
+        var addedForces = snapshot.Definitions.Forces.Select(f => f.Id).ToHashSet();
+        var initialPeople = definition.Content.Officers.Select(p => p.State.Id).Union(addedPeople).ToHashSet();
+        var initialForces = definition.Content.Forces.Select(f => f.Id).Union(addedForces).ToHashSet();
         if (!snapshot.World.Simulation.CanPersist)
             throw new ArgumentException("Session is not at a save boundary.");
         if (snapshot.DeploymentPresets.IsDefault || snapshot.DeploymentPresets.Any(p => p is null) ||
@@ -14,21 +20,21 @@ internal static class SessionValidation
             throw new ArgumentException("Invalid deployment preset collection.");
         if (!snapshot.DeploymentPresets.IsEmpty)
         {
-            var presetView = new Presentation.StrategySnapshot(definition.Content, snapshot.World);
+            var presetView = new Presentation.StrategySnapshot(new Presentation.StrategySnapshotSource(definition.Content, definition.Rules, snapshot.Definitions), snapshot.World);
             foreach (var preset in snapshot.DeploymentPresets) preset.Validate(presetView);
         }
         if (snapshot.Records.IsDefault || snapshot.Chronicle.IsDefault || snapshot.History is null || snapshot.Records.Length > GameSession.RecentRecordLimit ||
             snapshot.NextOperationSequence < 0)
             throw new ArgumentException("Missing session state.");
         if (snapshot.InitialPlayerForceIds.IsDefault || snapshot.InitialPlayerForceIds.Distinct().Count() != snapshot.InitialPlayerForceIds.Length ||
-            snapshot.InitialPlayerForceIds.Any(id => !definition.Content.Forces.Any(f => f.Id == id)))
+            snapshot.InitialPlayerForceIds.Any(id => !initialForces.Contains(id)))
             throw new ArgumentException("Invalid initial player selection.");
         if (!Enum.IsDefined(snapshot.PlayerForceController)) throw new ArgumentException("Invalid player force controller.");
         if (snapshot.OriginalAi is null) throw new ArgumentException("Missing original AI state.");
         snapshot.OriginalAi.Validate(snapshot.World, definition.Content);
         var initialClock = new GameClock(definition.Content.Year, definition.Content.Month, definition.Content.Day);
         var generated = snapshot.World.Forces.Where(f => f.Origin is not null).OrderBy(f => f.Id).ToArray();
-        long nextForceId = (long)definition.Content.Forces.Max(f => f.Id) + 1;
+        long nextForceId = (long)initialForces.Max() + 1;
         foreach (var force in generated)
         {
             var origin = force.Origin!;
@@ -40,7 +46,7 @@ internal static class SessionValidation
                         origin.PredecessorId is not int previous || previous >= force.Id || !snapshot.World.Forces.Any(f => f.Id == previous),
                     _ => true
                 }) ||
-                !definition.Content.Officers.Any(o => o.State.Id == origin.FounderId) ||
+                !initialPeople.Contains(origin.FounderId) ||
                 !definition.Content.Settlements.Any(s => s.Id == origin.SettlementId && s.Kind == SettlementKind.City) ||
                 origin.Clock.DayNumber < initialClock.DayNumber + 30 || origin.Clock.DayNumber > snapshot.World.Clock.DayNumber)
                 throw new ArgumentException("Invalid runtime force provenance.");
@@ -85,7 +91,7 @@ internal static class SessionValidation
             .Where(s => snapshot.World.Simulation.ConsumedEventKeys.Contains(s.WithdrawalKey)).Select(s => s.ScholarOfficerId).ToHashSet();
         if (snapshot.World.Forces.Any(f => f.IsDormant != (content.Forces.Any(i => i.Id == f.Id && i.IsDormant) && !activatedForces.Contains(f.Id))) ||
             snapshot.World.Settlements.Any(s => s.IsDormant != (content.Settlements.Any(i => i.Id == s.Id && i.IsDormant) && !activatedSettlements.Contains(s.Id))) ||
-            snapshot.World.Officers.Any(p => p.IsDormant != (withdrawnOfficers.Contains(p.Id) || content.Officers.Any(i => i.State.Id == p.Id && i.State.IsDormant) && !activatedOfficers.Contains(p.Id))))
+            snapshot.World.Officers.Any(p => !addedPeople.Contains(p.Id) && p.IsDormant != (withdrawnOfficers.Contains(p.Id) || content.Officers.Any(i => i.State.Id == p.Id && i.State.IsDormant) && !activatedOfficers.Contains(p.Id))))
             throw new ArgumentException("Dormant state does not match initial content and completed participation events.");
         if (snapshot.World.Simulation.Boundary == SimulationBoundary.Terminal)
         {
@@ -99,19 +105,19 @@ internal static class SessionValidation
         {
             if (!a.Order().SequenceEqual(b.Order())) throw new ArgumentException("Scenario identity set mismatch.");
         }
-        Same(content.Forces.Select(f => f.Id), snapshot.World.Forces.Where(f => f.Origin is null).Select(f => f.Id));
+        Same(initialForces, snapshot.World.Forces.Where(f => f.Origin is null).Select(f => f.Id));
         if (content.Settlements.Any(s => !snapshot.World.Settlements.Any(current => current.Id == s.Id)) ||
             snapshot.World.Settlements.Any(s => !content.Settlements.Any(initial => initial.Id == s.Id) &&
                 (s.Facility is null || !content.UnbuiltPlaces.Any(region => region.Id == s.Id))))
             throw new ArgumentException("Unknown or missing settlement identity.");
-        Same(content.Officers.Select(o => o.State.Id), snapshot.World.Officers.Select(o => o.Id));
+        Same(initialPeople, snapshot.World.Officers.Select(o => o.Id));
         // Field units are created and absorbed at runtime; identities are allocated by the world.
         if (snapshot.World.Units.Any(u => u.ServicePlaceId is int home &&
             !content.Settlements.Any(s => s.Id == home) && !content.UnbuiltPlaces.Any(p => p.Id == home)))
             throw new ArgumentException("Unknown unit service place.");
         // Succession can promote a child corps to the ruler's corps. The treasury belongs to the force,
         // so validate its surviving owner rather than requiring the initial corps identity.
-        Same(content.Information.Corps.Where(c => c.IsRoot && snapshot.World.Forces.Any(f => f.Id == c.OwnerId && !f.IsEliminated)).Select(c => c.OwnerId).Concat(generated.Where(f => !f.IsEliminated).Select(f => f.Id)),
+        Same(content.Information.Corps.Where(c => c.IsRoot && snapshot.World.Forces.Any(f => f.Id == c.OwnerId && !f.IsEliminated)).Select(c => c.OwnerId).Union(addedForces.Where(id => snapshot.World.Forces.Any(f => f.Id == id && !f.IsEliminated))).Concat(generated.Where(f => !f.IsEliminated).Select(f => f.Id)),
             snapshot.World.Corps.Where(c => c.IsRoot).Select(c => c.OwnerId));
         Same(content.Information.TreasureStates.Select(t => t.Id), snapshot.World.Treasures.Select(t => t.Id));
         if (content.Information.Relations.Any(initial => !snapshot.World.Relations.Any(current =>

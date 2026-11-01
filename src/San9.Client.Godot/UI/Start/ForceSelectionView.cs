@@ -1,4 +1,6 @@
 using Godot;
+using San9.Application.Authoring;
+using San9.Content.Authoring;
 using San9.Application.Presentation;
 using San9.Content.Interface;
 
@@ -9,12 +11,16 @@ public partial class ForceSelectionView : ModalView
 {
     public ScenarioSelectionPresentation Definition { get; init; } = null!;
     public ScenarioPreviewEntry Entry { get; init; } = null!;
-    public Func<CancellationToken, Task<ScenarioForceSelection>> LoadScenario { get; init; } = null!;
-    private ScenarioPreparation _preparation = null!;
+    public Func<CancellationToken, Task<NewGameDraft>> LoadScenario { get; init; } = null!;
+    private ScenarioPreparation<NewGameDraft> _preparation = null!;
     private CancellationToken _token;
     private readonly TaskCompletionSource _firstFrame = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _openingMap;
+    private NewGameDraft? _draft;
+    private OpeningSetupDialog? _setupDialog;
+    public NewGameSetup Setup => _draft?.Setup ?? NewGameSetup.Empty;
     private Label _hint = null!;
+    private Label _createdCount = null!;
     public TextureService Service { get; init; } = null!;
     public StartMenuSprite Help { get; init; } = null!;
     public StartMenuSprite Close { get; init; } = null!;
@@ -36,7 +42,11 @@ public partial class ForceSelectionView : ModalView
         _textures.Request(Definition.Forces.Assets.Concat([Help.Asset, Close.Asset]));
         Label("选择势力", new(48, 16), new(224, 32));
         Label($"{Entry.Year}年{Entry.Month}月 {Entry.Title}", new(32, 108), new(960, 28), new("00f878"));
-        Button(Definition.Forces.Choose, "ChooseForces", "选择势力", OpenMap);
+        Button(Definition.Forces.Choose, "ChooseForces", "选择势力", () => OpenPrepared(draft => OpenPreparedMap(draft.Selection())));
+        Button(Definition.Forces.CreateForces, "CreateForces", "创作新势力", () => OpenSetup(create: true)).Disabled = true;
+        Button(Definition.Forces.DeployOfficers, "DeployOfficers", "部署新武将", () => OpenSetup()).Disabled = true;
+        Button(Definition.Forces.CancelDeployment, "CancelDeployment", "取消部署", () => OpenSetup(cancel: true)).Disabled = true;
+        _createdCount = Label("势力数 0/8", new(268, 274), new(160, 16), font: 16);
         Button(Definition.Forces.Back, "Back", "返回", Return);
         Button(Definition.Forces.Confirm, "Confirm", "决定", Confirmed).Disabled = true;
         Button(Help, "Help", "", null);
@@ -44,7 +54,7 @@ public partial class ForceSelectionView : ModalView
         Vector2[] slots = [new(536, 152), new(672, 152), new(808, 152), new(640, 304), new(776, 304), new(600, 456), new(736, 456), new(872, 456)];
         foreach (var p in slots)
         {
-            _names.Add(Label("", p + new Vector2(-32, 92), new(128, 24), Colors.White, 16, HorizontalAlignment.Center));
+            _names.Add(Label("", p + new Vector2(0, 96), new(64, 16), Colors.White, 16, HorizontalAlignment.Center));
             var portrait = new AsyncPortrait { Service = Service, View = San9.Content.Images.PortraitView.Face,
                 Position = p, Size = new(64, 80), MouseFilter = MouseFilterEnum.Ignore };
             AddChild(portrait); _portraits.Add(portrait);
@@ -66,7 +76,8 @@ public partial class ForceSelectionView : ModalView
             _token.ThrowIfCancellationRequested();
             var task = _preparation.PrepareAsync();
             _firstFrame.TrySetResult();
-            await task;
+            _draft = await task;
+            RefreshDraft();
         }
         catch (OperationCanceledException) when (_token.IsCancellationRequested) { }
         catch (Exception error) { ShowPreparationError(error); }
@@ -99,20 +110,20 @@ public partial class ForceSelectionView : ModalView
         if (pressed is not null) button.Pressed += pressed;
         return button;
     }
-    private async void OpenMap()
+    private async void OpenPrepared(Action<NewGameDraft> open)
     {
-        if (_dialog is not null || _openingMap) return;
+        if (_dialog is not null || _setupDialog is not null || _openingMap) return;
         _openingMap = true;
         _hint.Text = "正在准备势力数据…";
         try
         {
             await _firstFrame.Task;
             _token.ThrowIfCancellationRequested();
-            var scenario = await _preparation.PrepareAsync();
+            _draft = await _preparation.PrepareAsync();
             _token.ThrowIfCancellationRequested();
             if (!IsVisibleInTree()) { _hint.Text = "请选择势力。"; return; }
             _hint.Text = "请选择势力。";
-            OpenPreparedMap(scenario);
+            open(_draft);
         }
         catch (OperationCanceledException) when (_token.IsCancellationRequested) { }
         catch (Exception error) { ShowPreparationError(error); }
@@ -125,16 +136,55 @@ public partial class ForceSelectionView : ModalView
             InitialSelection = _selected, Closed = CloseMap, Confirmed = selected =>
             {
                 _selected = selected.ToHashSet();
-                GetNode<StartMenuButton>("Confirm").Disabled = _selected.Count == 0;
-                var forces = scenario.Forces.Where(f => _selected.Contains(f.Id)).ToArray();
-                for (int i = 0; i < _names.Count; i++)
-                {
-                    _names[i].Text = i < forces.Length ? forces[i].Name : "";
-                    _portraits[i].Role = i < forces.Length ? forces[i].Portrait : null;
-                }
+                RefreshDraft();
                 CloseMap();
             } };
         AddChild(_dialog);
+    }
+    private void OpenSetup(bool create = false, bool cancel = false) => OpenPrepared(draft =>
+    {
+        if (create) foreach (var child in GetChildren().OfType<CanvasItem>()) child.Hide();
+        _setupDialog = new OpeningSetupDialog { Name = "OpeningSetup", Draft = draft, Service = Service, Definition = Definition.Forces, Geography = Definition.Map,
+            Help = Help, Close = Close, QuitRequested = QuitRequested,
+            CreateForces = create, CancelDeployment = cancel, Closed = CloseSetup,
+            Changed = () => { RefreshDraft(); CloseSetup(); } };
+        AddChild(_setupDialog);
+        QueueRedraw();
+    });
+    private void CloseSetup()
+    {
+        RemoveChild(_setupDialog!); _setupDialog!.QueueFree(); _setupDialog = null;
+        foreach (var child in GetChildren().OfType<CanvasItem>()) child.Show();
+        QueueRedraw();
+    }
+    private void RefreshDraft()
+    {
+        if (_draft is null) return;
+        GetNode<StartMenuButton>("CancelDeployment").Disabled = Setup.Placements.IsEmpty;
+        GetNode<StartMenuButton>("DeployOfficers").Disabled = !Setup.Library.Officers.Any(p =>
+            NewGameComposer.CanDeploy(p, _draft.Source) && !Setup.Forces.Any(f => f.RulerId == p.Id) &&
+            !Setup.Placements.Any(a => a.OfficerId == p.Id));
+        GetNode<StartMenuButton>("CreateForces").Disabled = Setup.Forces.IsEmpty &&
+            (!Setup.Library.Officers.Any(p => NewGameComposer.CanDeploy(p, _draft.Source)) ||
+             !_draft.Source.Settlements.Any(s => s.Kind == San9.Core.Domain.SettlementKind.City && s.OwnerId is null && !s.IsDormant && s.CanHostPersons));
+        // An empty player selection needs neither force totals nor economic forecasts.
+        OpeningForce[] forces = [];
+        if (_selected.Count > 0)
+        {
+            var scenario = _draft.Selection();
+            _selected.IntersectWith(scenario.Forces.Select(f => f.Id));
+            forces = scenario.Forces.Where(f => _selected.Contains(f.Id)).ToArray();
+        }
+        GetNode<StartMenuButton>("Confirm").Disabled = _selected.Count == 0;
+        for (int i = 0; i < _names.Count; i++)
+        {
+            _names[i].Text = i < forces.Length ? forces[i].Name : "";
+            _portraits[i].Role = i < forces.Length ? forces[i].Portrait : null;
+        }
+        string prompt = Setup.Library.Officers.IsEmpty ? "人物库为空，可先在主菜单登录新武将。" :
+            !Setup.Library.Officers.Any(p => NewGameComposer.CanDeploy(p, _draft.Source)) ? "没有15至90岁的新武将，请检查人物出生年。" : "请选择势力。";
+        _createdCount.Text = $"势力数 {Setup.Forces.Length}/{NewGameSetup.MaximumCreatedForces}";
+        _hint.Text = prompt;
     }
     private void CloseMap()
     {
@@ -142,13 +192,14 @@ public partial class ForceSelectionView : ModalView
     }
     public override void _Input(InputEvent input)
     {
-        if (!IsVisibleInTree() || _dialog is not null) return;
+        if (!IsVisibleInTree() || _dialog is not null || _setupDialog is not null || _openingMap) return;
         if (input is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape } ||
             input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
         { GetViewport().SetInputAsHandled(); Return(); }
     }
     public override void _Draw()
     {
+        if (_setupDialog is { CreateForces: true }) return;
         if (!_textures.IsReady) { _textures.BindRedraw(this); return; }
         foreach (var sprite in Definition.Forces.Foreground.Concat([Definition.Forces.Heading, Definition.Forces.PortraitSlots]))
             DrawTexture(_textures.Get(sprite.Asset, this), new(sprite.X, sprite.Y));

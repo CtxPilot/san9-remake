@@ -42,7 +42,7 @@ public sealed record ScenarioForceSelection(string Title, int Year, int Month, O
                 scenario.Settlements.Where(s => s.OwnerId == f.Id).Sum(s => (long)s.Soldiers) + scenario.Units.Where(u => u.OwnerId == f.Id).Sum(u => (long)u.Soldiers),
                 owned.Select(c => c.Id).ToArray())
             {
-                Portrait = f.LeaderId is int leader ? illustrations[$"catalog-person-{leader}"] : null,
+                Portrait = f.LeaderId is int leader ? illustrations.GetValueOrDefault($"catalog-person-{leader}") : null,
                 IsBarbarian = f.IsBarbarian,
                 Tactics = string.Join("、", f.ProvidedTactics.Select(id => Text(scenario.Information.Tactics.Single(t => t.Id == id).NameKey))),
                 Country = scenario.Information.CountryTitles.FirstOrDefault(c => c.Id == f.CountryTitleId) is { } country ? Text(country.NameKey) : "",

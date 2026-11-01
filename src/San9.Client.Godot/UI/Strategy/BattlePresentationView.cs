@@ -112,6 +112,7 @@ public partial class BattlePresentationView : Control
                 ? San9.Content.Images.PortraitView.Bust : San9.Content.Images.PortraitView.Face)).Distinct())
         {
             var role = $"information-person-{portrait.Speaker}";
+            if (!Textures.Roles.ContainsKey(role)) continue;
             var scope = Textures.CreatePortraitScope(role, portrait.View);
             scope.Request([role]); _portraits.Add(scope);
         }

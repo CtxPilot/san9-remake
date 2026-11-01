@@ -1,4 +1,6 @@
 using Godot;
+using San9.Application.Authoring;
+using San9.Content.Authoring;
 using San9.Application.Presentation;
 using San9.Content.Packages;
 using San9.Client.Godot.Persistence;
@@ -10,7 +12,7 @@ namespace San9.Client.Godot;
 public partial class StartMenuPreview : Node
 {
     [Export] public string ContentRoot { get; set; } = "../../local/generated/content";
-    public Func<string, int[], San9.Core.Domain.NewGameSettings, int, Task> BeginGame { get; init; } = null!;
+    public Func<string, int[], San9.Core.Domain.NewGameSettings, int, NewGameSetup, Task> BeginGame { get; init; } = null!;
     public Func<SlotSaveDocument, Task> LoadGame { get; init; } = null!;
     public ClientDataPaths? DataPaths { get; init; }
     public bool InitiallyVisible { get; init; } = true;
@@ -61,14 +63,17 @@ public partial class StartMenuPreview : Node
                 }
             }
             var view = new StartMenuView { Definition = opening.Menu, SelectionDefinition = opening.Selection, Service = service, Visible = InitiallyVisible,
-                Store = new SlotSaveStore(paths.SaveSlots), LoadGame = document => EnterGame(() => LoadGame(document)),
-                BeginGame = (id, players, settings, damage) => EnterGame(() => BeginGame(id, players, settings, damage)),
+                DataPaths = paths, ContentRoot = root, Store = new SlotSaveStore(paths.SaveSlots), LoadGame = document => EnterGame(() => LoadGame(document)),
+                BeginGame = (id, players, settings, damage, setup) => EnterGame(() => BeginGame(id, players, settings, damage, setup)),
                 LoadScenario = (id, cancellation) => Task.Run(async () =>
                 {
                     var entry = catalog.RequireScenario(id);
                     var content = await ScenarioContentFiles.LoadSelectionAsync(PackageFiles.Resolve(root, entry.Package), cancellation);
                     cancellation.ThrowIfCancellationRequested();
-                    return ScenarioForceSelection.Read(content.Scenario, content.Text, content.IllustrationRoles);
+                    var source = await ScenarioContentFiles.LoadScenarioAsync(PackageFiles.Resolve(root, entry.Package), cancellation);
+                    var library = new CreatedOfficerStore(paths.CreatedOfficers).Load();
+                    library.Validate();
+                    return new NewGameDraft(source, content.Text, content.IllustrationRoles, library);
                 }, cancellation) };
             _view = view;
             AddChild(view);

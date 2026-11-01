@@ -19,7 +19,7 @@ public static class SaveSlotSummaryFactory
         var ruler = view.Officers.SingleOrDefault(o => o.Id == force?.LeaderId);
         var simulation = view.World.Simulation;
         string xun = view.Day <= 10 ? "上旬" : view.Day <= 20 ? "中旬" : "下旬";
-        string? portrait = ruler is null ? null : illustrationRoles[$"information-person-{ruler.Id}"];
+        string? portrait = ruler is null ? null : illustrationRoles.GetValueOrDefault($"information-person-{ruler.Id}");
         return new(definition.ScenarioId, force is null ? simulation.Controls.Any(c => c.Kind == ControllerKind.Player) ? "玩家势力" : "无玩家势力" : texts.Resolve(ruler?.NameKey ?? force.NameKey), portrait,
             $"{definition.Year,3}年{definition.Month,2}月", texts.Resolve(TextCatalog.ScenarioTitleKey), $"{view.Year,3}年{view.Month,2}月{xun}", DateTimeOffset.Now,
             simulation.Controls.Count(c => c.Kind == ControllerKind.Player), simulation.NewGame.Mode == San9.Core.Domain.GameMode.Historical,

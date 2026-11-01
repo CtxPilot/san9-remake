@@ -56,12 +56,14 @@ public static class SaveService
             throw new SaveException(SaveFailure.InvalidFormat, "Missing save rules version.");
         try
         {
-            var owned = new ScenarioSessionDefinition(definition, envelope.Session.InitialPlayerForceIds);
+            if (envelope.Session.Definitions is null) throw new ArgumentException("Missing session definitions.");
+            envelope.Session.Definitions.Validate(definition);
+            var owned = new ScenarioSessionDefinition(definition, envelope.Session.InitialPlayerForceIds, envelope.Session.Definitions);
             var session = playerLoad ? GameSession.Load(owned, envelope.Session, factory) : GameSession.Restore(owned, envelope.Session, factory);
             session.ReportRulesVersion(envelope.RulesVersion);
             return session;
         }
-        catch (Exception error) when (error is ArgumentException or InvalidOperationException or OverflowException)
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or OverflowException or InvalidDataException)
         { throw new SaveException(SaveFailure.InvalidState, "Invalid authoritative session state.", error); }
     }
 

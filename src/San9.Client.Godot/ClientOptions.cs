@@ -7,6 +7,7 @@ public sealed record ClientOptions(string? PackageRoot, int? CenterX, int? Cente
 {
     public string ContentRoot { get; init; } = "";
     public string? ScenarioId { get; init; }
+    public bool OfficerEditor { get; init; }
     public int? PlayerForceId { get; init; }
     public string? UserDataRoot { get; init; }
     public int ComputerDamageBonusPercent { get; init; }
@@ -52,6 +53,7 @@ public sealed record ClientOptions(string? PackageRoot, int? CenterX, int? Cente
         {
             ContentRoot = Path.GetFullPath(Argument("--content-root") ?? contentRoot),
             ScenarioId = Argument("--scenario"),
+            OfficerEditor = args.Contains("--officer-editor"),
             PlayerForceId = Argument("--player-force") is { } player ? int.Parse(player, CultureInfo.InvariantCulture) : null,
             UserDataRoot = Argument("--user-data-root") is { } dataRoot ? Path.GetFullPath(dataRoot) : null,
             ComputerDamageBonusPercent = bonus,
@@ -60,6 +62,8 @@ public sealed record ClientOptions(string? PackageRoot, int? CenterX, int? Cente
             InformationSmoke = args.Contains("--information-smoke"),
             TextSmoke = args.Contains("--text-smoke")
         };
+        if (options.OfficerEditor && (options.PackageRoot is not null || options.ScenarioId is not null || options.RequiresWorldVerification || options.TextSmoke))
+            throw new ArgumentException("Officer editor runs separately from world loading and verification.");
         if (options.PackageRoot is not null && options.ScenarioId is not null)
             throw new ArgumentException("Specify either --scenario or --content-package.");
         if (options.TextSmoke && options.RequiresWorldVerification)

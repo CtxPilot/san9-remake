@@ -1,4 +1,6 @@
 using Godot;
+using San9.Application.Authoring;
+using San9.Content.Authoring;
 using San9.Application.Presentation;
 using San9.Content.Interface;
 
@@ -10,9 +12,12 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     protected override Color PageBackground => Colors.Black;
     public StartMenuPresentation Definition { get; init; } = null!;
     public ScenarioSelectionPresentation SelectionDefinition { get; init; } = null!;
-    public Func<string, CancellationToken, Task<ScenarioForceSelection>> LoadScenario { get; init; } = null!;
-    public Func<string, int[], San9.Core.Domain.NewGameSettings, int, Task> BeginGame { get; init; } = null!;
+    public Func<string, CancellationToken, Task<NewGameDraft>> LoadScenario { get; init; } = null!;
+    public Func<string, int[], San9.Core.Domain.NewGameSettings, int, NewGameSetup, Task> BeginGame { get; init; } = null!;
     public TextureService Service { get; init; } = null!;
+    public Persistence.ClientDataPaths DataPaths { get; init; } = null!;
+    public string ContentRoot { get; init; } = "";
+    private CreatedOfficerEditor? _officerEditor;
     private TextureScope _textures = null!;
     private StartMenuArtwork _artwork = null!;
     private Label _hint = null!;
@@ -53,8 +58,9 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
             button.Name = entry.Id;
             if (entry.Id == "new-game") button.Pressed += OpenScenarioSelection;
             if (entry.Id == "load-game") button.Pressed += OpenLoad;
+            if (entry.Id == "create-officer") button.Pressed += OpenOfficerEditor;
             if (entry.Id == "exit") button.Pressed += RequestQuit;
-            button.MouseEntered += () => { button.GrabFocus(); Select(entry); };
+            button.MouseEntered += () => Select(entry);
             button.FocusEntered += () => Select(entry);
             button.MouseExited += RestorePrompt;
             first ??= button;
@@ -72,6 +78,17 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
             Position = new(sprite.X, sprite.Y), Size = new(image.Width / sprite.Columns, image.Height) };
         _controls.AddChild(button);
         return button;
+    }
+    private void OpenOfficerEditor()
+    {
+        if (_officerEditor is not null) return;
+        _controls.Hide();
+        _officerEditor = new CreatedOfficerEditor { Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Closed = () =>
+        {
+            _officerEditor!.QueueFree(); _officerEditor = null; _controls.Show();
+            _controls.GetNode<StartMenuButton>("create-officer").GrabFocus();
+        } };
+        AddChild(_officerEditor);
     }
     private void OpenScenarioSelection()
     {
@@ -103,7 +120,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
         {
             _settings = new OpeningSettingsView { Name = "OpeningSettings", Definition = SelectionDefinition,
                 Service = Service, Help = Definition.Help, Close = Definition.Close, QuitRequested = RequestQuit,
-                Confirmed = (settings, damage) => BeginGame(_forces!.Entry.Id, _forces.Selected.Order().ToArray(), settings, damage),
+                Confirmed = (settings, damage) => BeginGame(_forces!.Entry.Id, _forces.Selected.Order().ToArray(), settings, damage, _forces.Setup),
                 Closed = () =>
                 {
                     _settings!.Hide(); _forces!.Show(); _forces.GetNode<StartMenuButton>("Confirm").GrabFocus();
