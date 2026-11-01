@@ -71,7 +71,8 @@ public partial class DeploymentPresetBar : Control
                 Position = new(8, 6), Size = new(48, 60), MouseFilter = MouseFilterEnum.Ignore
             });
         else Text(slot, "—", new(8, 6, 48, 60), 24, Muted);
-        Text(slot, preset.Name, new(3, 66, 58, 22), 14, commander is null ? Muted : check.HasMissingMembers ? Warning : Gold);
+        Text(slot, preset.Name, new(3, 66, 58, 22), 14,
+            commander is null ? Muted : check.HasMissingMembers || modified ? Warning : source ? Gold : Ink);
         slot.Pressed += () => Activated(preset);
         if (modified)
         {
@@ -85,7 +86,11 @@ public partial class DeploymentPresetBar : Control
 
     private static Button Slot(Control rows, int height, bool applied, bool missing)
     {
-        var slot = new Button { CustomMinimumSize = new(64, height), SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
+        var slot = new Button
+        {
+            CustomMinimumSize = new(64, height), SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+            FocusMode = FocusModeEnum.None
+        };
         StyleButton(slot, warning: missing, selected: applied);
         rows.AddChild(slot); return slot;
     }

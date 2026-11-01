@@ -31,14 +31,16 @@ internal static class DeploymentPresetStyle
             button.AddThemeColorOverride(state, Gold);
         button.AddThemeStyleboxOverride("normal", Surface(warning ? "352b25" : "182a3c",
             selected ? "e3cc91" : warning ? "956c42" : "34485d", selected ? 2 : 1));
-        button.AddThemeStyleboxOverride("hover", Surface(warning ? "48392b" : "233c53", "c4aa6d"));
+        button.AddThemeStyleboxOverride("hover", Surface(warning ? "48392b" : "233c53",
+            selected ? "e3cc91" : warning ? "c39b66" : "8192a1"));
         button.AddThemeStyleboxOverride("pressed", Surface(warning ? "443629" : "2b3b49", "c4aa6d"));
         button.AddThemeStyleboxOverride("hover_pressed", Surface(warning ? "51412e" : "344957", "e3cc91"));
         button.AddThemeStyleboxOverride("disabled", Surface("161e26", "3b4653"));
         button.AddThemeStyleboxOverride("focus", new StyleBoxFlat
         {
-            BgColor = Colors.Transparent, BorderColor = Gold,
-            BorderWidthLeft = 2, BorderWidthTop = 2, BorderWidthRight = 2, BorderWidthBottom = 2
+            BgColor = Colors.Transparent, BorderColor = new("8192a1"),
+            BorderWidthLeft = 1, BorderWidthTop = 1, BorderWidthRight = 1, BorderWidthBottom = 1,
+            ExpandMarginLeft = 2, ExpandMarginTop = 2, ExpandMarginRight = 2, ExpandMarginBottom = 2
         });
     }
 
