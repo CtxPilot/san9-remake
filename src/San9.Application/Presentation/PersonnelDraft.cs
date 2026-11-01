@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using San9.Content.Maps;
 using San9.Content.Text;
 using San9.Core.Domain;
 using San9.Core.Simulation;
@@ -104,20 +105,24 @@ public sealed class PersonnelDraft
             Members = Candidates.Where(id => AdvicePriority(id) >= 2).ToImmutableArray();
         _searchRepresentative = OrderSearchOfficers(Members).Select(id => (int?)id).FirstOrDefault();
     }
-    public ImmutableHashSet<MapCell> TargetCells()
+    public ImmutableHashSet<MapCell> TargetCells(MapPackage map)
     {
-        if (View.MilitaryRules is not {} rules) return [];
-        if (Kind == "move") return View.World.Settlements.Where(s => Targets.Contains(s.Id)).SelectMany(rules.GeographicFootprint).ToImmutableHashSet();
+        if (Kind == "move" && View.MilitaryRules is {} rules)
+            return View.World.Settlements.Where(s => Targets.Contains(s.Id)).SelectMany(rules.GeographicFootprint).ToImmutableHashSet();
         if (Kind != "search") return [];
         var cells = ImmutableHashSet.CreateBuilder<MapCell>();
         var regions = Targets.ToHashSet();
-        for (int y = 0; y < rules.Map.Height; y++)
-        for (int x = 0; x < rules.Map.Width; x++)
-            if (rules.RegionAt(MapCoordinates.Center(new(x, y))) is int id && regions.Contains(id)) cells.Add(new(x, y));
-        foreach (var settlement in View.World.Settlements.Where(s => Targets.Contains(s.Id))) cells.UnionWith(rules.GeographicFootprint(settlement));
+        for (int y = 0; y < map.Height; y++)
+        for (int x = 0; x < map.Width; x++)
+            if (PlaceAt(map, new(x, y)) is int id && regions.Contains(id)) cells.Add(new(x, y));
         return cells.ToImmutable();
     }
-    public int? PlaceAt(MapCell cell) => View.RegionAt(MapCoordinates.Center(cell));
+    public int? PlaceAt(MapPackage map, MapCell cell)
+    {
+        if (cell.X < 0 || cell.X >= map.Width || cell.Y < 0 || cell.Y >= map.Height) return null;
+        var square = map.Squares[cell.Y * map.Width + cell.X];
+        return !square.HideRegionName && View.RegionNameKeys.ContainsKey(square.RegionId) ? square.RegionId : null;
+    }
     public string PlaceName(TextCatalog texts, int id) => View.Settlements.SingleOrDefault(s => s.Id == id)?.ResolveName(texts)
         ?? (View.RegionNameKeys.TryGetValue(id, out string? key) ? texts.Resolve(key) : throw new InvalidDataException("Unknown personnel place."));
     public string DestinationName(TextCatalog texts, int id)

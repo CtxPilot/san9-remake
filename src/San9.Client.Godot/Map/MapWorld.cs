@@ -170,7 +170,7 @@ public partial class MapWorld : Node2D
             {
                 var point = ViewportToWorld(_pointer);
                 if (MapGeometry.TrySquare(point.X, point.Y, out int x, out int y, _map!.Width, _map.Height))
-                    _display.PersonnelHoverPlace = search.PlaceAt(new(x, y));
+                    _display.PersonnelHoverPlace = search.PlaceAt(_map, new(x, y));
             }
         }
         _animationMilliseconds += delta * 1000;

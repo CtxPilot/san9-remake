@@ -59,11 +59,15 @@ public partial class PersonnelCommandFlow : Node
         if (_view is not {} view) return;
         IsTargeting = true; view.Hide();
         World.Display!.PersonnelTargets = view.Draft;
+        void PickPlace(MapCell cell)
+        {
+            if (view.Draft.PlaceAt(World.Package!, cell) is int place) PickTarget(place);
+        }
         _input = new(World, target =>
         {
             if (target is null) EndTargets();
             else if (!target.Value.IsUnit) PickTarget(target.Value.Id);
-        }, cell => { if (view.Draft.PlaceAt(cell) is int place) PickTarget(place); });
+        }, PickPlace, view.Draft.Kind == "search" ? PickPlace : null);
         Changed?.Invoke();
     }
     private void PickTarget(int id)

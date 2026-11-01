@@ -353,7 +353,7 @@ public partial class MapSceneView : Node2D
             _drawnPersonnelTargets = PersonnelTargets;
             _drawnCommandTargets = CommandTargets;
             _targetMeshes = Targets is { } targets ? TargetOverlayGeometry.Meshes(frame.Region.Scene.Map, targets.ClearCells, targets.InfluenceCells).ToArray() :
-                PersonnelTargets is {} personnel ? TargetOverlayGeometry.Meshes(frame.Region.Scene.Map, personnel.TargetCells(), System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty).ToArray() :
+                PersonnelTargets is {} personnel ? TargetOverlayGeometry.Meshes(frame.Region.Scene.Map, personnel.TargetCells(frame.Region.Scene.Map), System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty).ToArray() :
                 CommandTargets is {} command ? TargetOverlayGeometry.Meshes(frame.Region.Scene.Map, command.ClearCells, System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty).ToArray() : [];
             _personnelRegionMeshes.Clear();
             if (PersonnelTargets is { Kind: "search" } search)
@@ -361,7 +361,7 @@ public partial class MapSceneView : Node2D
                 var map = frame.Region.Scene.Map;
                 var empty = System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty;
                 var meshes = TargetOverlayGeometry.Meshes(map, empty, empty).ToArray();
-                foreach (var group in meshes.Select((mesh, index) => (Mesh: mesh, Place: search.PlaceAt(new(index % map.Width, index / map.Width))))
+                foreach (var group in meshes.Select((mesh, index) => (Mesh: mesh, Place: search.PlaceAt(map, new(index % map.Width, index / map.Width))))
                     .Where(item => item.Place is not null).GroupBy(item => item.Place!.Value))
                     _personnelRegionMeshes.Add(group.Key, group.Select(item => item.Mesh).ToArray());
             }

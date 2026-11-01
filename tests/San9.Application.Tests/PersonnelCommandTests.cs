@@ -2,6 +2,7 @@ using San9.Tests;
 using System.Collections.Immutable;
 using San9.Application.Presentation;
 using San9.Content.Interface;
+using San9.Content.Maps;
 using San9.Content.Scenarios;
 using San9.Content.Text;
 using San9.Core.Domain;
@@ -11,6 +12,48 @@ namespace San9.Application.Tests;
 
 public sealed class PersonnelCommandTests
 {
+    [Fact]
+    public void SearchMapExcludesNamelessSquaresEvenInsideAnEligibleRegionOrBuildingFootprint()
+    {
+        var definition = MissionScenario.Create();
+        var military = definition.Military!;
+        definition = definition with
+        {
+            UnbuiltPlaces = [new(300, MapCoordinates.Center(new(2, 0)))],
+            RegionNameKeys = new(definition.RegionNameKeys) { [300] = "empty-region" },
+            RegionCityIds = new(definition.RegionCityIds) { [300] = 1 },
+            Military = military with { RegionIds = military.RegionIds.SetItem(2, 300).SetItem(3, 2).SetItem(4, null) }
+        };
+        var session = GameSession.Start(definition, 7);
+        var before = session.Snapshot;
+        var draft = new PersonnelDraft(session, 1, "search");
+        var squares = definition.Military!.RegionIds.Select(id => new MapSquare(0, 1, 0, id ?? -1)).ToArray();
+        squares[1] = squares[1] with { HideRegionName = true };
+        // The home building footprint must not restore a nameless square to the bright area.
+        squares[30] = squares[30] with { HideRegionName = true };
+        var map = new MapPackage(MapPackage.CurrentSchemaVersion, "fixture", "fixture", "spring", 30, 3,
+            0, 0, squares, [], [], [], [], [], [], [], [], [], [], [], new([], []), []);
+
+        var clear = draft.TargetCells(map);
+        Assert.Contains(new MapCell(0, 0), clear);
+        Assert.Equal(1, draft.PlaceAt(map, new(0, 0)));
+        foreach (var cell in new MapCell[] { new(1, 0), new(0, 1), new(4, 0) })
+        {
+            Assert.DoesNotContain(cell, clear);
+            Assert.Null(draft.PlaceAt(map, cell));
+        }
+        Assert.DoesNotContain(new MapCell(3, 0), clear);
+        Assert.Equal(2, draft.PlaceAt(map, new(3, 0)));
+        Assert.False(draft.SetTarget(2));
+        Assert.Contains(new MapCell(2, 0), clear);
+        Assert.Equal(300, draft.PlaceAt(map, new(2, 0)));
+        Assert.True(draft.SetTarget(300));
+        Assert.Null(draft.PlaceAt(map, new(30, 0)));
+        Assert.Null(draft.PlaceAt(map, new(-1, 0)));
+        Assert.Equal(1, session.View.RegionAt(MapCoordinates.Center(new(1, 0))));
+        StateAssert.Equal(before, session.Snapshot);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
