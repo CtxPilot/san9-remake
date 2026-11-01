@@ -25,6 +25,22 @@ public sealed class AppointmentDraftTests
         };
     }
 
+    [Fact]
+    public void ProhibitionRejectsAnExecutionPreparedBeforeTheSettingChanged()
+    {
+        var session = GameSession.Start(Fixture(), 190);
+        var draft = new AppointmentDraft(session, 1, "execute");
+        session.ConfigureCompanion(new() { DisablePlayerPrisonerExecution = true });
+        Assert.NotNull(AppointmentDraft.UnavailableReasonKey(session.View, 1, "execute"));
+        Assert.Null(AppointmentDraft.UnavailableReasonKey(session.View, 1, "exile"));
+        var before = session.Capture();
+        var result = draft.Submit();
+        Assert.Equal(CommandRejection.PrisonerExecutionProhibited, result.Rejection);
+        Assert.Equal(0, result.CompletedCommands);
+        Assert.Empty(result.Events);
+        StateAssert.Equal(before, session.Capture());
+    }
+
     [Theory]
     [InlineData("strategist")]
     [InlineData("rank")]

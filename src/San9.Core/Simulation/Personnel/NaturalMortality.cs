@@ -4,6 +4,9 @@ namespace San9.Core.Simulation;
 
 public static class NaturalMortality
 {
+    public static bool Enabled(SimulationState simulation, CompanionSettings companion) =>
+        simulation.NaturalDeathsEnabled && !companion.InfiniteLifespan;
+
     public static int Chance(int year, OfficerState person)
     {
         long age = (long)year + 1 - person.BirthYear;
@@ -12,7 +15,7 @@ public static class NaturalMortality
 
     internal static void Apply(WorldMutation world, SimulationRules rules, List<DomainEvent> events)
     {
-        if (!world.Simulation.NaturalDeathsEnabled || world.Clock.DayNumber - world.Simulation.Started.DayNumber < 360) return;
+        if (!Enabled(world.Simulation, world.Companion) || world.Clock.DayNumber - world.Simulation.Started.DayNumber < 360) return;
         foreach (int id in world.Officers.Keys.Order().ToArray())
         {
             var person = world.Officers[id];

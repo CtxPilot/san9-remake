@@ -136,6 +136,8 @@ public sealed class ProgressPresentationTests
             Assert.Equal(2,message.SpeakerId);
             Assert.Null(message.MapSpeech);
         });
+        session.ConfigureCompanion(new() { InfiniteLifespan = true });
+        Assert.Equal(messages.Count - 3, StrategicContext.Produce(state,session.View,session.Messages(texts),texts,content).Count);
     }
 
     [Fact]

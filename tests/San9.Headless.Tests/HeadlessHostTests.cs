@@ -57,12 +57,17 @@ public sealed class HeadlessHostTests : IDisposable
         };
         File.WriteAllBytes(FilePath("scenario.json"), CanonicalJson.Encode(definition));
         var session = GameSession.Start(definition, 42, companionSettings: new()
-        { PlayerAutoDomesticEnabled = true, ConfigureTacticsOnFormationSelection = true });
+        {
+            PlayerAutoDomesticEnabled = true, ConfigureTacticsOnFormationSelection = true,
+            BattleDeathProtectionThreshold = 125, AllowCommanderBattleDeaths = true, DuelDeathCoefficient = 5,
+            DisablePlayerPrisonerExecution = true, DisableComputerPrisonerExecution = false,
+            InfiniteLifespan = true,
+        });
         var header = CommandLogService.CreateHeader(session);
         var end = session.Request(new EndControlOperation());
         Assert.Equal(SessionDisposition.Accepted, session.Apply(end).Disposition);
         CommandLogService.Write(FilePath("commands.jsonl"), header, [end]);
-        Assert.True(CommandLogService.ReadHeader(FilePath("commands.jsonl")).Companion.ConfigureTacticsOnFormationSelection);
+        Assert.Equal(session.Companion, CommandLogService.ReadHeader(FilePath("commands.jsonl")).Companion);
         var result = Run("run", "--scenario", FilePath("scenario.json"), "--log", FilePath("commands.jsonl"),
             "--report", FilePath("report.json"), "--save", FilePath("result.save.json"));
         Assert.True(result.Code == 0, result.Report.ToString());

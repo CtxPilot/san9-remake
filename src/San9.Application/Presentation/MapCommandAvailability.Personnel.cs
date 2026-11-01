@@ -14,7 +14,9 @@ internal sealed partial class MapCommandAvailability
         "strategist" => Subordinates().Where(p => p.Status == OfficerStatus.Serving && people[p.Id].Abilities.Intelligence >= 70),
         "reward" => Subordinates().Where(p => Stationed(p) && p.Loyalty < 100 && !p.RewardedThisXun),
         "rank" or "bestow" => Subordinates().Where(Stationed),
-        "execute" => view.World.Officers.Where(Captive),
+        "execute" => view.World.Officers.Where(p => Captive(p) &&
+            !PrisonerExecutionRules.IsProhibited(view.Companion, view.World.Simulation, Owner,
+                p.OwnerId is int owner && forces[owner].LeaderId == p.Id)),
         "exile" => Subordinates().Where(Stationed).Concat(view.World.Officers.Where(Captive)),
         _ => []
     };
@@ -51,7 +53,8 @@ internal sealed partial class MapCommandAvailability
                     .Where(p => view.World.Treasures.Any(t => t.Discovered && t.HolderId == p.Id)).ToArray();
                 if (holders.Length == 0) return "no-treasure-holder";
                 return AppointmentTreasures(command).Any() ? null : "no-stationed-treasure-holder";
-            case "execute": return AppointmentPeople(command).Any() ? null : "no-prisoner";
+            case "execute": return AppointmentPeople(command).Any() ? null :
+                view.World.Officers.Any(Captive) ? "unavailable" : "no-prisoner";
             case "exile": return AppointmentPeople(command).Any() ? null : "no-exile-candidate";
             case "rank":
                 if (subordinates.Length == 0) return "no-subordinate";

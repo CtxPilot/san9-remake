@@ -1,3 +1,4 @@
+using San9.Tests;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 using static San9.Core.Tests.DuelContestTests;
@@ -26,14 +27,19 @@ public sealed class DuelAftermathTests
     public void CooldownUsesUnitMorale(int morale, int expected) => Assert.Equal(expected, DuelAftermath.Interval(morale));
 
     [Theory]
-    [InlineData(50, 30, 60)]
-    [InlineData(79, 1, 60)]
-    [InlineData(80, 0, 60)]
-    [InlineData(100, -20, 20)]
-    [InlineData(int.MaxValue, -2147483567L, -6442450621L)]
-    public void ProbabilityBoundsSupportLargeAuthoredAbilities(int martial, long death, long capture)
+    [InlineData(50, 0, 30, 60)]
+    [InlineData(79, 0, 1, 60)]
+    [InlineData(80, 0, 0, 60)]
+    [InlineData(100, 0, -20, 20)]
+    [InlineData(int.MaxValue, 0, -2147483567L, -6442450621L)]
+    [InlineData(83, 1, 1, 60)]
+    [InlineData(84, 1, 0, 60)]
+    [InlineData(80, 10, 30, 60)]
+    [InlineData(120, 10, 0, -40)]
+    [InlineData(int.MaxValue, 10, -2147483527L, -6442450621L)]
+    public void ProbabilityBoundsSupportCoefficientsAndLargeAuthoredAbilities(int martial, int coefficient, long death, long capture)
     {
-        Assert.Equal(death, DuelAftermath.DeathChance(martial));
+        Assert.Equal(death, DuelAftermath.DeathChance(martial, coefficient));
         Assert.Equal(capture, DuelAftermath.CaptureChance(martial));
     }
 
@@ -54,9 +60,10 @@ public sealed class DuelAftermathTests
         return seed;
     }
 
-    private static WorldMutation Mutation(bool deaths = true)
+    private static WorldMutation Mutation(bool deaths = true, CompanionSettings? companion = null)
     {
-        var world = World([Person(11, 1, 70), Person(21, 2, 100), Person(22, 2, 50), Person(23, 2, 50)], Seed()).BeginMutation();
+        var world = World([Person(11, 1, 70), Person(21, 2, 100), Person(22, 2, 50), Person(23, 2, 50)], Seed())
+            .BeginMutation(companion: companion);
         world.Replace(world.Forces[1] with { LeaderId = 11 }); world.Replace(ResourceAccounts.Root(world, 1) with { LeaderId = 11 });
         world.Replace(world.Forces[2] with { LeaderId = 21 }); world.Replace(ResourceAccounts.Root(world, 2) with { LeaderId = 21 });
         world.SetSimulation(world.Simulation with { BattleDeathsEnabled = deaths, Controls = [new("player", 1, ControllerKind.Player)] });
@@ -84,9 +91,10 @@ public sealed class DuelAftermathTests
     }
 
     [Fact]
-    public void PlayerRulerWaitsBeforeDeathAndResumesWithoutRerolling()
+    public void PlayerRulerCommanderWaitsBeforeDeathAndResumesWithoutRerolling()
     {
-        var world = Mutation();
+        var world = Mutation(companion: new() { AllowCommanderBattleDeaths = true });
+        world.Replace(world.Units[2] with { CommanderId = 22 });
         world.Replace(world.Forces[2] with { LeaderId = 22 }); world.Replace(ResourceAccounts.Root(world, 2) with { LeaderId = 22 });
         world.Replace(world.Officers[22] with { Status = OfficerStatus.Ruler });
         world.SetSimulation(world.Simulation with { Controls = [new("player", 2, ControllerKind.Player)] });
@@ -94,7 +102,7 @@ public sealed class DuelAftermathTests
         var rules = new SimulationRules { Military = Rules() };
         var progress = DuelAftermath.Advance(world, DuelAftermath.Begin(world, Outcome()), rules, events)!;
         Assert.Equal(22, progress.PendingRulerId);
-        Assert.Equal(2, progress.NextDeathIndex); // Commander 21 was skipped before ruler 22 in identity order.
+        Assert.Equal(2, progress.NextDeathIndex); // Protected officer 21 was skipped before ruler 22 in identity order.
         Assert.Equal(OfficerStatus.Ruler, world.Officers[22].Status);
         Assert.Empty(events.OfType<OfficerDiedEvent>());
         Assert.Empty(events.OfType<OfficerCapturedEvent>());
@@ -107,6 +115,51 @@ public sealed class DuelAftermathTests
         var random = new StableRandom(StableRandom.DeriveSeed(Seed(), "duel-death"));
         random.NextUInt64(); random.NextUInt64();
         Assert.Equal(random.State, world.Simulation.RandomStreams.Single(s => s.Name == "duel-death").State);
+    }
+
+    [Theory]
+    [InlineData(80, 79, true)]
+    [InlineData(80, 80, false)]
+    [InlineData(125, 124, true)]
+    [InlineData(125, 125, false)]
+    [InlineData(0, 0, false)]
+    [InlineData(int.MaxValue, int.MaxValue, false)]
+    public void DeathProtectionUsesConfiguredBaseAbilityIndependentlyOfGrowthCap(int threshold, int politics, bool dies)
+    {
+        var world = Mutation(companion: new() { BattleDeathProtectionThreshold = threshold, OfficerAbilityCap = 100 });
+        world.Replace(world.Officers[22] with { BaseAbilities = new(50, 50, politics, 50), Injury = 7 });
+        List<DomainEvent> events = [];
+        DuelAftermath.Advance(world, DuelAftermath.Begin(world, SingleLoser()), new() { Military = Policy(true, false) }, events);
+        Assert.Equal(dies, world.Officers[22].Status == OfficerStatus.Dead);
+        Assert.Equal(dies, world.Simulation.RandomStreams.Any(s => s.Name == "duel-death"));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CommanderDeathOptionDoesNotPermitCommanderCapture(bool allow, bool deaths)
+    {
+        var world = Mutation(deaths, new() { AllowCommanderBattleDeaths = allow });
+        world.Replace(world.Units[2] with { CommanderId = 22 });
+        List<DomainEvent> events = [];
+        DuelAftermath.Advance(world, DuelAftermath.Begin(world, SingleLoser()), new() { Military = Policy(true, true) }, events);
+        Assert.Equal(allow && deaths, world.Officers[22].Status == OfficerStatus.Dead);
+        Assert.DoesNotContain(events.OfType<OfficerCapturedEvent>(), e => e.OfficerId == 22);
+        Assert.DoesNotContain(world.Simulation.RandomStreams, s => s.Name == "duel-capture");
+        if (allow && deaths) Assert.Equal(21, world.Units[2].CommanderId);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    public void DuelDeathCoefficientChangesTheActualRoll(int coefficient, bool dies)
+    {
+        var world = Mutation(companion: new() { DuelDeathCoefficient = coefficient });
+        world.Replace(world.Officers[22] with { BaseAbilities = new(79, 50, 50, 50) });
+        world.SetSimulation(world.Simulation with { RandomStreams = [new("duel-death", TestSeeds.StateForRoll(1))] });
+        DuelAftermath.Advance(world, DuelAftermath.Begin(world, SingleLoser()), new() { Military = Policy(true, false) }, []);
+        Assert.Equal(dies, world.Officers[22].Status == OfficerStatus.Dead);
     }
 
     [Fact]

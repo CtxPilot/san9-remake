@@ -127,7 +127,7 @@ public static class StrategicContext
         var buried = world.Treasures.Where(t => t.Discovery == TreasureDiscovery.Buried && t.DiscoveryRegionId is int place && EligiblePlace(place)).OrderBy(t => t.Id).ToArray();
         if (buried.Length > 0)
         { var item = buried[Pick(buried.Length)]; if (Hint("treasure",item.DiscoveryRegionId!.Value,treasure: item.Id)) return Finish(); }
-        if (world.Clock.Boundary.Quarter && world.Simulation.NaturalDeathsEnabled)
+        if (world.Clock.Boundary.Quarter && NaturalMortality.Enabled(world.Simulation, view.Companion))
         {
             var aging = available.Where(p => p.BirthYear > 0 && NaturalMortality.Chance(world.Clock.Year,p) > 0).OrderBy(p => p.Id).ToArray();
             if (aging.Length > 0 && Chance(50))
@@ -142,7 +142,8 @@ public static class StrategicContext
         TextCatalog texts, ProgressPresentationDefinition content)
     {
         if (state.Clock is not { } clock) return [];
-        return state.Prompts.Select((prompt,index) =>
+        return state.Prompts.Where(prompt => !view.Companion.InfiniteLifespan ||
+            prompt.Role is not ("ruler-health" or "adviser-health" or "officer-health")).Select((prompt,index) =>
         {
             Dictionary<string,MessageBinding> values = new()
             {

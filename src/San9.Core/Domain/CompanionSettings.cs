@@ -13,12 +13,14 @@ public sealed record CompanionSettings
     [JsonRequired] public bool HideRoutineSearchReports { get; init; }
     [JsonRequired] public bool ConfigureTacticsOnFormationSelection { get; init; }
     [JsonRequired] public bool DisableComputerForceConsolidation { get; init; }
+    [JsonRequired] public bool DisablePlayerPrisonerExecution { get; init; }
     [JsonRequired] public bool DisableComputerPrisonerExecution { get; init; }
     [JsonRequired] public int ComputerRevenuePercent { get; init; } = 100;
     [JsonRequired] public int ComputerHarvestPercent { get; init; } = 100;
     [JsonRequired] public AutomaticStrategyPermissions ComputerStrategyPermissions { get; init; } = AutomaticStrategyPermissions.All;
     [JsonRequired] public AutomaticStrategyPermissions PlayerDelegatedStrategyPermissions { get; init; } = AutomaticStrategyPermissions.All;
     [JsonRequired] public bool DynamicOfficerAbilityGrowth { get; init; }
+    [JsonRequired] public bool InfiniteLifespan { get; init; }
     [JsonRequired] public int OfficerAbilityCap { get; init; } = 100;
     [JsonRequired] public bool UseFacilityTacticPreset { get; init; }
     [JsonRequired] public bool EnableNavalTacticFallback { get; init; }
@@ -28,6 +30,9 @@ public sealed record CompanionSettings
     [JsonRequired] public bool ReduceRangedTacticDamageAgainstFacilities { get; init; }
     [JsonRequired] public int MartialTacticDamageCoefficient { get; init; } = 10;
     [JsonRequired] public bool ReduceBattleWounded { get; init; }
+    [JsonRequired] public int BattleDeathProtectionThreshold { get; init; } = 80;
+    [JsonRequired] public bool AllowCommanderBattleDeaths { get; init; }
+    [JsonRequired] public int DuelDeathCoefficient { get; init; }
     [JsonRequired] public bool IncreaseDurabilityDefense { get; init; }
     [JsonRequired] public int CityBattleDamagePercent { get; init; } = 100;
     [JsonRequired] public int NoRetreatCaptureBonus { get; init; } = 100;
@@ -55,6 +60,9 @@ public sealed record CompanionSettings
         ArgumentOutOfRangeException.ThrowIfNegative(ComputerRevenuePercent);
         ArgumentOutOfRangeException.ThrowIfNegative(ComputerHarvestPercent);
         ArgumentOutOfRangeException.ThrowIfNegative(CityBattleDamagePercent);
+        ArgumentOutOfRangeException.ThrowIfNegative(BattleDeathProtectionThreshold);
+        if (DuelDeathCoefficient is < 0 or > 10)
+            throw new ArgumentOutOfRangeException(nameof(DuelDeathCoefficient), "The duel death coefficient must be between 0 and 10.");
         if (NoRetreatCaptureBonus is < 0 or > 100)
             throw new ArgumentOutOfRangeException(nameof(NoRetreatCaptureBonus), "The capture bonus must be between 0 and 100 percentage points.");
         ArgumentNullException.ThrowIfNull(ComputerStrategyPermissions);

@@ -10,7 +10,7 @@ public sealed record DuelCompletedEvent(GameClock Clock, int WinningUnitId, int 
 internal static class DuelAftermath
 {
     internal static int Interval(int morale) => (int)Math.Min(10, (100 - DuelStrike.Score(morale)) / 10 + 5);
-    internal static long DeathChance(int martial) => Math.Min(30, 80L - martial);
+    internal static long DeathChance(int martial, int coefficient) => Math.Min(30, 80L + 4L * coefficient - martial);
     internal static long CaptureChance(int martial) => Math.Min(60, 120 - DuelStrike.Score(martial));
 
     internal static ImmutableArray<int> Successors(WorldMutation world, int rulerId) => RulerSuccession.Candidates(world, rulerId);
@@ -47,7 +47,7 @@ internal static class DuelAftermath
         bool Roll(string stream, long chance) => chance > 0 && (chance >= 100 || (long)(world.NextRandom(stream) % 100) < chance);
         bool Candidate(int id) => world.Officers[id] is { IsServing: true, OwnerId: int owner, UnitId: int unit } &&
             unit == loserUnit && !world.Forces[owner].IsBarbarian && !priorWinners.Contains(id) &&
-            world.Units.TryGetValue(unit, out var current) && current.CommanderId != id;
+            world.Units.ContainsKey(unit);
         bool CanKill() => BattleDeathRules.Enabled(world, rules.Military!) &&
             world.Units.ContainsKey(outcome.Roster.AttackingUnitId) &&
             world.Units.ContainsKey(outcome.Roster.DefendingUnitId);
@@ -58,7 +58,7 @@ internal static class DuelAftermath
             var person = world.Officers[id];
             if (!Candidate(id) || BattleDeathRules.IsProtected(world, person,
                     world.Units[loserUnit].CommanderId == id, OfficerDeathCause.Duel) ||
-                !Roll("duel-death", DeathChance(world.Abilities(person).War))) continue;
+                !Roll("duel-death", DeathChance(world.Abilities(person).War, world.Companion.DuelDeathCoefficient))) continue;
             if (person.OwnerId is int owner && world.Forces[owner].LeaderId == id &&
                 world.Simulation.Controls.Any(c => c.ForceId == owner) && !Successors(world, id).IsEmpty)
             {
@@ -71,7 +71,7 @@ internal static class DuelAftermath
         {
             foreach (int id in losers)
             {
-                if (!Candidate(id) || world.HasEscapeMount(id, rules.Treasures) ||
+                if (!Candidate(id) || world.Units[loserUnit].CommanderId == id || world.HasEscapeMount(id, rules.Treasures) ||
                     !Roll("duel-capture", CaptureChance(world.Abilities(world.Officers[id]).War))) continue;
                 PersonnelTransitions.Capture(world, id, null, outcome.WinningUnitId, rules.Personnel, events);
                 world.Replace(world.Officers[id] with { TacticCooldown = 0 });

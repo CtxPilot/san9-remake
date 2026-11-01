@@ -27,7 +27,8 @@ public sealed class LongevitySessionTests
     [InlineData(false)]
     public void ChoiceResumesDailyQueueAndStableSaveAgree(bool accept)
     {
-        var d = Definition(); var session = GameSession.Start(d, 1);         Assert.True(session.Execute(new("player"), new SearchCommand(Guid.NewGuid(), 1, 0, [2], 1)).Submission.Accepted);
+        var d = Definition(); var session = GameSession.Start(d, 1);
+        Assert.True(session.Execute(new("player"), new SearchCommand(Guid.NewGuid(), 1, 0, [2], 1)).Submission.Accepted);
         var restored = SaveService.Decode(SaveService.Encode(session), d);
         session.AdvanceXun(); restored.AdvanceXun();
         var p = Assert.IsType<LongevityPrompt>(session.GetLongevityPrompt());
@@ -52,6 +53,20 @@ public sealed class LongevitySessionTests
         StateAssert.Equal(session.Capture(), SaveService.Decode(SaveService.Encode(session), d).Capture());
         Assert.True(session.Execute(new("player"), new SearchCommand(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence, [2], 1)).Submission.Accepted);
         session.AdvanceXun(); Assert.NotNull(session.GetLongevityPrompt());
+    }
+
+    [Fact]
+    public void InfiniteLifespanSkipsPaidLongevityAndContinuesOrdinarySearch()
+    {
+        var session = GameSession.Start(Definition(), 1, companionSettings: new() { InfiniteLifespan = true });
+        Assert.True(session.Execute(new("player"), new SearchCommand(Guid.NewGuid(), 1, 0, [2], 1)).Submission.Accepted);
+        var result = session.AdvanceXun();
+        Assert.Null(session.GetLongevityPrompt());
+        Assert.Single(result.Events.OfType<SearchResolvedEvent>());
+        Assert.DoesNotContain(result.Events, e => e is LongevityResolvedEvent or ResourceChangedEvent { Reason: "longevity" });
+        Assert.Equal(0, session.Snapshot.Officers.Single(o => o.Id == 2).LifespanTier);
+        Assert.DoesNotContain(session.Snapshot.Simulation.RandomStreams, s => s.Name == "event-search-eligibility");
+        Assert.Equal(SimulationBoundary.Stable, session.Snapshot.Simulation.Boundary);
     }
 
     [Theory]

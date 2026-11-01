@@ -155,21 +155,25 @@ public sealed class MeleeDeathTests
     [Fact]
     public void RestoredBattleHasIdenticalDeathsAndTransfersBelongingsToTheOldRuler()
     {
+        var companion = new CompanionSettings
+        {
+            BattleDeathProtectionThreshold = 125, AllowCommanderBattleDeaths = true,
+        };
         var (fixture, baseRules, _) = TacticSnipingTests.Create();
         _ = new SimulationEngine(fixture, baseRules);
         var rules = new SimulationRules { Military = baseRules.Military, Treasures = new([new(99, default, 0)]) };
         var world = WorldState.Restore(fixture.CreateSnapshot() with { Treasures = [new(99, 22, TreasureDiscovery.Discovered, null)] });
         var setup = world.BeginMutation(rules.Abilities);
         setup.SetSimulation(setup.Simulation with { BattleDeathsEnabled = true });
-        setup.Replace(setup.Units[2] with { Soldiers = 1 });
-        setup.Replace(setup.Officers[22] with { BaseAbilities = new(40, 40, 40, 40) });
+        setup.Replace(setup.Units[2] with { Soldiers = 1, CommanderId = 22 });
+        setup.Replace(setup.Officers[22] with { BaseAbilities = new(40, 124, 40, 40) });
         Roll(setup, "military-tactic-double", 0); Roll(setup, "battle-melee-death", 0);
         world.Commit(setup);
         var restored = WorldState.Restore(JsonSerializer.Deserialize<WorldSnapshot>(CanonicalJson.Text(world.CreateSnapshot()), CanonicalJson.Options)!);
         List<DomainEvent> first = [], second = [];
         foreach (var (state, events) in new[] { (world, first), (restored, second) })
         {
-            var m = state.BeginMutation(rules.Abilities);
+            var m = state.BeginMutation(rules.Abilities, companion: companion);
             TacticCombat.TryUnit(m, 1, Target, rules, events);
             Assert.Equal(21, m.Treasures[99].HolderId);
             Assert.Equal(OfficerDeathCause.Melee, Assert.Single(events.OfType<OfficerDiedEvent>()).Cause);

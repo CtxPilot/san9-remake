@@ -19,16 +19,23 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         Assert.Equal(45, store.Load().PlayerAutoSearchMinimumPolitics);
         Assert.False(store.Load().DisableComputerForceConsolidation);
         Assert.False(store.Load().DisableComputerPrisonerExecution);
+        Assert.False(store.Load().DisablePlayerPrisonerExecution);
+        Assert.False(store.Load().InfiniteLifespan);
         Assert.Equal(100, store.Load().CityBattleDamagePercent);
         Assert.Equal(100, store.Load().NoRetreatCaptureBonus);
         Assert.False(store.Load().UseHighestAbilityForCapture);
         Assert.False(store.Load().ConfigureTacticsOnFormationSelection);
+        Assert.Equal(80, store.Load().BattleDeathProtectionThreshold);
+        Assert.False(store.Load().AllowCommanderBattleDeaths);
+        Assert.Equal(0, store.Load().DuelDeathCoefficient);
         Assert.False(Directory.Exists(_directory));
         var settings = new CompanionSettings
         {
             PlayerAutoDomesticEnabled = true, OfficerAbilityCap = 125,
             DisableComputerForceConsolidation = true,
             DisableComputerPrisonerExecution = true,
+            DisablePlayerPrisonerExecution = true,
+            InfiniteLifespan = true,
             EnableNavalTacticFallback = true, TacticAllocation = new(0, 1, 2, 3, 4),
             PlayerAutoSearchEnabled = true, PlayerAutoSearchMinimumPolitics = 60,
             HideRoutineSearchReports = true,
@@ -37,6 +44,9 @@ public sealed class CompanionSettingsStoreTests : IDisposable
             CityBattleDamagePercent = 50,
             NoRetreatCaptureBonus = 20,
             UseHighestAbilityForCapture = true,
+            BattleDeathProtectionThreshold = 125,
+            AllowCommanderBattleDeaths = true,
+            DuelDeathCoefficient = 5,
             ComputerStrategyPermissions = new() { Alienate = false, Burn = false },
             PlayerDelegatedStrategyPermissions = new() { Seize = false, Gossip = false },
         };
@@ -50,6 +60,9 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { CityBattleDamagePercent = -1 }));
         Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { NoRetreatCaptureBonus = -1 }));
         Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { NoRetreatCaptureBonus = 101 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { BattleDeathProtectionThreshold = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { DuelDeathCoefficient = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(settings with { DuelDeathCoefficient = 11 }));
         Assert.Throws<ArgumentNullException>(() => store.Save(settings with { ComputerStrategyPermissions = null! }));
         Assert.Throws<ArgumentNullException>(() => store.Save(settings with { PlayerDelegatedStrategyPermissions = null! }));
         Assert.Equal(saved, File.ReadAllBytes(FilePath));

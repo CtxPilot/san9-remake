@@ -55,7 +55,7 @@ public partial class CompanionSettingsView : ModalView
         var shortcut = Note("Esc 保存并关闭"); shortcut.SizeFlagsVertical = SizeFlags.ShrinkCenter; actions.AddChild(shortcut);
         actions.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
         var preset = new Button { Text = "预设配置", CustomMinimumSize = new(104, 38),
-            TooltipText = "开启普通功能开关；允许伪报、扰乱、激励、救援，禁止离间、流言、烧夷、夺取。\n资金与兵粮倍率200%，能力上限125，无退路俘获加成0%，其余数值保留当前输入。" };
+            TooltipText = "开启普通功能开关（含无限寿命）；允许伪报、扰乱、激励、救援，禁止离间、流言、烧夷、夺取。\n资金与兵粮倍率200%，能力上限与免阵亡能力门槛125，无退路俘获加成0%，其余数值保留当前输入。\n战斗阵亡仍须在PK设定中开启。" };
         preset.Pressed += ApplyPreset; actions.AddChild(preset);
         var reset = new Button { Text = "原版配置", CustomMinimumSize = new(104, 38),
             TooltipText = "恢复原版对应配置。" };

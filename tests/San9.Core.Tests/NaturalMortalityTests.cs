@@ -54,12 +54,13 @@ public sealed class NaturalMortalityTests
     }
 
     [Theory]
-    [InlineData(false, 360)]
-    [InlineData(true, 359)]
-    public void DisabledOrBefore360DaysHasNoRandomConsumption(bool enabled, int days)
+    [InlineData(false, 360, false)]
+    [InlineData(true, 359, false)]
+    [InlineData(true, 360, true)]
+    public void DisabledMortalityOrFirstYearConsumesNoRandom(bool enabled, int days, bool infinite)
     {
         var world = World(enabled);
-        var mutation = world.BeginMutation();
+        var mutation = world.BeginMutation(companion: new() { InfiniteLifespan = infinite });
         var date = mutation.Clock;
         for (int i = 0; i < days; i++) date = date.NextDay();
         mutation.SetClock(date);

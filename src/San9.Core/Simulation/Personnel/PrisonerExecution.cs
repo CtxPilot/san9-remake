@@ -42,7 +42,10 @@ internal static class PrisonerExecution
     {
         if (!world.Officers.TryGetValue(officerId, out var prisoner)) return CommandRejection.UnknownPerson;
         if (!DetainedBy(world, prisoner, executingForceId)) return CommandRejection.PersonUnavailable;
-        if (prisoner.OwnerId is int owner && world.Forces[owner].LeaderId == prisoner.Id &&
+        bool isRuler = prisoner.OwnerId is int prisonerOwner && world.Forces[prisonerOwner].LeaderId == prisoner.Id;
+        if (PrisonerExecutionRules.IsProhibited(world.Companion, world.Simulation, executingForceId, isRuler))
+            return CommandRejection.PrisonerExecutionProhibited;
+        if (isRuler && prisoner.OwnerId is int owner &&
             world.Simulation.Controls.Any(c => c.ForceId == owner && !world.Forces[c.ForceId].IsEliminated) &&
             !Candidates(world, owner).IsEmpty &&
             ForceLifecycle.HasCity(world, owner))

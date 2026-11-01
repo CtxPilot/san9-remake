@@ -11,9 +11,11 @@ internal static class BattleDeathRules
     internal static bool IsProtected(WorldMutation world, OfficerState person, bool isCommander,
         OfficerDeathCause cause)
     {
-        if (person.OwnerId is not int owner || world.Forces[owner].IsBarbarian || isCommander) return true;
+        if (person.OwnerId is not int owner || world.Forces[owner].IsBarbarian ||
+            isCommander && !world.Companion.AllowCommanderBattleDeaths) return true;
         var abilities = person.BaseAbilities;
-        if (Math.Max(Math.Max(abilities.War, abilities.Intelligence), Math.Max(abilities.Politics, abilities.Leadership)) >= 80)
+        if (Math.Max(Math.Max(abilities.War, abilities.Intelligence), Math.Max(abilities.Politics, abilities.Leadership)) >=
+            world.Companion.BattleDeathProtectionThreshold)
             return true;
         // Ruler immunity belongs to melee deaths, not to duel or sniping deaths.
         return cause == OfficerDeathCause.Melee &&

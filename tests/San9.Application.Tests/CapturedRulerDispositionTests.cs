@@ -32,7 +32,10 @@ public sealed class CapturedRulerDispositionTests
         var definition = Fixture();
         var session = GameSession.Start(definition, 190);
         var restored = SaveService.Decode(SaveService.Encode(session), definition);
-        var companion = new CompanionSettings { DisableComputerPrisonerExecution = prohibitComputerExecution };
+        var companion = new CompanionSettings
+        {
+            DisablePlayerPrisonerExecution = true, DisableComputerPrisonerExecution = prohibitComputerExecution,
+        };
         session.ConfigureCompanion(companion);
         restored.ConfigureCompanion(companion);
         var advance = session.Request(new AdvanceOperation(), "player");

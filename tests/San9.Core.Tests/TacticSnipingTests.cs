@@ -103,23 +103,35 @@ public sealed class TacticSnipingTests
     [InlineData("disabled", false)]
     [InlineData("mode", false)]
     [InlineData("commander", false)]
+    [InlineData("companion", true)]
     [InlineData("ability", false)]
     [InlineData("barbarian", false)]
     [InlineData("defeated", false)]
     public void DeathUsesSharedLifecycleAndEligibility(string gate, bool dies)
     {
-        var (world, rules, tactic) = Create(deathsAllowed: gate != "mode"); var m = world.BeginMutation(); List<DomainEvent> events = [];
+        var (world, rules, tactic) = Create(deathsAllowed: gate != "mode");
+        var m = world.BeginMutation(companion: new()
+        {
+            BattleDeathProtectionThreshold = gate == "companion" ? 125 : 80,
+            AllowCommanderBattleDeaths = gate == "companion",
+        }); List<DomainEvent> events = [];
         m.SetSimulation(m.Simulation with { BattleDeathsEnabled = gate != "disabled" });
-        if (gate == "commander") m.Replace(m.Units[2] with { CommanderId = 22 });
+        if (gate is "commander" or "companion") m.Replace(m.Units[2] with { CommanderId = 22 });
         if (gate == "ability") m.Replace(m.Officers[22] with { BaseAbilities = new(70, 80, 70, 70) });
+        if (gate == "companion") m.Replace(m.Officers[22] with { BaseAbilities = new(70, 124, 70, 70) });
         if (gate == "barbarian") m.Replace(m.Forces[2] with { IsBarbarian = true });
         var outcome = TacticSniping.Select(m, new(1, false), tactic, UnitTarget, [11], 10, rules.Military!);
         Assert.NotNull(outcome); Roll(m, "military-sniping-death", 0);
         TacticSniping.Apply(m, outcome, gate == "defeated", rules, events);
         Assert.Equal(dies, m.Officers[22].Status == OfficerStatus.Dead);
         Assert.Single(events.OfType<TacticSnipingResolvedEvent>());
-        if (dies) Assert.Equal(OfficerDeathCause.Sniping, Assert.Single(events.OfType<OfficerDiedEvent>()).Cause);
+        if (dies)
+        {
+            Assert.Equal(OfficerDeathCause.Sniping, Assert.Single(events.OfType<OfficerDiedEvent>()).Cause);
+            Assert.Equal(21, m.Units[2].CommanderId);
+        }
         else Assert.True(m.Officers[22].Injury > 0);
+        world.Commit(m);
     }
 
     [Theory]

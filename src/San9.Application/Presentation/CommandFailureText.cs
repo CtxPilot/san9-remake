@@ -6,6 +6,7 @@ namespace San9.Application.Presentation;
 public static class CommandFailureText
 {
     public static string Describe(TextCatalog texts, CommandRejection reason) => reason == CommandRejection.None ? "" :
+        reason == CommandRejection.PrisonerExecutionProhibited ? "当前优化伴侣设置禁止该势力处斩普通俘虏。" :
         CommandText.Resolve(texts, reason switch
     {
         CommandRejection.NotStable or CommandRejection.WrongSequence => "failure.stale",

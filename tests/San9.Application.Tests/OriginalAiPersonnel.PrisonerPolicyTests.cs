@@ -12,7 +12,7 @@ public sealed partial class OriginalAiPersonnelTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void ExecutionProhibitionRetainsComputerCaptivesWithoutPlanningButPreservesPlayerDelegation(bool player, bool disabled)
+    public void IndependentExecutionProhibitionsRetainCaptivesWithoutPlanning(bool player, bool disabled)
     {
         var original = Fixture();
         int captor = player ? 1 : 2;
@@ -25,13 +25,16 @@ public sealed partial class OriginalAiPersonnelTests
         };
         int draws = 0;
         var h = new Harness(content, _ => { draws++; return 0; }, corpsId: captor);
-        h.Engine.ConfigureCompanion(new() { DisableComputerPrisonerExecution = disabled });
+        h.Engine.ConfigureCompanion(new()
+        {
+            DisablePlayerPrisonerExecution = player ? disabled : !disabled,
+            DisableComputerPrisonerExecution = player ? !disabled : disabled,
+        });
         var before = h.Engine.Snapshot;
         var progress = h.Personnel.PreparePrisoners();
-        bool blocked = !player && disabled;
-        Assert.Equal(blocked ? [] : new[] { captive }, progress.Execute);
+        Assert.Equal(disabled ? [] : new[] { captive }, progress.Execute);
         progress = h.Personnel.Dispose(progress, 2);
-        if (blocked)
+        if (disabled)
         {
             Assert.Equal(0, draws);
             Assert.Equal(0, progress.Attempts);
@@ -57,7 +60,7 @@ public sealed partial class OriginalAiPersonnelTests
                 ? p with { State = p.State with { Status = OfficerStatus.Captive, SettlementId = 2 } } : p).ToArray()
         };
         var h = new Harness(content, corpsId: 2);
-        h.Engine.ConfigureCompanion(new() { DisableComputerPrisonerExecution = true });
+        h.Engine.ConfigureCompanion(new() { DisablePlayerPrisonerExecution = true, DisableComputerPrisonerExecution = true });
         Assert.Equal(new[] { 1 }, h.Personnel.PreparePrisoners().Execute);
     }
 

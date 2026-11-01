@@ -314,13 +314,12 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
     {
         var execute = new List<int>();
         var release = new List<int>();
-        bool protectOrdinaryPrisoners = engine.Companion.DisableComputerPrisonerExecution &&
-            !World.Simulation.Controls.Any(c => c.ForceId == Owner && c.Kind == ControllerKind.Player);
         foreach (var p in World.Officers.Where(p => !p.IsDormant && Detained(p)).OrderBy(p => Sum(Ability(p))))
         {
             var disposition = Disposition(Threshold(p), Relation(p.OwnerId), Ruler is { } ruler ? PersonnelRulebook.AffinityDistance(p, ruler) : 0, Ability(p));
             if (disposition == PrisonerDisposition.Execute &&
-                (!protectOrdinaryPrisoners || World.Forces.Any(f => f.Id == p.OwnerId && f.LeaderId == p.Id))) execute.Add(p.Id);
+                !PrisonerExecutionRules.IsProhibited(engine.Companion, World.Simulation, Owner,
+                    World.Forces.Any(f => f.Id == p.OwnerId && f.LeaderId == p.Id))) execute.Add(p.Id);
             if (disposition == PrisonerDisposition.Release) release.Add(p.Id);
         }
         return new(execute.ToImmutableArray(), release.ToImmutableArray(), 0, 0, 0);

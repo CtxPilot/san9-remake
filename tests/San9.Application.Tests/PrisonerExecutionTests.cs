@@ -46,6 +46,13 @@ public sealed class PrisonerExecutionTests
         session.ConfigureCompanion(new() { DisableComputerPrisonerExecution = prohibitComputerExecution });
         Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 2, 7)).Submission.Accepted);
         var command = new ExecutePrisonerCommand(Guid.NewGuid(), 1, 1, 7);
+        session.ConfigureCompanion(session.Companion with { DisablePlayerPrisonerExecution = true });
+        var retained = session.Capture();
+        var blocked = session.Execute(new("player"), command);
+        Assert.Equal(CommandRejection.PrisonerExecutionProhibited, blocked.Submission.Rejection);
+        Assert.Empty(blocked.Events);
+        StateAssert.Equal(retained, session.Capture());
+        session.ConfigureCompanion(session.Companion with { DisablePlayerPrisonerExecution = false });
         var result = session.Execute(new("player"), command);
         Assert.True(result.Submission.Accepted);
         Assert.Equal(OfficerDeathCause.Execution, Assert.Single(result.Events.OfType<OfficerDiedEvent>()).Cause);
@@ -83,6 +90,7 @@ public sealed class PrisonerExecutionTests
                 .Select(p => p.State.Id == 5 ? p with { State = p.State with { ParentId = 7, BirthYear = 180 } } : p).ToArray()
         };
         var session = GameSession.Start(definition, 190);
+        session.ConfigureCompanion(new() { DisablePlayerPrisonerExecution = true, DisableComputerPrisonerExecution = true });
         var result = session.Execute(new("player"), new ExecutePrisonerCommand(Guid.NewGuid(), 1, 0, 7));
         Assert.True(result.Submission.Accepted);
         Assert.Null(session.GetExecutionSuccessionPrompt());

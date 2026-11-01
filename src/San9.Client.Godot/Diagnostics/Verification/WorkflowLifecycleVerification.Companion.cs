@@ -50,7 +50,9 @@ public partial class WorkflowLifecycleVerification
             view.Back();
             Check(saved is { ComputerRevenuePercent: 200, ComputerHarvestPercent: 200, OfficerAbilityCap: 125,
                 NoRetreatCaptureBonus: 0, CityBattleDamagePercent: 75, DisableComputerPrisonerExecution: true,
-                ConfigureTacticsOnFormationSelection: true } &&
+                DisablePlayerPrisonerExecution: true,
+                ConfigureTacticsOnFormationSelection: true, BattleDeathProtectionThreshold: 125,
+                AllowCommanderBattleDeaths: true, DuelDeathCoefficient: 0, InfiniteLifespan: true } &&
                 saved.ComputerStrategyPermissions is { Alienate: false, Burn: false, FalseReport: true } &&
                 saved.PlayerDelegatedStrategyPermissions == saved.ComputerStrategyPermissions,
                 $"The companion preset discarded a retained numeric draft or applied incorrect policies: {saved}.");

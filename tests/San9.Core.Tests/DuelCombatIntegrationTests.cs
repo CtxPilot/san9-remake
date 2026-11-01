@@ -15,7 +15,7 @@ public sealed class DuelCombatIntegrationTests
         return seed;
     }
 
-    private static SimulationEngine Engine(bool deaths = false, int opportunity = 0, int defensiveChance = 0, bool counterOnly = false, bool laterBattle = false, int cooldown = 0, bool normalPower = false)
+    private static SimulationEngine Engine(bool deaths = false, int opportunity = 0, int defensiveChance = 0, bool counterOnly = false, bool laterBattle = false, int cooldown = 0, bool normalPower = false, CompanionSettings? companion = null)
     {
         var combat = normalPower ? new CombatProfile(10, 10, 0, 10, 50) : new CombatProfile(0, 0, 0, 1000, 50);
         var military = new MilitaryRulebook(new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
@@ -60,6 +60,7 @@ public sealed class DuelCombatIntegrationTests
                 Units = [.. snapshot.Units, laterAttacker, laterDefender]
             }), EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: military);
         }
+        if (companion is not null) engine.ConfigureCompanion(companion);
         engine.EndControl(new("player"));
         return engine;
     }
@@ -95,15 +96,24 @@ public sealed class DuelCombatIntegrationTests
     [Fact]
     public void SuccessionContinuationRetainsRemainingBattlesAndUsedAttackers()
     {
-        var engine = Engine(deaths: true, laterBattle: true);
+        var settings = new CompanionSettings
+        {
+            BattleDeathProtectionThreshold = 125, AllowCommanderBattleDeaths = true, DuelDeathCoefficient = 10,
+        };
+        var engine = Engine(deaths: true, laterBattle: true, companion: settings);
+        var branch = engine.Fork();
+        Assert.Equal(settings, branch.Companion);
         var paused = engine.AdvanceXun();
+        EventAssert.Equal(paused.Events, branch.AdvanceXun().Events);
         Assert.NotNull(engine.GetDuelSuccessionPrompt());
         Assert.Empty(paused.Events.OfType<BattleDamageEvent>());
-        var response = engine.Execute(new("player"), new ChooseDuelSuccessorCommand(Guid.NewGuid(), 2,
-            engine.Snapshot.Simulation.NextSequence, 22, 21));
+        var command = new ChooseDuelSuccessorCommand(Guid.NewGuid(), 2, engine.Snapshot.Simulation.NextSequence, 22, 21);
+        var response = engine.Execute(new("player"), command);
         Assert.True(response.Submission.Accepted);
+        EventAssert.Equal(response.Events, branch.Execute(new("player"), command).Events);
         Assert.Equal(new[] { 1, 2, 3, 4 }, response.Events.OfType<BattleDamageEvent>().Where(e => e.Clock.Day == 1).Select(e => e.AttackerId).Order());
         Assert.Single(response.Events.OfType<StageCompletedEvent>(), e => e.Clock.Day == 1 && e.Stage == ResolutionStage.DailyCombat);
+        StateAssert.Equal(engine.CaptureStableState(), branch.CaptureStableState());
     }
 
     [Fact]

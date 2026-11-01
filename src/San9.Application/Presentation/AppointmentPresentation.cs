@@ -32,6 +32,7 @@ public static class AppointmentPresentation
             lines.Add(CommandText.Resolve(texts, "result.partial", result.CompletedCommands) + (result.Rejection switch {
                 CommandRejection.NoDestination => CommandText.Resolve(texts, "failure.accommodation"),
                 CommandRejection.InsufficientFunds => CommandText.Resolve(texts, "failure.money"),
+                CommandRejection.PrisonerExecutionProhibited => CommandFailureText.Describe(texts, result.Rejection),
                 _ => CommandText.Resolve(texts, "failure.conditions") }));
         if (lines.Count == 0) lines.Add(result.CompletedCommands > 0 ? CommandText.Resolve(texts, "result.submitted") : CommandText.Resolve(texts, "result.empty"));
         return string.Join("\n", lines);

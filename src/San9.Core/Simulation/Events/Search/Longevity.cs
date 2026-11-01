@@ -10,6 +10,7 @@ public sealed record LongevityResolvedEvent(GameClock Clock, string EventId, int
 internal static class Longevity
 {
     private static bool BeforeChance(WorldMutation world, PersistentTask task, LongevitySearchEventDefinition d) =>
+        !world.Companion.InfiniteLifespan &&
         world.Forces.TryGetValue(task.ForceId, out var force) && !force.IsEliminated &&
         world.Simulation.Controls.Any(c => c.ForceId == force.Id && c.Kind == ControllerKind.Player) &&
         force.EventHistory.Contains(d.RequiredHistoryKey) && task.Journey?.DestinationPlaceId == d.PlaceId;
