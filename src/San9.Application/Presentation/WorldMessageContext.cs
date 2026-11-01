@@ -18,7 +18,6 @@ public sealed class WorldMessageContext
     private readonly Dictionary<int, ForceState> _forces;
     private readonly Dictionary<int, SettlementState> _places;
     private readonly Dictionary<int, UnitState> _units;
-    private readonly Dictionary<int, OfficerInitialState> _personDefinitions;
     private readonly OfficerAbilityRules _abilities;
     private readonly Lazy<StrategySnapshot> _view;
     private readonly IReadOnlyDictionary<int, BattleObjectContext> _capturedUnits;
@@ -36,7 +35,6 @@ public sealed class WorldMessageContext
         _forces = world.Forces.ToDictionary(f => f.Id);
         _places = world.Settlements.ToDictionary(s => s.Id);
         _units = world.Units.ToDictionary(u => u.Id);
-        _personDefinitions = definition.Officers.ToDictionary(p => p.State.Id);
         _abilities = source.Abilities;
         _view = new(() => source.Project(world));
         _capturedUnits = (capturedObjects ?? []).Where(o => !o.IsSettlement).ToDictionary(o => o.Id);
@@ -48,7 +46,7 @@ public sealed class WorldMessageContext
         _source = source._source;
         _definition = source._definition; _world = source._world with { Clock = clock }; _texts = source._texts;
         _people = source._people; _forces = source._forces; _places = source._places; _units = source._units;
-        _personDefinitions = source._personDefinitions; _abilities = source._abilities;
+        _abilities = source._abilities;
         _view = new(() => _source.Project(_world));
         _capturedUnits = objects.Where(o => !o.IsSettlement).ToDictionary(o => o.Id);
     }
@@ -159,7 +157,7 @@ public sealed class WorldMessageContext
                 "person.name" => Text(PersonName(p.Id)),
                 "person.surname" => Text(ResolveOptional(Profile(p.Id).SurnameKey)),
                 "person.given-name" => Text(ResolveOptional(Profile(p.Id).GivenNameKey)),
-                "person.courtesy-name" => Text(ResolveOptional(_personDefinitions[p.Id].CourtesyNameKey)),
+                "person.courtesy-name" => Text(ResolveOptional(_source.Officer(p.Id).CourtesyNameKey)),
                 "person.office-name" => Text(p.OfficeId is int office ? _texts.Resolve(_definition.Information.Offices.Single(o => o.Id == office).NameKey) : ""),
                 "person.office-command-capacity" => new(p.OfficeId is int office ? _definition.Information.Offices.Single(o => o.Id == office).CommandCapacity : 0),
                 "person.location-name" => Text(p.SettlementId is int place ? PlaceName(place) : p.UnitId is int unit ? UnitLocation(_units[unit]) :
@@ -228,7 +226,7 @@ public sealed class WorldMessageContext
         { if (args.Count != expected) throw new InvalidDataException($"{name} requires {expected} arguments."); }
     }
 
-    private string PersonName(int id) => _texts.Resolve(_personDefinitions[id].NameKey);
+    private string PersonName(int id) => _texts.Resolve(_source.Officer(id).NameKey);
     private string ResolveOptional(string? key) => key is null ? "" : _texts.Resolve(key);
     private MessagePersonProfile Profile(int id) => _texts.MessagePeople.TryGetValue(id, out var profile) ? profile :
         throw new InvalidDataException($"Missing message person profile: {id}.");

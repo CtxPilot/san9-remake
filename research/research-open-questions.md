@@ -6,7 +6,7 @@
 
 | ID | 裁决与证据 |
 | --- | --- |
-| A01 | 新局增兵已有确认调用链，仅君主运行时编号700–799满足转换门，`INIT-01`调度关闭；见[RE-0061](findings/RE-SAN9PK-0061.md)、[RE-0140](findings/RE-SAN9PK-0140.md) |
+| A01 | 新局增兵已有确认调用链，仅君主运行时编号700–799满足转换门，`INIT-01`调度关闭；见[新武将研究RE-0202](findings/RE-SAN9PK-0202.md#自创君主城市兵役转化与增兵)、[RE-0140](findings/RE-SAN9PK-0140.md) |
 | A02 | 伤兵恢复按内嵌守兵是否交战决定基数翻倍，再按伤兵数封顶；不是建筑类别加倍。见[RE-0014](findings/RE-SAN9PK-0014.md)、[BEH-IMPORT-0009](../specs/behavior/BEH-IMPORT-0009-scenario-fixed-building-records.md) |
 | A03 | 兵法圆圈=本人习得，三角=本人未习得但宝物／根势力提供，空白=均无；不保证可发动。见[RE-0152](findings/RE-SAN9PK-0152.md)、[RE-0131](findings/RE-SAN9PK-0131.md) |
 | A04 | 劝降读取双方当前信望及目标根势力城市数，含军团城市；见[RE-0118](findings/RE-SAN9PK-0118.md) |
@@ -71,7 +71,7 @@ git diff --check
 
 RE-0095旧能力字段、相性概率及修筑资金上限已纠正：巡查用当前智力，商业／开垦用政治，修筑用统率；相性后备概率`5*(最大同相性人数+1)`，少于两人返回0；特殊组合另有逐对10%、根君主相性及身份门。29有序组合、最多五人、稳定降序和修筑加倍后仍每人扣50但不再受资金上限已静态闭合。
 
-数量计算、组合契约、多人判定、周期经济及稳定存档已接入，见[BEH-DOMESTIC-0001](../specs/behavior/BEH-DOMESTIC-0001-base-development-effect.md)、[G03](../docs/g03-verification.md)、[G02](../docs/g02-verification.md)、[运行时架构](../docs/runtime-state.md)。自创君主增兵仍按D02排除。
+数量计算、组合契约、多人判定、周期经济及稳定存档已接入，见[BEH-DOMESTIC-0001](../specs/behavior/BEH-DOMESTIC-0001-base-development-effect.md)、[G03](../docs/g03-verification.md)、[G02](../docs/g02-verification.md)、[运行时架构](../docs/runtime-state.md)。自创君主增兵已按2026-11-01[范围决策](../specs/decisions/DEC-SCOPE-0001-scenario-scope.md)恢复，运行时按显式新建势力处理。
 
 ### 决策 D01：繁中与日版1.3差异如何进入重制
 

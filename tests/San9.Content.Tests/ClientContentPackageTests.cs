@@ -94,6 +94,25 @@ public sealed class ClientContentPackageTests
         foreach (string role in SpecialDeploymentText.Roles) text.Entries.Add(SpecialDeploymentText.Key(role), "Hint");
         foreach (string column in ExecutionPanelSkin.Columns) text.Entries.Add(ExecutionPanelSkin.HeaderKey(column), "Header");
         var p = new ClientContentPackage(ScenarioContent.CurrentSchemaVersion, map, Fixture(), text, skin, new(3, [])); p.ValidateLinks();
+        var blankPortrait = p with
+        {
+            Scenario = p.Scenario with { Officers = [new("person.blank", new(900, null, null, new(50, 50, 50, 50), false)
+                { Status = San9.Core.Domain.OfficerStatus.Undiscovered })] },
+            Text = p.Text with { Entries = new(p.Text.Entries) { ["person.blank"] = "Blank portrait" },
+                MessagePeople = new() { [900] = new(null, null, null) } }
+        };
+        blankPortrait.ValidateLinks();
+        Assert.Throws<InvalidDataException>(() => (blankPortrait with { Text = blankPortrait.Text with
+            { MessagePeople = new() { [900] = new(null, null, "portrait/42") } } }).ValidateLinks());
+        var additions = new SessionDefinitions { Officers = [new(901, "新", "人物", "", "列传", null)] };
+        var augmented = blankPortrait with { Definitions = additions, Text = additions.AddText(blankPortrait.Text) };
+        augmented.ValidateLinks();
+        Assert.Throws<InvalidDataException>(() => (augmented with { Text = blankPortrait.Text }).ValidateLinks());
+        var missingPortrait = additions with { Officers = [additions.Officers[0] with { PortraitKey = "portrait/42" }] };
+        var roles = new Dictionary<string, string>(augmented.Skin.Roles)
+            { ["information-person-901"] = augmented.Skin.Assets[0].Id, ["catalog-person-901"] = augmented.Skin.Assets[0].Id };
+        Assert.Throws<InvalidDataException>(() => (augmented with { Definitions = missingPortrait,
+            Text = missingPortrait.AddText(blankPortrait.Text), Skin = augmented.Skin with { Roles = roles } }).ValidateLinks());
         Assert.Throws<InvalidDataException>(() => (p with { SchemaVersion = 15 }).ValidateLinks());
         Assert.Throws<InvalidDataException>(() => (p with { Scenario = p.Scenario with { Settlements = [p.Scenario.Settlements[0]] } }).ValidateLinks());
         Assert.Throws<InvalidDataException>(() => (p with { Scenario = p.Scenario with { ScenarioId = "other" } }).ValidateLinks());

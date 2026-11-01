@@ -14,10 +14,10 @@ address,symbol,kind,module,confidence,evidence,sources,match,notes
 0x00435380,is_region_building_record_empty,function,core-data,high,RE-SAN9PK-0086,SRC-SAN9PK-TC-101,target-fields-0x3C-and-0x48+operation-10,Checks whether a region-building record has no runtime building and no nonzero id/state word
 0x00435740,city_belongs_to_force,function,scenario-terminal,high,RE-SAN9PK-0142,SRC-SAN9PK-TC-101,target-owner-comparison,Compares a city's current owner leader with a force leader
 0x00435840,is_unoccupied_region_building,function,core-data,high,RE-SAN9PK-0086,SRC-SAN9PK-TC-101,target-nonempty+invalid-virtual-owner+operation-60,Checks whether a nonempty region building has no valid occupying or owning object
-0x004373D0,add_city_soldiers,function,new-game-initialization,high,RE-SAN9PK-0061,SRC-SAN9PK-TC-101,target-complete-function-body+caller-formula,Adds a delta through the city's capped soldier setter
+0x004373D0,add_city_soldiers,function,new-game-initialization,high,RE-SAN9PK-0061+RE-SAN9PK-0202,SRC-SAN9PK-TC-101,target-complete-function-body+caller-formula,Adds a delta through the city's capped soldier setter
 0x0043A1E0,deserialize_terrain_record,function,terrain-data,high,RE-SAN9PK-0013,SRC-SAN9PK-TC-101,target-ciki-three-u16-loader,Loads one six-byte terrain record and derives its display name
-0x0043A360,get_city_draft_population,function,city-runtime,high,RE-SAN9PK-0008+RE-SAN9PK-0061,SRC-SAN9PK-TC-101,target-field-read+vtable,City vtable +0xE0 accessor reads draft population at +0x1C0
-0x0043A3B0,subtract_city_draft_population,function,city-runtime,high,RE-SAN9PK-0061,SRC-SAN9PK-TC-101,target-field-write+limsub,Subtracts a delta from City +0x1C0 through limsub
+0x0043A360,get_city_draft_population,function,city-runtime,high,RE-SAN9PK-0008+RE-SAN9PK-0061+RE-SAN9PK-0202,SRC-SAN9PK-TC-101,target-field-read+vtable,City vtable +0xE0 accessor reads draft population at +0x1C0
+0x0043A3B0,subtract_city_draft_population,function,city-runtime,high,RE-SAN9PK-0061+RE-SAN9PK-0202,SRC-SAN9PK-TC-101,target-field-write+limsub,Subtracts a delta from City +0x1C0 through limsub
 0x0043A4C0,get_city_max_durability,function,map-building-info,high,RE-SAN9PK-0057,SRC-SAN9PK-TC-101,target-field-read+vtable,CCityData vslot +0x12C reads runtime +0x1C8
 0x0043A6C0,city_hosts_emperor,function,map-building-info,high,RE-SAN9PK-0057,SRC-SAN9PK-TC-101,target-pointer-comparison+vtable,CCityData vslot +0xC4 compares this city with the current emperor-host city
 0x0043A8E0,deserialize_city_record,function,scenario-format,high,RE-SAN9PK-0008,SRC-SAN9PK-TC-101+SRC-DOCS+SRC-SAN9PKHARD,target-vtable+fixed-consumption+sample-crosscheck,Called 50 times over 56-byte city records
@@ -35,7 +35,7 @@ address,symbol,kind,module,confidence,evidence,sources,match,notes
 0x0043F9F0,is_primary_force_player_controlled,function,duel,high,RE-SAN9PK-0105,SRC-SAN9PK-TC-101,target-force-flags-bit0,Tests primary force flags bit 0 for player control
 0x0043FA20,is_force_barbarian,function,duel,high,RE-SAN9PK-0105,SRC-SAN9PK-TC-101,target-force-flags-bit2,Tests primary force flags bit 2 for barbarian force
 0x0043FA50,root_force_has_yellow_turban_title,function,country-title,high,RE-SAN9PK-0016,SRC-SAN9PK-TC-101,target-title-id9,Tests whether the root force holds Yellow Turban title ID 9
-0x0043FDE0,get_force_leader,function,force-runtime,high,RE-SAN9PK-0045+RE-SAN9PK-0061,SRC-SAN9PK-TC-101,target-primary-normalization+field-read,Returns primary force leader_0BC after normalizing aliases through self_0B8
+0x0043FDE0,get_force_leader,function,force-runtime,high,RE-SAN9PK-0045+RE-SAN9PK-0061+RE-SAN9PK-0202,SRC-SAN9PK-TC-101,target-primary-normalization+field-read,Returns primary force leader_0BC after normalizing aliases through self_0B8
 0x0043FFA0,compute_automatic_force_successor_sort_key,function,force-lifecycle,high,RE-SAN9PK-0141,SRC-SAN9PK-TC-101,target-successor-composite-key,Builds the automatic successor relationship and person ordering key
 0x0043FFE0,compute_player_successor_candidate_sort_key,function,force-lifecycle,high,RE-SAN9PK-0141,SRC-SAN9PK-TC-101,target-selector-order-key,Builds the player selector status office and person ordering key
 0x00440110,force_requires_ruler_successor,function,force-lifecycle,high,RE-SAN9PK-0141,SRC-SAN9PK-TC-101,target-ruler-validity-predicate,Preserves a special captured ruler and detects other invalid leaders
@@ -115,7 +115,7 @@ address,symbol,kind,module,confidence,evidence,sources,match,notes
 0x0044F040,set_person_injury_state,function,duel,high,RE-SAN9PK-0104,SRC-SAN9PK-TC-101,target-person-injury-write+refresh-chain,Writes person +0x80 injury state and refreshes derived person state when requested
 0x0044F0C0,release_person_from_captivity,function,person-data,high,RE-SAN9PK-0009,SRC-SAN9PK-TC-101,target-status+flag-transition,Restores captured rulers to status 0 and clears bit13; ordinary prisoners enter status 3
 0x0044F120,set_person_office_rank_id,function,person-data,high,RE-SAN9PK-0009+RE-SAN9PK-0011+RE-SAN9PK-0141,SRC-SAN9PK-TC-101,target-field-setter+command-consumer,Stores Person +0x8C shak office rank; code 76 becomes no office and optional refresh recomputes abilities
-0x0044F460,resolve_person_current_city,function,person-runtime,high,RE-SAN9PK-0058+RE-SAN9PK-0061,SRC-SAN9PK-TC-101,target-location-validation+city-resolution,Resolves a person's valid current location to its associated city
+0x0044F460,resolve_person_current_city,function,person-runtime,high,RE-SAN9PK-0058+RE-SAN9PK-0061+RE-SAN9PK-0202,SRC-SAN9PK-TC-101,target-location-validation+city-resolution,Resolves a person's valid current location to its associated city
 0x0044F830,deserialize_person_record,function,scenario-format,high,RE-SAN9PK-0009,SRC-SAN9PK-TC-101,target-complete-function-body,Called 800 times; consumes u32 + 37 u16 + 50 bytes + 6 bytes
 0x00452C10,CSakuryakuData_get_runtime_class,function,scenario-strategy,high,RE-SAN9PK-0018,SRC-SAN9PK-TC-101,target-mfc-runtime-class,Returns the CSakuryakuData runtime-class descriptor
 0x00452C70,deserialize_sakuryaku_record,function,scenario-strategy,high,RE-SAN9PK-0018,SRC-SAN9PK-TC-101,target-fixed-loop+runtime-type14,Loads one ten-byte skrk/Sakuryaku record into the seven-record runtime table
@@ -138,7 +138,7 @@ address,symbol,kind,module,confidence,evidence,sources,match,notes
 0x00456150,is_country_title_reserved_or_in_use,function,country-title,high,RE-SAN9PK-0016,SRC-SAN9PK-TC-101,target-barbarian-reservation+force-scan,Reserves IDs 4..8 and detects titles held by valid forces
 0x00456BD0,create_force_record_for_founder_at_city,function,governance,high,RE-SAN9PK-0124,SRC-SAN9PK-TC-101,target-shared-new-force-record-boundary,Reserves and initializes an unused force record for a founder and city
 0x00456C00,create_force_from_person_current_city,function,governance,high,RE-SAN9PK-0124,SRC-SAN9PK-TC-101,target-current-city-force-creation-wrapper,Creates a force using a person's current city and current force context
-0x00456C30,initialize_primary_force_leader_cities,function,new-game-initialization,high,RE-SAN9PK-0061,SRC-SAN9PK-TC-101,target-restored-boundary+complete-loop+formula,Iterates 50 primary forces and initializes each eligible leader city's draft and soldier state
+0x00456C30,initialize_primary_force_leader_cities,function,new-game-initialization,high,RE-SAN9PK-0061+RE-SAN9PK-0202,SRC-SAN9PK-TC-101,target-restored-boundary+complete-loop+formula,Iterates 50 primary forces and initializes each eligible leader city's draft and soldier state
 0x004580A0,count_player_controlled_primary_forces,function,scenario-terminal,high,RE-SAN9PK-0142,SRC-SAN9PK-TC-101,target-force-enumeration,Counts valid primary force records controlled by players
 0x0045BFC0,create_force_with_supporters_at_city,function,governance,high,RE-SAN9PK-0124,SRC-SAN9PK-TC-101,target-unaffiliated-supporter-force-creation,Places founder and supporters at a city before shared force creation
 0x0045C260,CShakuiData_vfunc_10,function,virtual-dispatch,high,RE-SAN9PK-0155,SRC-SAN9PK-TC-101,vtable-slot-recovery,Recovered .text virtual-table target; owner and slot encoded in symbol

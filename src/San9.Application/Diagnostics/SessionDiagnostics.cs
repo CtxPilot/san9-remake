@@ -10,7 +10,7 @@ namespace San9.Application.Diagnostics;
 public sealed record SessionDiagnosticSnapshot(WorldDiagnosticSnapshot World, ImmutableArray<SessionRecord> Records,
     ImmutableArray<ChronicleEntry> Chronicle, ImmutableList<ChronicleFact> History, EndingSelection? Ending, ImmutableDictionary<int, Presentation.StrategicContextState> StrategicContexts,
     long NextOperationSequence, ControllerKind PlayerForceController, AI.OriginalAiState OriginalAi,
-    ImmutableArray<DeploymentPreset> DeploymentPresets);
+    ImmutableArray<DeploymentPreset> DeploymentPresets, San9.Content.Scenarios.SessionDefinitions Definitions);
 
 public static class SessionDiagnostics
 {
@@ -20,7 +20,7 @@ public static class SessionDiagnostics
 
     public static SessionDiagnosticSnapshot Capture(SessionSnapshot session) => new(WorldDiagnostics.Capture(session.World),
         session.Records, session.Chronicle, session.History, session.Ending, session.StrategicContexts,
-        session.NextOperationSequence, session.PlayerForceController, session.OriginalAi, session.DeploymentPresets);
+        session.NextOperationSequence, session.PlayerForceController, session.OriginalAi, session.DeploymentPresets, session.Definitions);
 
     public static JsonElement Serialize(SessionSnapshot session) =>
         JsonSerializer.SerializeToElement(Capture(session), SessionDiagnosticJsonContext.Default.SessionDiagnosticSnapshot);
@@ -49,6 +49,7 @@ public static class SessionDiagnostics
             comparison.Check(expected.OriginalAi, actual.OriginalAi, "$.originalAi") &&
             comparison.Check(expected.PlayerForceController, actual.PlayerForceController, "$.playerForceController") &&
             comparison.Check(expected.Records, actual.Records, "$.records") &&
+            comparison.Check(expected.Definitions, actual.Definitions, "$.definitions") &&
             comparison.Check(expected.StrategicContexts, actual.StrategicContexts, "$.strategicContexts");
         difference = comparison.Difference;
         if (!equal) return false;

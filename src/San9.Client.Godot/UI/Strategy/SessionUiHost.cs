@@ -11,7 +11,7 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-public enum SessionReplacementKind { Startup, Load, NewGame, ControlDelegation }
+public enum SessionReplacementKind { Startup, Load, ControlDelegation }
 
 /// <summary>Owns session UI replacement while retaining its last complete presentation.</summary>
 public partial class SessionUiHost : Node
@@ -24,7 +24,6 @@ public partial class SessionUiHost : Node
     public SlotSaveStore SaveStore { get; init; } = null!;
     public SceneMusicPlayer Music { get; init; } = null!;
     public GameSession InitialSession { get; init; } = null!;
-    public Func<GameSession> CreateNewSession { get; init; } = null!;
     public SessionReplacementKind InitialSessionKind { get; init; } = SessionReplacementKind.Startup;
     public Func<Task> ReturnToOpening { get; init; } = null!;
     public Func<SlotSaveDocument, Task> LoadGame { get; init; } = null!;
@@ -32,7 +31,7 @@ public partial class SessionUiHost : Node
     public StrategySelection Selection { get; private set; } = null!;
     public MapMessageLog RecordsLog { get; private set; } = null!;
     public StrategyHud Hud { get; private set; } = null!;
-    public bool IsSwitching => _pending is not null || _replacement is not null;
+    public bool IsSwitching => _pending is not null;
     public bool CanSave => !IsSwitching && Hud.CanQuickSave;
     public bool IsBlocked => IsSwitching || Hud.SystemMenu?.IsVisibleInTree() == true;
     private GameSession? _session;
@@ -43,8 +42,6 @@ public partial class SessionUiHost : Node
     private CompanionSettingsStore _companionStore = null!;
     private CompanionConfiguration _companionSettings = CompanionConfiguration.Default;
     private WindowDisplay _windowDisplay = null!;
-    private SceneTransitionOverlay _transition = null!;
-    private SceneReplacementTransition? _replacement;
     private bool _bound;
     private AutoSaveQueue _autoSaves = null!;
     private readonly CancellationTokenSource _lifetime = new();
@@ -59,11 +56,6 @@ public partial class SessionUiHost : Node
         _autoSaveNotice.AddThemeConstantOverride("outline_size", 6);
         _autoSaveNotice.AddThemeColorOverride("font_outline_color", Colors.Black);
         AddChild(_autoSaveNotice);
-        // Scene replacement covers the complete UI canvas, regardless of modal depth.
-        var transitionLayer = new CanvasLayer { Name = "SessionTransition", Layer = 11 };
-        AddChild(transitionLayer);
-        _transition = new() { MouseFilter = Control.MouseFilterEnum.Stop };
-        transitionLayer.AddChild(_transition);
         _settings = new(new UserSettingsStore(DataPaths.Settings));
         _companionStore = new(DataPaths.CompanionSettings);
         LoadCompanionSettings();
@@ -78,19 +70,12 @@ public partial class SessionUiHost : Node
     public void Activate(GameSession next, SessionReplacementKind kind)
     {
         if (IsSwitching) return;
-        if (kind == SessionReplacementKind.NewGame) LoadCompanionSettings();
         next.ConfigureCompanion(_companionSettings.Rules);
         next.EnableXunStartCheckpoints();
         _pending = next;
         _pendingKind = kind;
         if (_sessionUi is not null) _sessionUi.ProcessMode = ProcessModeEnum.Disabled;
         _bound = false;
-        if (_sessionUi is not null && kind == SessionReplacementKind.NewGame)
-        {
-            // Modern scene replacement: retain the old scene until it is fully covered.
-            _replacement = new(1, .875);
-            return;
-        }
         BindPendingScene();
     }
 
@@ -111,11 +96,6 @@ public partial class SessionUiHost : Node
         {
             World.BindSession(_pending!);
             World.ConfigureFormationAppearance(_companionSettings.FormationAppearanceEnabled);
-            if (_pendingKind == SessionReplacementKind.NewGame)
-            {
-                var place = _pending!.View.PlayerRulerServicePlace;
-                World.FocusCell(place is null ? new(Content.Map.Width / 2, Content.Map.Height / 2) : new(place.X, place.Y));
-            }
             _bound = true;
         }
         catch (Exception error)
@@ -135,18 +115,6 @@ public partial class SessionUiHost : Node
             if (_noticeRemaining <= 0) _autoSaveNotice.Hide();
         }
         if (!IsSwitching) return;
-        if (_replacement is { } replacement)
-        {
-            replacement.Advance(delta); _transition.Sample(replacement.Opacity);
-            if (replacement.Phase == SceneReplacementPhase.Complete)
-            {
-                _replacement = null;
-                if (_sessionUi is not null) _sessionUi.ProcessMode = ProcessModeEnum.Inherit;
-                return;
-            }
-            if (replacement.Phase != SceneReplacementPhase.WaitingForScene) return;
-            if (!_bound) BindPendingScene();
-        }
         if (_pending is null || !_bound) return;
         if (World.LoadError is { } error) RestoreSession(error);
         else if (World.IsVisibleReady) CompleteSwitch();
@@ -155,7 +123,7 @@ public partial class SessionUiHost : Node
     private void RestoreSession(string error)
     {
         _pending = null;
-        _replacement = null; _transition.Sample(0); _bound = false;
+        _bound = false;
         World.BindSession(Session);
         if (_sessionUi is not null)
         {
@@ -176,7 +144,7 @@ public partial class SessionUiHost : Node
         var overlayHost = StrategyOverlayHost.Create();
         Hud = new StrategyHud
         {
-            IntroduceNewGame = _pendingKind is SessionReplacementKind.Startup or SessionReplacementKind.NewGame,
+            IntroduceNewGame = _pendingKind == SessionReplacementKind.Startup,
             CommandPresentation = Content.Presentation, ContentRoot = Content.ContentRoot,
             SaveStore = SaveStore,
             StrategyReady = SavePendingCheckpoint,
@@ -184,7 +152,7 @@ public partial class SessionUiHost : Node
             ActivateSession = next => Activate(next, SessionReplacementKind.Load),
             ReturnToOpening = ReturnToOpening, LoadGame = LoadSlot,
             ControlDelegated = () => Activate(Session, SessionReplacementKind.ControlDelegation),
-            StartNewGame = () => Callable.From(() => Activate(CreateNewSession(), SessionReplacementKind.NewGame)).CallDeferred(),
+            StartNewGame = OpenNewGame,
             Music = Music, OverlayHost = overlayHost,
             ReadSettings = () => _settings.Current,
             ReadFormationAppearance = () => _companionSettings.FormationAppearanceEnabled,
@@ -223,20 +191,33 @@ public partial class SessionUiHost : Node
         _pending = null;
         _autoSaveNotice.Hide();
         SavePendingCheckpoint();
-        _replacement?.RevealPreparedScene();
-        if (_replacement is not null) _sessionUi.ProcessMode = ProcessModeEnum.Disabled;
         if (!Session.RulesVersionWarnings.IsEmpty)
             Hud.SystemMenu.ShowLoadWarning(string.Join("\n", Session.RulesVersionWarnings.Select(w => w.Message)));
         if (_pendingKind == SessionReplacementKind.ControlDelegation)
             Hud.Turn.ContinueAutomaticControls();
     }
 
-    public void RequestQuickLoad() => Hud.SystemMenu.RequestLoad(() =>
-        San9.Application.Persistence.SaveService.Load(DataPaths.QuickSave, Definition));
+    public void RequestQuickLoad() => Hud.SystemMenu.RequestLoad(async token =>
+    {
+        var loaded = await Task.Run(() => San9.Application.Persistence.SaveService.Read(DataPaths.QuickSave, Definition), token);
+        token.ThrowIfCancellationRequested();
+        var text = loaded.Definitions.AddText(Content.Text);
+        var portraits = loaded.Definitions.AddPortraits(Content.Skin.Roles);
+        var document = SlotSaveStore.Capture(loaded, SaveSlotSummaryFactory.Create(loaded, Definition, text, portraits, "快速存档"));
+        await LoadSlot(document);
+    });
+
+    private async void OpenNewGame()
+    {
+        try { await ReturnToOpening(); }
+        catch (Exception error) { Hud.SystemMenu.ShowLoadFailure(error.Message); GD.PushError(error.ToString()); }
+    }
 
     private async Task LoadSlot(SlotSaveDocument document)
     {
-        if (document.Header.Summary.ScenarioId != Definition.ScenarioId)
+        if (document.Header.Summary.ScenarioId != Definition.ScenarioId ||
+            San9.Core.Simulation.CanonicalJson.Text(document.Save.Session.Definitions) !=
+            San9.Core.Simulation.CanonicalJson.Text(Session.Definitions))
         {
             await LoadGame(document);
             return;

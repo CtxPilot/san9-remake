@@ -11,7 +11,7 @@ public sealed class ScenarioPreparationTests
     {
         int loads = 0;
         var pending = new TaskCompletionSource<ScenarioForceSelection>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var preparation = new ScenarioPreparation(token => { loads++; return pending.Task; });
+        using var preparation = new ScenarioPreparation<ScenarioForceSelection>(token => { loads++; return pending.Task; });
         Assert.Equal(0, loads);
         var background = preparation.PrepareAsync();
         Assert.Same(background, preparation.PrepareAsync());
@@ -25,7 +25,7 @@ public sealed class ScenarioPreparationTests
     public async Task FailedPreparationCanRetryWithoutReplacingAHealthyTask()
     {
         int loads = 0;
-        using var preparation = new ScenarioPreparation(token => ++loads == 1
+        using var preparation = new ScenarioPreparation<ScenarioForceSelection>(token => ++loads == 1
             ? Task.FromException<ScenarioForceSelection>(new IOException("unreadable scenario"))
             : Task.FromResult(Selection()));
         var failed = preparation.PrepareAsync();
@@ -42,7 +42,7 @@ public sealed class ScenarioPreparationTests
     {
         CancellationToken readerToken = default;
         var pending = new TaskCompletionSource<ScenarioForceSelection>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var preparation = new ScenarioPreparation(token => { readerToken = token; return pending.Task; });
+        using var preparation = new ScenarioPreparation<ScenarioForceSelection>(token => { readerToken = token; return pending.Task; });
         var task = preparation.PrepareAsync();
         preparation.Dispose();
         preparation.Dispose();

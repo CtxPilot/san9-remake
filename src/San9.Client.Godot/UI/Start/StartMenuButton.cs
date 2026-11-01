@@ -8,6 +8,8 @@ public partial class StartMenuButton : BaseButton
     public TextureScope Textures { get; init; } = null!;
     public StartMenuSprite Sprite { get; init; } = null!;
     public string Title { get; init; } = "";
+    public Vector2 TextOffset { get; init; } = new(100, 0);
+    public Vector2 TextSize { get; init; } = new(336, 36);
     public GameButtonTextRole? TextRole { get; init; }
     public Func<bool, bool, bool, GameTextStyle>? TextStyle { get; init; }
     private readonly GameTextPresenter _text = new();
@@ -16,8 +18,9 @@ public partial class StartMenuButton : BaseButton
     private Label _label = null!;
     public override void _Ready()
     {
-        _label = new Label { Text = Title, Position = TextRole is null ? new(100, 0) : Vector2.Zero,
-            Size = TextRole is null ? new(336, 36) : Size,
+        MouseEntered += () => { if (!Disabled && FocusMode != FocusModeEnum.None) GrabFocus(); };
+        _label = new Label { Text = Title, Position = TextRole is null ? TextOffset : Vector2.Zero,
+            Size = TextRole is null ? TextSize : Size,
             HorizontalAlignment = TextRole is null ? HorizontalAlignment.Left : HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center, MouseFilter = MouseFilterEnum.Ignore };
         AddChild(_label);
@@ -31,14 +34,16 @@ public partial class StartMenuButton : BaseButton
         if (_previous == state) return;
         _previous = state;
         _frame = Disabled ? 3 : pressed ? 2 : active ? 1 : 0;
-        if (TextStyle is { } style)
-            _text.Apply(_label, style(active, pressed, Disabled));
-        if (TextRole is { } role)
+        var style = TextStyle?.Invoke(active, pressed, Disabled) ?? (TextRole is { } textRole
+            ? GameTextStyles.Button(textRole, active, pressed, Disabled)
+            : new(24, new Color(Disabled ? "888888" : "f8d860"), GameTextEffect.Outline, new Color(Disabled ? "000000" : "603000")));
+        if (TextRole is not null)
         {
-            if (TextStyle is null)
-                _text.Apply(_label, GameTextStyles.Button(role, active, pressed, Disabled));
+            _text.Apply(_label, style);
             _label.Position = pressed ? Vector2.One : Vector2.Zero;
         }
+        else
+            _text.ApplyAtGlyphCell(_label, style, TextOffset + new Vector2(0, (TextSize.Y - style.FontSize) / 2));
         QueueRedraw();
     }
     public override void _Draw()

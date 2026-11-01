@@ -58,7 +58,8 @@ public partial class CommandNarration : FixedPage
     private AudioStreams _streams = null!;
     private readonly GameTextPresenter _text = new();
     private StyleBoxTexture _resultFrame = null!;
-    private bool HasIllustration => Messages[_index].IllustrationRole is not null || Messages[_index].IllustrationPersonId is not null;
+    private bool HasIllustration => Messages[_index].IllustrationRole is not null ||
+        Messages[_index].IllustrationPersonId is int person && Service.Roles.ContainsKey($"information-person-{person}");
     private bool HasPerson => !HasIllustration && Messages[_index].SpeakerId is not null;
     public override void _Ready()
     {

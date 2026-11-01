@@ -29,6 +29,14 @@ godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/Wor
 
 成功输出 `WORKFLOW_LIFECYCLE_OK` 并以 0 退出；覆盖窗口锁、退出顺序、地图回调所有权，以及模态窗口重开、嵌套、初始化期间创建子窗口、动态控件、原始输入隔离、Tab焦点约束、关闭时排除退出控件的焦点恢复和祖先返回路由。`COMPANION_DRAFT_OK`另验证伴侣面板待提交数值、隐藏页预设与重置、无变化不写入及保存失败后的草稿保留；不代表画面或完整命令交互验收。
 
+设置`SAN9_OPENING_CONTENT`为已有转换内容根目录（含281年剧本），运行同一headless入口可单独检查真实开局控件：用未完成的读取任务核对首帧禁用状态，再检查悬停转移焦点、禁用控件不抢焦点及数据就绪后的部署状态。成功输出`OPENING_CONTROLS_OK`并退出；该模式不运行其他工作流检查，不创建游戏世界或操作桌面窗口。例如PowerShell：
+
+```powershell
+$env:SAN9_OPENING_CONTENT = (Resolve-Path local/generated/content).Path
+godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/WorkflowLifecycleVerification.tscn
+Remove-Item Env:SAN9_OPENING_CONTENT
+```
+
 设置`SAN9_MODAL_CONTENT`为已有转换包目录后，同一入口另检查真实环境设定的保存失败提示，以及终局标题菜单到存档行的鼠标选择和读取回调，成功时追加`MODAL_CONTENT_OK`。检查使用独立存档目录`local/generated/verification/modal-content/`，不读取用户存档；不创建真实战败事件，也不替代画面验收。例如PowerShell：
 
 ```powershell
@@ -91,6 +99,8 @@ Headless 默认不运行。修改 CLI 参数解析、退出码、文件产物、
 命令进度的同旬与跨旬倒计时合并为`ExecutionCommandsTests.JourneyCountdownMarksOnlyTheFinishingXun`的数据用例，保留三个旬首、跨年、逐日剩余时间及完成后移除覆盖。地图测试夹具引用`MapPackage.CurrentSchemaVersion`，不各自维护版本数字。
 
 后续开发默认复用现有夹具与覆盖，只为新增规则、独有边界或实际缺陷补最小回归；不逐项把实现细节写成测试，不为每个功能重复保存／回放、确定性或公共失败矩阵。验证按本次风险选择必要入口，通过即交付，不以增加测试数量作为完成标准。
+
+自建势力增兵的兵役人口与容量矩阵归`NewGameInitializationTests`；`NewGameSetupTests`只保留开局接线、补偿顺序、草稿原子性及新增定义的真实保存恢复／命令脚本入口。忽略年龄的用例直接核对开局组合身份和作者输入，不重复全年推进或通用保存协议；新势力贴图的四个来源编号共享一份透明度样本与对照。
 
 整旬表现采样接口退出后，删除仅约束该接口的`PresentedAdvanceTests`：整旬事务失败回滚保留在`IncrementalAdvanceTests.FailedBatchDiscardsEarlierDaysAndSessionChanges`，跨季／跨年与逐日一致性复用该类已有用例，终局拒绝由`EndingSessionTests`覆盖。待答暂停与禁止继续推进并入`DailyTaskDecisionTests.IncrementalAnswersResumeOnlyCurrentDayAndPreserveReplay`；电脑自动答复后的表现投影改由`CapturedRulerDispositionTests`通过后台逐日入口检查。采样数量和样本合并断言随接口删除，正式演出仍由客户端逐日测试覆盖。
 

@@ -123,12 +123,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
             await LoadGame(document);
         }));
     }
-    public void RequestLoad(Func<GameSession> read) => ConfirmLoad(() => Load(async token =>
-    {
-        var loaded = await Task.Run(read, token);
-        token.ThrowIfCancellationRequested();
-        Callable.From(() => { if (!token.IsCancellationRequested) ActivateSession(loaded); }).CallDeferred();
-    }));
+    public void RequestLoad(Func<CancellationToken, Task> activate) => ConfirmLoad(() => Load(activate));
     private void ConfirmLoad(Action load)
     {
         if (_busy) return;

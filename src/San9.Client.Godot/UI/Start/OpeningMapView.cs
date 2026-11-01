@@ -1,5 +1,4 @@
 using Godot;
-using San9.Application.Presentation;
 using San9.Content.Interface;
 
 namespace San9.Client.Godot;
@@ -11,8 +10,9 @@ public partial class OpeningMapView : Control
     public TextureScope Textures { get; init; } = null!;
     public TextureScope? SelectionTextures { get; init; }
     public IReadOnlyDictionary<int, string> CityColors { get; set; } = null!;
-    public IReadOnlyList<OpeningForce> Forces { get; init; } = [];
+    public IReadOnlyDictionary<int, int> Targets { get; init; } = new Dictionary<int, int>();
     public OpeningMapPreview? Preview { get; init; }
+    public string? MarkerAsset { get; init; }
     public Action<int?>? Hovered { get; init; }
     public Action<int>? Activated { get; init; }
     public IReadOnlySet<int> Selected { get; set; } = new HashSet<int>();
@@ -30,7 +30,7 @@ public partial class OpeningMapView : Control
         var city = Definition.Cities.FirstOrDefault(c => CityColors.ContainsKey(c.Key) &&
             new Rect2(c.Value.Center.X - 12, c.Value.Center.Y - 12, 24, 24).HasPoint(point));
         int? id = city.Value is null ? Definition.CityAt((int)Math.Floor(point.X), (int)Math.Floor(point.Y)) : city.Key;
-        return id is int found ? Forces.FirstOrDefault(f => f.CityIds.Contains(found))?.Id : null;
+        return id is int found && Targets.TryGetValue(found, out int target) ? target : null;
     }
     private void Hover(int? id)
     {
@@ -39,6 +39,8 @@ public partial class OpeningMapView : Control
     }
     public override void _GuiInput(InputEvent input)
     {
+        // A single-choice callback can remove this map from the scene immediately.
+        AcceptEvent();
         if (input is InputEventMouseMotion motion) Hover(Target(motion.Position));
         if (input is InputEventMouseButton { ButtonIndex: MouseButton.Left } click)
         {
@@ -47,7 +49,6 @@ public partial class OpeningMapView : Control
             else { if (target is int id && _pressed == target) Activated?.Invoke(id); _pressed = null; }
             QueueRedraw();
         }
-        AcceptEvent();
     }
     public override void _Draw()
     {
@@ -79,17 +80,17 @@ public partial class OpeningMapView : Control
         foreach (var (id, city) in Definition.Cities)
         {
             if (!CityColors.TryGetValue(id, out var color)) continue;
-            var owner = Forces.FirstOrDefault(f => f.CityIds.Contains(id));
+            int? target = Targets.TryGetValue(id, out int selectable) ? selectable : null;
             var center = new Vector2(city.Center.X, city.Center.Y);
-            bool selected = owner is not null && Selected.Contains(owner.Id);
+            bool selected = target is int entity && Selected.Contains(entity);
             if (selected && SelectionTextures is { } skin)
             {
                 var selection = skin.Get("information-map-selected", this);
                 DrawTexture(selection, center - selection.GetSize() / 2);
             }
-            var texture = Textures.Get(Definition.Colors[color].Marker, this);
+            var texture = Textures.Get(MarkerAsset ?? Definition.Colors[color].Marker, this);
             float width = texture.GetWidth() / 4f;
-            int frame = owner is null ? 3 : _hovered == owner.Id ? _pressed == owner.Id ? 2 : 1 : 0;
+            int frame = target is null ? 3 : _hovered == target ? _pressed == target ? 2 : 1 : 0;
             DrawTextureRectRegion(texture, new(center - new Vector2(width / 2, texture.GetHeight() / 2f), new(width, texture.GetHeight())),
                 new(frame * width, 0, width, texture.GetHeight()));
         }

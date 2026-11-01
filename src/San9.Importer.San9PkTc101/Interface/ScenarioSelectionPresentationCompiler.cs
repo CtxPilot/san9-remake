@@ -24,8 +24,20 @@ public static class ScenarioSelectionPresentationCompiler
         {
             Preview = OpeningMapCompiler.Preview(executable, map, Selection(67, 456, 136), Selection(68, 344, 214)),
             Forces = new([Start(39, 448, 48), Start(38, 448, 48), new(Asset("g_strtpk", 2), 0, 0), Start(21, 0, 640), Selection(73, 496, 128)],
-                Selection(74, 0, 96), Selection(52, 504, 240), Start(27, 0, 180, 4), Start(25, 752, 672, 4), Start(26, 856, 672, 4))
-            { MapSkin = ForceSelectionSkinCompiler.Compile(library) },
+                Selection(74, 0, 96), Selection(52, 504, 240), Start(27, 0, 180, 4), Start(25, 744, 672, 4), Start(26, 856, 672, 4))
+            {
+                JoinForcePrompt = Message(7512),
+                CreateForces = Start(29, 0, 264, 4), DeployOfficers = Start(31, 0, 348, 4), CancelDeployment = Start(32, 0, 390, 4),
+                NewForces = new([Start(38, 448, 48), new(Asset("g_strtpk", 2), 0, 0), Start(21, 0, 640)],
+                    Enumerable.Range(0, 8).Select(i =>
+                    {
+                        int x = 532 * (i / 4), y = 140 * (i % 4);
+                        return new NewForceSlotPresentation(new(Asset("g_start2", 4), x + 74, y + 87, 4),
+                            new(Asset("g_start2", 5), x + 74, y + 127, 4), new(Asset("g_start2", 6), x + 74, y + 167, 4),
+                            Selection(7, x + 320, y + 82), new(x + 58, y + 78), new(x + 166, y + 102), new(x + 166, y + 142), new(x + 353, y + 103));
+                    }).ToArray(), Start(25, 744, 672, 4), Start(26, 856, 672, 4)),
+                MapSkin = ForceSelectionSkinCompiler.Compile(library)
+            },
             Settings = OpeningSettingsPresentationCompiler.Compile(library)
         };
     }

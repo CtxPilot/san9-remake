@@ -41,14 +41,17 @@ public sealed record SettlementView(int Id,string NameKey,int? OwnerId,int X,int
     public bool HasMapContextMenu { get; init; } = true;
 }
 
+internal sealed record OfficerDisplayDefinition(string NameKey, string? CourtesyNameKey, string? BiographyKey, int FlagGlyph);
+
 internal sealed class StrategySnapshotSource
 {
-    private readonly IReadOnlyDictionary<int, OfficerInitialState> _officers;
+    private readonly IReadOnlyDictionary<int, OfficerDisplayDefinition> _officers;
     private readonly IReadOnlyDictionary<int, ForceInitialState> _forces;
+    private readonly IReadOnlyDictionary<int, SessionForceDefinition> _sessionForces;
     private readonly IReadOnlyDictionary<int, SettlementInitialState> _settlements;
     private readonly IReadOnlyDictionary<int, IReadOnlyList<string>> _settlementIcons;
 
-    public StrategySnapshotSource(ScenarioInitialState definition, ScenarioRules rules)
+    public StrategySnapshotSource(ScenarioInitialState definition, ScenarioRules rules, SessionDefinitions? additions = null)
     {
         Rules = rules;
         Military = rules.Military;
@@ -67,7 +70,11 @@ internal sealed class StrategySnapshotSource
             new Dictionary<int, string>(definition.RegionNameKeys));
         RegionCityIds = new System.Collections.ObjectModel.ReadOnlyDictionary<int, int>(
             new Dictionary<int, int>(definition.RegionCityIds));
-        _officers = definition.Officers.ToDictionary(officer => officer.State.Id);
+        var people = definition.Officers.ToDictionary(o => o.State.Id, o => new OfficerDisplayDefinition(o.NameKey, o.CourtesyNameKey, o.BiographyKey, o.FlagGlyph));
+        foreach (var person in (additions ?? SessionDefinitions.Empty).Officers)
+            people[person.Id] = new(person.NameKey, person.CourtesyNameKey, person.BiographyKey, -1);
+        _officers = people;
+        _sessionForces = (additions ?? SessionDefinitions.Empty).Forces.ToDictionary(f => f.Id);
         _forces = definition.Forces.ToDictionary(force => force.Id);
         _settlements = definition.Settlements.ToDictionary(settlement => settlement.Id);
         _settlementIcons = definition.Settlements.ToDictionary(
@@ -90,7 +97,7 @@ internal sealed class StrategySnapshotSource
     public IReadOnlyDictionary<int, string> RegionNameKeys { get; }
     public IReadOnlyDictionary<int, int> RegionCityIds { get; }
 
-    public OfficerInitialState Officer(int id) => _officers[id];
+    public OfficerDisplayDefinition Officer(int id) => _officers[id];
     public (string NameKey, int ColorCode, int FlagGlyph) Force(ForceState force)
     {
         string? rulerName = !force.IsBarbarian && force.LeaderId is int ruler && _officers.TryGetValue(ruler, out var person)
@@ -101,6 +108,8 @@ internal sealed class StrategySnapshotSource
             int glyph = force.LeaderId is int leader ? _officers[leader].FlagGlyph : -1;
             return (rulerName ?? _officers[origin.FounderId].NameKey, force.ColorCode, titleGlyph ?? glyph);
         }
+        if (_sessionForces.TryGetValue(force.Id, out var added))
+            return (rulerName ?? _officers[added.FounderId].NameKey, force.ColorCode, titleGlyph ?? -1);
         var initial = _forces[force.Id];
         return (rulerName ?? initial.NameKey, force.ColorCode, titleGlyph ?? initial.FlagGlyph);
     }

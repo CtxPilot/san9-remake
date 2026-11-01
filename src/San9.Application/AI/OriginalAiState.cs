@@ -82,7 +82,7 @@ public sealed record OriginalAiState
             throw new ArgumentException("Invalid original AI state.");
         try
         {
-            var people = content.Officers.Select(o => o.State.Id).ToHashSet();
+            var people = world.Officers.Select(o => o.Id).ToHashSet();
             Policy.Validate(people, content.Military);
             if (Policy.Military is null) throw new InvalidDataException("Missing saved military policy.");
             Policy.Military.Validate(people, content.Military);

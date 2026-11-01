@@ -51,26 +51,48 @@ public sealed record ScenarioSelectionPresentation(string Title, string Prompt, 
 public sealed record ForceSelectionPresentation(StartMenuSprite[] Foreground, StartMenuSprite Heading,
     StartMenuSprite PortraitSlots, StartMenuSprite Choose, StartMenuSprite Confirm, StartMenuSprite Back)
 {
+    [System.Text.Json.Serialization.JsonRequired] public string JoinForcePrompt { get; init; } = "";
+    [System.Text.Json.Serialization.JsonRequired] public StartMenuSprite CreateForces { get; init; } = null!;
+    [System.Text.Json.Serialization.JsonRequired] public StartMenuSprite DeployOfficers { get; init; } = null!;
+    [System.Text.Json.Serialization.JsonRequired] public StartMenuSprite CancelDeployment { get; init; } = null!;
+    [System.Text.Json.Serialization.JsonRequired] public NewForcePresentation NewForces { get; init; } = null!;
     public static IReadOnlyList<string> RequiredSkinRoles { get; } = Array.AsReadOnly(new[]
     {
         "background", "panel", "frame-top-left", "frame-top-right", "frame-bottom-left", "frame-bottom-right",
-        "top", "bottom", "left", "right", "title-left", "title-middle", "title-right", "footer-left", "footer-middle", "footer-right"
+        "top", "bottom", "left", "right", "title-left", "title-middle", "title-right", "footer-left", "footer-middle", "footer-right", "city-marker"
     }.Select(role => "opening-" + role).ToArray());
     [System.Text.Json.Serialization.JsonRequired] public Dictionary<string, ImageAsset> MapSkin { get; init; } = [];
     [System.Text.Json.Serialization.JsonIgnore]
-    public IEnumerable<string> Assets => Foreground.Concat([Heading, PortraitSlots, Choose, Confirm, Back]).Select(s => s.Asset);
+    public IEnumerable<string> Assets => Foreground.Concat([Heading, PortraitSlots, Choose, Confirm, Back, CreateForces, DeployOfficers, CancelDeployment])
+        .Select(s => s.Asset).Concat(NewForces.Assets);
 
     public void Validate(IReadOnlyDictionary<string, ImageAsset> images)
     {
-        if (Foreground.Length == 0 || Assets.Any(a => !images.ContainsKey(a)) ||
-            new[] { Choose, Confirm, Back }.Any(s => s.Columns != 4 || images[s.Asset].Width % 4 != 0) ||
+        if (string.IsNullOrWhiteSpace(JoinForcePrompt) || Foreground.Length == 0 || Assets.Any(a => !images.ContainsKey(a)) ||
+            new[] { Choose, Confirm, Back, CreateForces, DeployOfficers, CancelDeployment }.Any(s => s.Columns != 4 || images[s.Asset].Width % 4 != 0) ||
             RequiredSkinRoles.Any(role => !MapSkin.ContainsKey(role)))
             throw new InvalidDataException("Invalid force selection presentation.");
+        NewForces.Validate(images);
         var files = images.Values.Select(a => a.File).ToHashSet();
         foreach (var asset in MapSkin.Values)
         {
             asset.Validate();
             if (!files.Contains(asset.File)) throw new InvalidDataException("Unknown opening skin image file.");
         }
+    }
+}
+
+public sealed record NewForceSlotPresentation(StartMenuSprite Ruler, StartMenuSprite City, StartMenuSprite Erase,
+    StartMenuSprite Frame, ScenarioPreviewPoint Label, ScenarioPreviewPoint RulerName, ScenarioPreviewPoint CityName, ScenarioPreviewPoint Portrait);
+
+public sealed record NewForcePresentation(StartMenuSprite[] Foreground, NewForceSlotPresentation[] Slots, StartMenuSprite Confirm, StartMenuSprite Back)
+{
+    [System.Text.Json.Serialization.JsonIgnore] public IEnumerable<StartMenuSprite> Buttons => Slots.SelectMany(s => new[] { s.Ruler, s.City, s.Erase }).Concat([Confirm, Back]);
+    [System.Text.Json.Serialization.JsonIgnore] public IEnumerable<string> Assets => Foreground.Concat(Slots.Select(s => s.Frame)).Concat(Buttons).Select(s => s.Asset);
+    public void Validate(IReadOnlyDictionary<string, ImageAsset> images)
+    {
+        if (Slots.Length != San9.Content.Authoring.NewGameSetup.MaximumCreatedForces || Foreground.Length == 0 ||
+            Assets.Any(a => !images.ContainsKey(a)) || Buttons.Any(s => s.Columns != 4 || images[s.Asset].Width % 4 != 0))
+            throw new InvalidDataException("Invalid new-force presentation.");
     }
 }

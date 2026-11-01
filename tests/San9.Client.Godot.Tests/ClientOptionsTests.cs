@@ -26,6 +26,26 @@ public sealed class ClientOptionsTests
     }
 
     [Fact]
+    public void OfficerEditorStartsIndependentlyWithoutAnImplicitWorld()
+    {
+        var options = ClientOptions.Parse(["--officer-editor"], Environment.CurrentDirectory);
+        Assert.True(options.OfficerEditor);
+        Assert.Null(options.ScenarioId);
+        Assert.Null(options.PackageRoot);
+        Assert.False(options.RequiresWorldVerification);
+    }
+
+    [Theory]
+    [InlineData("--scenario", "19")]
+    [InlineData("--content-package", "package")]
+    [InlineData("--text-smoke")]
+    [InlineData("--map-smoke")]
+    public void OfficerEditorRejectsSimultaneousWorldOrVerificationStartup(params string[] arguments)
+    {
+        Assert.Throws<ArgumentException>(() => ClientOptions.Parse(["--officer-editor", .. arguments], Environment.CurrentDirectory));
+    }
+
+    [Fact]
     public void MapCenterIsResolvedAgainstLoadedDimensionsInsteadOfTheOriginalMap()
     {
         var expanded = ClientOptions.Parse(["--map-center", "254,281"], Environment.CurrentDirectory);

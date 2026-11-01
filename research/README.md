@@ -6,6 +6,7 @@
 
 - [原版 AI 权威研究](ai.md)：集中维护 AI 决策事实、裁决和未决项；旧 RE 保留取证身份及标注账本。
 - [小兵培养权威研究](findings/RE-SAN9PK-0149.md)：统一触发、生成、成长、全部事件、训练菜单、随机与出师证据，已移除旧重复正文。
+- [新武将权威研究](findings/RE-SAN9PK-0202.md)：统一创建、独立登记文件、秘籍、批量生年和开局处理；详细未决项只在该专题维护。
 - [逆向结论索引](findings/README.md)：按主题查找 `RE-*`。
 - [研究疑点与处理结果](research-open-questions.md)：已纠错结论、证据边界和后置实验；历史“待验证”不直接作为当前待办。
 - [来源登记](SOURCES.md)、[S9 文件清单](sources/s9-file-inventory.md)、[EXE 外部 DLL 契约](sources/exe-dll-analysis-inventory.md)、[第三方仓库](sources/upstream-repositories.md)。

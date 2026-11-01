@@ -18,7 +18,10 @@ public sealed class ScenarioSelectionPresentationTests
             sprite, "image", sprite, button, [button],
             [new("history", "一般", "提示", new(0, 0))], [entry])
         { Forces = new([sprite], sprite, sprite, button, button, button)
-            { MapSkin = ForceSelectionPresentation.RequiredSkinRoles.ToDictionary(role => role, _ => images[0]) },
+            { JoinForcePrompt = "使其所属于势力吗？", MapSkin = ForceSelectionPresentation.RequiredSkinRoles.ToDictionary(role => role, _ => images[0]),
+                CreateForces = button, DeployOfficers = button, CancelDeployment = button,
+                NewForces = new([sprite], Enumerable.Range(0, 8).Select(_ => new NewForceSlotPresentation(button, button, button, sprite,
+                    new(0, 0), new(0, 0), new(0, 0), new(0, 0))).ToArray(), button, button) },
             Preview = new(sprite, sprite, 1, 1, 0, 0),
             Settings = new([sprite], [sprite, sprite], "image", new(["image"], 1, 0, 0, .25), button, button, button, sprite) };
         scene.Validate(images);
@@ -32,6 +35,8 @@ public sealed class ScenarioSelectionPresentationTests
             scene with { Entries = [entry with { Month = 13 }] },
             scene with { Forces = scene.Forces with { Choose = button with { Columns = 0 } } },
             scene with { Forces = scene.Forces with { MapSkin = [] } },
+            scene with { Forces = scene.Forces with { JoinForcePrompt = "" } },
+            scene with { Forces = scene.Forces with { NewForces = scene.Forces.NewForces with { Slots = [] } } },
             scene with { Forces = scene.Forces with { MapSkin = new(scene.Forces.MapSkin) { ["opening-panel"] = new("other", "missing.png", 160, 40) } } },
             scene with { Settings = scene.Settings with { ChoiceHighlight = "missing" } },
             scene with { Settings = scene.Settings with { Illustration = scene.Settings.Illustration with { Columns = 3 } } }

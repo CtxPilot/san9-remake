@@ -1,22 +1,20 @@
-using San9.Application.Presentation;
-
 namespace San9.Client.Godot;
 
 /// <summary>One page owns one preparation task. Interactive requests reuse it; only a failed attempt is retried.</summary>
-internal sealed class ScenarioPreparation(Func<CancellationToken, Task<ScenarioForceSelection>> load) : IDisposable
+internal sealed class ScenarioPreparation<T>(Func<CancellationToken, Task<T>> load) : IDisposable
 {
     private readonly CancellationTokenSource _lifetime = new();
-    private Task<ScenarioForceSelection>? _task;
+    private Task<T>? _task;
     private bool _closed;
     public CancellationToken Token => _lifetime.Token;
 
-    public Task<ScenarioForceSelection> PrepareAsync()
+    public Task<T> PrepareAsync()
     {
         ObjectDisposedException.ThrowIf(_closed, this);
         if (_task is null || _task.IsFaulted || _task.IsCanceled) _task = LoadAsync();
         return _task;
     }
-    private async Task<ScenarioForceSelection> LoadAsync()
+    private async Task<T> LoadAsync()
     {
         var token = _lifetime.Token;
         var result = await load(token).ConfigureAwait(false);
