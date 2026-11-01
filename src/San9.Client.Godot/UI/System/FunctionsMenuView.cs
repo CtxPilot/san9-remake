@@ -27,8 +27,8 @@ public partial class FunctionsMenuView : HudDropdown
         Size = GetViewportRect().Size; MouseFilter = MouseFilterEnum.Stop;
         (string Title, string Role)[] entries = [("储存", "save"), ("载入", "load"),
             ("编辑武将", "edit-officers"), ("编辑军团", "edit-corps"), ("编辑都市", "edit-cities"),
-            ("编辑设施", "edit-facilities"), ("编辑障碍物", "edit-obstacles"), ("PK设定", "pk"),
-            ("优化伴侣", "companion"),
+            ("编辑设施", "edit-facilities"), ("编辑障碍物", "edit-obstacles"),
+            ("优化伴侣", "companion"), ("PK设定", "pk"),
             ("设定环境", "environment"), ("初始设定", "initial"), ("结束游戏", "exit")];
         for (int i = 0; i < entries.Length; i++)
         {
@@ -49,7 +49,7 @@ public partial class FunctionsMenuView : HudDropdown
                 _ => null
             };
             var button = new InformationMenuButton { Title = entries[i].Title, Textures = Textures,
-                HintText = entries[i].Role == "companion" ? "设置优化伴侣功能，旬末自动安排直辖军团闲置武将的内政工作。" :
+                HintText = entries[i].Role == "companion" ? "设置辅助功能、势力、成长与战斗规则。快捷键：Tab。" :
                     Texts.ResolveRich(StrategyHintText.Key($"functions-{entries[i].Role}")),
                 Position = new(16, 16 + i * 24), Size = new(88, 24), Disabled = action is null };
             if (action is not null) button.Pressed += action;

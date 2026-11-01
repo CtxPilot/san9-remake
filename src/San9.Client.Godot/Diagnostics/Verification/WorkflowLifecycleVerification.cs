@@ -19,6 +19,7 @@ public partial class WorkflowLifecycleVerification : Node
             CheckWindows();
             CheckMapInputs();
             await CheckModals();
+            CheckCompanionDraft();
             if (System.Environment.GetEnvironmentVariable("SAN9_MODAL_CONTENT") is { Length: > 0 } content) await CheckContentModals(content);
             GD.Print("WORKFLOW_LIFECYCLE_OK windows=normal,hidden,owner-first,host-first,failure inputs=replaced,repeated-release,unowned-exit modals=reused,nested,focus,raw-input,dynamic,teardown");
             GetTree().Quit();

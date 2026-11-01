@@ -523,7 +523,8 @@ public partial class StrategyHud : Control
     }
     public override void _Input(InputEvent @event)
     {
-        if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F10 } &&
+        if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Tab,
+                ShiftPressed: false, CtrlPressed: false, AltPressed: false, MetaPressed: false } &&
             _built && Interaction.CanSave && Session.CanEditWorld)
         {
             SystemMenu.OpenCompanionSettings();
