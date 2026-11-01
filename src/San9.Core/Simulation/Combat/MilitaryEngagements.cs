@@ -181,7 +181,11 @@ internal static class MilitaryEngagements
         world.Engagements(military).Engaged(new(unit.Id, false));
 }
 
-/// <summary>A derived view owned by one mutation; queries never modify it or enumerate the world.</summary>
+// Rules and relations travel together through commits and forks. Mutations drop their own
+// reference when an input changes; previews and discarded branches cannot invalidate their owner.
+internal sealed record EngagementView(MilitaryRulebook Rules, EngagementRelations Relations);
+
+/// <summary>An immutable derived view of identities; live actor state is read from the querying world.</summary>
 internal sealed class EngagementRelations(Dictionary<BattleSource, BattleSource> targets, Dictionary<BattleSource, BattleSource> opponents)
 {
     private readonly ILookup<BattleSource, BattleSource> attackers = targets.ToLookup(pair => pair.Value, pair => pair.Key);

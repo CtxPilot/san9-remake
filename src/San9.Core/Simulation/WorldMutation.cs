@@ -30,8 +30,8 @@ internal sealed partial class WorldMutation : IWorldQuery
     // The countdown pass precedes combat and task execution; new journeys then start counting next date.
     internal bool CurrentDateCountdownConsumed { get; set; }
     private Dictionary<int, int?>? _leadershipBefore;
-    private EngagementRelations? _engagements;
-    private MilitaryRulebook? _engagementRules;
+    private EngagementView? _engagements;
+    internal EngagementView? EngagementCache => _engagements;
     private MovementOccupancy? _movementOccupancy;
     internal IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry) =>
         OccupancyFor(rules).Query(this, owner, policies, movingUnit, entry);
@@ -45,12 +45,9 @@ internal sealed partial class WorldMutation : IWorldQuery
 
     internal EngagementRelations Engagements(MilitaryRulebook military)
     {
-        if (_engagements is null || !ReferenceEquals(_engagementRules, military))
-        {
-            _engagements = MilitaryEngagements.Build(this, military);
-            _engagementRules = military;
-        }
-        return _engagements;
+        if (_engagements is null || !ReferenceEquals(_engagements.Rules, military))
+            _engagements = new(military, MilitaryEngagements.Build(this, military));
+        return _engagements.Relations;
     }
 
     // Leadership is consistent when every place's commander flag and every unit's commander follow from the current
@@ -151,6 +148,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         Companion = companion;
         _leadershipConsistent = owner.LeadershipConsistent;
         GovernanceConsistent = owner.GovernanceConsistent;
+        _engagements = owner.EngagementCache;
         _abilityRules = abilityRules;
         OfficerGrowth = abilityRules.Growth.Resolve(companion);
         _economy = economy;
@@ -408,7 +406,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         if (previous.OwnerId != value.OwnerId || previous.CorpsId != value.CorpsId || previous.ServicePlaceId != value.ServicePlaceId ||
             previous.IsEmbedded != value.IsEmbedded || TransportDestination(previous) != TransportDestination(value))
             GovernanceConsistent = false;
-        if (_engagements is not null && MilitaryEngagements.UnitChanged(previous, value, _engagementRules!)) _engagements = null;
+        if (_engagements is not null && MilitaryEngagements.UnitChanged(previous, value, _engagements.Rules)) _engagements = null;
         Units = Replace(Units, value.Id, value);
         _movementOccupancy?.Set(value);
     }

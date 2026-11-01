@@ -20,6 +20,7 @@ public sealed class WorldState
     /// ones; not saved: a loaded world reselects everything once, as before).</summary>
     internal bool LeadershipConsistent { get; private set; }
     internal bool GovernanceConsistent { get; private set; }
+    internal EngagementView? EngagementCache { get; private set; }
     private ActiveWorldRecords _activeRecords = new(
         ImmutableDictionary<int, ForceState>.Empty, ImmutableDictionary<int, SettlementState>.Empty,
         ImmutableDictionary<int, OfficerState>.Empty);
@@ -123,6 +124,7 @@ public sealed class WorldState
             _activeRecords = _activeRecords,
             Simulation = Simulation, Revision = Revision, _snapshot = _snapshot, LeadershipConsistent = LeadershipConsistent,
             GovernanceConsistent = GovernanceConsistent,
+            EngagementCache = EngagementCache,
             _publishedForces = _publishedForces,
             _publishedSettlements = _publishedSettlements,
             _publishedOfficers = _publishedOfficers,
@@ -186,6 +188,7 @@ public sealed class WorldState
         _activeRecords = mutation.ActiveRecords;
         LeadershipConsistent = mutation.LeadershipConsistentAtCommit;
         GovernanceConsistent = mutation.GovernanceConsistent;
+        EngagementCache = mutation.EngagementCache;
         Clock = mutation.Clock;
         Simulation = mutation.Simulation;
         Revision++;
