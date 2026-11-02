@@ -61,7 +61,7 @@ public static class OfficerDetails
     [
         ["force", "corps", "home", "location", "service", "status"],
         ["office", "capacity", "salary", "loyalty"],
-        ["gender", "personality", "parent", "age", "health"],
+        ["gender", "personality", "affinity", "parent", "age", "health"],
         ["order", "target-person", "target-place", "arrival", "formation", "equipped-tactic"]
     ];
     public static OfficerDetailData Read(StrategySnapshot view, TextCatalog texts, int id)

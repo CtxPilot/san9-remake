@@ -113,6 +113,7 @@ public static class ScenarioContentCompiler
                     ? San9.Core.Domain.CorpsControlMode.Direct : San9.Core.Domain.CorpsControlMode.Automatic }).ToArray(),
             treasureStates)
         {
+            ShowOfficerAges = !header.IgnoresPersonAge,
             MapContextExcludedFacilityIds = ConstructionContentCompiler.MapContextExcludedFacilityIds,
             Tactics = Read(San9ScenarioTacticArchive.ReadKnownRecords)
                 .Select(t => new MilitaryCatalogDefinition(t.Id, text.Tactic(t.Id)) { DescriptionKey = text.TacticDescription(t.Id) }).ToArray(),

@@ -9,6 +9,35 @@ namespace San9.Application.Tests;
 public sealed class InformationBrowserTests
 {
     [Theory]
+    [InlineData(false, true, false, 84, "**", null)]
+    [InlineData(false, false, false, 84, "**", null)]
+    [InlineData(false, false, true, 0, "**", null)]
+    [InlineData(true, true, false, 84, "107", 107L)]
+    [InlineData(true, false, false, 84, "107", 107L)]
+    [InlineData(true, true, true, 84, "107", 107L)]
+    [InlineData(true, true, false, 0, "—", null)]
+    public void AgeVisibilityIsSharedByCatalogAndDetailAndIndependentOfMortality(
+        bool showAges, bool naturalDeaths, bool infiniteLifespan, int birthYear, string expected, long? number)
+    {
+        var definition = G01ScenarioTests.Fixture();
+        definition = definition with { NaturalDeathsEnabled = naturalDeaths,
+            Information = definition.Information with { ShowOfficerAges = showAges } };
+        var session = GameSession.Start(definition, 1,
+            companionSettings: CompanionSettings.Default with { InfiniteLifespan = infiniteLifespan });
+        var world = session.Snapshot with { Officers = session.Snapshot.Officers
+            .Select(o => o.Id == 1 ? o with { BirthYear = birthYear } : o).ToArray() };
+        var view = new StrategySnapshot(definition, world);
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, definition.Officers.Select(o => o.NameKey)
+            .Concat(definition.Settlements.Select(s => s.NameKey)).ToDictionary(key => key, key => key));
+        var table = OfficerCatalog.Read(view, texts, 3, null, null, 1);
+        var age = Assert.Single(table.Rows).Cells[Array.IndexOf(table.Columns, "年龄")];
+        Assert.Equal(new CatalogCell(expected, number, number is null), age);
+        Assert.Equal(expected, OfficerDetails.Read(view, texts, 1).Fields.SelectMany(c => c)
+            .Single(f => f.Label == "年龄").Value);
+        Assert.Equal(birthYear, world.Officers.Single(o => o.Id == 1).BirthYear);
+    }
+
+    [Theory]
     [InlineData(OfficerStatus.Ruler, false)]
     [InlineData(OfficerStatus.Governor, true)]
     [InlineData(OfficerStatus.Strategist, true)]
@@ -210,7 +239,9 @@ public sealed class InformationBrowserTests
         PresentationTacticFixture.AddNames(texts);
         long before = session.Snapshot.Revision;
         var detail = OfficerDetails.Read(session.View, texts, 1);
-        Assert.Equal(new[] { 6, 4, 5, 6 }, detail.Fields.Select(c => c.Length));
+        Assert.Equal(new[] { 6, 4, 6, 6 }, detail.Fields.Select(c => c.Length));
+        Assert.Equal(new[] { "性别", "性格", "相性", "父母", "年龄", "健康" }, detail.Fields[2].Select(f => f.Label));
+        Assert.Equal(session.View.World.Officers.Single(o => o.Id == 1).Affinity.ToString(), detail.Fields[2][2].Value);
         Assert.Equal(session.View.Officers.Single(o => o.Id == 1).Abilities, detail.RadarAbilities);
         Assert.Equal(89, detail.RadarAbilities.War); // Injury 2 recovers to 1 at the opening xun.
         Assert.Equal("90-1", detail.AbilityValues[1]);

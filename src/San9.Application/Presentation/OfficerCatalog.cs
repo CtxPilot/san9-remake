@@ -126,7 +126,8 @@ public static class OfficerCatalog
                         "service" => ruler ? new("—", long.MaxValue)
                             : o.IsServing && person.StatusStartYear is int year ? view.Year - year + 1 : CatalogCell.Unavailable,
                         "parent" => person.ParentId is null ? "" : Person(person.ParentId),
-                        "age" => person.BirthYear > 0 ? view.Year - person.BirthYear + 1 : CatalogCell.Unavailable,
+                        "age" => !view.Information.ShowOfficerAges ? new("**", IsUnavailable: true)
+                            : person.BirthYear > 0 ? view.Year - person.BirthYear + 1 : CatalogCell.Unavailable,
                         "gender" => person.IsFemale ? "女" : "男",
                         "affinity" => person.Affinity,
                         "personality" => new[] { "莽撞", "刚胆", "冷静", "慎重" }[person.Personality],

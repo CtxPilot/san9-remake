@@ -351,6 +351,7 @@ public sealed class StrategySnapshot
 
 public sealed class InformationCatalog(InformationDefinitions definitions)
 {
+    public bool ShowOfficerAges { get; } = definitions.ShowOfficerAges;
     public IReadOnlySet<int> MapContextExcludedFacilityIds { get; } = definitions.MapContextExcludedFacilityIds.ToImmutableHashSet();
     public IReadOnlyList<CountryTitleDefinition> CountryTitles { get; } = Array.AsReadOnly(definitions.CountryTitles.ToArray());
     public IReadOnlyList<MilitaryCatalogDefinition> Tactics { get; } = Array.AsReadOnly(definitions.Tactics.ToArray());
