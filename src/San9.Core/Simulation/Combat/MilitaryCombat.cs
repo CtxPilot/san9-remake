@@ -233,15 +233,17 @@ internal static class MilitaryCombat
     private static bool FinishOpportunities(WorldMutation world, SimulationRules rules, List<DomainEvent> events,
         Exchange exchange, CombatExchangeDamage damage, bool counterAllowed, bool counterOnly = false)
     {
-        if (!counterOnly) CompanionBattleRules.InspireLeader(world, exchange.Source, exchange.Target, rules, events);
         for (int opportunity = counterOnly ? 1 : 0; opportunity < (counterAllowed ? 2 : 1) && world.Simulation.TerminalReason is null; opportunity++)
         {
             bool counter = opportunity == 1;
             var source = counter ? exchange.Target : exchange.Source;
             var target = counter ? exchange.Source : exchange.Target;
             // Neutral and unstaffed garrisons remain targets even though they cannot act as battle sources.
-            if (!source.IsPresent(world) || !target.IsPresent(world) || IsDefeated(world, source) || IsDefeated(world, target)) break;
             var oriented = counter ? damage.Reverse() : damage;
+            if (!source.IsPresent(world) || !target.IsPresent(world) ||
+                !SurvivesOrdinary(world, source, target, oriented.Outgoing) ||
+                !SurvivesOrdinary(world, target, source, oriented.Incoming)) break;
+            if (!counter) CompanionBattleRules.InspireLeader(world, source, target, rules, events);
             bool resolved;
             if (!source.IsSettlement && !target.IsSettlement)
             {
@@ -355,6 +357,14 @@ internal static class MilitaryCombat
         if (damage is not { } pair) return;
         ApplyDamage(world, source, target, pair.Outgoing, military, events, isTacticExchange: isTacticExchange, continuesSiege: pair.OutgoingContinuesSiege);
         ApplyDamage(world, target, source, pair.Incoming, military, events, isTacticExchange: isTacticExchange, continuesSiege: pair.IncomingContinuesSiege);
+    }
+
+    private static bool SurvivesOrdinary(WorldMutation world, BattleSource source, BattleSource target, uint damage)
+    {
+        if (IsDefeated(world, target)) return false;
+        int? owner = target.IsSettlement ? world.Settlements[target.Id].OwnerId : target.Owner(world);
+        uint soldiers = target.Soldiers(world);
+        return FinalDamage(world, source, owner, damage, soldiers) < soldiers;
     }
 
     internal static void ApplyDamage(WorldMutation world, BattleSource source, BattleSource target, uint damage,

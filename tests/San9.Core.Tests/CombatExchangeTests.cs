@@ -136,7 +136,7 @@ public sealed class CombatExchangeTests
     [InlineData(true, 15, true, 10000u, 0, 4595u, 4095u, 4095u)]
     [InlineData(true, 1, true, 10000u, 100, 1546u, 546u, 546u)]
     [InlineData(false, 10, false, 700u, 0, 700u, 200u, 1050u)]
-    [InlineData(false, 10, false, 400u, 0, 400u, 0u, 1050u)]
+    [InlineData(false, 10, false, 501u, 0, 501u, 1u, 1050u)]
     public void TacticNumbersExcludeOrdinaryDamageAfterModifiersAndCapacity(bool doubled, int effect, bool abnormal,
         uint soldiers, int bonus, uint total, uint pure, uint calculatedPure)
     {
@@ -253,18 +253,93 @@ public sealed class CombatExchangeTests
     }
 
     [Theory]
-    [InlineData(TacticEffect.Martial)]
-    [InlineData(TacticEffect.Confusion)]
-    public void LethalOrdinaryLossesRetainTheChosenActivationUntilBothSidesAreSettled(TacticEffect effect)
+    [InlineData("field", TacticEffect.Martial, false)]
+    [InlineData("field", TacticEffect.Martial, true)]
+    [InlineData("naval", TacticEffect.Martial, false)]
+    [InlineData("assault", TacticEffect.Martial, false)]
+    [InlineData("facility", TacticEffect.Martial, false)]
+    [InlineData("field", TacticEffect.Confusion, false)]
+    [InlineData("facility", TacticEffect.Inspire, true)]
+    public void LethalOrdinaryLossesCloseOpportunitiesBeforeAnyActivation(string path, TacticEffect effect, bool sourceLoses)
     {
-        var (world, rules, source, target) = Create(effect: effect);
+        var (world, rules, source, target) = Create(path, effect);
+        var m = world.BeginMutation();
+        var loser = sourceLoses ? source : target;
+        if (loser.IsSettlement)
+        {
+            m.Replace(m.Settlements[loser.Id] with { Soldiers = 1 });
+            var winner = sourceLoses ? target : source;
+            m.Replace(m.Units[winner.Id] with { Order = MilitaryCombat.TargetOrder(loser) });
+        }
+        else m.Replace(m.Units[loser.Id] with { Soldiers = 1 });
+        if (effect == TacticEffect.Inspire) m.Replace(m.Settlements[source.Id] with { Morale = 79 });
+        uint outgoing = MilitaryCombat.NormalDamage(m, source, target, rules.Military!);
+        uint incoming = MilitaryCombat.NormalDamage(m, target, source, rules.Military!);
+        var random = m.Simulation.RandomStreams;
+        List<DomainEvent> events = [];
+
+        Assert.True(MilitaryCombat.BeginExchange(m, source, target, rules, events, world.Clock, () => new([], [], [])));
+
+        Assert.DoesNotContain(events, e => e is TacticActivatedEvent or DuelStartedEvent);
+        Assert.DoesNotContain(events.OfType<TacticProficiencyGrownEvent>(), e => e.Category == rules.Military!.Tactics[9000].Category);
+        Assert.All(m.Officers.Values, p => Assert.Equal(0, p.TacticCooldown));
+        Assert.All(m.Simulation.RandomStreams.Where(r => r.Name.StartsWith("military-tactic-", StringComparison.Ordinal) || r.Name == "duel-trigger"),
+            stream => Assert.Contains(stream, random));
+        var hits = events.OfType<BattleDamageEvent>().ToArray();
+        Assert.Equal(2, hits.Length);
+        Assert.Equal(outgoing, hits[0].SoldierLoss);
+        Assert.Equal(incoming, hits[1].SoldierLoss);
+        Assert.All(hits, hit =>
+        {
+            Assert.False(hit.IsTacticExchange);
+            Assert.Null(hit.TacticId);
+            Assert.Equal(hit.SoldierLoss, hit.AddedWounded + hit.Dead);
+        });
+        if (!loser.IsSettlement) Assert.False(m.Units.ContainsKey(loser.Id));
+        else Assert.NotEqual(loser.Id, m.Settlements[loser.Id].OwnerId);
+    }
+
+    [Theory]
+    [InlineData(31, false)]
+    [InlineData(32, true)]
+    public void OrdinarySurvivalUsesTheFinalComputerDamageAtTheLethalBoundary(int bonus, bool lethal)
+    {
+        var (world, rules, source, target) = Create();
+        var m = world.BeginMutation();
+        const uint soldiers = 200;
+        m.Replace(m.Units[target.Id] with { Soldiers = soldiers });
+        m.SetSimulation(m.Simulation with { ComputerDamageBonusPercent = bonus, Controls = [new("player", 2, ControllerKind.Player)] });
+        List<DomainEvent> events = [];
+
+        Assert.True(MilitaryCombat.BeginExchange(m, source, target, rules, events, world.Clock, () => new([], [], [])));
+
+        var ordinaryHit = Assert.Single(events.OfType<BattleDamageEvent>(), e => e.TargetUnitId == target.Id && e.TacticId is null);
+        Assert.Equal(lethal ? soldiers : soldiers - 1, ordinaryHit.SoldierLoss);
+        if (lethal)
+        {
+            Assert.DoesNotContain(events, e => e is TacticActivatedEvent);
+            Assert.Equal(0, m.Officers[11].TacticCooldown);
+        }
+        else
+        {
+            Assert.Single(events.OfType<TacticActivatedEvent>());
+            var tacticHit = Assert.Single(events.OfType<BattleDamageEvent>(), e => e.TacticId is not null);
+            Assert.Equal(1u, tacticHit.SoldierLoss);
+        }
+    }
+
+    [Fact]
+    public void MutuallyLethalOrdinaryLossesSettleBothSidesWithoutAnActivation()
+    {
+        var (world, rules, source, target) = Create();
         var m = world.BeginMutation();
         m.Replace(m.Units[source.Id] with { Soldiers = 1 });
         m.Replace(m.Units[target.Id] with { Soldiers = 1 });
         List<DomainEvent> events = [];
+
         Assert.True(MilitaryCombat.BeginExchange(m, source, target, rules, events, world.Clock, () => new([], [], [])));
-        var activation = Assert.Single(events.OfType<TacticActivatedEvent>());
-        Assert.All(events.OfType<UnitTerminatedEvent>(), e => Assert.True(events.IndexOf(activation) < events.IndexOf(e)));
+
+        Assert.DoesNotContain(events, e => e is TacticActivatedEvent);
         Assert.Equal(2, events.OfType<UnitTerminatedEvent>().Count());
         Assert.Empty(m.Units);
         Assert.Equal(2, events.OfType<BattleDamageEvent>().Where(e => e.TacticId is null).Sum(e => (long)e.SoldierLoss));
