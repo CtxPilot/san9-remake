@@ -86,18 +86,19 @@ public static class StrategicContext
             var borders = view.TerritoryConnections();
             SettlementView[] Neighbors(SettlementView source) => owned.Where(s => s.Id != source.Id && world.Settlements.Single(p => p.Id == s.Id).CanHostPersons &&
                 borders.Any(b => b.FromRegionId == source.Id && b.ToRegionId == s.Id || b.ToRegionId == source.Id && b.FromRegionId == s.Id)).ToArray();
-            // Frontier candidates are friendly places adjacent to a foreign occupied place; an active attack is not required.
-            var threatened = owned.Where(s => borders.Any(b => (b.FromRegionId == s.Id || b.ToRegionId == s.Id) &&
-                view.Settlements.Any(other => other.Id == (b.FromRegionId == s.Id ? b.ToRegionId : b.FromRegionId) &&
-                    other.OwnerId is int owner && MilitaryDiplomacy.AutomaticEnemy(world,force.Id,owner) && !other.IsDestroyed && !other.IsUnderConstruction))).ToArray();
-            var largest = threatened.OrderByDescending(s => s.Soldiers).ThenBy(s => s.Id).FirstOrDefault();
+            // Compare hostile garrisons with adjacent player-owned places, without requiring an active attack.
+            var enemies = view.Settlements.Where(s => s.OwnerId is int owner &&
+                MilitaryDiplomacy.AutomaticEnemy(world,force.Id,owner) && !s.IsDestroyed && !s.IsUnderConstruction &&
+                world.Settlements.Single(p => p.Id == s.Id).CanHostPersons && Neighbors(s).Length > 0)
+                .OrderByDescending(s => s.Soldiers).ThenBy(s => s.Id).ToArray();
+            var largest = enemies.FirstOrDefault();
             if (largest is { Soldiers: >= 20000 } && Neighbors(largest).OrderBy(s => s.Soldiers).FirstOrDefault() is { } weak &&
                 3L * weak.Soldiers <= largest.Soldiers)
-            { Add("reinforce-from", largest.Id, City(largest.Id), otherPlace: weak.Id); return Finish(); }
-            var undefended = threatened.FirstOrDefault(s => !world.Units.Any(u => u.OwnerId == force.Id && u.ServicePlaceId == s.Id));
+            { Add("reinforce-from", largest.Id, City(largest.Id), enemy: largest.OwnerId, otherPlace: weak.Id); return Finish(); }
+            var undefended = enemies.FirstOrDefault(s => !world.Units.Any(u => u.OwnerId == force.Id && u.ServicePlaceId == s.Id));
             if (undefended is not null && Neighbors(undefended).OrderByDescending(s => s.Soldiers).FirstOrDefault() is { } strongNeighbor &&
                 strongNeighbor.Soldiers >= 3L * undefended.Soldiers)
-            { Add("reinforce-to", undefended.Id, City(undefended.Id), otherPlace: strongNeighbor.Id); return Finish(); }
+            { Add("reinforce-to", undefended.Id, City(undefended.Id), enemy: undefended.OwnerId, otherPlace: strongNeighbor.Id); return Finish(); }
             var outlook = view.PlayerEconomicOutlook;
             if (outlook?.Food.Sufficient == false) { Add("food-shortage"); return Finish(); }
             if (outlook?.Money.Sufficient == false) { Add("money-shortage"); return Finish(); }

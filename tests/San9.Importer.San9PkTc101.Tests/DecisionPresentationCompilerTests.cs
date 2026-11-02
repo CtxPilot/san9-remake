@@ -20,6 +20,8 @@ public sealed class DecisionPresentationCompilerTests
         Assert.Equal("messages.6123", decisions.Shared["gift-corps-confirmation"].Key);
         Assert.Equal("conflict-corps-leader", decisions.Shared["gift-corps-confirmation"].Bindings["person.0"]);
         var progress = ExecutionPresentationCompiler.Compile();
+        foreach (string role in new[] { "enemy-city", "enemy-place", "reinforce-from", "reinforce-to" })
+            Assert.Equal("enemy-force", progress.Context[role].Bindings["force.0"]);
         foreach (var (role, key) in new[] { ("diplomacy-units-returned", "messages.7447"), ("diplomacy-corps-cleared", "messages.7448") })
         {
             Assert.Equal(key, progress.Records[role].Key); Assert.Equal(key, progress.Feedback[role].Key);
