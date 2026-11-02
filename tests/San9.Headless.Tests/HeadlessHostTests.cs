@@ -94,6 +94,8 @@ public sealed class HeadlessHostTests : IDisposable
             BattleDeathProtectionThreshold = 125, AllowCommanderBattleDeaths = true, DuelDeathCoefficient = 5,
             DisablePlayerPrisonerExecution = true, DisableComputerPrisonerExecution = false,
             InfiniteLifespan = true,
+            ComputerDiplomacyPermissions = new() { Gift = false, RequestAttack = false, Surrender = false },
+            PlayerDelegatedDiplomacyPermissions = new() { ReturnPrisoner = false },
         });
         var header = CommandLogService.CreateHeader(session);
         var end = session.Request(new EndControlOperation());

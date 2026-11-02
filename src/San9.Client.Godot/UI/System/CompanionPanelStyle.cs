@@ -31,12 +31,12 @@ internal static class CompanionPanelStyle
         theme.SetColor("selection_color", "LineEdit", new("465c74"));
 
         var tabBody = Surface("1b212a", "1b212a", 0);
-        tabBody.ContentMarginTop = 14;
+        tabBody.ContentMarginTop = 8;
         theme.SetStylebox("panel", "TabContainer", tabBody);
-        theme.SetStylebox("tab_selected", "TabContainer", Surface("344151", "536478", 6, 18, 8));
-        theme.SetStylebox("tab_unselected", "TabContainer", Surface("232b36", "232b36", 6, 18, 8));
-        theme.SetStylebox("tab_hovered", "TabContainer", Surface("2c3745", "465669", 6, 18, 8));
-        theme.SetStylebox("tab_disabled", "TabContainer", Surface("202731", "202731", 6, 18, 8));
+        theme.SetStylebox("tab_selected", "TabContainer", Surface("344151", "536478", 6, 18, 6));
+        theme.SetStylebox("tab_unselected", "TabContainer", Surface("232b36", "232b36", 6, 18, 6));
+        theme.SetStylebox("tab_hovered", "TabContainer", Surface("2c3745", "465669", 6, 18, 6));
+        theme.SetStylebox("tab_disabled", "TabContainer", Surface("202731", "202731", 6, 18, 6));
         theme.SetStylebox("tab_focus", "TabContainer", Focus());
         theme.SetColor("font_selected_color", "TabContainer", new("f0d3a3"));
         theme.SetColor("font_unselected_color", "TabContainer", new("aab6c5"));
@@ -50,7 +50,25 @@ internal static class CompanionPanelStyle
         return theme;
     }
 
-    internal static StyleBoxFlat Card() => Surface("252e3a", "3b495b", 8, 18, 16);
+    internal static StyleBoxFlat Card() => Surface("252e3a", "3b495b", 8, 14, 10);
+
+    internal static PanelContainer SectionHeading(string title)
+    {
+        var style = Surface("263d49", "61c9da", 6, 14, 6);
+        style.BorderWidthLeft = 4;
+        style.BorderWidthRight = style.BorderWidthTop = style.BorderWidthBottom = 0;
+        var banner = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        banner.AddThemeStyleboxOverride("panel", style);
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        row.AddThemeConstantOverride("separation", 18); banner.AddChild(row);
+        var heading = new Label { Text = title };
+        heading.AddThemeFontSizeOverride("font_size", 18);
+        heading.AddThemeColorOverride("font_color", new("a4e3ed")); row.AddChild(heading);
+        row.AddChild(new ColorRect { Color = new("4e7e8d"), CustomMinimumSize = new(0, 1),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Ignore });
+        return banner;
+    }
 
     internal static void Toggle(Button button)
     {

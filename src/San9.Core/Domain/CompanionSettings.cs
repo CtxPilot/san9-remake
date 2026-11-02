@@ -19,6 +19,8 @@ public sealed record CompanionSettings
     [JsonRequired] public int ComputerHarvestPercent { get; init; } = 100;
     [JsonRequired] public AutomaticStrategyPermissions ComputerStrategyPermissions { get; init; } = AutomaticStrategyPermissions.All;
     [JsonRequired] public AutomaticStrategyPermissions PlayerDelegatedStrategyPermissions { get; init; } = AutomaticStrategyPermissions.All;
+    [JsonRequired] public AutomaticDiplomacyPermissions ComputerDiplomacyPermissions { get; init; } = AutomaticDiplomacyPermissions.All;
+    [JsonRequired] public AutomaticDiplomacyPermissions PlayerDelegatedDiplomacyPermissions { get; init; } = AutomaticDiplomacyPermissions.All;
     [JsonRequired] public bool DynamicOfficerAbilityGrowth { get; init; }
     [JsonRequired] public bool InfiniteLifespan { get; init; }
     [JsonRequired] public int OfficerAbilityCap { get; init; } = 100;
@@ -67,6 +69,8 @@ public sealed record CompanionSettings
             throw new ArgumentOutOfRangeException(nameof(NoRetreatCaptureBonus), "The capture bonus must be between 0 and 100 percentage points.");
         ArgumentNullException.ThrowIfNull(ComputerStrategyPermissions);
         ArgumentNullException.ThrowIfNull(PlayerDelegatedStrategyPermissions);
+        ArgumentNullException.ThrowIfNull(ComputerDiplomacyPermissions);
+        ArgumentNullException.ThrowIfNull(PlayerDelegatedDiplomacyPermissions);
         if (OfficerAbilityCap < 100)
             throw new ArgumentOutOfRangeException(nameof(OfficerAbilityCap), "The base ability cap must be at least 100.");
         if (MartialTacticDamageCoefficient is < 5 or > 10)

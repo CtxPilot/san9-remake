@@ -12,8 +12,11 @@ public partial class CompanionSettingsView
         Func<CompanionSettings, int> Read, Func<CompanionSettings, int, CompanionSettings> Write,
         string Suffix = "", int? PresetValue = null) : Option(Title, Note);
     private sealed record NumberGroupOption(string Title, string Note, NumericOption[] Fields, int Width) : Option(Title, Note);
-    private sealed record SectionDefinition(string? Title, Option[] Options);
-    private sealed record PageDefinition(string Title, SectionDefinition[] Sections, bool HasStrategyPermissions = false);
+    private sealed record FormationAppearanceOption() : Option("阵型差异外观",
+        "普通八阵的中央兵群使用不同兵模，锥行、锋矢中央复用原版骑兵数量与站位，外围保留普通士兵。关闭面板后生效。");
+    private sealed record SectionDefinition(string Title, Option[] Options,
+        Func<bool, IEnumerable<ToggleOption>>? Permissions = null);
+    private sealed record PageDefinition(string Title, SectionDefinition[] Sections);
 
     private static readonly NumericOption[] IncomeOptions =
     [
@@ -47,7 +50,7 @@ public partial class CompanionSettingsView
     [
         new("辅助",
         [
-            new(null,
+            new("自动安排与汇报",
             [
                 new ToggleOption("玩家自动内政", "每旬结束操作时，使用直辖军团的闲置武将依次安排训练、修筑、商业、开垦和巡察。",
                     settings => settings.PlayerAutoDomesticEnabled,
@@ -65,10 +68,14 @@ public partial class CompanionSettingsView
                     settings => settings.ConfigureTacticsOnFormationSelection,
                     (settings, value) => settings with { ConfigureTacticsOnFormationSelection = value }),
             ]),
+            new("地图外观",
+            [
+                new FormationAppearanceOption(),
+            ]),
         ]),
         new("势力",
         [
-            new(null,
+            new("钱粮与合并",
             [
                 new NumberGroupOption("电脑钱粮收入倍率",
                     "资金按季度收入，兵粮在七月收获。两项均默认100%，200%为双倍，0%停止对应收入；适用于普通电脑势力。",
@@ -77,10 +84,12 @@ public partial class CompanionSettingsView
                     settings => settings.DisableComputerForceConsolidation,
                     (settings, value) => settings with { DisableComputerForceConsolidation = value }),
             ]),
+            new("自动计略", [], StrategyPermissions),
+            new("自动外交", [], DiplomacyPermissions),
         ]),
-        new("成长",
+        new("武将",
         [
-            new(null,
+            new("能力与寿命",
             [
                 new NumericOption("武将基础能力上限", "默认100，125为原伴侣预设。普通成长、事件奖励和武将编辑统一使用此值，已有超限能力不倒扣。",
                     100, int.MaxValue, settings => settings.OfficerAbilityCap,
@@ -91,6 +100,9 @@ public partial class CompanionSettingsView
                 new ToggleOption("无限寿命", "所有武将不因寿命自然死亡；战死、处斩及剧情死亡仍按各自规则处理。关闭后从下一次季度判定恢复，超龄武将可能寿终。",
                     settings => settings.InfiniteLifespan,
                     (settings, value) => settings with { InfiniteLifespan = value }),
+            ]),
+            new("熟练度成长",
+            [
                 new ToggleOption("分档增加兵法熟练度", "精通加成之后，熟练度增量乘以max(1, 4−当前熟练度÷250)÷3。越熟练增长越慢。",
                     settings => settings.DynamicTacticProficiencyGrowth,
                     (settings, value) => settings with { DynamicTacticProficiencyGrowth = value }),
@@ -101,8 +113,28 @@ public partial class CompanionSettingsView
                     settings => settings.DisableDailyCombatProficiencyGain,
                     (settings, value) => settings with { DisableDailyCombatProficiencyGain = value }),
             ]),
+            new("阵亡",
+            [
+                new NumericOption("免阵亡能力门槛", "基础统率、武力、智力、政治任一项达到此值时免于战斗阵亡。默认80，预设125；0保护所有武将，与成长上限独立。战斗阵亡须在PK设定中开启。",
+                    0, int.MaxValue, settings => settings.BattleDeathProtectionThreshold,
+                    (settings, value) => settings with { BattleDeathProtectionThreshold = value }, PresetValue: 125),
+                new ToggleOption("部队主将可阵亡", "允许部队主将参与单挑、混战和阻击的阵亡判定，仍受能力门槛与原有豁免保护；单挑中主将仍不会被俘。",
+                    settings => settings.AllowCommanderBattleDeaths,
+                    (settings, value) => settings with { AllowCommanderBattleDeaths = value }),
+                new NumericOption("单挑阵亡系数", "范围0～10，默认0。单挑阵亡概率为min(30, 80+4×系数−有效武力)%；仍受阵亡资格限制。",
+                    0, 10, settings => settings.DuelDeathCoefficient,
+                    (settings, value) => settings with { DuelDeathCoefficient = value }),
+            ]),
+            new("俘虏处置",
+            [
+                new ToggleOption("禁止玩家势力处斩俘虏", "玩家势力不能处斩普通俘虏，包含手动处斩及委任军团；不包括君主处置。",
+                    settings => settings.DisablePlayerPrisonerExecution,
+                    (settings, value) => settings with { DisablePlayerPrisonerExecution = value }),
+                new ToggleOption("禁止电脑势力处斩俘虏", "电脑势力及其军团不能处斩普通俘虏；不包括君主处置。",
+                    settings => settings.DisableComputerPrisonerExecution,
+                    (settings, value) => settings with { DisableComputerPrisonerExecution = value }),
+            ]),
         ]),
-        new("计略", [], HasStrategyPermissions: true),
         new("兵法",
         [
             new("发动",
@@ -144,10 +176,31 @@ public partial class CompanionSettingsView
                         0, 10, settings => settings.SnipingChanceCoefficient,
                         (settings, value) => settings with { SnipingChanceCoefficient = value })),
             ]),
+            new("设施兵法",
+            [
+                new ToggleOption("港口、城塞连射，阵齐射", "按配置预设：港口、城塞发动连射，阵发动齐射。",
+                    settings => settings.UseFacilityTacticPreset,
+                    (settings, value) => settings with { UseFacilityTacticPreset = value }),
+                new ToggleOption("减半设施智力兵法间隔", "设施发动智力兵法、鼓舞或治疗后，发动者的兵法间隔减半并向下取整。",
+                    settings => settings.HalveFacilityIntelligenceCooldown,
+                    (settings, value) => settings with { HalveFacilityIntelligenceCooldown = value }),
+            ]),
+            new("水军兵法",
+            [
+                new ToggleOption("艨艟可以发动箭雨", "近距离优先强袭，否则改用箭雨，包括攻击设施。",
+                    settings => settings.EnableNavalTacticFallback,
+                    (settings, value) => settings with { EnableNavalTacticFallback = value }),
+                new ToggleOption("斗舰不能发动箭岚", "从斗舰的自动船型兵法中移除箭岚，保留强攻。不改变电脑选船策略。",
+                    settings => settings.SuppressAdvancedNavalTactic,
+                    (settings, value) => settings with { SuppressAdvancedNavalTactic = value }),
+                new ToggleOption("调整水军兵法发动率", "未习得当前船只对应技术的首发武将，有一半几率失去本次兵法机会；不影响智力兵法带动的后续兵法。",
+                    settings => settings.RequireNavalTacticTraining,
+                    (settings, value) => settings with { RequireNavalTacticTraining = value }),
+            ]),
         ]),
-        new("攻防",
+        new("战斗",
         [
-            new(null,
+            new("伤害与防御",
             [
                 new ToggleOption("兵数与统率增加兵法伤害", "兵力至少一万时，按发动武将超过60的统率和当前兵力提高武力兵法伤害；设施按守军兵力计算。",
                     settings => settings.BoostMartialTacticDamage,
@@ -174,46 +227,7 @@ public partial class CompanionSettingsView
                     0, int.MaxValue, settings => settings.CityBattleDamagePercent,
                     (settings, value) => settings with { CityBattleDamagePercent = value }, "%"),
             ]),
-        ]),
-        new("设施舰船",
-        [
-            new(null,
-            [
-                new ToggleOption("港口、城塞连射，阵齐射", "按配置预设：港口、城塞发动连射，阵发动齐射。",
-                    settings => settings.UseFacilityTacticPreset,
-                    (settings, value) => settings with { UseFacilityTacticPreset = value }),
-                new ToggleOption("减半设施智力兵法间隔", "设施发动智力兵法、鼓舞或治疗后，发动者的兵法间隔减半并向下取整。",
-                    settings => settings.HalveFacilityIntelligenceCooldown,
-                    (settings, value) => settings with { HalveFacilityIntelligenceCooldown = value }),
-                new ToggleOption("艨艟可以发动箭雨", "近距离优先强袭，否则改用箭雨，包括攻击设施。",
-                    settings => settings.EnableNavalTacticFallback,
-                    (settings, value) => settings with { EnableNavalTacticFallback = value }),
-                new ToggleOption("斗舰不能发动箭岚", "从斗舰的自动船型兵法中移除箭岚，保留强攻。不改变电脑选船策略。",
-                    settings => settings.SuppressAdvancedNavalTactic,
-                    (settings, value) => settings with { SuppressAdvancedNavalTactic = value }),
-                new ToggleOption("调整水军兵法发动率", "未习得当前船只对应技术的首发武将，有一半几率失去本次兵法机会；不影响智力兵法带动的后续兵法。",
-                    settings => settings.RequireNavalTacticTraining,
-                    (settings, value) => settings with { RequireNavalTacticTraining = value }),
-            ]),
-        ]),
-        new("阵亡",
-        [
-            new(null,
-            [
-                new NumericOption("免阵亡能力门槛", "基础统率、武力、智力、政治任一项达到此值时免于战斗阵亡。默认80，预设125；0保护所有武将，与成长上限独立。战斗阵亡须在PK设定中开启。",
-                    0, int.MaxValue, settings => settings.BattleDeathProtectionThreshold,
-                    (settings, value) => settings with { BattleDeathProtectionThreshold = value }, PresetValue: 125),
-                new ToggleOption("部队主将可阵亡", "允许部队主将参与单挑、混战和阻击的阵亡判定，仍受能力门槛与原有豁免保护；单挑中主将仍不会被俘。",
-                    settings => settings.AllowCommanderBattleDeaths,
-                    (settings, value) => settings with { AllowCommanderBattleDeaths = value }),
-                new NumericOption("单挑阵亡系数", "范围0～10，默认0。单挑阵亡概率为min(30, 80+4×系数−有效武力)%；仍受阵亡资格限制。",
-                    0, 10, settings => settings.DuelDeathCoefficient,
-                    (settings, value) => settings with { DuelDeathCoefficient = value }),
-            ]),
-        ]),
-        new("俘虏",
-        [
-            new(null,
+            new("俘获",
             [
                 new ToggleOption("四维最高值计算俘获率", "开启后使用当前有效统率、武力、智力、政治的最高值计算个人俘获率，关闭时使用有效武力。",
                     settings => settings.UseHighestAbilityForCapture,
@@ -221,12 +235,6 @@ public partial class CompanionSettingsView
                 new NumericOption("无退路俘获加成", "无其他有效城市可退时，在常规俘获率上按百分点增加此数值，最终最多100%。默认100保持必俘，0按常规概率。",
                     0, 100, settings => settings.NoRetreatCaptureBonus,
                     (settings, value) => settings with { NoRetreatCaptureBonus = value }, "%", PresetValue: 0),
-                new ToggleOption("禁止玩家势力处斩俘虏", "玩家势力不能处斩普通俘虏，包含手动处斩及委任军团；不包括君主处置。",
-                    settings => settings.DisablePlayerPrisonerExecution,
-                    (settings, value) => settings with { DisablePlayerPrisonerExecution = value }),
-                new ToggleOption("禁止电脑势力处斩俘虏", "电脑势力及其军团不能处斩普通俘虏；不包括君主处置。",
-                    settings => settings.DisableComputerPrisonerExecution,
-                    (settings, value) => settings with { DisableComputerPrisonerExecution = value }),
             ]),
         ]),
     ];
@@ -242,4 +250,30 @@ public partial class CompanionSettingsView
         (AutomaticStrategyKind.Inspire, "激励", "恢复己方部队的士气。"),
         (AutomaticStrategyKind.Reinforce, "救援", "向己方部队派遣援兵。"),
     ];
+
+    private static readonly (AutomaticDiplomacyKind Kind, string Title, string Note)[] DiplomacyOptions =
+    [
+        (AutomaticDiplomacyKind.Gift, "赠与", "自动向其他势力赠送资金、兵粮或宝物。只影响后续自动派遣，手动命令与在途任务不受影响。"),
+        (AutomaticDiplomacyKind.RequestAttack, "请求", "自动请求其他势力出兵。只影响后续自动派遣，不影响手动请求、在途任务和已成立请求的履约。"),
+        (AutomaticDiplomacyKind.ReturnPrisoner, "交还", "自动派遣使者请求交还本方俘虏。只影响后续自动派遣，手动命令与在途任务不受影响。"),
+        (AutomaticDiplomacyKind.Surrender, "劝降", "自动劝说其他势力投降。只影响后续自动派遣，手动命令与在途任务不受影响。"),
+    ];
+
+    private static IEnumerable<ToggleOption> StrategyPermissions(bool delegated) => StrategyOptions.Select(option =>
+        new ToggleOption(option.Title, option.Note,
+            settings => (delegated ? settings.PlayerDelegatedStrategyPermissions : settings.ComputerStrategyPermissions).Allows(option.Kind),
+            (settings, allowed) => delegated
+                ? settings with { PlayerDelegatedStrategyPermissions = settings.PlayerDelegatedStrategyPermissions.WithAllowed(option.Kind, allowed) }
+                : settings with { ComputerStrategyPermissions = settings.ComputerStrategyPermissions.WithAllowed(option.Kind, allowed) },
+            EnabledText: "允许", DisabledText: "禁止",
+            PresetValue: option.Kind is not (AutomaticStrategyKind.Alienate or AutomaticStrategyKind.Gossip or
+                AutomaticStrategyKind.Burn or AutomaticStrategyKind.Seize)));
+
+    private static IEnumerable<ToggleOption> DiplomacyPermissions(bool delegated) => DiplomacyOptions.Select(option =>
+        new ToggleOption(option.Title, option.Note,
+            settings => (delegated ? settings.PlayerDelegatedDiplomacyPermissions : settings.ComputerDiplomacyPermissions).Allows(option.Kind),
+            (settings, allowed) => delegated
+                ? settings with { PlayerDelegatedDiplomacyPermissions = settings.PlayerDelegatedDiplomacyPermissions.WithAllowed(option.Kind, allowed) }
+                : settings with { ComputerDiplomacyPermissions = settings.ComputerDiplomacyPermissions.WithAllowed(option.Kind, allowed) },
+            EnabledText: "允许", DisabledText: "禁止", PresetValue: option.Kind == AutomaticDiplomacyKind.ReturnPrisoner));
 }
