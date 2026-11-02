@@ -8,6 +8,29 @@ namespace San9.Client.Godot.Tests;
 
 public sealed class TurnPresentationTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AdvanceUsesTheSameTurnAndRejectsRepeatedRequestsWithOrWithoutConfirmation(bool requireConfirmation)
+    {
+        var session = Session();
+        long started = session.Snapshot.Clock.DayNumber;
+        int titles = 0;
+        var turn = new TurnPresentation(session) { ExecutionTitleStarted = () => titles++ };
+
+        Assert.True(turn.Request(requireConfirmation));
+        Assert.Equal(requireConfirmation ? TurnScreen.Confirmation : TurnScreen.Entering, turn.Screen);
+        Assert.False(turn.Request(requireConfirmation));
+        if (requireConfirmation) turn.Confirm();
+        turn.Confirm();
+        Assert.Equal(1, titles);
+        Assert.Equal(TurnScreen.Entering, turn.Screen);
+
+        Finish(turn);
+        Assert.Equal(TurnScreen.Strategy, turn.Screen);
+        Assert.Equal(started + 10, session.Snapshot.Clock.DayNumber);
+    }
+
     [Fact]
     public void NewGameWaitsForPresentationThenCompletesTheStrategyTitleBeforeEntrance()
     {

@@ -525,6 +525,16 @@ public partial class StrategyHud : Control
     }
     public override void _Input(InputEvent @event)
     {
+        if (@event is InputEventKey { Keycode: Key.Space,
+                ShiftPressed: false, CtrlPressed: false, AltPressed: false, MetaPressed: false } space &&
+            _built && Interaction.CanAdvance && GetWindow().HasFocus() &&
+            GetViewport().GuiGetFocusOwner() is not (LineEdit or TextEdit))
+        {
+            // Own the whole key gesture before a focused HUD button can activate.
+            GetViewport().SetInputAsHandled();
+            if (space.Pressed && !space.Echo) RequestAdvance(requireConfirmation: false);
+            return;
+        }
         if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Tab,
                 ShiftPressed: false, CtrlPressed: false, AltPressed: false, MetaPressed: false } &&
             _built && Interaction.CanSave && Session.CanEditWorld)

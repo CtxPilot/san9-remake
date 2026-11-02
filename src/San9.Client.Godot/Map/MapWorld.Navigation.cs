@@ -65,6 +65,25 @@ public partial class MapWorld
             MoveWorld(movement.X, movement.Y);
     }
 
+    private bool UpdateKeyboardScrolling(double delta)
+    {
+        if (!NavigationAvailable || _mapDrag.IsHeld || Input.IsMouseButtonPressed(MouseButton.Middle) ||
+            GetViewport().GuiGetFocusOwner() is LineEdit or TextEdit ||
+            Input.IsKeyPressed(Key.Ctrl) || Input.IsKeyPressed(Key.Alt) ||
+            Input.IsKeyPressed(Key.Meta) || Input.IsKeyPressed(Key.Shift)) return false;
+
+        var direction = new EdgeScrollDirection(
+            (Input.IsPhysicalKeyPressed(Key.D) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) ? 1 : 0),
+            (Input.IsPhysicalKeyPressed(Key.S) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) ? 1 : 0));
+        if (direction.IsNone) return false;
+
+        _edgeScroll.CancelGesture();
+        _edgeCursor.Show(default, false);
+        var movement = EdgeScrollController.Displacement(direction, delta, RequestedZoom, IsVisibleReady);
+        if (movement != default) MoveWorld(movement.X, movement.Y);
+        return true;
+    }
+
     private bool HandleNavigationKey(InputEvent input)
     {
         if (input is not InputEventKey { Keycode: Key.F8, Pressed: true, Echo: false } || !NavigationAvailable) return false;
