@@ -168,7 +168,7 @@ public sealed class BattleRoutingTests
         var snapshot = System.Text.Json.JsonSerializer.Deserialize<WorldSnapshot>(
             CanonicalJson.Text(first.Snapshot), CanonicalJson.Options)!;
         var second = new SimulationEngine(WorldState.Restore(snapshot), rules);
-        Assert.Equal(new(ArrivalEstimateStatus.Incomplete), new MilitaryArrivalForecast(snapshot, rules.Military!).Estimate(5));
+        Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(snapshot, rules.Military!).Estimate(5).Status);
         first.EndControl(new("player"));
         second.EndControl(new("player"));
         EventAssert.Equal(first.AdvanceXun().Events, second.AdvanceXun().Events);

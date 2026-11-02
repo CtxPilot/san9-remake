@@ -141,9 +141,9 @@ public sealed class FacilityConstructionTests
     }
 
     [Theory]
-    [InlineData(24)]
-    [InlineData(25)]
-    public void ConstructionFindsClearArrivalAfterShoreFootprintExpansion(int startX)
+    [InlineData(24, 2)]
+    [InlineData(25, 0)]
+    public void ConstructionFindsClearArrivalAfterShoreFootprintExpansion(int startX, int routeDays)
     {
         var rules = new MilitaryRulebook(new(10, 10,
             Enumerable.Range(0, 100).Select(i => i % 10 < 5 && i / 10 >= 5 ? 1 : 0).ToImmutableArray(),
@@ -174,14 +174,15 @@ public sealed class FacilityConstructionTests
         var site = new MapOccupancy(new(27, 22), new(4, 4));
         Assert.Equal(startX == 25, MilitaryCombat.Area(builder, rules).Overlaps(site));
         var estimate = new MilitaryArrivalForecast(snapshot, rules, geography.RegionCities, TreasureRulebook.Empty).Estimate(0);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 1), estimate);
+        // Coarse route time does not predict the final footprint adjustment across the shore.
+        Assert.Equal(new(ArrivalEstimateStatus.Known, routeDays), estimate);
         var world = state.BeginMutation();
         List<DomainEvent> events = [];
         FacilityConstruction.AdvanceDay(world, simulation, events);
         Assert.False(MilitaryCombat.Area(world.Units[0], rules).Overlaps(site));
         Assert.Equal(NavigationStatus.Arrived, Assert.Single(events.OfType<UnitMovedEvent>()).Status);
         var started = Assert.Single(events.OfType<FacilityConstructionChangedEvent>(), e => e.Phase == "started");
-        Assert.Equal(Math.Max(1L, estimate.Days!.Value), started.Clock.DayNumber - snapshot.Clock.DayNumber + 1);
+        Assert.Equal(1L, started.Clock.DayNumber - snapshot.Clock.DayNumber + 1);
         Assert.True(world.Settlements.ContainsKey(8000));
         Assert.Equal(builder, snapshot.Units.Single());
     }

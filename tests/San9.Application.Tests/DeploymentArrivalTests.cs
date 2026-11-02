@@ -30,7 +30,7 @@ public sealed class DeploymentArrivalTests
     [InlineData(0, false)]
     [InlineData(1, true)]
     [InlineData(9, true)]
-    public void DraftForecastMatchesActualFirstArrivalIncludingShorelinesRelayAndDelay(int delay, bool relay)
+    public void DraftAndDeployedUnitShareRouteEstimateIncludingShorelinesRelayAndDelay(int delay, bool relay)
     {
         var session = GameSession.Start(Fixture(), 42);
         var draft = new DeploymentDraft(session.View, 1); Assert.True(draft.SetMembers([1]));
@@ -53,7 +53,8 @@ public sealed class DeploymentArrivalTests
         for (int i = 0; i < 10 && arrival is null; i++)
             arrival = session.AdvanceXun().Events.OfType<UnitAbsorbedEvent>().SingleOrDefault(e => e.UnitId == unit.Id);
         Assert.NotNull(arrival);
-        Assert.Equal((long)estimate.Days!.Value, arrival.Clock.DayNumber - before.Clock.DayNumber + 1);
+        // Daily fine movement may arrive earlier than the coarse route estimate.
+        Assert.Equal((relay ? 12L : 11L) + delay, arrival.Clock.DayNumber - before.Clock.DayNumber + 1);
     }
 
     [Fact]

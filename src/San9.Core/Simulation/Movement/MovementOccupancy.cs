@@ -122,35 +122,49 @@ public static class MilitaryRouteQuery
     internal static MilitaryRoutePlan Plan(IWorldQuery world, MilitaryRulebook rules, UnitState unit, int? movingUnit,
         int maximumDays, int maximumExpanded)
     {
-        var work = new NavigationWorkBudget(maximumExpanded);
+        var route = Estimate(world, rules, unit, movingUnit, new(maximumExpanded));
+        return new(route.Status switch
+        {
+            RouteReachability.Reachable => NavigationStatus.Arrived,
+            RouteReachability.Incomplete => NavigationStatus.Planning,
+            _ => NavigationStatus.Unreachable
+        }, route.Cells.Select(MapCoordinates.Center).ToImmutableArray());
+    }
+
+    /// <summary>One search per active route segment; avoidance affects routing, never adds elapsed days.</summary>
+    internal static RouteCostEstimate Estimate(IWorldQuery world, MilitaryRulebook rules, UnitState unit, int? movingUnit,
+        NavigationWorkBudget work)
+    {
         var travel = rules.Travel(unit);
         var order = unit.EffectiveOrder!;
         var target = order.IsAttack ? MilitaryCombat.TargetArea(world, order, rules) :
             order.Construction is { } site ? rules.FacilityArea(site.Position, site.FacilityTypeId) :
             order.SettlementId is int home ? rules.SettlementArea(world.Settlements[home]) : new MapOccupancy(order.Position!.Value, new(1, 1));
         var occupancy = world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId);
-        var steps = ImmutableArray.CreateBuilder<WorldPosition>();
+        var cells = ImmutableArray.CreateBuilder<MapCell>();
+        long cost = 0;
         WorldPosition start = unit.Position;
-        RouteCostEstimate Segment(WorldPosition end, MapOccupancy? excluded = null) => travel.Map.EstimateTravelCost(start, new(end, new(1, 1)),
-            travel.Shape, travel.Mode, occupancy, work, intoRange: false, includeCells: true, excluded: excluded);
+        RouteCostEstimate Segment(MapOccupancy end, bool intoRange, MapOccupancy? excluded = null) => travel.Map.EstimateTravelCost(start, end,
+            travel.Shape, travel.Mode, occupancy, work, intoRange: intoRange, includeCells: true, excluded: excluded);
         var waypoint = unit.ActiveWaypoint;
         if (waypoint is { } via)
         {
-            var first = Segment(via, order.SettlementId is not null ? target : null);
+            var first = Segment(new(via, new(1, 1)), false, order.SettlementId is not null ? target : null);
             if (first.Status != RouteReachability.Reachable)
-                return new(first.Status == RouteReachability.Incomplete ? NavigationStatus.Planning : NavigationStatus.Unreachable, []);
-            steps.AddRange(first.Cells.Select(MapCoordinates.Center));
+                return first;
+            cells.AddRange(first.Cells);
+            cost = first.Cost;
             start = via;
         }
-        var last = Segment(target.Position, waypoint is not null && order.SettlementId is not null ? target : null);
+        var last = Segment(target, order.IsAttack || order.SettlementId is not null || order.Construction is not null,
+            waypoint is not null && order.SettlementId is not null ? target : null);
         if (last.Status != RouteReachability.Reachable)
-            return new(last.Status == RouteReachability.Incomplete ? NavigationStatus.Planning : NavigationStatus.Unreachable, steps.ToImmutable());
+            return last with { Cells = cells.ToImmutable() };
         foreach (var cell in last.Cells)
         {
-            var position = MapCoordinates.Center(cell);
-            if (steps.Count == 0 || steps[^1] != position) steps.Add(position);
+            if (cells.Count == 0 || cells[^1] != cell) cells.Add(cell);
         }
-        return new(NavigationStatus.Arrived, steps.ToImmutable());
+        return new(RouteReachability.Reachable, cost + last.Cost) { Cells = cells.ToImmutable() };
     }
 
     public static IReadOnlyList<MapOccupancy> Occupancy(WorldSnapshot snapshot, MilitaryRulebook rules, int owner, UnitPolicies policies,

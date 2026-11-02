@@ -117,10 +117,10 @@ public sealed class MovementForecastTests
         Assert.Equal(NavigationStatus.Arrived, context.Plan(planned, null).Status);
         var request = new DeploymentArrivalRequest(1, 0, null, planned.Order!, planned.Policies);
         var forecast = new MilitaryArrivalForecast(snapshot, rules);
-        Assert.Equal(ArrivalEstimateStatus.Incomplete, forecast.EstimateDeployment(request).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request).Status);
         Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request with { Policies = new() }).Status);
         Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(moved, rules).EstimateDeployment(request).Status);
-        Assert.Equal(ArrivalEstimateStatus.Incomplete, forecast.EstimateDeployment(request).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request).Status);
     }
 
     private static MilitaryRulebook Rules(int budget, bool mixed = false) => new(new(100, 1,
@@ -337,7 +337,8 @@ public sealed class MovementForecastTests
         var unit = new UnitState(0, 1, new(2, 2), 100) { FormationId = 0,
             Order = new(MilitaryOrderKind.Move, new(21, 2), null), Condition = UnitCondition.Confused, ConditionDaysRemaining = 3 };
         var world = World(unit);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 5), new MilitaryArrivalForecast(world.CreateSnapshot(), rules).Estimate(0));
+        var normal = world.CreateSnapshot() with { Units = [unit with { Condition = UnitCondition.Normal, ConditionDaysRemaining = 0 }] };
+        Assert.Equal(new MilitaryArrivalForecast(normal, rules).Estimate(0), new MilitaryArrivalForecast(world.CreateSnapshot(), rules).Estimate(0));
         var mutation = world.BeginMutation();
         for (int day = 1; day <= 5; day++)
             Assert.Equal(day == 5, Day(mutation, rules).Position == new WorldPosition(21, 2));
@@ -349,7 +350,7 @@ public sealed class MovementForecastTests
         var unit = new UnitState(0, 1, new(380, 2), 100) { FormationId = 0,
             Order = new(MilitaryOrderKind.Return, null, 1) };
         var world = World(unit); var rules = Rules(100);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 2), new MilitaryArrivalForecast(world.CreateSnapshot(), rules).Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 3), new MilitaryArrivalForecast(world.CreateSnapshot(), rules).Estimate(0));
         Assert.Single(world.CreateSnapshot().Units);
         var mutation = world.BeginMutation();
         Day(mutation, rules);
@@ -362,8 +363,28 @@ public sealed class MovementForecastTests
     {
         var forecast = new MilitaryArrivalForecast(World().CreateSnapshot(), Rules(95));
         Assert.Equal(new(ArrivalEstimateStatus.Incomplete), forecast.Estimate(0, maximumExpanded: 1));
-        Assert.Equal(new(ArrivalEstimateStatus.Incomplete), forecast.Estimate(0, maximumDays: 1));
         Assert.Equal(ArrivalEstimateStatus.Known, forecast.Estimate(0).Status);
+    }
+
+    [Fact]
+    public void RouteEstimateHasNoDayLimitAndSearchesEachWaypointSegmentOnlyOnce()
+    {
+        var unit = new UnitState(0, 1, new(2, 2), 100) { FormationId = 0,
+            Order = new(MilitaryOrderKind.Move, new(492, 2), null), Waypoint = new(102, 2) };
+        var snapshot = World(unit).CreateSnapshot();
+        using var diagnostics = new PathSearchDiagnostics();
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 4900), new MilitaryArrivalForecast(snapshot, Rules(1)).Estimate(0));
+        Assert.Equal(2, diagnostics.Queries);
+        Assert.Equal(unit, Assert.Single(snapshot.Units));
+    }
+
+    [Fact]
+    public void RouteEstimateConsumesOnlyExistingFractionalMovementRemainder()
+    {
+        var unit = new UnitState(0, 1, new(2, 2), 100) { FormationId = 0,
+            Order = new(MilitaryOrderKind.Move, new(12, 2), null), MovementRemainder = 5 };
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 1), new MilitaryArrivalForecast(World(unit).CreateSnapshot(), Rules(95)).Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 2), new MilitaryArrivalForecast(World(unit with { MovementRemainder = 0 }).CreateSnapshot(), Rules(95)).Estimate(0));
     }
 
     [Fact]
@@ -392,11 +413,11 @@ public sealed class MovementForecastTests
     }
 
     [Fact]
-    public void ExpiringForcedOrderDoesNotReportArrivalAtAnotherDestination()
+    public void ExpiringForcedOrderEstimatesItsCurrentDestinationWithoutPredictingTheNextOrder()
     {
         var unit = new UnitState(0, 1, new(2, 2), 100) { FormationId = 0, ServicePlaceId = 1,
             Order = new(MilitaryOrderKind.Move, new(21, 2), null), Condition = UnitCondition.Disguised, ConditionDaysRemaining = 1 };
-        Assert.Equal(new(ArrivalEstimateStatus.Incomplete), new MilitaryArrivalForecast(World(unit).CreateSnapshot(), Rules(95)).Estimate(0));
+        Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(World(unit).CreateSnapshot(), Rules(95)).Estimate(0).Status);
     }
     [Fact]
     public void ProspectiveDeploymentKeepsRealUnitZeroAsAnObstacleAndPoliciesAffectPrediction()
@@ -409,11 +430,10 @@ public sealed class MovementForecastTests
         var forecast = new MilitaryArrivalForecast(before, rules);
         var request = new DeploymentArrivalRequest(1, 0, null, new(MilitaryOrderKind.Move, new(52, 2), null),
             new(AttackApproachingEnemies: true));
-        Assert.Equal(ArrivalEstimateStatus.Incomplete, forecast.EstimateDeployment(request).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request).Status);
         Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request with { Policies = new() }).Status);
-        Assert.Equal(ArrivalEstimateStatus.Incomplete, forecast.EstimateDeployment(request).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request).Status);
         Assert.Equal(before, world.CreateSnapshot());
-        Assert.Equal(ArrivalEstimateStatus.Incomplete, forecast.EstimateDeployment(request with { Policies = new() }, maximumDays: 1).Status);
         Assert.Equal(ArrivalEstimateStatus.Incomplete, forecast.EstimateDeployment(request with { Policies = new() }, maximumExpanded: 1).Status);
         Assert.Equal(ArrivalEstimateStatus.NotApplicable, forecast.EstimateDeployment(request with { SettlementId = 99 }).Status);
     }

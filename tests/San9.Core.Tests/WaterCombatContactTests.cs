@@ -101,7 +101,7 @@ public sealed class WaterCombatContactTests
         var player = new CommandContext("player");
         var order = new MilitaryOrder(MilitaryOrderKind.AttackSettlement, null, 2);
         Assert.True(engine.Execute(player, new OrderUnitCommand(Guid.NewGuid(), 1, 0, 0, order)).Submission.Accepted);
-        var estimate = new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0, maximumDays: 5);
+        var estimate = new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0);
         Assert.Equal(ArrivalEstimateStatus.Known, estimate.Status);
         engine.EndControl(player);
         var events = engine.AdvanceXun().Events;
@@ -111,17 +111,17 @@ public sealed class WaterCombatContactTests
         Assert.True(rules.Map.IsWater(position));
         Assert.False(Area(position.X, position.Y).Overlaps(rules.BuildingArea(rules.Places[2])));
         Assert.All(approach.SelectMany(e => e.Steps), p => Assert.True(rules.Map.IsWater(p)));
-        Assert.Equal(estimate.Days, events.OfType<BattleDamageEvent>().First(e => e.AttackerId == 0).Clock.Day);
+        Assert.Equal(1, events.OfType<BattleDamageEvent>().First(e => e.AttackerId == 0).Clock.Day);
     }
 
     [Fact]
-    public void ABlockedChannelIsNotReportedAsArrivalAtTheTarget()
+    public void RouteEstimateDoesNotPredictDailyWaterContactBlocking()
     {
         var (world, rules) = Scenario(blocker: true);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: rules);
         var order = new MilitaryOrder(MilitaryOrderKind.AttackSettlement, null, 2);
         Assert.True(engine.Execute(new("player"), new OrderUnitCommand(Guid.NewGuid(), 1, 0, 0, order)).Submission.Accepted);
-        Assert.NotEqual(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0, maximumDays: 5).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0).Status);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public sealed class WaterCombatContactTests
     }
 
     [Fact]
-    public void ForecastAndCombatBothExpirePassiveContactAcrossABlockedWaterCorner()
+    public void CombatExpiresPassiveContactAcrossABlockedWaterCorner()
     {
         var (world, _) = Scenario();
         var rules = new MilitaryRulebook(new(3, 3, [1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -170,9 +170,7 @@ public sealed class WaterCombatContactTests
         var defender = mutation.Units[0] with { Id = 1, OwnerId = 2, Position = new(7, 7),
             ActiveEngagement = false, PassiveEngagement = true, ContactTarget = null, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty };
         mutation.AddUnit(defender);
-        var predicted = MilitaryEngagements.ForecastNextCombat(mutation, defender, rules);
         MilitaryEngagements.ClearExpired(mutation, rules);
-        Assert.False(predicted.PassiveEngagement);
-        Assert.Equal(mutation.Units[1].PassiveEngagement, predicted.PassiveEngagement);
+        Assert.False(mutation.Units[1].PassiveEngagement);
     }
 }

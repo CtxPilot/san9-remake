@@ -101,27 +101,6 @@ internal static class MilitaryEngagements
                 MilitaryCombat.UnitRange(world, source, MilitaryContacts.Attack(target), military) > 0);
     }
 
-    // A frozen-world ETA predicts the next combat phase for its one moving subject only.
-    internal static UnitState ForecastNextCombat(IWorldQuery world, UnitState unit, MilitaryRulebook military)
-    {
-        var subject = new BattleSource(unit.Id, false);
-        var area = MilitaryCombat.Area(unit, military);
-        bool active = unit.ActiveEngagement && unit.ContactTarget is { } contact && RetainsContact(world, unit, contact, military) ||
-            FindTarget(world, unit, military) is { } own && area.IntersectsExpanded(own.Area(world, military), MapCoordinates.UnitsPerCell);
-        bool passive = world.Units.Values.Any(other => other.Id != unit.Id && other.FormationId is not null &&
-            MilitaryCombat.Area(other, military).IntersectsExpanded(area, MapCoordinates.UnitsPerCell) &&
-            (unit.PassiveEngagement && other.ContactTarget is { IsSettlement: false } previous && previous.Id == unit.Id &&
-                RetainsContact(world, other, previous, military) ||
-                other.EffectiveOrder?.UnitId == unit.Id && FindTarget(world, other, military) == subject));
-        if (!passive)
-            foreach (var place in world.Settlements.Values)
-                if (military.TryPlace(place, out _) && military.SettlementArea(place).IntersectsExpanded(area, MapCoordinates.UnitsPerCell) &&
-                    (unit.PassiveEngagement && place.CombatTargetUnitId == unit.Id || FindFacilityTarget(world, place, military)?.Id == unit.Id))
-                    { passive = true; break; }
-        return active == unit.ActiveEngagement && passive == unit.PassiveEngagement ? unit :
-            unit with { ActiveEngagement = active, PassiveEngagement = passive };
-    }
-
     private static BattleSource? FindTarget(IWorldQuery world, UnitState unit, MilitaryRulebook military)
     {
         if (!MilitaryCombat.CanInitiate(unit) || unit.EffectiveOrder is not { IsAttack: true } order ||

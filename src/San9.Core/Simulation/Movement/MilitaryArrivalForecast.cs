@@ -9,24 +9,22 @@ public sealed record ArrivalEstimate(ArrivalEstimateStatus Status, int? Days = n
 public sealed record DeploymentArrivalRequest(int SettlementId, int FormationId, int? NavalFormationId,
     MilitaryOrder Order, UnitPolicies Policies, int DepartureDelayDays = 0, WorldPosition? Waypoint = null, uint Soldiers = 1);
 
-/// <summary>Predicts navigation against a frozen world without publishing paths or consuming simulation randomness.</summary>
+/// <summary>Estimates current-route travel time without simulating future movement, combat or command changes.</summary>
 public sealed class MilitaryArrivalForecast(WorldSnapshot snapshot, MilitaryRulebook rules,
     IReadOnlyDictionary<int, int>? regionCities = null, TreasureRulebook? treasures = null)
 {
     private WorldQuery? deploymentWorld;
 
-    public ArrivalEstimate Estimate(int unitId, int maximumDays = 4096, int maximumExpanded = 100000)
+    public ArrivalEstimate Estimate(int unitId, int maximumExpanded = 100000)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumDays);
         var work = new NavigationWorkBudget(maximumExpanded);
         var unit = snapshot.Units.FirstOrDefault(u => u.Id == unitId);
         if (unit is not { FormationId: int formation, EffectiveOrder: not null } || !rules.Formations.ContainsKey(formation)) return new(ArrivalEstimateStatus.NotApplicable);
-        return Estimate(unit, maximumDays, work);
+        return Estimate(unit, work);
     }
 
-    public ArrivalEstimate EstimateDeployment(DeploymentArrivalRequest request, int maximumDays = 4096, int maximumExpanded = 100000)
+    public ArrivalEstimate EstimateDeployment(DeploymentArrivalRequest request, int maximumExpanded = 100000)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumDays);
         var work = new NavigationWorkBudget(maximumExpanded);
         var home = snapshot.Settlements.FirstOrDefault(s => s.Id == request.SettlementId);
         if (home is not { OwnerId: int owner, CanHostPersons: true, IsDestroyed: false, IsDormant: false } || home.Durability == 0 ||
@@ -49,8 +47,7 @@ public sealed class MilitaryArrivalForecast(WorldSnapshot snapshot, MilitaryRule
         if (request.Order.Construction is { } construction && travel.AreaAt(start.Value)
             .Overlaps(rules.FacilityArea(construction.Position, construction.FacilityTypeId)))
             return new(ArrivalEstimateStatus.NotApplicable);
-        // Use the next deployment identity for its deterministic navigation seed without allocating it.
-        // The predicted unit is added only to its private query world.
+        // Exclude only the prospective identity from occupancy, preserving every existing unit.
         if (snapshot.Simulation.NextUnitId > int.MaxValue) return new(ArrivalEstimateStatus.NotApplicable);
         var unit = new UnitState((int)snapshot.Simulation.NextUnitId, owner, start.Value, request.Soldiers)
         {
@@ -60,57 +57,30 @@ public sealed class MilitaryArrivalForecast(WorldSnapshot snapshot, MilitaryRule
         };
         // The construction site was checked above. This synthetic unit has no serving members in the
         // frozen world; ongoing-construction validation would incorrectly require a deployed serving leader.
-        return Estimate(unit, maximumDays, work, constructionPreview: request.Order.Construction is not null);
+        return Estimate(unit, work, constructionPreview: request.Order.Construction is not null);
     }
 
     public ArrivalEstimate EstimateOrder(int unitId, MilitaryOrder order, UnitPolicies policies, WorldPosition? waypoint,
-        int maximumDays = 4096, int maximumExpanded = 100000)
+        int maximumExpanded = 100000)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumDays);
         var unit = snapshot.Units.FirstOrDefault(u => u.Id == unitId);
         if (unit is not { FormationId: int formation } || !rules.Formations.ContainsKey(formation))
             return new(ArrivalEstimateStatus.NotApplicable);
-        return Estimate(unit.WithMilitaryOrder(order, policies, waypoint), maximumDays, new(maximumExpanded));
+        return Estimate(unit.WithMilitaryOrder(order, policies, waypoint), new(maximumExpanded));
     }
 
-    private ArrivalEstimate Estimate(UnitState unit, int maximumDays, NavigationWorkBudget work, bool constructionPreview = false)
+    private ArrivalEstimate Estimate(UnitState unit, NavigationWorkBudget work, bool constructionPreview = false)
     {
         var world = new WorldQuery(snapshot);
         world.SetForecastUnit(unit);
         if (!constructionPreview && !Valid(world, unit)) return new(ArrivalEstimateStatus.NotApplicable);
-        if (unit.DepartureDaysRemaining == 0 && MilitaryNavigation.Advance(world, unit, unit.Id, rules, 0).Arrived) return new(ArrivalEstimateStatus.Known, 0);
-        var movementDate = snapshot.Clock;
-        for (int day = 1; day <= maximumDays; day++)
-        {
-            // Movement uses the current date; waiting days advance the same calendar after combat.
-            bool preparing = unit.DepartureDaysRemaining > 0;
-            bool immobilized = unit.Condition == UnitCondition.Confused;
-            if (!preparing && !constructionPreview && !Valid(world, unit)) return new(ArrivalEstimateStatus.NotApplicable);
-            if (immobilized) unit = unit with { MovementRemainder = 0 };
-            world.SetForecastUnit(unit);
-            if (!preparing && !immobilized)
-            {
-                var step = MilitaryNavigation.Advance(world, unit, unit.Id, rules, MilitaryNavigation.Budget(unit, rules), work, movementDate: movementDate);
-                if (work.Exhausted || step.Status == NavigationStatus.Planning) return new(ArrivalEstimateStatus.Incomplete);
-                if (step.Arrived) return new(ArrivalEstimateStatus.Known, day);
-                if (step.Status == NavigationStatus.Unreachable) return new(ArrivalEstimateStatus.Unreachable);
-                // Daily randomness can change a blocked route; an idle move is not a fixed point.
-                unit = MilitaryNavigation.Apply(unit, step);
-                var contacted = MilitaryContacts.AfterMovement(world, unit, step.Navigation.Collision, rules);
-                if (contacted.EffectiveOrder != unit.EffectiveOrder) return new(ArrivalEstimateStatus.Incomplete);
-                unit = contacted;
-                world.SetForecastUnit(unit);
-            }
-            // The common daily phase expires conditions and departure delays after movement, before combat.
-            var previousOrder = unit.EffectiveOrder;
-            unit = MilitaryUnitTransitions.Apply(unit, MilitaryConditions.Tick(unit));
-            if (unit.EffectiveOrder != previousOrder) return new(ArrivalEstimateStatus.Incomplete);
-            if (preparing) unit = unit with { DepartureDaysRemaining = unit.DepartureDaysRemaining - 1 };
-            world.SetForecastUnit(unit);
-            unit = MilitaryEngagements.ForecastNextCombat(world, unit, rules);
-            movementDate = movementDate.NextDay();
-        }
-        return new(ArrivalEstimateStatus.Incomplete);
+        var route = MilitaryRouteQuery.Estimate(world, rules, unit, unit.Id, work);
+        if (route.Status == RouteReachability.Incomplete) return new(ArrivalEstimateStatus.Incomplete);
+        if (route.Status == RouteReachability.Unreachable) return new(ArrivalEstimateStatus.Unreachable);
+        var travel = rules.Travel(unit);
+        long cost = Math.Max(0, route.Cost - unit.MovementRemainder);
+        int days = (int)Math.Min(int.MaxValue, unit.DepartureDaysRemaining + (cost + travel.DailyBudget - 1) / travel.DailyBudget);
+        return new(ArrivalEstimateStatus.Known, days);
     }
 
     private bool Valid(IWorldQuery world, UnitState unit) => unit.EffectiveOrder is { } order &&
