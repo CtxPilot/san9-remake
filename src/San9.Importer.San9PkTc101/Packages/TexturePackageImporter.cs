@@ -59,10 +59,10 @@ public static class TexturePackageImporter
         ImageAsset Save(string id, string path, PngImage image)
         {
             if (sourceImages.TryGetValue(path, out var existing)) return existing with { Id = id };
-            var bytes = image.Encode();
             string relative = $".sources/{sourceNumber++}.png";
             string target = PackageFiles.Resolve(output, relative); Directory.CreateDirectory(staging);
-            File.WriteAllBytes(target, bytes);
+            using (var stream = File.Create(target))
+                image.Encode(stream, System.IO.Compression.CompressionLevel.Fastest);
             var asset = new ImageAsset(id, relative, image.Width, image.Height, image.Channels);
             sourceImages.Add(path, asset); return asset;
         }

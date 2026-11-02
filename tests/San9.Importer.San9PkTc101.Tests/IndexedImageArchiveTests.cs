@@ -13,6 +13,7 @@ public sealed class IndexedImageArchiveTests
         new byte[] { 0, 248, 0, 0, 180, 120, 60, 64 }.CopyTo(palette, 0);
         byte[] indices = new byte[25]; indices[12] = 1;
         var decoded = IndexedImageArchive.Decode(new(5, 5, indices), palette, true, true);
+        IndexedImageArchive.ExtendTransparentColors(decoded.Pixels, decoded.Width, decoded.Height);
         var roundTrip = PngImage.Decode(decoded.Encode());
         for (int i = 0; i < 25; i++)
         {
@@ -36,9 +37,12 @@ public sealed class IndexedImageArchiveTests
         byte[] palette = new byte[1024];
         new byte[] { 255, 0, 255, 0, 180, 120, 60, 128, 40, 80, 120, 128 }.CopyTo(palette, 0);
         var decoded = IndexedImageArchive.Decode(new(5, 1, [1, 0, 0, 0, 2]), palette, true, true);
+        IndexedImageArchive.ExtendTransparentColors(decoded.Pixels, decoded.Width, decoded.Height);
         Assert.Equal(new byte[] { 180, 120, 60, 0 }, decoded.Pixels.AsSpan(8, 4).ToArray());
         Assert.Equal(new byte[] { 40, 80, 120, 0 }, decoded.Pixels.AsSpan(12, 4).ToArray());
-        Assert.Equal(new byte[8], IndexedImageArchive.Decode(new(1, 2, [0, 0]), palette, true, true).Pixels);
+        var empty = IndexedImageArchive.Decode(new(1, 2, [0, 0]), palette, true, true);
+        IndexedImageArchive.ExtendTransparentColors(empty.Pixels, empty.Width, empty.Height);
+        Assert.Equal(new byte[8], empty.Pixels);
         Assert.Equal(new byte[] { 180, 120, 60, 255, 40, 80, 120, 255 }, IndexedImageArchive.Decode(new(2, 1, [1, 2]), palette, true, true).Pixels);
         Assert.Equal(new byte[] { 255, 0, 255 }, IndexedImageArchive.Decode(new(1, 1, [0]), palette, false, false).Pixels);
     }

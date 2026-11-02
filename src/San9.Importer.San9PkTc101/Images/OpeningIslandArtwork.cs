@@ -13,7 +13,6 @@ internal static class OpeningIslandArtwork
         byte[] pixels = (byte[])background.Pixels.Clone();
         for (int p = 0; p < pixels.Length; p += 4)
             if (pixels[p + 2] > pixels[p + 1]) pixels[p + 3] = 0;
-        IndexedImageArchive.ExtendTransparentColors(pixels, background.Width, background.Height);
         return background with { Pixels = pixels };
     }
 
@@ -68,7 +67,6 @@ internal static class OpeningIslandArtwork
         // Keep the frame exclusively in the movable inset. Copying it to the base
         // would leave the old island location visibly framed.
         var basis = cityMask is null ? RemovePreviewSeaFrame(background) : background;
-        IndexedImageArchive.ExtendTransparentColors(island, width, height);
         return (basis, inset with { Pixels = island });
     }
 }

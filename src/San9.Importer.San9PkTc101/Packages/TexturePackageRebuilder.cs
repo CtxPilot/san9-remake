@@ -73,7 +73,8 @@ internal static class TexturePackageRebuilder
             string relative = $".sources/{images.Count}.png";
             string path = PackageFiles.Resolve(output, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllBytes(path, image.Encode());
+            using (var stream = File.Create(path))
+                image.Encode(stream, System.IO.Compression.CompressionLevel.Fastest);
             var asset = new ImageAsset(id, relative, image.Width, image.Height, image.Channels);
             images.Add(sourcePath, asset);
             return asset;
