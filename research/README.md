@@ -8,6 +8,7 @@
 - [小兵培养权威研究](findings/RE-SAN9PK-0149.md)：统一触发、生成、成长、全部事件、训练菜单、随机与出师证据，已移除旧重复正文。
 - [新武将权威研究](findings/RE-SAN9PK-0202.md)：统一创建、独立登记文件、秘籍、批量生年和开局处理；详细未决项只在该专题维护。
 - [逆向结论索引](findings/README.md)：按主题查找 `RE-*`。
+- [原版命令执行顺序扩查](notes/2026-11-02-original-command-resolution-order-audit.md)：日模拟各命令组、登庸／计略能力键、探索／外交政治队列、士气与移动阶段排序，以及同值时的单位表顺序。
 - [研究疑点与处理结果](research-open-questions.md)：已纠错结论、证据边界和后置实验；历史“待验证”不直接作为当前待办。
 - [来源登记](SOURCES.md)、[S9 文件清单](sources/s9-file-inventory.md)、[EXE 外部 DLL 契约](sources/exe-dll-analysis-inventory.md)、[第三方仓库](sources/upstream-repositories.md)。
 - [军事邻城、设施行程与实际进攻范围实验](experiments/EXP-SAN9PK-0002.md)：统一保存校准、简单通道、动态前线与设施时间表研究，以及当前采用、内存／性能边界和后续AI改造方向。
