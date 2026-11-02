@@ -19,7 +19,7 @@ public sealed class SettlementLossTests
          Person(201, 2, null, OfficerStatus.Ruler) with { UnitId = 900 }, Person(301, 3, 30, OfficerStatus.Ruler),
          .. captive ? new[] { Person(302, 3, 10, OfficerStatus.Captive) } : []],
         units: [new(900, 2, new(12, 2), 1000) { CorpsId = 200, ServicePlaceId = 20, FormationId = 1,
-            Morale = 70, CommanderId = 201, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(201, BattleRank.Front),
+            Morale = 70, CommanderId = 201, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(201, BattleRank.Front)),
             Order = new(MilitaryOrderKind.AttackSettlement, null, 10) }],
         corps: [new(100, 1, 101, new(1000, 1000)) { IsRoot = true }, new(200, 2, 201, new(1000, 1000)) { IsRoot = true },
             new(300, 3, 301, new(1000, 1000)) { IsRoot = true }]);
@@ -260,7 +260,7 @@ public sealed class SettlementLossTests
         var world = State(captive: true).BeginMutation();
         world.Replace(world.Officers[201] with { UnitId = null, SettlementId = 10, Status = OfficerStatus.Captive });
         world.Replace(world.Officers[302] with { OwnerId = 2, Status = OfficerStatus.Serving, UnitId = 900, SettlementId = null });
-        world.Replace(world.Units[900] with { CommanderId = 302, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(302, BattleRank.Front) });
+        world.Replace(world.Units[900] with { CommanderId = 302, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(302, BattleRank.Front)) });
         if (child)
         {
             world.AddCorps(new(210, 2, 302, new(100, 100)));

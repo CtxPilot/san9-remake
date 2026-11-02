@@ -29,7 +29,7 @@ public sealed class FieldRecruitmentTests
          Person(30, 1, 1) with { OwnerId = null, Status = OfficerStatus.Undiscovered }],
         units: [new(100, 2, new(332, 2), 5000) { CorpsId = 2, ServicePlaceId = 2, FormationId = 1, CommanderId = 20,
             Morale = 70, Wounded = 123, CargoMoney = 345, CargoFood = 678,
-            MemberRanks = new Dictionary<int, BattleRank> { [20] = BattleRank.Front, [21] = BattleRank.Middle, [22] = BattleRank.Rear }.ToImmutableDictionary() }],
+            MemberPositions = San9.Tests.FormationTestData.Members(new Dictionary<int, BattleRank> { [20] = BattleRank.Front, [21] = BattleRank.Middle, [22] = BattleRank.Rear }.ToImmutableDictionary()) }],
         corps: [new(1, 1, 1, new(10000, 10000)) { IsRoot = true }, new(2, 2, 2, new(10000, 10000)) { IsRoot = true }], relations: [new(1, 2, 50)],
         controls: [new("player", 1, ControllerKind.Player)]);
 
@@ -188,7 +188,7 @@ public sealed class FieldRecruitmentTests
         var mutation = state.BeginMutation(Rules.Abilities);
         mutation.AddUnit(new(200, 2, new(502, 2), 5000) { CorpsId = 2, ServicePlaceId = 2,
             FormationId = 1, CommanderId = 22, Morale = 70,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) });
         mutation.SetSimulation(mutation.Simulation with { NextUnitId = 201 });
         mutation.Replace(mutation.Officers[22] with { UnitId = 200, SettlementId = null });
         mutation.MaintainLeadership([]);

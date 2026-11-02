@@ -38,7 +38,7 @@ public sealed class AttackNavigationTests
         FormationRule Formation(int id, int range, Footprint shape) => new(id, 60, 0, 10000, 1, shape, TravelMode.Land)
         { Combat = new(10, 10, 10, 10, 50), Attack = new(range, true)
             { RangedSiege = id == 0, ElevationBonusPerLevel = id == 3 ? 5 : 0, MaximumElevationBonus = id == 3 ? 10 : 0 },
-            CaptureRanks = [BattleRank.Front] };
+            Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) };
         var rules = new MilitaryRulebook(new(20, 20, new int[400].ToImmutableArray(), [new(0, 10, null)],
             [Formation(0, 10, new(1, 1)), Formation(1, 1, new(1, 1)), Formation(2, 1, new(1, 100)), Formation(3, 20, new(1, 1))],
             [new(2, new(70, 50), new(1, 1)) { FacilityTypeId = 100, Combat = new(10, 10, 10, 10, 50), Attack = new(1, false) },

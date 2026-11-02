@@ -12,7 +12,7 @@ public sealed class MilitaryEngagementTests
         var combat = new CombatProfile(10, 10, 10, 10, 50);
         var military = new MilitaryRulebook(new(20, 3, [.. Enumerable.Repeat(0, 60)], [new(0, 1, null)],
             [new(1, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(10, true), CaptureRanks = [BattleRank.Middle] }],
+                { Combat = combat, Attack = new(10, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
             [new(1, new(2, 7), new(1, 1)) { Combat = combat, WoundedRecovery = 1 },
              new(2, new(40, 7), new(buildingWidth, 1)) { Combat = combat, Attack = new(10, false), WoundedRecovery = 1 },
              new(3, new(60, 7), new(1, 1)) { Combat = combat, Attack = new(10, false) }]) { Geography = new(scale, []) });

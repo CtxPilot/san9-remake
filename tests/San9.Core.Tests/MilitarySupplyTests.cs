@@ -29,7 +29,7 @@ public sealed class MilitarySupplyTests
         [new(11, 1, null, new(70, 70, 70, 70), false) { UnitId = 0, Status = OfficerStatus.Ruler },
          new(22, 2, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler }],
         units: [new(0, 1, new(7, 2), 500) { Morale = morale, FormationId = 10, ServicePlaceId = 1,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) }], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(1000, food)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(1000, 1000)) { IsRoot = true }]);
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) }], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(1000, food)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(1000, 1000)) { IsRoot = true }]);
 
     [Fact]
     public void PartialSupplyAffectsOnlyTheDebitedAccountAndDoesNotDrawRandom()

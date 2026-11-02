@@ -39,7 +39,7 @@ public sealed class MilitaryCombatTests
             Personality = 3, BaseAbilities = new(70, 70, 70, 120), TacticProficiencies = [0, 0, 0, 0, 0, 0, 3, 0, 0] });
         mutation.Replace(mutation.Officers[11] with { TacticProficiencies = [0, 0, 0, 0, 0, 0, 3, 0, 0] });
         mutation.Replace(mutation.Units[0] with { CommanderId = 12,
-            MemberRanks = mutation.Units[0].MemberRanks.Add(12, BattleRank.Middle) });
+            MemberPositions = mutation.Units[0].MemberPositions.Add(12, new(0, BattleRank.Middle)) });
         mutation.AddSettlement(mutation.Settlements[2] with { Id = 3, Durability = 100 });
         mutation.Replace(mutation.Officers[22] with { SettlementId = 3 });
         mutation.Replace(mutation.Settlements[2] with { Kind = SettlementKind.Facility, CanHostPersons = false });
@@ -82,7 +82,7 @@ public sealed class MilitaryCombatTests
         var mutation = world.BeginMutation();
         mutation.Replace(mutation.Officers[12] with { UnitId = 0, SettlementId = null });
         mutation.Replace(mutation.Units[0] with { CommanderId = 11,
-            MemberRanks = mutation.Units[0].MemberRanks.Add(12, BattleRank.Middle) });
+            MemberPositions = mutation.Units[0].MemberPositions.Add(12, new(0, BattleRank.Middle)) });
         if (!owned)
         {
             mutation.Replace(mutation.Settlements[2] with { OwnerId = null });
@@ -145,17 +145,17 @@ public sealed class MilitaryCombatTests
     }
 
     [Fact]
-    public void PartialMemberRanksAreRejectedEvenForMovementOnlyFormations()
+    public void PartialMemberPositionsAreRejectedEvenForMovementOnlyFormations()
     {
         var definition = new MilitaryDefinition(1, 1, [0], [new(0, 1, null)],
-            [new(1, 1, 0, 10000, 5, new(1, 1), TravelMode.Land) { CaptureRanks = [BattleRank.Front] }], []);
+            [new(1, 1, 0, 10000, 5, new(1, 1), TravelMode.Land) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []);
         Assert.Throws<ArgumentException>(() => new MilitaryRulebook(definition));
     }
 
     private static readonly CombatProfile Profile = new(10, 10, 10, 10, 50);
     private static MilitaryRulebook Rules(int range = 1, bool destroyed = false) => new(new(8, 3,
         Enumerable.Repeat(0, 24).ToImmutableArray(), [new(0, 1, null)],
-        [new(7, 10, 0, 100000, 5, new(1, 1), TravelMode.Land) { Combat = Profile, Attack = new(range, true), CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle] }],
+        [new(7, 10, 0, 100000, 5, new(1, 1), TravelMode.Land) { Combat = Profile, Attack = new(range, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]) }],
         [new(1, new(2, 7), new(1, 1)) { Combat = Profile, Attack = new(1, false) },
          new(2, new(37, 7), new(1, 1)) { Combat = Profile, Attack = new(1, false), DestroyedAtZeroDurability = destroyed },
          new(3, new(37, 2), new(1, 1)) { Combat = Profile, Attack = new(1, false) }]));
@@ -166,7 +166,7 @@ public sealed class MilitaryCombatTests
         [new(11, 1, null, new(90, 90, 90, 90), false) { UnitId = 0, Status = OfficerStatus.Ruler },
          new(12, 1, 1, new(70, 70, 70, 70), false), new(22, 2, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler }],
         units: [new(0, 1, new(35, 7), 10000) { FormationId = 7, Morale = 90, ServicePlaceId = 1,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front),
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)),
             Order = new(MilitaryOrderKind.AttackSettlement, null, 2) }],
         controls: controlled ? [new("player", 1, ControllerKind.Player)] : [], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(10000, 10000)) { IsRoot = true }]);
 
@@ -345,7 +345,7 @@ public sealed class MilitaryCombatTests
         mutation.Replace(mutation.Officers[22] with { SettlementId = null, UnitId = 1 });
         mutation.AddUnit(new(1, 2, new(17, 2), 10000) { FormationId = 7, ServicePlaceId = 3,
             CorpsId = 20, CommanderId = 22,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) });
         mutation.SetSimulation(mutation.Simulation with { NextUnitId = 2 });
         world.Commit(mutation);
         var baseline = Rules();
@@ -550,7 +550,7 @@ public sealed class MilitaryCombatTests
         mutation.Replace(mutation.Units[0] with { Position = new(20, 7), Soldiers = 1, Morale = 90,
             Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 } });
         mutation.AddUnit(new(1, 2, new(21, 7), 1) { FormationId = 7, Morale = 90, ServicePlaceId = 2,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Rear) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Rear)) });
         mutation.Replace(mutation.Officers[22] with { UnitId = 1, SettlementId = null });
         mutation.SetSimulation(mutation.Simulation with { NextUnitId = 2 });
         world.Commit(mutation);
@@ -701,7 +701,7 @@ public sealed class MilitaryCombatTests
             baseline.Settlements.Append(new SettlementState(3, 3, 100, 100, 100, 70, 500, 0, 100, 0, 100)),
             baseline.Officers.Append(new OfficerState(33, 3, null, new(90, 90, 90, 90), false) { UnitId = 1, Status = OfficerStatus.Ruler }),
             baseline.Units.Append(new UnitState(1, 3, new(36, 6), 10000) { FormationId = 7, Morale = 90,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(33, BattleRank.Front),
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(33, BattleRank.Front)),
                 Order = new(MilitaryOrderKind.AttackSettlement, null, 2) }), corps: [.. baseline.Corps, new San9.Core.Domain.CorpsState(3, 3, 33, new(10000, 10000)) { IsRoot = true }]);
         var engine = Engine(world);
         var result = engine.AdvanceXun();

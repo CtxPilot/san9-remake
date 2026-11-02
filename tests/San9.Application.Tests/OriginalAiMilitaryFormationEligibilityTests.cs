@@ -40,7 +40,7 @@ public sealed partial class OriginalAiMilitaryTests
                 Formations = content.Military.Formations.Select(f => f.Id == 400 ? f with
                 {
                     IsCommon = !barbarian,
-                    CaptureRanks = [BattleRank.Front, BattleRank.Front, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear]
+                    Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Front, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear])
                 } : f).ToImmutableArray()
             }
         };
@@ -59,8 +59,8 @@ public sealed partial class OriginalAiMilitaryTests
         Assert.Equal(1, Assert.Single(command.OfficerIds));
         Assert.Equal(400, command.FormationId);
         var expected = barbarian ? BattleRank.Front : BattleRank.Rear;
-        Assert.Equal(expected, command.Ranks[1]);
-        Assert.Equal(expected, h.Engine.Snapshot.Units.Single(u => u.OwnerId == 1).MemberRanks[1]);
+        Assert.Equal(expected, command.Positions[1].Rank);
+        Assert.Equal(expected, h.Engine.Snapshot.Units.Single(u => u.OwnerId == 1).MemberPositions[1].Rank);
     }
 
     [Theory]

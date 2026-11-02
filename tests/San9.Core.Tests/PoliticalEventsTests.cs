@@ -219,7 +219,7 @@ public sealed class PoliticalEventsTests
         var state = World(5, true); var world = Due(state);
         world.SetSimulation(world.Simulation with { NextUnitId = 101 });
         world.AddUnit(new(100, 1, new(999, 999), 1000) { FormationId = 9, ServicePlaceId = 4, CommanderId = 11,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) });
         world.Replace(world.Officers[11] with { SettlementId = null, UnitId = 100, IsCommander = false });
         var original = Politics();
         var politics = new PoliticalRulebook(original.Events, original.Ranks.Values,

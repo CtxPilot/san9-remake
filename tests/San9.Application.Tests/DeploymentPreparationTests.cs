@@ -21,7 +21,7 @@ public sealed class DeploymentPreparationTests
         Military = new(20, 3, Enumerable.Repeat(0, 60).ToImmutableArray(), [new(0, 1, null)],
             [new(7, 10, 10, 20000, 5, new(1, 1), TravelMode.Land)
                 { Combat = new(20, 20, 50, 20, 50), Attack = new(1, true),
-                  CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle] },
+                  Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]) },
              new(70, 10, 10, 20000, 5, new(1, 1), TravelMode.Land)],
             [new(1, new(92, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
              new(2, new(2, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },

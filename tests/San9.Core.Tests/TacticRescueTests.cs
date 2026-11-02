@@ -13,7 +13,7 @@ public sealed class TacticRescueTests
         var tactic = new TacticRule(9000, 0, TacticEffect.Martial, 1, 9, 0, true, false, [100]) { CanRescuePrisoners = true };
         var military = new MilitaryRulebook(new(100, 3, [.. Enumerable.Repeat(0, 300)], [new(0, 1, 1)],
             [new(100, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = new(10, 10, 0, 1000, 50), Attack = new(10, false), CaptureRanks = [BattleRank.Front],
+                { Combat = new(10, 10, 0, 1000, 50), Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]),
                     PreventsTacticRescue = protectedFormation, Tactics = new(100, 2, [0], []) }],
             [new(1, new(2, 7), new(1, 1)), new(2, new(497, 7), new(1, 1)), new(3, new(402, 7), new(1, 1))])
             { Tactics = [tactic], Geography = new(5, []) });
@@ -28,9 +28,9 @@ public sealed class TacticRescueTests
                 new(40, own ? 1 : 3, null, new(70, 70, 70, 70), false) { UnitId = 2, Status = OfficerStatus.Captive },
                 new(41, 3, null, new(70, 70, 70, 70), false) { UnitId = 2, Status = OfficerStatus.Captive }],
             units: [new(1, 1, new(102, 7), 100000) { FormationId = 100, Morale = 100, ServicePlaceId = 1, Order = Target,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) },
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) },
                 new(2, 2, new(106, 7), 100000) { FormationId = 100, Morale = 100, ServicePlaceId = 2,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front) }], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(3, 3, null, new(10000, 10000)) { IsRoot = true }]);
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)) }], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(3, 3, null, new(10000, 10000)) { IsRoot = true }]);
         return (world, new() { Military = military }, tactic);
     }
 
@@ -62,7 +62,7 @@ public sealed class TacticRescueTests
         var journey = Assert.Single(m.Simulation.Tasks.Where(t => t.OfficerId == person.Id)).Journey!;
         Assert.Equal(new WorldPosition(106, 7), journey.Route.Origin);
         Assert.True(journey.ReturnLeg!.FieldTravel);
-        Assert.Equal(new[] { 11 }, m.Units[1].MemberRanks.Keys);
+        Assert.Equal(new[] { 11 }, m.Units[1].MemberPositions.Keys);
     }
 
     [Theory]

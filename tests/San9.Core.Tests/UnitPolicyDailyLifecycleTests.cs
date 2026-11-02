@@ -78,7 +78,7 @@ public sealed partial class UnitPolicyTests
         var third = snapshot.Units.Single(u => u.Id == 2) with
         {
             Id = 3, Position = new(38, 18), CommanderId = 33,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(33, BattleRank.Front),
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(33, BattleRank.Front)),
             Order = new(MilitaryOrderKind.Move, new(20, 5), null)
         };
         snapshot = snapshot with

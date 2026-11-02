@@ -16,7 +16,7 @@ public sealed class CombatExchangeTests
         var tactic = new TacticRule(9000, effect == TacticEffect.Martial ? 0 : 7, effect == TacticEffect.Trap ? TacticEffect.TrapSelection : effect, effect == TacticEffect.Taunt ? 0 : 10, 9, 0, true, true, [100]);
         var military = new MilitaryRulebook(new(10, 1, [.. Enumerable.Repeat(0, 10)], [new(0, 1, 1)],
             [new(100, 5, 0, 100000, 2, new(1, 1), automatic ? TravelMode.Water : TravelMode.Land)
-                { Combat = combat, Attack = new(1, reprisal), CaptureRanks = [BattleRank.Front, BattleRank.Middle],
+                { Combat = combat, Attack = new(1, reprisal), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle]),
                     Tactics = new(100, 2, [0], automatic ? [9000] : []) { AutomaticOpportunityChance = automatic ? 100 : null } }],
             [new(1, new(2, 2), new(1, 1)) { Combat = combat, FacilityTypeId = 8000 },
                 new(2, new(facility ? 17 : 47, 2), new(1, 1)) { Combat = combat, FacilityTypeId = 8000, Attack = new(1, false) }])
@@ -36,9 +36,9 @@ public sealed class CombatExchangeTests
         UnitState Unit(int id) => new(id, id, new(id == 1 ? facility ? 16 : 12 : 13, 2), 10000)
         {
             FormationId = 100, Morale = 100, ServicePlaceId = id, CommanderId = id * 10 + 1,
-            MemberRanks = id == 1 && companion ? ImmutableDictionary<int, BattleRank>.Empty
+            MemberPositions = San9.Tests.FormationTestData.Members(id == 1 && companion ? ImmutableDictionary<int, BattleRank>.Empty
                 .Add(11, BattleRank.Front).Add(12, BattleRank.Middle) :
-                ImmutableDictionary<int, BattleRank>.Empty.Add(id * 10 + 1, BattleRank.Front)
+                ImmutableDictionary<int, BattleRank>.Empty.Add(id * 10 + 1, BattleRank.Front))
         };
         var world = WorldState.Create(new(190, 1, 1), 42,
             [new(1, 100) { LeaderId = 11 }, new(2, 100) { LeaderId = 21 }],

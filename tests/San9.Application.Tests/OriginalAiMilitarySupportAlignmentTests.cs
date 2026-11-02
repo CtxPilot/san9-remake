@@ -186,7 +186,7 @@ public sealed partial class OriginalAiMilitaryTests
             Officers = w.Officers.Select(p => p.Id == 2 ? p with { SettlementId = null, UnitId = 901 } : p).ToArray(),
             Units = [new(901, 1, new(17, 7), 5000) { FormationId = 400, CommanderId = 2, Morale = 100,
                 CorpsId = 1, ServicePlaceId = 1, Order = order,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle) },
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle)) },
                 new(902, 2, new(47, 7), 5000) { FormationId = 400, ServicePlaceId = 2, Morale = 100,
                     Order = new(MilitaryOrderKind.Move, new(47, 7), null) }],
             Simulation = w.Simulation with { NextUnitId = 903 }
@@ -215,10 +215,10 @@ public sealed partial class OriginalAiMilitaryTests
                         CorpsId = 1, ServicePlaceId = 1, Condition = condition,
                         ConditionDaysRemaining = condition == UnitCondition.Normal ? 0 : 5,
                         Order = new(MilitaryOrderKind.Return, null, 1),
-                        MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle) },
+                        MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle)) },
                     new(903, 1, new(22, 7), 5000) { FormationId = 400, CommanderId = 3, Morale = 100,
                         CorpsId = 1, Order = new(MilitaryOrderKind.Move, new(47, 7), null),
-                        MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(3, BattleRank.Middle) }],
+                        MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(3, BattleRank.Middle)) }],
                 Simulation = enemy.Simulation with { NextUnitId = 904 }
             };
         });
@@ -245,7 +245,7 @@ public sealed partial class OriginalAiMilitaryTests
                     new(902, 1, new(17, 7), 5000) { FormationId = 400, CommanderId = 2, Morale = 100,
                         CorpsId = 1, ServicePlaceId = 1, EngagementTargetId = temporary ? 910 : null,
                         Order = new(MilitaryOrderKind.Return, null, 1),
-                        MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle) },
+                        MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle)) },
                     new(910, 2, new(18, 7), 5000) { FormationId = 400, ServicePlaceId = 2, Morale = 100,
                         Order = new(MilitaryOrderKind.Move, new(47, 7), null) }],
                 Simulation = enemy.Simulation with { NextUnitId = 911 }

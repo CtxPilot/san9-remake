@@ -20,7 +20,7 @@ public sealed class MilitaryCommandPresentationTests
             Military = new(8, 8, Enumerable.Repeat(0, 64).ToImmutableArray(), [new(0, 1, null)],
                 [new(7, 1, 50, 10000, 5, new(1, 1), TravelMode.Land)
                     { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true),
-                        CaptureRanks = Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray() }],
+                        Positions = San9.Tests.FormationTestData.Layout(Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray()) }],
                 [new(1, new(7, 7), new(1, 1)), new(2, new(12, 12), new(1, 1))])
         };
     }

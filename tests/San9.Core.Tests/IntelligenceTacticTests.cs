@@ -19,8 +19,8 @@ public sealed partial class IntelligenceTacticTests
         int power = effect switch { TacticEffect.Heal => 19, TacticEffect.Sorcery => 14, TacticEffect.Illusion => 13, TacticEffect.Taunt => 0, _ => 10 };
         var rules = new MilitaryRulebook(new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, 1, null)],
             [new(100, 5, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, Attack = new(1, false),
-                CaptureRanks = [BattleRank.Front], Tactics = new(100, 2, [], []) },
-             new(200, 5, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, CaptureRanks = [BattleRank.Middle],
+                Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]), Tactics = new(100, 2, [], []) },
+             new(200, 5, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]),
                 Tactics = null, BypassesPassiveCounters = bypass, ConfusionResistanceChance = formationResistance }],
             [new(1, new(2, 2), new(1, 1)) { Combat = combat }, new(2, new(17, 2), new(1, 1)) { Combat = combat },
              new(3, new(areaSettlement ? 9 : 27, 2), new(1, 1)) { Combat = combat }])
@@ -37,7 +37,7 @@ public sealed partial class IntelligenceTacticTests
             new(21, targetOwner, settlement ? 2 : null, new(70, 0, 70, 70), false) { UnitId = settlement ? null : 1,
                 LearnedTactics = counter ? [9100] : [], EquippedTacticId = counter ? 9100 : null, Injury = effect == TacticEffect.Heal ? 7 : 0 }];
         List<UnitState> units = [new(0, 1, new(settlement ? 16 : 6, 2), 99900) { FormationId = 100, Morale = effect == TacticEffect.Inspire ? 79 : 100, ServicePlaceId = 1,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) }];
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) }];
         if (!settlement) units.Add(new(1, targetOwner, new(7, 2), support ? 99950u : 10000u)
         {
             FormationId = 200,
@@ -46,7 +46,7 @@ public sealed partial class IntelligenceTacticTests
             Wounded = effect == TacticEffect.Heal ? wounded : 0,
             Condition = effect == TacticEffect.Heal || existingConfusion > 0 ? UnitCondition.Confused : UnitCondition.Normal,
             ConditionDaysRemaining = effect == TacticEffect.Heal ? 100 : existingConfusion,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle))
         });
         List<ForceState> forces = [new(1, 100) { LeaderId = 11 }];
         if (!support) forces.Add(new(2, 100) { LeaderId = 21 });
@@ -61,7 +61,7 @@ public sealed partial class IntelligenceTacticTests
                 FormationId = 200,
                 Morale = 100,
                 ServicePlaceId = 3,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(31, BattleRank.Middle)
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(31, BattleRank.Middle))
             });
             units.Add(new(3, 1, new(8, 3), 10000) { FormationId = 200, Morale = 100 });
             settlements.Add(new(3, 3, 1000, 100, 100, 100, 0, 0, 100, 0, 100));

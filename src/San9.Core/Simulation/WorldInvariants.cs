@@ -97,7 +97,7 @@ internal static class WorldInvariants
         foreach (var unit in state.Units.Values)
         {
             if (!unit.IsValid || !state.AllForces.ContainsKey(unit.OwnerId) ||
-                unit.MemberRanks.Keys.Any(id => !state.AllOfficers.TryGetValue(id, out var person) || person.UnitId != unit.Id || !person.IsServing) ||
+                unit.MemberPositions.Keys.Any(id => !state.AllOfficers.TryGetValue(id, out var person) || person.UnitId != unit.Id || !person.IsServing) ||
                 unit.Order?.SettlementId is int target && !state.AllSettlements.ContainsKey(target) ||
                 unit.Order?.UnitId is int targetUnit && !state.Units.ContainsKey(targetUnit) ||
                 unit.EngagementTargetId is int engagement && !state.Units.ContainsKey(engagement) ||
@@ -126,7 +126,7 @@ internal static class WorldInvariants
                 (f.LeaderId is int leader && state.AllOfficers.TryGetValue(leader, out var p) && p.IsDormant ||
                  f.AdviserId is int adviser && state.AllOfficers.TryGetValue(adviser, out var a) && a.IsDormant)) ||
             state.Units.Values.Any(u => !state.Forces.ContainsKey(u.OwnerId) ||
-                u.MemberRanks.Keys.Any(id => !state.Officers.ContainsKey(id)) ||
+                u.MemberPositions.Keys.Any(id => !state.Officers.ContainsKey(id)) ||
                 u.CommanderId is int commander && !state.Officers.ContainsKey(commander) ||
                 u.Order?.SettlementId is int target && !state.Settlements.ContainsKey(target) ||
                 u.ServicePlaceId is int home && state.AllSettlements.TryGetValue(home, out var place) && place.IsDormant) ||

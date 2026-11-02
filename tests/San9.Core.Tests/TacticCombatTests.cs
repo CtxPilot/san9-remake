@@ -98,9 +98,9 @@ public sealed class TacticCombatTests
         var rules = new MilitaryRulebook(new(4, 1, [0, 0, 0, 0], [new(0, 1, 1)],
             [new(100, 5, 0, 100000, 2, new(1, 1), mode) { Combat = combat, Attack = new(1, false),
                 AutomaticTacticLearningId = waterLearning ? 9020 : null,
-                CaptureRanks = [BattleRank.Front, BattleRank.Front], Tactics = new(opportunityChance, linkMultiplier, [0], water ? [9000] : [])
+                Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Front]), Tactics = new(opportunityChance, linkMultiplier, [0], water ? [9000] : [])
                     { AutomaticOpportunityChance = water ? opportunityChance : null } },
-             new(200, 5, 0, 100000, 1, new(1, 1), mode) { Combat = combat, CaptureRanks = [BattleRank.Middle],
+             new(200, 5, 0, 100000, 1, new(1, 1), mode) { Combat = combat, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]),
                 MartialTacticVulnerabilities = vulnerableCategory is int weak ? [weak] : [],
                 Attack = counter ? new(1, false) : null, Tactics = counter ? new(opportunityChance, 2, [0], []) : null }],
             [new(1, new(2, 2), new(1, 1)) { Combat = combat }, new(2, new(17, 2), new(1, 1)) { Combat = combat }])
@@ -131,13 +131,13 @@ public sealed class TacticCombatTests
             EquippedTacticId = counter ? 9000 : null
         });
         List<UnitState> units = [new(0, 1, new(settlement ? 16 : 6, 2), 100000) { FormationId = 100, Morale = 100, ServicePlaceId = 1,
-            MemberRanks = officers.Where(p => p.UnitId == 0).ToImmutableDictionary(p => p.Id, _ => BattleRank.Front) }];
+            MemberPositions = San9.Tests.FormationTestData.Members(officers.Where(p => p.UnitId == 0).ToImmutableDictionary(p => p.Id, _ => BattleRank.Front)) }];
         if (!settlement) units.Add(new(1, 2, new(7, 2), 100000)
         {
             FormationId = 200,
             Morale = 100,
             ServicePlaceId = 2,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle))
         });
         if (differentCommander)
             units[0] = units[0] with { CommanderId = 12, };

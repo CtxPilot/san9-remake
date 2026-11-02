@@ -77,7 +77,7 @@ public sealed partial class OriginalAiPersonnelTests
                 new("undiscovered", new(201, null, 3, new(50, 50, 50, 50), false) { Status = OfficerStatus.Undiscovered })],
             Military = new(20, 3, Enumerable.Repeat(0, 60).ToImmutableArray(), [new(0, 1, null)],
                 [new(400, 10, 0, 30000, 1, new(1, 1), TravelMode.Land)
-                    { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true), CaptureRanks = [BattleRank.Middle] }],
+                    { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
                 [new(1, new(7, 7), new(1, 1)) { Combat = new(10, 10, 10, 10, 50) }, new(2, new(17, 7), new(1, 1)), new(3, new(27, 7), new(1, 1))])
         };
         var h = new Harness(content, change: w => w with

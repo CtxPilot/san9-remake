@@ -4,9 +4,8 @@ using San9.Core.Domain;
 
 namespace San9.Application.Presentation;
 
-public sealed record FormationMemberView(int OfficerId, string Name, string Tactic, BattleRank Rank, bool IsCommander)
+public sealed record FormationMemberView(int OfficerId, string Name, string Tactic, FormationSlot? Position, bool IsCommander)
 {
-    public FormationSlot? Position { get; init; }
     public string HoverText { get; init; } = "";
     public bool TacticAvailable { get; init; } = true;
 }
@@ -30,13 +29,16 @@ public static class UnitDetails
         string force = texts.Resolve(view.Forces.Single(f => f.Id == unit.OwnerId).NameKey);
         var command = new OfficerCommands(view, texts).ReadUnit(unit, view.PlayerForceId);
         string Policy(string value) => unit.OwnerId == view.PlayerForceId ? value : "＊＊＊";
-        var boardMembers = members.OrderBy(o => unit.MemberRanks.GetValueOrDefault(o.Id, BattleRank.Middle)).ThenByDescending(o => o.Id == unit.CommanderId).ThenBy(o => o.Id).Select(o =>
+        var boardMembers = members.OrderByDescending(o => o.Id == unit.CommanderId).ThenBy(o => o.Id).Select(o =>
         {
             var person = view.World.Officers.Single(p => p.Id == o.Id);
             var tactic = UnitTacticDisplay.Read(view, rules, texts, unit, person, view.PlayerForceId);
             return new FormationMemberView(o.Id, texts.Resolve(o.NameKey), tactic.Text == "＊＊" ? "＊＊＊" : tactic.Text.Length == 0 ? "—" : tactic.Text,
-                unit.MemberRanks.GetValueOrDefault(o.Id, BattleRank.Middle), o.Id == unit.CommanderId)
-            { TacticAvailable = !tactic.IsUnavailable };
+                unit.MemberPositions.TryGetValue(o.Id, out var position) ? new(position.Column, position.Row) : null,
+                o.Id == unit.CommanderId)
+            {
+                TacticAvailable = !tactic.IsUnavailable
+            };
         }).ToArray();
         var commander = view.World.Officers.FirstOrDefault(o => o.Id == unit.CommanderId);
         var owner = view.World.Forces.Single(f => f.Id == unit.OwnerId);

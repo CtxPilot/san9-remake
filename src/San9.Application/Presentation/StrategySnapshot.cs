@@ -162,8 +162,8 @@ public sealed class StrategySnapshot
     }
     public IReadOnlyList<MapCell> FacilityRockfallPath(int id, WorldPosition target) => military is not null &&
         World.Settlements.FirstOrDefault(s => s.Id == id) is {} source ? military.RockfallPath(source, target, World.Settlements) : [];
-    public BattleRank? FormationRank(UnitState unit, int officerId) => unit.FormationId is null || !unit.MemberRanks.TryGetValue(officerId, out var rank)
-        ? null : unit.NavalFormationId is null ? rank : military!.Rank(unit, officerId);
+    public BattleRank? FormationRank(UnitState unit, int officerId) => unit.FormationId is null || !unit.MemberPositions.TryGetValue(officerId, out var position)
+        ? null : unit.NavalFormationId is null ? position.Rank : military!.Rank(unit, officerId);
     private MilitaryArrivalForecast? arrivalForecast;
     private readonly TreasureRulebook arrivalTreasures;
     private readonly Dictionary<int, ArrivalEstimate> arrivals = [];

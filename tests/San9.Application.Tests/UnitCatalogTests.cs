@@ -25,7 +25,7 @@ public sealed class UnitCatalogTests
         definition = definition with { Military = new(4, 4, Enumerable.Repeat(0, 16).ToImmutableArray(),
             [new(0, 1, 1)], [new(100, 5, 0, 100000, 5, new(1, 1), TravelMode.Land)
                 { Combat = new(10, 10, 10, 10, 50), Attack = new(10, false),
-                    CaptureRanks = Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray() }], []),
+                    Positions = San9.Tests.FormationTestData.Layout(Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray()) }], []),
             Information = definition.Information with { Formations = [new(100, "formation")] } };
         var subject = new UnitState(78, 2, new(16, 12), 1000)
         {

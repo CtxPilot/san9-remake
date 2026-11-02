@@ -24,11 +24,11 @@ public sealed class AllianceVictoryTests
             Enumerable.Range(1, 4).Select(i => new ForceState(i, 100)
                 { LeaderId = i * 10, BaseTrust = i == victor ? trust : 100 }),
             cities, people, units: [new(1, victor, new(32, 7), 1000) { FormationId = 1, Morale = 100, Order = new(MilitaryOrderKind.AttackSettlement, null, 3),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle)) }],
             alliance: new(3, 1, [1, 2], 20), corps: [.. Enumerable.Range(1, 4).Select(i => new San9.Core.Domain.CorpsState(i, i, i * 10, new(1000, 1000)) { IsRoot = true })]);
         var military = new MilitaryRulebook(new(20, 3, [.. Enumerable.Repeat(0, 60)], [new(0, 1, 1)],
             [new(1, 1, 0, 10000, 1, new(1, 1), TravelMode.Land)
-                { Combat = new(10, 10, 100, 10, 50), Attack = new(15, true), CaptureRanks = [BattleRank.Middle] }],
+                { Combat = new(10, 10, 100, 10, 50), Attack = new(15, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
             [.. Enumerable.Range(1, 5).Select(i => new BattlefieldPlace(i, new(i * 10 + 2, 7), new(1, 1))
                 { Combat = new(10, 10, 0, 10, 50) })]));
         var rules = new SimulationRules { Military = military };

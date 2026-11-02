@@ -24,7 +24,7 @@ public sealed class FixedUnitFormationTests
 
     private static FormationRule Formation(int id, int budget, TravelMode mode) => new(id, budget, 0, 10000, 1, new(1, 1), mode)
     {
-        IsCommon = id < 500, Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Middle]
+        IsCommon = id < 500, Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle])
     };
 
     private static WorldState World() => WorldState.Create(new(190, 1, 1), 42,

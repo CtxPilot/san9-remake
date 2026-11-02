@@ -13,9 +13,9 @@ public sealed class FacilityConstructionTests
     private static readonly MilitaryRulebook Military = CreateMilitary();
     private static MilitaryRulebook CreateMilitary(bool hostsPeople = true, bool needsTechnology = false, bool attacksWalls = false, int members = 1) => new(new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, 1, null)],
         [new(1, 5, 50, 100000, members, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 1000, 10, 50), Attack = new(1, attacksWalls), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Front, members)] },
+            { Combat = new(10, 10, 1000, 10, 50), Attack = new(1, attacksWalls), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Front, members)]) },
          new(2, 5, 50, 100000, members, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 1000, 10, 50), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Front, members)] }],
+            { Combat = new(10, 10, 1000, 10, 50), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Front, members)]) }],
         [new(1, new(2, 2), new(1, 1)) { FacilityTypeId = 0 },
          new(2, new(27, 2), new(1, 1)) { FacilityTypeId = 0 }])
     {
@@ -656,7 +656,7 @@ public sealed class FacilityConstructionTests
                 { UnitId = 1, Status = OfficerStatus.Ruler }),
             Units = saved.Units.Select(u => u with { Condition = UnitCondition.Confused, ConditionDaysRemaining = 100 }).ToImmutableArray()
                 .Add(new(1, 2, new(19, 2), 10000) { FormationId = 1, Morale = 100,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front),
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)),
                     Order = new(MilitaryOrderKind.AttackSettlement, null, 8000) }),
             Simulation = saved.Simulation with { NextUnitId = 2 }
         }), rules);
@@ -704,7 +704,7 @@ public sealed class FacilityConstructionTests
             Officers = saved.Officers.ToImmutableArray().Add(new(21, 2, null, new(100, 100, 100, 100), false)
                 { UnitId = 1, Status = OfficerStatus.Ruler }),
             Units = [new(1, 2, new(19, 2), 10000) { FormationId = 1, Morale = 50,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front),
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)),
                 Order = new(MilitaryOrderKind.AttackSettlement, null, 8000) }],
             Simulation = saved.Simulation with { NextUnitId = 2 }
         }), rules);
@@ -742,7 +742,7 @@ public sealed class FacilityConstructionTests
                 { UnitId = 1, Status = OfficerStatus.Ruler }),
             Units = saved.Units.Select(u => u with { Soldiers = 1, Condition = UnitCondition.Confused, ConditionDaysRemaining = 100 }).ToImmutableArray()
                 .Add(new(1, 2, new(12, 2), 10000) { FormationId = 1, Morale = 100,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front),
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)),
                     Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 0 } }),
             Simulation = saved.Simulation with { NextUnitId = 2 }
         }));

@@ -10,7 +10,7 @@ public enum UnitCondition { Normal = 0, Disguised = 3, NoFormation = 4, Confused
 public sealed record UnitState(int Id, int OwnerId, [property: JsonRequired] WorldPosition Position, uint Soldiers)
 {
     [JsonRequired] public WorldDirection Facing { get; init; } = WorldDirection.South;
-    [JsonRequired] public System.Collections.Immutable.ImmutableDictionary<int, BattleRank> MemberRanks { get; init; } = System.Collections.Immutable.ImmutableDictionary<int, BattleRank>.Empty;
+    [JsonRequired] public System.Collections.Immutable.ImmutableDictionary<int, FormationPosition> MemberPositions { get; init; } = System.Collections.Immutable.ImmutableDictionary<int, FormationPosition>.Empty;
     [JsonRequired] public int? FormationId { get; init; }
     [JsonRequired] public int? NavalFormationId { get; init; }
     [JsonRequired] public int Morale { get; init; }
@@ -93,7 +93,7 @@ public sealed record UnitState(int Id, int OwnerId, [property: JsonRequired] Wor
         (!AwaitingPostAction || Order is null) && (!AutonomousReturn || Order is { Kind: MilitaryOrderKind.Return }) &&
         (!PursuitResponsePending || AutonomousReturn) &&
         (FormationId is not null || EngagementTargetId is null && !AwaitingPostAction && CommanderId is null) &&
-        MemberRanks is not null && MemberRanks.All(p => p.Key >= 0 && Enum.IsDefined(p.Value)) &&
+        MemberPositions is not null && MemberPositions.All(p => p.Key >= 0 && p.Value.IsValid) &&
         (Order is null || FormationId is not null && Order.IsValid) &&
         (MovementRemainder == 0 || FormationId is not null && EffectiveOrder is not null && Condition != UnitCondition.Confused);
 }

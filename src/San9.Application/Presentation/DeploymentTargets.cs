@@ -38,6 +38,6 @@ public sealed class DeploymentTargets(DeploymentDraft draft)
         {
             NavalFormationId = NavalFormationId, Policies = Policies, ConfirmAttack = confirmAttack,
             DepartureDelayDays = DepartureDelayDays, Waypoint = WaypointPosition,
-            Tactics = Draft.Tactics, Ranks = Draft.Positions.ToImmutableDictionary(p => p.Key, p => (BattleRank)Math.Min(2, p.Value.Row))
+            Tactics = Draft.Tactics, Positions = Draft.Positions.ToImmutableDictionary(p => p.Key, p => new FormationPosition(p.Value.Column, (BattleRank)p.Value.Row))
         };
 }

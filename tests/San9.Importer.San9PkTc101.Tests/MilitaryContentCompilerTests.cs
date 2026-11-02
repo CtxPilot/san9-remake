@@ -123,9 +123,9 @@ public sealed class MilitaryContentCompilerTests
             Assert.Equal(source.Id == 27, formation.ImmuneToDisorder);
             Assert.Equal(source.Id is >= 21 and <= 23 ? source.Id - 9 : (int?)null, formation.AutomaticTacticLearningId);
             Assert.Equal(source.Id is >= 8 and <= 11 ? source.Id + 7 : (int?)null, formation.CaptureTacticLearningId);
-            Assert.Equal(source.Id is >= 20 and <= 26 ?
-                [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle] :
-                new[] { BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear }, formation.CaptureRanks);
+            Assert.Equal(source.Id is >= 20 and <= 26
+                ? new FormationPosition[] { new(0, BattleRank.Middle), new(1, BattleRank.Middle), new(2, BattleRank.Middle), new(3, BattleRank.Middle), new(4, BattleRank.Middle) }
+                : [new(1, BattleRank.Front), new(0, BattleRank.Middle), new(1, BattleRank.Middle), new(2, BattleRank.Middle), new(1, BattleRank.Rear)], formation.Positions);
         }
         var rules = new MilitaryRulebook(definition);
         Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 33, 34 }, definition.Tactics.Where(t => t.CanRescuePrisoners).Select(t => t.Id));

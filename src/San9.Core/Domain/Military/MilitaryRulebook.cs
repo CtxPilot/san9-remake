@@ -35,7 +35,7 @@ public sealed record FormationRule(int Id, int MovementBudget, int DeploymentCos
     [JsonRequired] public int? CaptureTacticLearningId { get; init; }
     [JsonRequired] public CombatProfile? Combat { get; init; }
     [JsonRequired] public OrdinaryAttack? Attack { get; init; }
-    [JsonRequired] public ImmutableArray<BattleRank> CaptureRanks { get; init; } = [];
+    [JsonRequired] public ImmutableArray<FormationPosition> Positions { get; init; } = [];
     [JsonRequired] public bool DoublesCapture { get; init; }
     [JsonRequired] public bool PreventsTacticRescue { get; init; }
     [JsonRequired] public int SnipingChanceBonus { get; init; }
@@ -241,9 +241,9 @@ public sealed partial class MilitaryRulebook
             f.MartialTacticVulnerabilities.Any(c => c is < 0 or > 8) ||
             f.MartialTacticVulnerabilities.Distinct().Count() != f.MartialTacticVulnerabilities.Length))
             throw new ArgumentException("Invalid formation tactic vulnerabilities.");
-        if (Formations.Values.Any(f => f.CaptureRanks.IsDefault || f.CaptureRanks.Any(r => !Enum.IsDefined(r)) ||
-            (!f.CaptureRanks.IsEmpty || f.Attack is not null) && f.CaptureRanks.Length != f.OfficerCapacity))
-            throw new ArgumentException("Missing formation capture ranks.");
+        if (Formations.Values.Any(f => f.Positions.IsDefault || f.Positions.Any(p => !p.IsValid) ||
+            (!f.Positions.IsEmpty || f.Attack is not null) && f.Positions.Length != f.OfficerCapacity))
+            throw new ArgumentException("Invalid formation positions.");
         Places = definition.Places.ToImmutableDictionary(p => p.Id);
         if (Places.Values.Select(p => p.Footprint).Concat(Facilities.Values.Select(f => f.Footprint))
             .Any(shape => (long)shape.Width * Geography.FootprintScale > int.MaxValue || (long)shape.Height * Geography.FootprintScale > int.MaxValue))

@@ -21,7 +21,7 @@ public sealed class MilitaryDiplomacyTests
             [new(11, 1, 1, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler },
              new(12, 1, null, new(70, 70, 70, 70), false) { UnitId = 0 }],
             units: [new(0, 1, new(47, 10), 10000) { FormationId = 0, Morale = 90, ServicePlaceId = 1,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(12, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(12, BattleRank.Front)) }],
             controls: [new("player", 1, ControllerKind.Player)],
             corps: [new(1, 1, 11, new(1000, 1000)) { IsRoot = true }]);
         var rules = Military(work);
@@ -57,7 +57,7 @@ public sealed class MilitaryDiplomacyTests
 
     private static MilitaryRulebook Military(bool work = false, bool armed = false, int geographicScale = 1) => new(new MilitaryDefinition(12, 4, new int[48].ToImmutableArray(),
         [new(0, 10, null)], [new(0, 10, 0, 100000, 5, new(1, 1), TravelMode.Land)
-            { Combat = Combat, Attack = new(3, true), CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear] }],
+            { Combat = Combat, Attack = new(3, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear]) }],
         [new(1, new(2, 10), new(1, 1)) { Combat = Combat, FacilityTypeId = 8 },
          new(2, new(50, 10), new(3, 3)) { Combat = Combat, Attack = armed ? new(3, false) : null, FacilityTypeId = 9 }])
         { Geography = new(geographicScale, []), Facilities = [new(8, 0, 100, new(1, 1), 0, false, true, false, 100000, null, null, null, []) { Combat = Combat }, new(9, 0, 100, new(3, 3), 0, false, false, false, 100000, null, null, null, []) { Combat = Combat, Attack = armed ? new(3, false) : null, IsWork = work }] });
@@ -69,9 +69,9 @@ public sealed class MilitaryDiplomacyTests
          new OfficerState(12, 1, null, new(70, 70, 70, 70), false) { UnitId = 0, Righteousness = 10 }.WithLoyalty(1, 100),
          new OfficerState(22, 2, null, new(70, 70, 70, 70), false) { UnitId = 1 }],
         units: [new(0, 1, new(10, 10), 10000) { FormationId = 0, Morale = 90, ServicePlaceId = 1,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(12, BattleRank.Front),
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(12, BattleRank.Front)),
             Order = field ? new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 } : new(MilitaryOrderKind.AttackSettlement, null, 2) },
-            new(1, 2, new(12, 10), 10000) { MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front), FormationId = 0, Morale = 90, ServicePlaceId = 2 }],
+            new(1, 2, new(12, 10), 10000) { MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)), FormationId = 0, Morale = 90, ServicePlaceId = 2 }],
         relations: [new(1, 2, relation), new(1, 3, relation), new(1, 4, 0), new(2, 3, 70), new(2, 4, 0), new(3, 4, 0)],
         controls: [new("player", 1, ControllerKind.Player)], alliance: alliance ? new(4, 2, [1, 2, 3], 36) : null, corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(1000, 1000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(1000, 1000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(3, 3, null, new(0, 0)) { IsRoot = true }, new San9.Core.Domain.CorpsState(4, 4, null, new(0, 0)) { IsRoot = true }]);
 

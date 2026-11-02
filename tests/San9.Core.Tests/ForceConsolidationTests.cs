@@ -275,7 +275,7 @@ public sealed class ForceConsolidationTests
             units: [new(50, 2, new(12, 2), 1000) { FormationId = 9, ServicePlaceId = 3, CorpsId = 21, Morale = 70,
                 CommanderId = 23, CargoMoney = 99, CargoFood = 88,
                 Order = new(MilitaryOrderKind.Move, new(7, 2), null),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(23, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(23, BattleRank.Front)) }],
             corps: [..initial.Corps.Where(c => c.OwnerId == 1), new(20, 2, 21, new(200, 300)) { IsRoot = true }, new(21, 2, 22, new(2000, 3000)), new(30, 3, 31, new(TreasuryRules.Capacity - 100, 500)) { IsRoot = true }],
             relations: initial.Relations, controls: initial.Simulation.Controls);
         var mutation = Pending(world);

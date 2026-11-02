@@ -9,7 +9,7 @@ public sealed class MovementContactTests
 {
     private static MilitaryRulebook Rules() => new(new(100, 30, new int[3000].ToImmutableArray(), [new(0, 10, null)],
         [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
         [new(1, new(42, 52), new(10, 10)) { Combat = new(10, 10, 10, 10, 50) }]));
 
     private static UnitState Unit(int id, WorldPosition position) => new(id, id + 1, position, 1000)
@@ -40,7 +40,7 @@ public sealed class MovementContactTests
     {
         var rules = new MilitaryRulebook(new(30, 30, new int[900].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(lowerId, new(42, 57), new(10, 10)) { Combat = new(10, 10, 10, 10, 50) },
              new(upperId, new(42, 47), new(10, 10)) { Combat = new(10, 10, 10, 10, 50) }]));
         var mover = Unit(0, new(32, 52)) with { Order = new(MilitaryOrderKind.Move, new(42, 52), null) };

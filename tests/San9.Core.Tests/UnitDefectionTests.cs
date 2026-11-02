@@ -11,7 +11,7 @@ public sealed class UnitDefectionTests
     {
         Personnel = new([new(1, new(2, 2)), new(2, new(902, 2))], new Dictionary<int, int> { [1] = 1, [2] = 2 }, [new(1, 2), new(2, 1)]),
         Military = new(new(200, 2, Enumerable.Repeat(0, 400).ToImmutableArray(), [new(0, 1, null)],
-            [new(1, 1, 0, 1000000, 5, new(1, 1), TravelMode.Land) { CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle], Attack = new(10, true), Combat = new(10, 10, 10, 10, 50) }],
+            [new(1, 1, 0, 1000000, 5, new(1, 1), TravelMode.Land) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]), Attack = new(10, true), Combat = new(10, 10, 10, 10, 50) }],
             [new(1, new(2, 2), new(1, 1)), new(2, new(902, 2), new(1, 1))])
             { RegionIds = Enumerable.Repeat<int?>(2, 400).ToImmutableArray() })
     };

@@ -234,7 +234,7 @@ public sealed class ChainedPlotTests
         var state = World(true); var world = state.BeginMutation(Rules().Abilities);
         world.SetSimulation(world.Simulation with { NextUnitId = 52 });
         world.AddUnit(new(50, 1, new(12, 2), 1000) { FormationId = 1, ServicePlaceId = 1, CommanderId = 11,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front).Add(17, BattleRank.Rear) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front).Add(17, BattleRank.Rear)) });
         world.AddUnit(new(51, 1, new(12, 2), 1000) { FormationId = 1, ServicePlaceId = 1, CommanderId = 18 });
         foreach (int id in new[] { 11, 17 }) world.Replace(world.Officers[id] with { SettlementId = null, UnitId = 50 });
         world.Replace(world.Officers[18] with { SettlementId = null, UnitId = 51 });

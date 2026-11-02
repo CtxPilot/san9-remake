@@ -20,14 +20,14 @@ public sealed class SiegePersistenceTests
             Military = basis.Military! with
             {
                 Formations = [.. basis.Military.Formations.Select(f => f with
-                    { Combat = new(10, 10, 0, 10, 50), Attack = new(1, false), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Middle, f.OfficerCapacity)] })],
+                    { Combat = new(10, 10, 0, 10, 50), Attack = new(1, false), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Middle, f.OfficerCapacity)]) })],
                 Places = [.. basis.Military.Places.Select(p => p with { Combat = new(10, 10, 0, 10, 50) })]
             },
             Settlements = [.. basis.Settlements.Select(s => s.Id == 3 ? s with { Soldiers = 1 } : s)],
             Units = [.. basis.Units.Select(u => u with
             {
                 Position = new(100, 7), Order = new(MilitaryOrderKind.AttackSettlement, null, 3),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(u.Id == 10 ? 3 : 23, BattleRank.Middle),
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(u.Id == 10 ? 3 : 23, BattleRank.Middle)),
                 Condition = u.Id == 10 ? UnitCondition.Confused : UnitCondition.Normal,
                 ConditionDaysRemaining = u.Id == 10 ? 100 : 0
             })]

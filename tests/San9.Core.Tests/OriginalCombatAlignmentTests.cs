@@ -10,8 +10,8 @@ public sealed class OriginalCombatAlignmentTests
 {
     private static MilitaryDefinition Definition() => new(20, 1, [.. Enumerable.Repeat(0, 20)], [new(0, 1, 1)],
         [new(101, 1, 0, 100000, 1, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 0, 10, 80), Attack = new(10, false), CaptureRanks = [BattleRank.Middle] },
-         new(202, 1, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = new(8, 8, 0, 8, 50), CaptureRanks = [BattleRank.Middle] }],
+            { Combat = new(10, 10, 0, 10, 80), Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) },
+         new(202, 1, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = new(8, 8, 0, 8, 50), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
         [new(1, new(2, 2), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
          new(2, new(92, 2), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
          new(3, new(82, 2), new(1, 1)), new(4, new(72, 2), new(1, 1))])
@@ -35,9 +35,9 @@ public sealed class OriginalCombatAlignmentTests
          new(21, 2, null, new(70, 70, 70, 70), false) { UnitId = 2 },
          new(31, 3, 3, new(70, 70, 70, 70), false)],
         units: [new(1, 1, new(12, 2), 500) { FormationId = 101, Morale = 70, ServicePlaceId = 1,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle) },
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle)) },
                 new(2, 2, new(17, 2), 500) { FormationId = 101, Morale = 70, ServicePlaceId = 2,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle) }], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, food)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 1000000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(3, 3, 31, new(10000, 1000000)) { IsRoot = true }]);
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)) }], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, food)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 1000000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(3, 3, 31, new(10000, 1000000)) { IsRoot = true }]);
 
     [Theory]
     [InlineData(0u, true)]

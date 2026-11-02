@@ -222,7 +222,7 @@ public sealed class SiegeContributionTests
 
     private static SimulationRules Rules() => new() { Military = new(new(20, 8, [.. Enumerable.Repeat(0, 160)],
         [new(0, 1, 1)], [new(1, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Middle] }],
+            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
         [new(10, new(32, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
          new(11, new(92, 25), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
          new(20, new(2, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
@@ -234,7 +234,7 @@ public sealed class SiegeContributionTests
         [Person(1, 1, 20) with { Status = OfficerStatus.Ruler }, Person(2, 2, 30) with { Status = OfficerStatus.Ruler },
          Person(3, 3, 11) with { Status = OfficerStatus.Ruler }, Person(12, 1, 20) with { SettlementId = null, UnitId = 101 }, Person(31, 3, 11)],
         [Unit(100, 1, 1), Unit(101, 1, 11) with { CommanderId = 12,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(12, BattleRank.Middle) }, Unit(201, 2, 2)],
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(12, BattleRank.Middle)) }, Unit(201, 2, 2)],
         [new(1, 1, 1, new(1000, 1000)) { IsRoot = true }, new(11, 1, 12, new(1000, 1000)),
          new(2, 2, 2, new(1000, 1000)) { IsRoot = true }, new(3, 3, 3, new(10000, 10000)) { IsRoot = true }]);
 

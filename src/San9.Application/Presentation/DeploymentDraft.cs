@@ -107,8 +107,8 @@ public sealed partial class DeploymentDraft
     public FormationPresentation? Presentation(bool naval) => View.Information.Formations.FirstOrDefault(f => f.Id == (naval ? NavalFormationId : FormationId))?.Presentation;
     public ImmutableArray<FormationSlot> Slots => FormationId is int id ? FormationSlots(View, id) : [];
     internal static ImmutableArray<FormationSlot> FormationSlots(StrategySnapshot view, int id) =>
-        view.Information.Formations.FirstOrDefault(f => f.Id == id)?.Presentation is { Slots.IsEmpty: false } presentation
-            ? presentation.Slots
+        view.MilitaryRules!.Formations[id].Positions is { IsEmpty: false } positions
+            ? positions.Select(p => new FormationSlot(p.Column, p.Row)).ToImmutableArray()
             : Enumerable.Range(0, view.MilitaryRules!.Formations[id].OfficerCapacity).Select(i => new FormationSlot(i, 1)).ToImmutableArray();
     private void Arrange(bool retain)
     {
@@ -143,9 +143,8 @@ public sealed partial class DeploymentDraft
             bool compatible = IsTacticCompatible(id);
             return new FormationMemberView(id, texts.Resolve(person.NameKey), Tactics[id] is int tactic
                 ? texts.Resolve(View.Information.Tactics.Single(t => t.Id == tactic).NameKey) : "—",
-                (BattleRank)Math.Min(2, Positions[id].Row), id == CommanderId)
+                Positions[id], id == CommanderId)
             {
-                Position = Positions[id],
                 TacticAvailable = Tactics[id] is null || compatible,
                 HoverText = $"武力{person.Abilities.War}、智力{person.Abilities.Intelligence}、兵法数{AvailableTactics(id).Count}" +
                     (Tactics[id] is null ? "\n尚未配置兵法" : compatible ? "" : "\n当前兵法不适配陆上阵形")

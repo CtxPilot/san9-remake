@@ -19,7 +19,7 @@ public sealed class FacilityCombatSessionTests
             Officers = [new("defender", new(11, 1, 1, new(100, 100, 100, 100), false) { Status = OfficerStatus.Ruler }),
                 new("attacker", new(21, 2, 2, new(100, 100, 100, 100), false) { Status = OfficerStatus.Ruler, TacticLinkBonus = 10 })],
             Military = new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
-                [new(700, 5, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, Attack = new(1, false), CaptureRanks = [BattleRank.Middle] }],
+                [new(700, 5, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, Attack = new(1, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
                 [new(1, new(2, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat, Attack = new(1, false), EnabledTacticIds = [9000] },
                     new(2, new(12, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat }])
             {

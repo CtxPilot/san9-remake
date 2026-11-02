@@ -18,7 +18,7 @@ public sealed class FacilityCombatTests
         var profile = new CombatProfile(0, 0, 0, 1000, 50);
         var military = new MilitaryRulebook(new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
             [new(700, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = profile, Attack = new(1, false), CaptureRanks = [BattleRank.Middle],
+                { Combat = profile, Attack = new(1, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]),
                     MartialTacticVulnerabilities = vulnerableCategory is int weak ? [weak] : [] }],
             [new(1, new(7, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = profile, Attack = new(1, false), EnabledTacticIds = enabled ? [9000] : [] },
                 new(2, new(17, 2), new(1, 1)) { FacilityTypeId = 8001, Combat = profile },
@@ -47,7 +47,7 @@ public sealed class FacilityCombatTests
                 new(22, 2, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler }],
             units: [new(1, support ? 1 : 2, new(8, 2), targetSoldiers) { FormationId = 700, Morale = support ? 79 : 100,
                 CargoMoney = 50, CargoFood = 75,
-                Wounded = support ? 100u : 40u, ServicePlaceId = 2, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle),
+                Wounded = support ? 100u : 40u, ServicePlaceId = 2, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)),
                 Condition = support ? UnitCondition.Confused : UnitCondition.Normal, ConditionDaysRemaining = support ? 100 : 0 }],
             controls: [new("player", attacking ? 2 : 1, ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 100000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(10000, 100000)) { IsRoot = true }]);
         var engine = new SimulationEngine(state, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: military);

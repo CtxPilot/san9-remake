@@ -19,7 +19,7 @@ public sealed class G06CampaignTests
             new("general", new(12, 1, 1, new(90, 90, 90, 90), false)),
             new("enemy", new(22, 2, 2, new(40, 40, 40, 40), false) { Status = OfficerStatus.Ruler })],
         Military = new(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(), [new(0, 1, null)],
-            [new(7, 2, 10, 100000, 5, new(1, 1), TravelMode.Land) { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle] }],
+            [new(7, 2, 10, 100000, 5, new(1, 1), TravelMode.Land) { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]) }],
             [new(1, new(2, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50), Attack = new(1, false) },
              new(2, new(37, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50), Attack = new(1, false) }])
     , Information = new([], [], [], [new San9.Core.Domain.CorpsState(1, 1, 11, new(100000, 100000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(1000, 1000)) { IsRoot = true }], []) };

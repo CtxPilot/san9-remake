@@ -8,7 +8,7 @@ public sealed record DeployUnitCommand(Guid CommandId, int IssuerId, long Sequen
     ImmutableArray<int> OfficerIds, uint Soldiers, int FormationId, MilitaryOrder Order) : GameCommand(CommandId, IssuerId, Sequence)
 {
     [JsonRequired] public ImmutableDictionary<int, int?> Tactics { get; init; } = ImmutableDictionary<int, int?>.Empty;
-    [JsonRequired] public ImmutableDictionary<int, BattleRank> Ranks { get; init; } = ImmutableDictionary<int, BattleRank>.Empty;
+    [JsonRequired] public ImmutableDictionary<int, FormationPosition> Positions { get; init; } = ImmutableDictionary<int, FormationPosition>.Empty;
     [JsonRequired] public int DepartureDelayDays { get; init; }
     [JsonRequired] public WorldPosition? Waypoint { get; init; }
     [JsonRequired] public int? NavalFormationId { get; init; }
@@ -80,8 +80,8 @@ internal static class MilitaryMovement
                 throw new ArgumentException("Invalid unit waypoint.");
             if (unit.Lookahead is { } stage && (stage.Position.X >= rules.Map.FineWidth || stage.Position.Y >= rules.Map.FineHeight))
                 throw new ArgumentException("Invalid navigation lookahead.");
-            if (formation.Combat is not null && world.Officers.Any(p => p.IsServing && p.UnitId == unit.Id && !unit.MemberRanks.ContainsKey(p.Id)))
-                throw new ArgumentException("Missing battle member rank.");
+            if (formation.Combat is not null && world.Officers.Any(p => p.IsServing && p.UnitId == unit.Id && !unit.MemberPositions.ContainsKey(p.Id)))
+                throw new ArgumentException("Missing battle member position.");
             if (unit.Order?.Construction is { } plan && (!rules.ConstructionSites.TryGetValue((plan.RegionId, plan.Position), out var site) ||
                 !site.FacilityIds.Contains(plan.FacilityTypeId) || !world.Officers.Any(p => p.Id == plan.LeaderId && p.UnitId == unit.Id && p.IsServing)))
                 throw new ArgumentException("Invalid construction plan.");
@@ -134,8 +134,8 @@ internal static class MilitaryMovement
         var unit = new UnitState(id, home.OwnerId!.Value, start, command.Soldiers)
         {
             CorpsId = home.CorpsId, ServicePlaceId = home.Id, FormationId = formation.Id, NavalFormationId = navalId, Morale = home.Morale,
-            MemberRanks = formation.CaptureRanks.IsEmpty ? ImmutableDictionary<int, BattleRank>.Empty : command.OfficerIds
-                .Select((person, index) => (person, rank: command.Ranks.GetValueOrDefault(person, formation.CaptureRanks[index]))).ToImmutableDictionary(p => p.person, p => p.rank),
+            MemberPositions = formation.Positions.IsEmpty ? command.Positions : command.OfficerIds
+                .Select((person, index) => (person, position: command.Positions.GetValueOrDefault(person, formation.Positions[index]))).ToImmutableDictionary(p => p.person, p => p.position),
             CargoMoney = cargoMoney, CargoFood = cargoFood, Order = command.Order,
             DepartureDaysRemaining = command.DepartureDelayDays, Waypoint = command.Waypoint,
             Policies = command.Policies, CommanderId = commander, CommandedThisXun = true, HasEnteredDailyCycle = false,
@@ -192,9 +192,9 @@ internal static class MilitaryMovement
         if (command.OfficerIds.Any(id => plan?.IsOfficerReserved(id) == true ||
             !PersonnelMissions.CanAct(world, command.IssuerId, id) || world.Officers[id].SettlementId != home.Id))
             return CommandRejection.PersonUnavailable;
-        if (command.Tactics is null || command.Ranks is null ||
-            command.Tactics.Keys.Concat(command.Ranks.Keys).Any(id => !command.OfficerIds.Contains(id)) ||
-            command.Ranks.Values.Any(rank => !Enum.IsDefined(rank))) return CommandRejection.InvalidTask;
+        if (command.Tactics is null || command.Positions is null ||
+            command.Tactics.Keys.Concat(command.Positions.Keys).Any(id => !command.OfficerIds.Contains(id)) ||
+            command.Positions.Values.Any(position => !position.IsValid)) return CommandRejection.InvalidTask;
         foreach (var (person, tacticId) in command.Tactics)
             if (tacticId is int tactic && (!rules.Tactics.TryGetValue(tactic, out var definition) || !definition.Selectable ||
                 !MilitaryTactics.HasTactic(world, command.IssuerId, [person], tactic, treasures))) return CommandRejection.TacticUnavailable;

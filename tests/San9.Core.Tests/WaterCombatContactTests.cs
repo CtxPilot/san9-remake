@@ -75,7 +75,7 @@ public sealed class WaterCombatContactTests
         var rules = new MilitaryRulebook(new(10, 3, Enumerable.Range(0, 30).Select(i => i % 10 < 5 ? 1 : 0).ToImmutableArray(),
             [new(0, 1, null), new(1, null, 1) { IsWater = true }],
             [new(200, 100, 0, 100000, 1, new(1, 1), TravelMode.Water)
-                { Combat = combat, Attack = Melee, CaptureRanks = [BattleRank.Front] }],
+                { Combat = combat, Attack = Melee, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(2, 7), new(1, 1)) { FacilityTypeId = 8000, Combat = combat },
                 new(2, new(27, 7), new(5, 5)) { FacilityTypeId = 8000, Combat = combat },
                 new(3, new(blockerX, 7), new(5, 15)) { FacilityTypeId = 8000, Combat = combat, DestroyedAtZeroDurability = true }])
@@ -87,7 +87,7 @@ public sealed class WaterCombatContactTests
             [new(11, 1, null, new(80, 80, 80, 80), false) { UnitId = 0 },
                 new(22, 2, 2, new(80, 80, 80, 80), false)],
             units: [new(0, 1, new(7, 7), 10000) { FormationId = 200, Morale = 100, ServicePlaceId = 1,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) }],
             controls: [new("player", 1, ControllerKind.Player)],
             corps: [new(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new(2, 2, 22, new(10000, 1000000)) { IsRoot = true }]);
         return (world, rules);
@@ -164,11 +164,11 @@ public sealed class WaterCombatContactTests
         var rules = new MilitaryRulebook(new(3, 3, [1, 0, 0, 0, 1, 0, 0, 0, 1],
             [new(0, 1, null), new(1, null, 1) { IsWater = true }],
             [new(200, 100, 0, 100000, 1, new(1, 1), TravelMode.Water)
-                { Combat = new(10, 10, 10, 10, 50), Attack = Melee, CaptureRanks = [BattleRank.Front] }], []));
+                { Combat = new(10, 10, 10, 10, 50), Attack = Melee, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []));
         var mutation = world.BeginMutation();
         mutation.Replace(mutation.Units[0] with { Position = new(4, 4), ActiveEngagement = true, ContactTarget = new(1, false) });
         var defender = mutation.Units[0] with { Id = 1, OwnerId = 2, Position = new(7, 7),
-            ActiveEngagement = false, PassiveEngagement = true, ContactTarget = null, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty };
+            ActiveEngagement = false, PassiveEngagement = true, ContactTarget = null, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty) };
         mutation.AddUnit(defender);
         MilitaryEngagements.ClearExpired(mutation, rules);
         Assert.False(mutation.Units[1].PassiveEngagement);

@@ -85,11 +85,11 @@ public static class MilitaryContentCompiler
                     GainsDailyCombatProficiency = f.Id is not (13 or 14),
                     HalvesHostileStrategyChance = f.Id == 7,
                     ImmuneToDisorder = f.Id == 27,
-                    CaptureRanks = Enumerable.Range(0, 5).Select(i => f.Id is >= 20 and <= 26 ? BattleRank.Middle : f.GetDeploymentSlotPosition(i)?.Row switch
-                    {
-                        0 => BattleRank.Front, 1 => BattleRank.Middle, 2 => BattleRank.Rear,
-                        _ => throw new InvalidDataException("Missing formation member position.")
-                    }).ToImmutableArray() }).ToImmutableArray(), places)
+                    Positions = Enumerable.Range(0, 5).Select(i => f.Id is >= 20 and <= 26
+                        ? new FormationPosition(i, BattleRank.Middle)
+                        : f.GetDeploymentSlotPosition(i) is { } position
+                            ? new FormationPosition(position.Column, (BattleRank)position.Row)
+                            : throw new InvalidDataException("Missing formation member position.")).ToImmutableArray() }).ToImmutableArray(), places)
         {
             BasicNavalFormationId = BasicNavalFormationId,
             CompanionCombat = new(new(2, 5), new(5, 4),

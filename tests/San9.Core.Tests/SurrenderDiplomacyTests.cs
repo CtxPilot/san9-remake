@@ -121,7 +121,7 @@ public sealed class SurrenderDiplomacyTests
          Person(33, 3, units ? null : 2, OfficerStatus.Captive) with { UnitId = units ? 50 : null }],
         units: units ? [new UnitState(50, 2, new(102, 2), 1000) { FormationId = 9, Morale = 70, CorpsId = 20,
             Order = new(MilitaryOrderKind.Move, new(152, 2), null),
-            ServicePlaceId = 2, CommanderId = 22, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front).Add(23, BattleRank.Rear) }] : [],
+            ServicePlaceId = 2, CommanderId = 22, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front).Add(23, BattleRank.Rear)) }] : [],
         corps: [new(10, 1, 11, new(10000, 10000)) { IsRoot = true }, new(20, 2, 21, new(2000, 4000)) { IsRoot = true }, new(21, 2, 24, new(1000, 2000)), new San9.Core.Domain.CorpsState(3, 3, 31, new(10000, 10000)) { IsRoot = true }],
         relations: [new(1, 2, 80), new(1, 3, 0), new(2, 3, 0)],
         controls: [new("first", 1, ControllerKind.Player), new("second", 2, ControllerKind.Player), new("third", 3, ControllerKind.Automatic)]);

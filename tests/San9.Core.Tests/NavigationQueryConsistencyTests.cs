@@ -44,7 +44,7 @@ public sealed class NavigationQueryConsistencyTests
     {
         var rules = new MilitaryRulebook(new(40, 30, new int[1200].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(22, 52), new(4, 4)), new(2, new(62, 58), new(40, 4))
                 { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true) }]));
         var state = WorldState.Create(new(190, 1, 1), 42, [new(1, 100), new(2, 100)],
@@ -90,7 +90,7 @@ public sealed class NavigationQueryConsistencyTests
     {
         var rules = new MilitaryRulebook(new(40, 30, new int[1200].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(172, 52), new(4, 4))]));
         var unit = new UnitState(0, 1, new(22, 52), 1000)
         {
@@ -158,7 +158,7 @@ public sealed class NavigationQueryConsistencyTests
     {
         var rules = new MilitaryRulebook(new(50, 30, new int[1500].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true), CaptureRanks = [BattleRank.Front] }], []));
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []));
         var unit = new UnitState(0, 1, new(22, 22), 1000)
         {
             FormationId = 0, Morale = 90, DepartureDaysRemaining = 2,
@@ -267,7 +267,7 @@ public sealed class NavigationQueryConsistencyTests
     {
         var rules = new MilitaryRulebook(new(50, 30, new int[1500].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }], []));
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []));
         var unit = new UnitState(0, 1, new(22, 22), 1000)
         {
             FormationId = 0, Morale = 80, Order = new(MilitaryOrderKind.Move, new(122, 22), null),

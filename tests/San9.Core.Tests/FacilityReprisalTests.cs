@@ -17,7 +17,7 @@ public sealed class FacilityReprisalTests
         var combat = new CombatProfile(0, 0, 1, 1000, 50);
         var military = new MilitaryRulebook(new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
             [new(700, 5, 0, 100000, 2, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(1, walls), CaptureRanks = [BattleRank.Front, BattleRank.Rear],
+                { Combat = combat, Attack = new(1, walls), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Rear]),
                     Tactics = tactic is null ? null : new(100, 2, [0], automatic ? [9000] : [])
                         { AutomaticOpportunityChance = automatic ? 100 : null } }],
             [new(1, new(2, 2), new(1, 1)) { FacilityTypeId = 8001, Combat = combat },
@@ -41,7 +41,7 @@ public sealed class FacilityReprisalTests
                 TacticProficiencies = [0, 0, 0, 0, 0, 0, proficiency, 0, 0] },
              new(21, 2, 3, new(10, 10, 10, 10), false) { Status = OfficerStatus.Ruler }],
             units: [new(0, 1, new(6, 2), soldiers) { FormationId = 700, Morale = 100, Wounded = wounded, ServicePlaceId = 1,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front).Add(12, BattleRank.Rear) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front).Add(12, BattleRank.Rear)) }],
             controls: [new("player", 1, ControllerKind.Player)], computerDamageBonusPercent: 100, corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 100000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 100000)) { IsRoot = true }]);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: military);
         Assert.True(engine.Execute(Player, new OrderUnitCommand(Guid.NewGuid(), 1, 0, 0,

@@ -148,7 +148,7 @@ public sealed class UnitPolicyAwarenessTests
         {
             FormationId = 1, CommanderId = commander, ServicePlaceId = owner, Morale = 80,
             Policies = new(AttackApproachingEnemies: true), Order = new(MilitaryOrderKind.Move, new(95, 95), null),
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(commander, BattleRank.Front)
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(commander, BattleRank.Front))
         };
 
     private static MilitaryRulebook Rules(int radius = 30, ImmutableArray<SoldierVisionBonus> size = default,
@@ -157,7 +157,7 @@ public sealed class UnitPolicyAwarenessTests
             [new(1, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
             {
                 Vision = new(radius, 360), Combat = new(10, 10, 10, 10, 50), Attack = new(1, true),
-                CaptureRanks = [BattleRank.Front]
+                Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front])
             }], [new(1, new(5, 5), new(1, 1)) { Combat = garrisons ? new(10, 10, 10, 10, 50) : null },
                 new(2, new(95, 5), new(1, 1)) { Combat = garrisons ? new(10, 10, 10, 10, 50) : null }])
         { PolicyRadius = 10, VisionSizeBands = size.IsDefault ? [] : size });

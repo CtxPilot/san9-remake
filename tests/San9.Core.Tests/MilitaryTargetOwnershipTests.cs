@@ -254,7 +254,7 @@ public sealed partial class MilitaryCommandLifecycleTests
         world.Replace(world.Officers[22] with { OwnerId = 3, SettlementId = null, UnitId = 3 });
         world.AddUnit(new(3, 3, new(45, 2), 5000) { CorpsId = 3, ServicePlaceId = 4, FormationId = 1,
             Morale = 80, CommanderId = 22, Order = order,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) });
         world.Replace(world.Settlements[3] with { Soldiers = 0, Durability = 0 });
         world.SetRelation(new(1, 3, relation));
         if (allied) world.SetSimulation(world.Simulation with { Alliance = new(2, 1, [1, 3], 30) });

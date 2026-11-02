@@ -42,7 +42,7 @@ public sealed class UnitLeadershipTests
 
     private static MilitaryRulebook Military() => new(new(4, 2, Enumerable.Repeat(0, 8).ToImmutableArray(),
         [new(0, 1, null)], [new(1, 1, 0, 10000, 3, new(1, 1), TravelMode.Land)
-            { CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Rear] }],
+            { Positions = [new(1, BattleRank.Front), new(2, BattleRank.Middle), new(0, BattleRank.Rear)] }],
         [new(1, new(2, 2), new(1, 1))]));
 
     private static SimulationEngine Deploy(out WorldState world, out GovernanceRulebook governance, params OfficerState[] people)
@@ -64,8 +64,8 @@ public sealed class UnitLeadershipTests
         var engine = Deploy(out _, out _, Person(90, 70, 9000), Person(10, 60, 8000));
         var unit = Assert.Single(engine.Snapshot.Units);
         Assert.Equal(10, unit.CommanderId);
-        Assert.Equal(BattleRank.Front, unit.MemberRanks[90]);
-        Assert.Equal(BattleRank.Middle, unit.MemberRanks[10]);
+        Assert.Equal(BattleRank.Front, unit.MemberPositions[90].Rank);
+        Assert.Equal(BattleRank.Middle, unit.MemberPositions[10].Rank);
     }
 
     [Theory]
@@ -81,7 +81,9 @@ public sealed class UnitLeadershipTests
         mutation.Replace(person with { UnitId = null, SettlementId = 1 });
         mutation.MaintainLeadership([]);
         Assert.Equal(10, mutation.Units[unit.Id].CommanderId);
-        Assert.DoesNotContain(70, mutation.Units[unit.Id].MemberRanks.Keys);
+        Assert.DoesNotContain(70, mutation.Units[unit.Id].MemberPositions.Keys);
+        Assert.Equal(unit.MemberPositions[90], mutation.Units[unit.Id].MemberPositions[90]);
+        Assert.Equal(unit.MemberPositions[10], mutation.Units[unit.Id].MemberPositions[10]);
         world.Commit(mutation);
     }
 
@@ -108,6 +110,6 @@ public sealed class UnitLeadershipTests
         Assert.True(result.Submission.Accepted);
         var after = Assert.Single(engine.Snapshot.Units);
         Assert.Equal(10, after.CommanderId);
-        Assert.Equal(before.MemberRanks, after.MemberRanks);
+        Assert.Equal(before.MemberPositions, after.MemberPositions);
     }
 }

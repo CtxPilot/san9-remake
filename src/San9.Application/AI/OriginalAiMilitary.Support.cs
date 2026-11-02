@@ -226,7 +226,7 @@ internal sealed partial class OriginalAiMilitary
         first.Waypoint == second.Waypoint && first.Policies == second.Policies && first.ConfirmAttack == second.ConfirmAttack &&
         first.OfficerIds.AsSpan().SequenceEqual(second.OfficerIds.AsSpan()) &&
         first.Tactics.Count == second.Tactics.Count && first.Tactics.All(p => second.Tactics.TryGetValue(p.Key, out var tactic) && tactic == p.Value) &&
-        first.Ranks.Count == second.Ranks.Count && first.Ranks.All(p => second.Ranks.TryGetValue(p.Key, out var rank) && rank == p.Value);
+        first.Positions.Count == second.Positions.Count && first.Positions.All(p => second.Positions.TryGetValue(p.Key, out var position) && position == p.Value);
 
     private long ReliefDefense(SettlementState place) => place.Soldiers +
         World.Units.Where(u => FieldUnit(u) &&

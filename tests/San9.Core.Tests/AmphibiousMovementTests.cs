@@ -10,16 +10,16 @@ public sealed class AmphibiousMovementTests
         Enumerable.Range(0, 24).Select(i => i % 8 is >= 2 and <= 4 ? 1 : 0).ToImmutableArray(),
         [new(0, 2, null), new(1, null, 3) { IsWater = true }],
         [new(100, 6, 0, 10000, 5, new(1, 1), TravelMode.Land) { Combat = new(10, 10, 10, 10, 50),
-            Attack = new(1, false), CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear] },
+            Attack = new(1, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear]) },
          new(200, shipSpeed, 0, 10000, 5, shipShape ?? new(1, 1), TravelMode.Water) { Combat = new(20, 20, 20, 20, 50),
-            Attack = new(4, false) { RequiresWaterContact = true }, CaptureRanks = Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray() }], []));
+            Attack = new(4, false) { RequiresWaterContact = true }, Positions = San9.Tests.FormationTestData.Layout(Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray()) }], []));
 
     [Fact]
     public void AttackRangeAndRanksResolveFromTheActualOrCandidateShore()
     {
         var rules = Rules();
         var source = new UnitState(1, 1, new(15, 7), 1000) { FormationId = 100, NavalFormationId = 200,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(10, BattleRank.Rear) };
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(10, BattleRank.Rear)) };
         var target = new UnitState(2, 2, new(27, 7), 1000) { FormationId = 100 };
         var world = WorldState.Create(new(190, 1, 1), 42, [new(1, 100), new(2, 100)], [],
             [new OfficerState(10, 1, null, new(70, 70, 70, 70), false) { UnitId = 1 }], [source, target],

@@ -144,7 +144,7 @@ public sealed class MeleeDeathTests
     {
         var (world, rules, _) = TacticSnipingTests.Create(meleeRanks: useRanks); var m = world.BeginMutation(); List<DomainEvent> events = [];
         m.SetSimulation(m.Simulation with { BattleDeathsEnabled = true });
-        m.Replace(m.Units[2] with { Soldiers = 1, MemberRanks = m.Units[2].MemberRanks.SetItem(22, BattleRank.Rear) });
+        m.Replace(m.Units[2] with { Soldiers = 1, MemberPositions = m.Units[2].MemberPositions.SetItem(22, new(0, BattleRank.Rear)) });
         m.Replace(m.Officers[22] with { BaseAbilities = new(60, 40, 40, 40) });
         Roll(m, "military-tactic-double", 0); Roll(m, "battle-melee-death", 0);
         TacticCombat.TryUnit(m, 1, Target, rules, events);

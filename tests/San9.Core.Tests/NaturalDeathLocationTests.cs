@@ -19,7 +19,7 @@ public sealed class NaturalDeathLocationTests
             if (location == "field-commander") people[3] = people[3] with { SettlementId = null, UnitId = 10 };
             int[] members = location == "field-commander" ? [11, 12] : [11];
             units.Add(new(10, 1, new(6, 2), 1000) { FormationId = 1, Morale = 100, CommanderId = 11,
-                MemberRanks = members.ToImmutableDictionary(id => id, _ => BattleRank.Front), ServicePlaceId = 1 });
+                MemberPositions = San9.Tests.FormationTestData.Members(members.ToImmutableDictionary(id => id, _ => BattleRank.Front)), ServicePlaceId = 1 });
         }
         if (location is "captive-place" or "captive-field")
         {
@@ -29,7 +29,7 @@ public sealed class NaturalDeathLocationTests
             {
                 people[4] = people[4] with { SettlementId = null, UnitId = 10 };
                 units.Add(new(10, 2, new(7, 2), 1000) { FormationId = 1, Morale = 100, CommanderId = 21,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front), ServicePlaceId = 2 });
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)), ServicePlaceId = 2 });
             }
         }
         var world = WorldState.Create(new(190, 1, 1), 42,
@@ -76,7 +76,7 @@ public sealed class NaturalDeathLocationTests
         Assert.Null(dead.UnitId);
         Assert.Null(dead.RegionId);
         Assert.DoesNotContain(engine.Snapshot.Simulation.Tasks, t => t.OfficerId == 11 || t.Journey?.TargetOfficerId == 11);
-        Assert.DoesNotContain(engine.Snapshot.Units, u => u.CommanderId == 11 || u.MemberRanks.ContainsKey(11));
+        Assert.DoesNotContain(engine.Snapshot.Units, u => u.CommanderId == 11 || u.MemberPositions.ContainsKey(11));
         Assert.Equal(location.StartsWith("captive", StringComparison.Ordinal) ? 2 : 1, Assert.Single(engine.Snapshot.Treasures).HolderId);
         Assert.Single(result.Events.OfType<OfficerDiedEvent>(), e => e.OfficerId == 11 && e.Cause == OfficerDeathCause.Natural);
         Assert.Single(result.Events.OfType<TreasureTransferredEvent>(), e => e.TreasureId == 7);
