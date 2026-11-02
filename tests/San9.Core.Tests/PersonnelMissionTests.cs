@@ -334,7 +334,7 @@ public sealed class PersonnelMissionTests
         mutation.Replace(mutation.Settlements[3] with { OwnerId = 2, CorpsId = 2 });
         mutation.Replace(mutation.Officers[13] with { SettlementId = 1 });
         mutation.Replace(mutation.Officers[2] with { SettlementId = 3 });
-        mutation.Replace(mutation.Officers[20].WithLoyalty(1, success ? 50 : 0) with { SettlementId = 3 });
+        mutation.Replace(mutation.Officers[20].WithLoyalty(1, success ? 110 : 0) with { SettlementId = 3 });
         mutation.MaintainLeadership([]);
         world.Commit(mutation);
         var restored = Engine(WorldState.Restore(engine.CaptureStableState()));
@@ -372,7 +372,7 @@ public sealed class PersonnelMissionTests
          new(2, 2, 2, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler, Affinity = 50 },
          new(11, 1, 1, new(50, 50, 100, 50), false), new(12, 1, 1, new(50, 50, 100, 50), false),
          new(13, 1, 3, new(50, 50, 100, 50), false),
-         new(20, 2, 2, new(50, 50, 50, 50), false) { ForceLoyalties = ImmutableDictionary<int, int>.Empty.Add(1, 50).Add(2, 90), Righteousness = 5 },
+         new(20, 2, 2, new(50, 50, 50, 50), false) { ForceLoyalties = ImmutableDictionary<int, int>.Empty.Add(1, 110).Add(2, 90), Righteousness = 5 },
          new(21, null, null, new(50, 50, 50, 50), false) { Status = OfficerStatus.Undiscovered, RegionId = 30, ForceLoyalties = ImmutableDictionary<int, int>.Empty.Add(1, 0) }],
         relations: [new(1, 2, 80)], controls: [new("player", 1, ControllerKind.Player)], cityIndependenceEnabled: false, corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 2, new(10000, 10000)) { IsRoot = true }]);
     private static SimulationEngine Engine(WorldState world) => new(world, EconomyRulebook.Empty, Places);
