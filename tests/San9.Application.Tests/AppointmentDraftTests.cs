@@ -2,6 +2,7 @@ using San9.Tests;
 using San9.Application.Persistence;
 using San9.Application.Presentation;
 using San9.Content.Scenarios;
+using San9.Content.Text;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
@@ -24,6 +25,83 @@ public sealed class AppointmentDraftTests
             }
         };
     }
+
+    [Theory]
+    [InlineData("reward", 2, 3)]
+    [InlineData("bestow", -1, 7)]
+    public void AppointmentSummaryKeepsOfficeAndCapacityWhenAffinityPrecedesThem(string kind, int officeColumn, int capacityColumn)
+    {
+        var definition = Fixture();
+        definition = definition with { Officers = definition.Officers.Select(p => p.State.Id == 2
+            ? p with { State = p.State with { OfficeId = 401, Affinity = 149 } } : p).ToArray() };
+        var session = GameSession.Start(definition, 190);
+        var draft = new AppointmentDraft(session, 1, kind);
+        var texts = CatalogTexts(definition);
+        var columns = AppointmentOfficerCatalog.Pages(draft, texts)[0].Columns;
+        var row = AppointmentOfficerCatalog.Read(draft, texts, 0).Single(r => r.Id == 2);
+
+        Assert.Equal("capacity", columns[capacityColumn].Id);
+        Assert.Equal((CatalogCell)20000, row.Cells[capacityColumn]);
+        if (officeColumn >= 0)
+        {
+            Assert.Equal("office", columns[officeColumn].Id);
+            Assert.Equal("office.a", row.Cells[officeColumn].Text);
+        }
+    }
+
+    [Fact]
+    public void RankSummaryAndPersonalPageShowTheEditedOfficeWithoutChangingTheWorld()
+    {
+        var definition = Fixture();
+        var session = GameSession.Start(definition, 190);
+        var draft = new AppointmentDraft(session, 1, "rank");
+        var edited = draft.OfficePlan!.Fork();
+        Assert.True(edited.Assign(2, 902));
+        var texts = CatalogTexts(definition);
+        var pages = AppointmentOfficerCatalog.Pages(draft, texts);
+
+        Assert.Equal("office", pages[0].Columns[1].Id);
+        Assert.Equal("office.b", AppointmentOfficerCatalog.Read(draft, texts, 0, edited).Single(r => r.Id == 2).Cells[1].Text);
+        int personal = 1 + OfficerCatalog.CorePages.ToList().FindIndex(p => p.Title == "个人");
+        var row = AppointmentOfficerCatalog.Read(draft, texts, personal, edited).Single(r => r.Id == 2);
+        CatalogCell Cell(string id) => row.Cells[Array.FindIndex(pages[personal].Columns, c => c.Id == id)];
+        Assert.Equal("office.b", Cell("office").Text);
+        Assert.Equal((CatalogCell)18000, Cell("capacity"));
+        Assert.Equal((CatalogCell)session.Snapshot.Officers.Single(p => p.Id == 2).Affinity, Cell("affinity"));
+        Assert.Null(draft.OfficePlan.OfficeFor(2));
+        Assert.Null(session.Snapshot.Officers.Single(p => p.Id == 2).OfficeId);
+    }
+
+    [Theory]
+    [InlineData("rank")]
+    [InlineData("reward")]
+    [InlineData("bestow")]
+    [InlineData("strategist")]
+    [InlineData("execute")]
+    [InlineData("exile")]
+    public void AppointmentPagesPreserveCandidatePriorityAndSharedPersonalFacts(string kind)
+    {
+        var definition = Fixture();
+        var session = GameSession.Start(definition, 190);
+        var draft = new AppointmentDraft(session, 1, kind);
+        var texts = CatalogTexts(definition);
+        var pages = AppointmentOfficerCatalog.Pages(draft, texts);
+        int[] expected = (draft.OfficePlan is { } plan ? plan.OrderedPeople : draft.Candidates).ToArray();
+        for (int page = 0; page < pages.Count; page++)
+        {
+            var rows = AppointmentOfficerCatalog.Read(draft, texts, page);
+            Assert.Equal(expected, rows.Select(r => r.Id));
+            Assert.All(rows, row => Assert.Equal(pages[page].Columns.Length, row.Cells.Length));
+            int affinity = Array.FindIndex(pages[page].Columns, c => c.Id == "affinity");
+            if (affinity >= 0)
+                Assert.All(rows, row => Assert.Equal((CatalogCell)session.Snapshot.Officers.Single(o => o.Id == row.Id).Affinity, row.Cells[affinity]));
+        }
+    }
+
+    private static TextCatalog CatalogTexts(ScenarioInitialState definition) => new(TextCatalog.CurrentSchemaVersion,
+        CommandTextFixture.Entries(definition.Officers.Select(o => o.NameKey)
+            .Concat(definition.Settlements.Select(s => s.NameKey)).Concat(definition.Forces.Select(f => f.NameKey))
+            .Concat(definition.Information.Offices.Select(o => o.NameKey)).Distinct().ToDictionary(k => k, k => k)));
 
     [Fact]
     public void ProhibitionRejectsAnExecutionPreparedBeforeTheSettingChanged()
