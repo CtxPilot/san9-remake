@@ -3,6 +3,7 @@ using San9.Application.Authoring;
 using San9.Content.Authoring;
 using San9.Client.Godot.Diagnostics;
 using San9.Client.Godot.Persistence;
+using San9.Client.Godot.Settings;
 using San9.Content.Images;
 using San9.Content.Interface;
 using San9.Content.Packages;
@@ -19,8 +20,11 @@ public partial class Main : Node
     private ClientOptions _options = null!;
     private ClientDirectories _directories = null!;
     private readonly CancellationTokenSource _startup = new();
+    private UiPreferencesSession _preferences = new();
     public override void _ExitTree()
     {
+        try { _preferences.Save(); }
+        catch (Exception error) { GD.PushWarning($"界面偏好保存失败：{error.Message}"); }
         _startup.Cancel(); _startup.Dispose();
     }
     private static async Task NextFrame(SceneTree tree, CancellationToken token)
@@ -47,6 +51,12 @@ public partial class Main : Node
             var options = ClientOptions.Parse(OS.GetCmdlineUserArgs(), _directories.ContentRoot);
             _options = options;
             _directories = _directories.ApplyOverrides(options);
+            var preferenceStore = new UiPreferencesStore(DataPaths.UiPreferences);
+            var preferences = UiPreferences.Default;
+            try { preferences = preferenceStore.Load(); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or System.Text.DecoderFallbackException or InvalidDataException)
+            { GD.PushWarning($"界面偏好读取失败，使用默认值：{error.Message}"); }
+            _preferences = new(preferences, preferenceStore.Save);
             if (options.OfficerEditor)
             {
                 ui.AddChild(new CreatedOfficerEditor { Store = new(DataPaths.CreatedOfficers), ContentRoot = options.ContentRoot, Closed = () => GetTree().Quit() });
@@ -91,7 +101,7 @@ public partial class Main : Node
 
     private async Task<Node> PrepareOpening()
     {
-        var opening = new StartMenuPreview { ContentRoot = _options.ContentRoot, DataPaths = DataPaths, InitiallyVisible = false,
+        var opening = new StartMenuPreview { ContentRoot = _options.ContentRoot, DataPaths = DataPaths, Preferences = _preferences, InitiallyVisible = false,
             BeginGame = (id, players, settings, damage, setup) => SwitchScene(() => PrepareWorld(
                 _options with { PackageRoot = null, ScenarioId = id, ComputerDamageBonusPercent = damage }, players, settings, setup: setup)),
             LoadGame = document => LoadGame(document, transition: true) };
@@ -266,6 +276,7 @@ public partial class Main : Node
             {
                 World = world, Textures = textures, Content = content, Definition = initial,
                 DataPaths = dataPaths, SaveStore = saveStore, Music = music, InitialSession = session,
+                Preferences = _preferences,
                 InitialSessionKind = save is null ? SessionReplacementKind.Startup : SessionReplacementKind.Load,
                 ReturnToOpening = () => SwitchScene(PrepareOpening),
                 LoadGame = document => LoadGame(document, transition: false)

@@ -4,12 +4,15 @@ using San9.Application.Presentation;
 namespace San9.Client.Godot;
 
 public sealed record CommandTargetRequest(Control Owner, CommandTargetSelection Selection, string Title,
-    Action<Action<int>,Action> ShowList, Action<int> Selected, Action Cancelled);
+    Action<Action<int>,Action,Action> ShowList, Action<int> Selected, Action Cancelled);
 
 public partial class CommandTargetFlow : Node
 {
     public MapWorld World { get; init; } = null!;
     public San9.Application.GameSession Session { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
+    private Settings.SelectionViewGroup ModeGroup => _commandTargets!.Selection.Kind == CommandMapTargetKind.Unit
+        ? Settings.SelectionViewGroup.StrategyUnits : Settings.SelectionViewGroup.Facilities;
     public event Action? Changed;
     private MapTargetInputLease? _input;
     private CommandTargetRequest? _commandTargets;
@@ -30,11 +33,17 @@ public partial class CommandTargetFlow : Node
             else if (request.Selection.Resolve(new CommandMapObject(target.Value.Id,target.Value.IsUnit)) is int id) PickCommandTarget(id);
         });
         Changed?.Invoke();
+        if (!Preferences.IsMap(ModeGroup)) ShowList();
     }
     public void ShowList()
     {
         if (_commandTargets is not {} request) return;
-        request.ShowList(PickCommandTarget, () => { request.Owner.Hide(); Changed?.Invoke(); });
+        Preferences.SetMap(ModeGroup, false);
+        request.ShowList(PickCommandTarget, () =>
+        {
+            Preferences.SetMap(ModeGroup, true);
+            request.Owner.Hide(); Changed?.Invoke();
+        }, () => End());
         Changed?.Invoke();
     }
     public void ReleaseOwner(Control owner)

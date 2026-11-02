@@ -14,6 +14,8 @@ public partial class MilitaryCommandFlow : Node
     public TextCatalog Texts { get; init; } = null!;
     public TextureService Service { get; init; } = null!;
     public TextureScope Textures { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
+    private bool RememberTargetMode => Targets is not SpecialDeploymentTargets { IsConstruction: true };
     public event Action? Changed;
     public event Action<string>? Notice;
     public event Action<StrategySnapshot, GameCommand, IReadOnlyList<DomainEvent>>? Submitted;
@@ -97,6 +99,7 @@ public partial class MilitaryCommandFlow : Node
             else construction.SetWaypoint(cell);
         } : null);
         Changed?.Invoke();
+        if (RememberTargetMode && !Preferences.IsMap(Settings.SelectionViewGroup.MilitaryTargets)) ShowTargetList();
     }
 
     private void PickTarget(MapObjectTarget? target)
@@ -170,10 +173,16 @@ public partial class MilitaryCommandFlow : Node
         if (_catalog is not { } catalog) return;
         _catalog = null; catalog.GetParent().RemoveChild(catalog); catalog.QueueFree();
     }
+    private void ShowTargetMap()
+    {
+        if (RememberTargetMode) Preferences.SetMap(Settings.SelectionViewGroup.MilitaryTargets, true);
+        CloseTargetList();
+    }
 
     public void ShowTargetList()
     {
         if (Targets is not { } targets || _catalog is not null) return;
+        if (RememberTargetMode) Preferences.SetMap(Settings.SelectionViewGroup.MilitaryTargets, false);
         var catalog = new MilitaryTargetCatalog(targets, Texts);
         _catalog = new CatalogView
         {
@@ -189,7 +198,7 @@ public partial class MilitaryCommandFlow : Node
                 if (target.Position is { } position) World.FocusCell(San9.Core.Domain.MapCoordinates.Cell(position));
                 else if (target.IsUnit) World.FocusUnit(target.Id); else World.FocusBuilding(target.Id);
             },
-            ShowMap = CloseTargetList,
+            ShowMap = ShowTargetMap,
             Closed = EndTargetSelection
         };
         AddChild(_catalog);

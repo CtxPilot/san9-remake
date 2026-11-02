@@ -17,6 +17,7 @@ public abstract partial class CommandPreparationView : FixedPage
     public Action Closed { get; init; } = null!;
     public Action Submit { get; init; } = null!;
     public Action<CommandTargetRequest> ChooseMap { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     protected Control Body = null!;
     protected Control? Child;
     private bool invalidated;
@@ -52,7 +53,7 @@ public abstract partial class CommandPreparationView : FixedPage
     {
         if (selection.Candidates.IsEmpty) { Notice(CommandText.Resolve(Texts, "failure.no-target")); return; }
         var state = new CatalogTableState();
-        ChooseMap(new(this, selection, title, (pick, showMap) =>
+        ChooseMap(new(this, selection, title, (pick, showMap, cancel) =>
         {
             Show();
             void Map() { CloseChild(); showMap(); }
@@ -60,7 +61,7 @@ public abstract partial class CommandPreparationView : FixedPage
             {
                 Title = title, HintText = CommandText.Resolve(Texts, "hint.target"), CloseTitle = CommandText.Resolve(Texts, "action.cancel"), Service = Service, Textures = Textures,
                 Pages = pages, TableState = state, InitialCurrentId = state.SelectedId ?? current,
-                ReadRows = readRows, Activated = pick, ShowMap = Map, Closed = Map
+                ReadRows = readRows, Activated = pick, ShowMap = Map, Closed = () => { CloseChild(); cancel(); }
             });
         }, selected, canceled));
     }
@@ -80,6 +81,7 @@ public abstract partial class CommandPreparationView : FixedPage
         Action cancel = canceled ?? CloseChild;
         void Show(bool map)
         {
+            Preferences.SetMap(category, map);
             if (map)
                 ReplaceChild(new InformationMapView
                 {
@@ -99,7 +101,7 @@ public abstract partial class CommandPreparationView : FixedPage
                     ShowMap = () => Show(true), Closed = cancel
                 });
         }
-        Show(true);
+        Show(Preferences.IsMap(category));
     }
     protected void Notice(string message)
     {

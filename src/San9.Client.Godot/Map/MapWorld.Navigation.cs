@@ -9,6 +9,7 @@ public partial class MapWorld
     private readonly EdgeScrollCursor _edgeCursor = new();
     private Vector2 _pointer = new(-1, -1);
     public event Action<EdgeScrollMode>? EdgeScrollModeChanged;
+    public void SetEdgeScrollMode(EdgeScrollMode mode) => _edgeScroll.SetMode(mode);
     public Func<Vector2, bool>? IsNavigationBlocked { get; set; }
     public Func<bool>? CanNavigate { get; set; }
 

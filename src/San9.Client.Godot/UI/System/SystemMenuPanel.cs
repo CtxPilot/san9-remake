@@ -30,6 +30,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     public Func<bool> ReadFormationAppearance { get; init; } = () => false;
     public Action<Settings.CompanionConfiguration> ApplyCompanionSettings { get; init; } = null!;
     public SaveLoadBrowser Browser { get; } = new();
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     private TextureScope? _textures;
     private Control? _page;
     private Control? _pageRoot;
@@ -61,7 +62,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     {
         _textures!.RequestPrefixes("save-load-", "dialog-", "deployment-number-", "environment-", "editor-",
             "information-", "catalog-", "detail-", "roster-", "scroll-", "message-", "text-icon-", "overview-");
-        ReplacePage(new WorldEditorView { Textures = _textures, Service = Service, Skin = Skin, Texts = Texts, Draft = new WorldEditorDraft(Session, kind, Texts),
+        ReplacePage(new WorldEditorView { Textures = _textures, Preferences = Preferences, Service = Service, Skin = Skin, Texts = Texts, Draft = new WorldEditorDraft(Session, kind, Texts),
             MapPreview = (id, readView) => World.CreateInformationPreview(id, Texts, readView: readView),
             Apply = edit => Session.Apply(Session.Request(edit)), Closed = Close });
     }
@@ -99,8 +100,8 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
             if (token.IsCancellationRequested) return;
             Browser.SetEntries(catalog);
             Browser.SetAutoSaves(autoSave);
-            Browser.Open(mode);
-            ReplacePage(new SaveLoadView { State = Browser, Textures = _textures!, Service = Service, Closed = Close, Requested = Request });
+            Browser.Open(mode, Preferences.Current.SaveLoadPage);
+            ReplacePage(new SaveLoadView { State = Browser, Preferences = Preferences, Textures = _textures!, Service = Service, Closed = Close, Requested = Request });
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (SaveException error) { if (!token.IsCancellationRequested) ShowLoadFailure(SaveFailureMessages.Describe(error)); }

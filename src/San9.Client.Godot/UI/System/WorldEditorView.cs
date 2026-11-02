@@ -15,12 +15,19 @@ public partial class WorldEditorView : ModalView
     public InterfaceSkin Skin { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
     public WorldEditorDraft Draft { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public Func<int, Func<StrategySnapshot>, Control> MapPreview { get; init; } = null!;
     public Func<WorldEditOperation, SessionResult> Apply { get; init; } = null!;
     public Action Closed { get; init; } = null!;
     private Control? _page;
     private Control? _modal;
     private bool _mapMode;
+    private Settings.SelectionViewGroup? ModeGroup => Draft.Kind switch
+    {
+        WorldEditorKind.Corps => Settings.SelectionViewGroup.Forces,
+        WorldEditorKind.Cities => Settings.SelectionViewGroup.Cities,
+        _ => null
+    };
     public bool IsCatalog => _page is CatalogView;
     public string Title => Draft.Kind switch { WorldEditorKind.Officers => "编辑武将", WorldEditorKind.Corps => "编辑军团",
         WorldEditorKind.Cities => "编辑都市", WorldEditorKind.Facilities => "编辑设施", _ => "编辑障碍物" };
@@ -29,11 +36,12 @@ public partial class WorldEditorView : ModalView
     public override void _Ready()
     {
         Size = new(1024, 768); MouseFilter = MouseFilterEnum.Stop;
-        ShowCatalog();
+        if (ModeGroup is { } group && Preferences.IsMap(group)) ShowMap(); else ShowCatalog();
     }
     private void ShowCatalog()
     {
         _mapMode = false;
+        if (ModeGroup is { } group) Preferences.SetMap(group, false);
         Replace(new CatalogView
         {
             Service = Service, Textures = Textures, TableState = Draft.Catalog, Pages = Draft.Pages,
@@ -47,6 +55,8 @@ public partial class WorldEditorView : ModalView
     private void ShowMap()
     {
         _mapMode = true;
+        if (ModeGroup is { } group) Preferences.SetMap(group, true);
+        Draft.Catalog.RefreshRows(Draft.ReadRows(Draft.Catalog.Page));
         Replace(new InformationMapView
         {
             ReadView = () => Draft.Preview, Texts = Texts, Service = Service, Skin = Skin, Textures = Textures,

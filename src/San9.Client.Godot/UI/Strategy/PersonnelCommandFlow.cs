@@ -15,6 +15,9 @@ public partial class PersonnelCommandFlow : Node
     public TextCatalog Texts { get; init; } = null!;
     public TextureService Service { get; init; } = null!;
     public TextureScope Textures { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
+    private Settings.SelectionViewGroup ModeGroup => IsRegionSelection
+        ? Settings.SelectionViewGroup.ExplorationRegions : Settings.SelectionViewGroup.Facilities;
     public StrategyOverlayHost OverlayHost { get; init; } = null!;
     public PersonnelPresentationDefinition? Definition { get; init; }
     public event Action? Changed;
@@ -69,6 +72,7 @@ public partial class PersonnelCommandFlow : Node
             else if (!target.Value.IsUnit) PickTarget(target.Value.Id);
         }, PickPlace, view.Draft.Kind == "search" ? PickPlace : null);
         Changed?.Invoke();
+        if (!Preferences.IsMap(ModeGroup)) ShowTargetList();
     }
     private void PickTarget(int id)
     {
@@ -98,7 +102,17 @@ public partial class PersonnelCommandFlow : Node
         _adviceSelection = null;
     }
 
-    public void ShowTargetList() => _view?.ShowTargetList(() => _view?.Hide(), PickTarget);
+    public void ShowTargetList()
+    {
+        if (_view is not { } view || !IsTargeting) return;
+        Preferences.SetMap(ModeGroup, false);
+        view.ShowTargetList(() =>
+        {
+            Preferences.SetMap(ModeGroup, true);
+            view.Hide(); Changed?.Invoke();
+        }, EndTargets, PickTarget);
+        Changed?.Invoke();
+    }
     private void ShowAdvice()
     {
         if (_view is not {} view || Definition is null) return;

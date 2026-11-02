@@ -25,10 +25,10 @@ public partial class StartMenuView
         {
             var (catalog, automatic) = await Task.Run(() => (Store.ReadCatalog(_browser.SlotCount), Store.ReadAutoSaveCatalog()), token);
             if (token.IsCancellationRequested) return;
-            _browser.SetEntries(catalog); _browser.SetAutoSaves(automatic); _browser.Open(SaveLoadMode.Load);
+            _browser.SetEntries(catalog); _browser.SetAutoSaves(automatic); _browser.Open(SaveLoadMode.Load, Preferences.Current.SaveLoadPage);
             _loadTextures = Service.CreateScope();
             _loadTextures.RequestPrefixes("save-load-", "message-", "dialog-");
-            _loadView = new SaveLoadView { State = _browser, Textures = _loadTextures, Service = Service,
+            _loadView = new SaveLoadView { State = _browser, Preferences = Preferences, Textures = _loadTextures, Service = Service,
                 Closed = CloseLoad, Requested = LoadSlot };
             _loadRoot = OverlayPage.Create(_loadView, Colors.Black);
             AddChild(_loadRoot);

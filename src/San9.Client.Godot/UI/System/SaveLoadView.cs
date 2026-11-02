@@ -6,6 +6,7 @@ namespace San9.Client.Godot;
 public partial class SaveLoadView : ModalView
 {
     public SaveLoadBrowser State { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public TextureScope Textures { get; init; } = null!;
     public TextureService Service { get; init; } = null!;
     public Action Closed { get; init; } = null!;
@@ -40,7 +41,11 @@ public partial class SaveLoadView : ModalView
     }
     private void ChangePage(int page)
     {
-        if (State.ChangePage(page)) RefreshRows();
+        if (State.ChangePage(page))
+        {
+            Preferences.Update(p => p with { SaveLoadPage = State.Page });
+            RefreshRows();
+        }
     }
     private void RefreshRows()
     {

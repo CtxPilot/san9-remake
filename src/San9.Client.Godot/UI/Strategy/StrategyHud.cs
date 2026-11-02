@@ -40,6 +40,7 @@ public partial class StrategyHud : Control
     private MapObjectTarget? _commandTarget;
     private StrategyMinimap? _minimap;
     public StrategyOverview Overview { get; } = new();
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public InformationPanel Information { get; private set; } = null!;
     public SystemMenuPanel SystemMenu { get; private set; } = null!;
     public Action? StrategyReady { get; init; }
@@ -68,6 +69,11 @@ public partial class StrategyHud : Control
     private readonly GameTextPresenter _text = new();
     public override void _Ready()
     {
+        var preferences = Preferences.Current;
+        World.ShowBoundaries = preferences.ShowBoundaries;
+        if (Overview.ShowForces != preferences.ShowForces) Overview.Toggle(OverviewLayer.Forces);
+        if (Overview.ShowFacilities != preferences.ShowFacilities) Overview.Toggle(OverviewLayer.Facilities);
+        if (Overview.ShowUnits != preferences.ShowUnits) Overview.Toggle(OverviewLayer.Units);
         _textures = Textures.CreateScope();
         _textures.RequestPrefixes("button-", "top-", "radar-", "sidebar-", "ruler-", "field-", "region-",
             "season-", "turn-", "target-", "hover-", "icon-", "minimap-",
@@ -141,7 +147,11 @@ public partial class StrategyHud : Control
         UpdateResources(p);
         _season = LabelAt("春", new(32, 38), new(16, 16), 16);
         _text.Apply(_season, GameTextStyles.For(GameTextRole.Spring));
-        _territory = AddButton("疆界", "button-territory", new(694, 10), new(64, 36), true, () => World.ShowBoundaries = !World.ShowBoundaries, parent: _topRight);
+        _territory = AddButton("疆界", "button-territory", new(694, 10), new(64, 36), true, () =>
+        {
+            World.ShowBoundaries = !World.ShowBoundaries;
+            Preferences.Update(p => p with { ShowBoundaries = World.ShowBoundaries });
+        }, parent: _topRight);
         _territory.ToggleMode = true; _territory.SetPressedNoSignal(World.ShowBoundaries);
         _informationButton = AddButton("情报", "button-information", new(842, 7), new(80, 40), true, () => Information.OpenMenu(), parent: _topRight);
         _functionsButton = AddButton("功能", "button-functions", new(929, 7), new(80, 40), true, () => SystemMenu.OpenMenu(), parent: _topRight);
@@ -171,9 +181,11 @@ public partial class StrategyHud : Control
         };
         _sidebarMotion.AddChild(_rosterList);
         _rosterList.Refresh(Scenario);
+        SelectRosterPage(Preferences.Current.RosterPage);
         _overviewPanel = new StrategyOverviewPanel
         {
             State = Overview,
+            LayersChanged = RememberOverviewLayers,
             World = World,
             Session = Session,
             Skin = Skin,
@@ -184,6 +196,7 @@ public partial class StrategyHud : Control
         BackdropHost.AddChild(_overviewPanel);
         Information = new InformationPanel
         {
+            Preferences = Preferences,
             Session = Session,
             Texts = Texts,
             Service = Textures,
@@ -198,6 +211,7 @@ public partial class StrategyHud : Control
         OverlayHost.AddChild(Information);
         SystemMenu = new SystemMenuPanel
         {
+            Preferences = Preferences,
             World = World,
             Skin = Skin,
             Service = Textures,
@@ -457,10 +471,13 @@ public partial class StrategyHud : Control
     private void SelectRosterPage(RosterPage page)
     {
         _rosterList.SelectPage(page);
+        Preferences.Update(p => p with { RosterPage = page });
         _facilities!.SetPressedNoSignal(page == RosterPage.Facilities);
         _officers!.SetPressedNoSignal(page == RosterPage.Officers);
         _units!.SetPressedNoSignal(page == RosterPage.Units);
     }
+    private void RememberOverviewLayers() => Preferences.Update(p => p with
+    { ShowForces = Overview.ShowForces, ShowFacilities = Overview.ShowFacilities, ShowUnits = Overview.ShowUnits });
     private void ActivateRosterEntry(RosterKey key)
     {
         _rosterList.Refresh(Scenario);

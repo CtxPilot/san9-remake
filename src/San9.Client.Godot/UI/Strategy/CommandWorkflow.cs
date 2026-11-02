@@ -11,7 +11,10 @@ public sealed record CommandWorkflowServices(GameSession Session, MapWorld World
     TextureService Textures, TextureScope Scope, InterfaceSkin Skin, CommandPresentation Presentation,
     StrategyOverlayHost OverlayHost, CommandTargetFlow Targets, Action<string> Notice,
     Action<IReadOnlyList<CommandMessage>, StrategySnapshot, Action?> Narrate,
-    Func<MapMessageRecord, bool> Record, Action ClearMapSelection);
+    Func<MapMessageRecord, bool> Record, Action ClearMapSelection)
+{
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
+}
 
 public abstract partial class CommandWorkflow : Node
 {
