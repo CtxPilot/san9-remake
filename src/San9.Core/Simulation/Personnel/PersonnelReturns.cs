@@ -46,7 +46,7 @@ internal static class PersonnelReturns
             BattlePersonnel.Displace(world, personId, origin, rules.Personnel, rules.Military!, events);
             return;
         }
-        PersonnelTransitions.CancelMissions(world, personId, "unit-defected", events, rules.Personnel, afterDailyCommands);
+        PersonnelTransitions.CancelMissions(world, personId, "unit-defected", events, rules.Personnel, afterDailyCommands, preservePersonTargets: true);
         world.Replace(world.Officers[personId] with { UnitId = null, SettlementId = home.Id, RegionId = null, TacticCooldown = 0 });
         long sequence = world.Simulation.NextSequence;
         var context = new PersonnelReturnContext("system", person.OwnerId!.Value, sequence);
@@ -60,7 +60,8 @@ internal static class PersonnelReturns
     {
         var person = world.Officers[personId];
         var journey = world.TasksFor(personId).FirstOrDefault(t => t.Journey is not null);
-        PersonnelTransitions.CancelMissions(world, personId, "service-place-lost", events, places, afterDailyCommands, preserveReinforcements: true);
+        PersonnelTransitions.CancelMissions(world, personId, "service-place-lost", events, places, afterDailyCommands,
+            preserveReinforcements: true, preservePersonTargets: true);
         if (journey is not null)
         {
             Start(world, journey, places, events, afterDailyCommands, interrupted: true);

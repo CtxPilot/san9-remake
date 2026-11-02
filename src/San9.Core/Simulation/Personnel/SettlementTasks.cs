@@ -15,7 +15,8 @@ internal static class SettlementTasks
         {
             if (!world.Simulation.Tasks.Any(t => t.Id == task.Id)) continue;
             if (place.OwnerId == task.ForceId && !place.IsDestroyed && place.Durability > 0) continue;
-            if (task.Journey is not { } journey || journey.DestinationPlaceId == placeId)
+            // A person's former location is route history, not the identity of the target.
+            if (task.Journey is not { } journey || (journey.TargetOfficerId is null && journey.DestinationPlaceId == placeId))
             {
                 TaskCancellation.Apply(world, task, reason, events, preserveCargo: task.Journey is not null);
                 if (task.Journey is not null) BattlePersonnel.ResumeReturn(world, task, rules, events);

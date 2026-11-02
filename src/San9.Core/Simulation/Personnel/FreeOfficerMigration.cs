@@ -18,7 +18,7 @@ internal static class FreeOfficerMigration
             var destinations = PersonnelRelocation.Destinations(world, origin, places);
             if (destinations.Length == 0) continue;
             int destination = destinations[world.NextRandom("personnel-free-migration-placement") % (ulong)destinations.Length];
-            PersonnelTransitions.CancelMissions(world, id, "person-migrated", events, places, false);
+            PersonnelTransitions.CancelMissions(world, id, "person-migrated", events, places, false, preservePersonTargets: true);
             world.Replace(world.Officers[id] with
             {
                 SettlementId = world.Settlements.ContainsKey(destination) ? destination : null,

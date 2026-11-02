@@ -330,6 +330,35 @@ public sealed class PersonnelCommandTests
         var draft = new PersonnelDraft(session,1,"summon");
         Assert.Equal(new[] { 101,2 },PersonnelCatalog.Officers(draft,CatalogTexts(session.View),0).Select(r => r.Id));
     }
+    [Fact]
+    public void RecruitingAnOfficerOnSearchRemainsAvailableInPlayerDraft()
+    {
+        var definition = Definition();
+        definition = definition with { Information = definition.Information with { Relations = [new(1, 2, 0)] } };
+        var session = GameSession.Start(definition, 7);
+        var before = session.Capture();
+        var date = before.World.Clock;
+        var due = date;
+        for (int day = 1; day < 10; day++) due = due.NextDay();
+        var position = definition.Settlements.Single(s => s.Id == 2).Position;
+        var search = new PersistentTask(Guid.NewGuid(), "personnel-search", "ai:2", 2, 5, 2, date, due, 0,
+            before.World.Simulation.NextSequence) { Journey = new(2, null, 0) { Route = new(position, position, false) } };
+        session = GameSession.Restore(definition, before with { World = before.World with
+        {
+            Officers = before.World.Officers.Select(p => p.Id == 5 ? p with { Acted = true } : p).ToArray(),
+            Simulation = before.World.Simulation with { Tasks = before.World.Simulation.Tasks.Add(search),
+                NextSequence = before.World.Simulation.NextSequence + 1 }
+        } });
+        var draft = new PersonnelDraft(session, 1, "employ");
+        Assert.Contains(5, draft.Targets);
+        Assert.True(draft.SetTarget(5));
+        Assert.True(draft.CanExecute);
+        Assert.True(session.Execute(new("player"), draft.CreateCommand(Guid.NewGuid(),
+            session.Snapshot.Simulation.NextSequence)).Submission.Accepted);
+        var restored = San9.Application.Persistence.SaveService.Decode(San9.Application.Persistence.SaveService.Encode(session), definition);
+        StateAssert.Equal(session.Capture(), restored.Capture());
+    }
+
     private static ScenarioInitialState Definition()
     {
         var source = G01ScenarioTests.Fixture();

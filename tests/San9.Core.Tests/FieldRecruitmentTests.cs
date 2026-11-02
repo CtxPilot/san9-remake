@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using San9.Tests;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
@@ -86,17 +87,6 @@ public sealed class FieldRecruitmentTests
     }
 
     [Fact]
-    public void UnitMovementKeepsTargetButLeavingUnitInvalidatesIt()
-    {
-        var (world, task) = Submit(); var rule = Rules.FindTask(task.Kind)!;
-        Assert.True(rule.HasValidPayload(task));
-        world.Replace(world.Units[100] with { Position = new(502, 2) });
-        Assert.True(rule.Validate(world, task));
-        world.Replace(world.Officers[20] with { UnitId = null, SettlementId = 2 });
-        Assert.False(rule.Validate(world, task));
-    }
-
-    [Fact]
     public void LiveCommanderChangePreventsTakingArmyThroughFormerCommander()
     {
         var (world, task) = Submit();
@@ -145,13 +135,13 @@ public sealed class FieldRecruitmentTests
 
     [Theory]
     [InlineData(false)] [InlineData(true)]
-    public void PublicResolutionUsesCurrentPositionOrCancelsIfOfficerLeft(bool leaves)
+    public void PublicResolutionUsesCurrentUnitAndAllowsTargetReturningToCity(bool leaves)
     {
         var state = World(); var engine = new SimulationEngine(state, Rules);
         Assert.True(engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20)).Submission.Accepted);
         var mutation = state.BeginMutation(Rules.Abilities);
         mutation.Replace(mutation.Units[100] with { Position = new(502, 2) });
-        if (leaves) mutation.Replace(mutation.Officers[20] with { UnitId = null, SettlementId = 2 });
+        if (leaves) mutation.Replace(mutation.Officers[20] with { UnitId = null, SettlementId = 2, BaseAbilities = new(1, 50, 100, 50) });
         mutation.MaintainLeadership([]);
         state.Commit(mutation);
         var events = new List<DomainEvent>();
@@ -160,14 +150,18 @@ public sealed class FieldRecruitmentTests
             engine.EndControl(new("player")); events.AddRange(engine.AdvanceXun().Events);
         }
         Assert.Equal(leaves ? 2 : 1, engine.Snapshot.Units.Single(u => u.Id == 100).OwnerId);
+        Assert.True(Assert.Single(events.OfType<RecruitmentResolvedEvent>()).Success);
+        Assert.Equal(1, engine.Snapshot.Officers.Single(p => p.Id == 20).OwnerId);
+        Assert.DoesNotContain(events.OfType<TaskCancelledEvent>(), e => e.Reason == "invalid-target-or-executor");
         if (leaves)
         {
-            Assert.Empty(events.OfType<RecruitmentResolvedEvent>());
-            Assert.Contains(events.OfType<TaskCancelledEvent>(), e => e.Reason == "invalid-target-or-executor");
+            var envoy = Assert.Single(events.OfType<TaskStartedEvent>(), e => e.Task.Kind == PersonnelReturns.Kind && e.Task.OfficerId == 11).Task;
+            Assert.Equal(new WorldPosition(902, 2), envoy.Journey!.Route.Origin);
+            Assert.Equal(30, envoy.Journey.ReturnLeg!.CountdownDays);
+            Assert.False(envoy.Journey.ReturnLeg.FieldTravel);
         }
         else
         {
-            Assert.True(Assert.Single(events.OfType<RecruitmentResolvedEvent>()).Success);
             var returns = events.OfType<TaskStartedEvent>().Where(e => e.Task.Kind == PersonnelReturns.Kind).ToArray();
             var envoy = Assert.Single(returns, e => e.Task.OfficerId == 11).Task;
             Assert.Equal(new WorldPosition(502, 2), envoy.Journey!.Route.Origin);
@@ -175,6 +169,48 @@ public sealed class FieldRecruitmentTests
             Assert.Contains(returns, e => e.Task.OfficerId == 21 && e.Task.Journey!.Route.Origin == new WorldPosition(502, 2));
         }
         _ = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), Rules);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TargetCanJoinOrSwitchArmyAfterRecruitmentStarts(bool startsInCity)
+    {
+        var state = World();
+        var setup = state.BeginMutation(Rules.Abilities);
+        if (startsInCity)
+            setup.Replace(setup.Officers[22] with { UnitId = null, SettlementId = 2, BaseAbilities = new(1, 50, 100, 50) });
+        setup.MaintainLeadership([]);
+        state.Commit(setup);
+        var engine = new SimulationEngine(state, Rules);
+        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 22);
+        Assert.True(engine.Execute(new("player"), command).Submission.Accepted);
+        var mutation = state.BeginMutation(Rules.Abilities);
+        mutation.AddUnit(new(200, 2, new(502, 2), 5000) { CorpsId = 2, ServicePlaceId = 2,
+            FormationId = 1, CommanderId = 22, Morale = 70,
+            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) });
+        mutation.SetSimulation(mutation.Simulation with { NextUnitId = 201 });
+        mutation.Replace(mutation.Officers[22] with { UnitId = 200, SettlementId = null });
+        mutation.MaintainLeadership([]);
+        state.Commit(mutation);
+        var restored = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), Rules);
+        var events = new List<DomainEvent>();
+        for (int xun = 0; xun < 3 && !events.OfType<RecruitmentResolvedEvent>().Any(); xun++)
+        {
+            engine.EndControl(new("player"));
+            restored.EndControl(new("player"));
+            var result = engine.AdvanceXun();
+            EventAssert.Equal(result.Events, restored.AdvanceXun().Events);
+            events.AddRange(result.Events);
+        }
+        Assert.True(Assert.Single(events.OfType<RecruitmentResolvedEvent>()).Success);
+        Assert.DoesNotContain(events.OfType<TaskCancelledEvent>(), e => e.TaskId == command.CommandId);
+        Assert.Single(events.OfType<UnitTransferredEvent>(), e => e.UnitId == 200);
+        Assert.DoesNotContain(events.OfType<UnitTransferredEvent>(), e => e.UnitId == 100);
+        var returning = Assert.Single(events.OfType<TaskStartedEvent>(), e => e.Task.OfficerId == 11 && e.Task.Kind == PersonnelReturns.Kind).Task;
+        Assert.Equal(new WorldPosition(502, 2), returning.Journey!.Route.Origin);
+        Assert.True(returning.Journey.ReturnLeg!.FieldTravel);
+        StateAssert.Equal(engine.Snapshot, restored.Snapshot);
     }
 
     [Fact]

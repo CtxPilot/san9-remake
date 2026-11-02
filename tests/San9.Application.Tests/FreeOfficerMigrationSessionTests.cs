@@ -22,7 +22,7 @@ public sealed class FreeOfficerMigrationSessionTests
     }
 
     [Fact]
-    public void MigrationCancelsRecruitmentAndRoundTripsSave()
+    public void MigrationPreservesRecruitmentAndRoundTripsSave()
     {
         var scenario = Scenario();
         const ulong seed = 2UL;
@@ -35,8 +35,8 @@ public sealed class FreeOfficerMigrationSessionTests
         var restored = SaveService.Decode(SaveService.Encode(session), scenario, GameSession.EngineFactory(scenario));
         var result = session.AdvanceXun();
         Assert.Equal(new FreeOfficerMigratedEvent(new(190, 2, 1), 9000, 2, 1), Assert.Single(result.Events.OfType<FreeOfficerMigratedEvent>()));
-        Assert.Contains(result.Events.OfType<TaskCancelledEvent>(), e => e.TaskId == command.CommandId);
-        Assert.DoesNotContain(session.Snapshot.Simulation.Tasks, t => t.Kind == "personnel-recruit");
+        Assert.DoesNotContain(result.Events.OfType<TaskCancelledEvent>(), e => e.TaskId == command.CommandId);
+        Assert.Contains(session.Snapshot.Simulation.Tasks, t => t.Id == command.CommandId);
         Assert.Equal(1, session.Snapshot.Officers.Single(p => p.Id == 9000).SettlementId);
         Assert.Contains(session.View.Officers, p => p.Id == 9000);
         EventAssert.Equal(result.Events, restored.AdvanceXun().Events);
