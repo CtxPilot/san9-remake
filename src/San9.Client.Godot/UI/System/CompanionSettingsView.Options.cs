@@ -84,6 +84,13 @@ public partial class CompanionSettingsView
                     settings => settings.DisableComputerForceConsolidation,
                     (settings, value) => settings with { DisableComputerForceConsolidation = value }),
             ]),
+            new("人事",
+            [
+                new ToggleOption("取消电脑褒奖时机限制",
+                    "电脑势力从开局起每旬均可安排褒奖，不再受开局等待和周期限制。",
+                    settings => settings.DisableComputerRewardTimingRestrictions,
+                    (settings, value) => settings with { DisableComputerRewardTimingRestrictions = value }),
+            ]),
             new("自动计略", [], StrategyPermissions),
             new("自动外交", [], DiplomacyPermissions),
         ]),

@@ -91,6 +91,7 @@ public sealed class HeadlessHostTests : IDisposable
         var session = GameSession.Start(definition, 42, companionSettings: new()
         {
             PlayerAutoDomesticEnabled = true, ConfigureTacticsOnFormationSelection = true,
+            DisableComputerRewardTimingRestrictions = true,
             BattleDeathProtectionThreshold = 125, AllowCommanderBattleDeaths = true, DuelDeathCoefficient = 5,
             DisablePlayerPrisonerExecution = true, DisableComputerPrisonerExecution = false,
             InfiniteLifespan = true,

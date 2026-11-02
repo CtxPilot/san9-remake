@@ -22,6 +22,7 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         {
             PlayerAutoDomesticEnabled = true, OfficerAbilityCap = 125,
             DisableComputerForceConsolidation = true,
+            DisableComputerRewardTimingRestrictions = true,
             DisableComputerPrisonerExecution = true,
             DisablePlayerPrisonerExecution = true,
             InfiniteLifespan = true,

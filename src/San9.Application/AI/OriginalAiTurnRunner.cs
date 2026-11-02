@@ -108,7 +108,10 @@ internal static class OriginalAiTurnRunner
                     Report(new(corps.Id, work, OriginalAiWorkEnd.Permission, 0, 0));
                     continue;
                 }
-                if (!OriginalAiWorkGate.Calendar(engine.Snapshot.Clock, engine.Snapshot.Simulation.Started, forceState.SchedulingKey, rule, advanced))
+                bool unrestrictedRewardTiming = seat.Kind == ControllerKind.Automatic && work == OriginalAiWork.Reward &&
+                    engine.Companion.DisableComputerRewardTimingRestrictions;
+                if (!unrestrictedRewardTiming &&
+                    !OriginalAiWorkGate.Calendar(engine.Snapshot.Clock, engine.Snapshot.Simulation.Started, forceState.SchedulingKey, rule, advanced))
                 {
                     Report(new(corps.Id, work, OriginalAiWorkEnd.Calendar, 0, 0));
                     continue;
