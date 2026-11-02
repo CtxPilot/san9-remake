@@ -35,6 +35,7 @@ public sealed record SelectionViewPreferences(SelectionViewMode Forces, Selectio
 public sealed record UiPreferences(int SaveLoadPage, RosterPage RosterPage, EdgeScrollMode EdgeScrollMode,
     bool ShowForces, bool ShowFacilities, bool ShowUnits, bool ShowBoundaries, SelectionViewPreferences SelectionViews)
 {
+    [System.Text.Json.Serialization.JsonRequired] public bool AutoAssignOfficerFlag { get; init; } = true;
     public static UiPreferences Default { get; } = new(0, RosterPage.Facilities, EdgeScrollMode.Hover,
         true, true, true, true, SelectionViewPreferences.Default);
 

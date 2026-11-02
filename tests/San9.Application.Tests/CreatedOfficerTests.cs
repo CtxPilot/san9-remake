@@ -5,9 +5,88 @@ namespace San9.Application.Tests;
 
 public sealed class CreatedOfficerTests
 {
+    [Theory]
+    [InlineData("司马", 66)]
+    [InlineData("\U00020000甲", 77)]
+    [InlineData("\U00020001", -1)]
+    [InlineData("陌", -1)]
+    [InlineData("", -1)]
+    public void SurnameFlagsChangeOnlyOnExplicitEditorAssignment(string surname, int expected)
+    {
+        var person = Person() with { Surname = "新", FlagGlyph = 42 };
+        var workspace = new CreatedOfficerWorkspace(CreatedOfficerLibrary.Empty with { Officers = [person] });
+        workspace.UseFlagCatalog(new(OfficerFlagCatalog.CurrentSchemaVersion, new() { ["司"] = 66, ["𠀀"] = 77 }, [66, 77]));
+        Assert.False(workspace.HasChanges); Assert.Equal(42, workspace.Library.Officers[0].FlagGlyph);
+        workspace.Set(person with { Surname = surname });
+        Assert.Equal(42, workspace.Library.Officers[0].FlagGlyph);
+        workspace.AssignFlagFromSurname(person.Id);
+        var automatic = workspace.Library.Officers[0];
+        Assert.Equal(expected, automatic.FlagGlyph);
+        workspace.Set(automatic with { FlagGlyph = -1 });
+        workspace.Set(workspace.Library.Officers[0] with { Surname = "司徒" });
+        Assert.Equal(-1, workspace.Library.Officers[0].FlagGlyph);
+        workspace.AssignFlagFromSurname(person.Id);
+        Assert.Equal(66, workspace.Library.Officers[0].FlagGlyph);
+        var copy = workspace.Duplicate(person.Id);
+        Assert.Equal(66, copy.FlagGlyph);
+        Assert.Equal(66, CreatedOfficerLibrary.Decode(workspace.Library.Encode()).Officers[0].FlagGlyph);
+    }
+
+    [Fact]
+    public void MissingFlagCatalogRejectsAssignmentButAllowsSurnameEditingWithoutChangingTheFlag()
+    {
+        var person = Person() with { Surname = "新" };
+        var workspace = new CreatedOfficerWorkspace(CreatedOfficerLibrary.Empty with { Officers = [person] });
+        Assert.Throws<InvalidOperationException>(() => workspace.AssignFlagFromSurname(person.Id));
+        Assert.Same(person, workspace.Library.Officers[0]); Assert.False(workspace.HasChanges);
+        workspace.Set(person with { Surname = "司马" });
+        Assert.Equal(42, workspace.Library.Officers[0].FlagGlyph);
+        Assert.Throws<InvalidOperationException>(() => workspace.FinishSurnameEdit(person.Id, automatic: true));
+        workspace.UseFlagCatalog(new(OfficerFlagCatalog.CurrentSchemaVersion, new() { ["司"] = 66 }, [66]));
+        Assert.True(workspace.FinishSurnameEdit(person.Id, automatic: true));
+        Assert.Equal(66, workspace.Library.Officers[0].FlagGlyph);
+    }
+
+    [Theory]
+    [InlineData(true, 66)]
+    [InlineData(false, 42)]
+    public void FinishingSurnameEditsUsesTheCurrentPreferenceAndCannotOverrideALaterManualChoice(bool automatic, int expected)
+    {
+        var person = Person() with { Surname = "新" };
+        var workspace = new CreatedOfficerWorkspace(CreatedOfficerLibrary.Empty with { Officers = [person] });
+        workspace.UseFlagCatalog(new(OfficerFlagCatalog.CurrentSchemaVersion, new() { ["司"] = 66 }, [66]));
+        workspace.Set(person with { Surname = "司" });
+        workspace.Set(workspace.Library.Officers[0] with { Surname = "司马" });
+        Assert.Equal(42, workspace.Library.Officers[0].FlagGlyph);
+        workspace.FinishSurnameEdits(automatic);
+        Assert.Equal(expected, workspace.Library.Officers[0].FlagGlyph);
+
+        workspace.Set(workspace.Library.Officers[0] with { FlagGlyph = -1 });
+        Assert.False(workspace.FinishSurnameEdit(person.Id, automatic: true));
+        workspace.Set(workspace.Library.Officers[0] with { Surname = "刘" });
+        workspace.Set(workspace.Library.Officers[0] with { Surname = "司马" });
+        Assert.False(workspace.FinishSurnameEdits(automatic: true));
+        Assert.Equal(-1, workspace.Duplicate(person.Id).FlagGlyph);
+    }
+
+    [Fact]
+    public void ImportDiscardsSupersededSurnameEditsBeforeLateControlCallbacks()
+    {
+        var person = Person() with { Surname = "新" };
+        var workspace = new CreatedOfficerWorkspace(CreatedOfficerLibrary.Empty with { Officers = [person] });
+        workspace.UseFlagCatalog(new(OfficerFlagCatalog.CurrentSchemaVersion, new() { ["刘"] = 163 }, [163]));
+        workspace.Set(person with { Surname = "司马" });
+        workspace.Import(CreatedOfficerLibrary.Empty with { Officers = [person with { Surname = "刘", FlagGlyph = 77 }] }, createCopies: false);
+        Assert.False(workspace.FinishSurnameEdit(person.Id, automatic: true));
+        Assert.Equal(77, workspace.Library.Officers[0].FlagGlyph);
+        workspace.Delete(person.Id);
+        Assert.False(workspace.FinishSurnameEdit(person.Id, automatic: true));
+    }
+
     private static CreatedOfficer Person(string name = "自创人物") => new(Guid.NewGuid(), name)
     {
-        PortraitKey = "portrait-42", Abilities = new(125, 76, 85, 94), BirthYear = 160, AppearanceYear = 181,
+        PortraitKey = "portrait-42", FlagGlyph = 42,
+        Abilities = new(125, 76, 85, 94), BirthYear = 160, AppearanceYear = 181,
         Proficiencies = [42, 0, 0, 0, 0, 0, 0, 0, 0], MasteredCategories = [3]
     };
 

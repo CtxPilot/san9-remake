@@ -33,7 +33,7 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
                 foreach (int direction in Enumerable.Range(0, 8))
                     if (!clips.Contains($"unit-flag-{direction}-cloth-{color}"))
                         throw new InvalidDataException($"Missing unit flag color: {color}");
-            foreach (int glyph in Scenario.Officers.Select(o => o.FlagGlyph).Where(g => g >= 0).Distinct())
+            foreach (int glyph in Scenario.Officers.Select(o => o.FlagGlyph).Concat(Definitions.Officers.Select(o => o.FlagGlyph)).Where(g => g >= 0).Distinct())
                 foreach (int direction in Enumerable.Range(0, 8))
                     if (!clips.Contains($"unit-flag-{direction}-glyph-0-{glyph}") || !clips.Contains($"unit-flag-{direction}-glyph-1-{glyph}"))
                         throw new InvalidDataException($"Missing officer flag glyph: {glyph}");

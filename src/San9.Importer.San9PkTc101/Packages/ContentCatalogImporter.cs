@@ -2,6 +2,7 @@ using System.Text.Json;
 using San9.Content.Packages;
 using San9.Content.Text;
 using San9.Importer.San9PkTc101.Interface;
+using San9.Importer.San9PkTc101.Scenarios;
 using San9.Importer.San9PkTc101.Text;
 
 namespace San9.Importer.San9PkTc101.Packages;
@@ -18,7 +19,8 @@ public static class ContentCatalogImporter
         string textureRoot = PackageFiles.Resolve(output, "shared/textures");
         var textures = await TexturePackageFiles.LoadAsync(textureRoot, token);
         byte[] exe = await File.ReadAllBytesAsync(source.Executable, token);
-        var messages = MessageArchiveCompiler.CompileForPublication(File.ReadAllBytes(source.File("M_MsgPK.s9")), "M_MsgPK.s9", "messages").Messages;
+        byte[] messageBytes = await File.ReadAllBytesAsync(source.File("M_MsgPK.s9"), token);
+        var messages = MessageArchiveCompiler.CompileForPublication(messageBytes, "M_MsgPK.s9", "messages").Messages;
         var text = new TextCatalog(TextCatalog.CurrentSchemaVersion, []) { Messages = messages.ToDictionary(p => p.Key, p => new MessageDefinition(MessageGraph.Simplify(p.Value.Nodes))) };
         var headers = Enumerable.Range(1, 20).Select(i =>
         {
@@ -64,7 +66,15 @@ public static class ContentCatalogImporter
             { Audio = new("setup", "game-start", sounds) };
         opening.Audio.Validate(output);
         await Publish("shared/opening.json", opening);
-        await Publish("catalog.json", new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries.ToArray()));
+        using (var peopleSource = File.OpenRead(source.File("D_Sce001.S9")))
+        using (var names = new ScenarioTextReader(messageBytes, exe))
+        {
+            var flags = OfficerFlagCatalogCompiler.Compile(San9ScenarioPersonArchive.ReadKnownRecords(peopleSource), names.Surname);
+            flags.ValidateReferences(textures.Map.Clips.Select(c => c.Id).ToHashSet());
+            await Publish("shared/officer-flags.json", flags);
+        }
+        await Publish("catalog.json", new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries.ToArray())
+            { OfficerFlags = "shared/officer-flags.json" });
 
         async Task Publish<T>(string path, T value)
         {

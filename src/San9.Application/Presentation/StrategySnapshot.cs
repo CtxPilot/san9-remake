@@ -72,7 +72,7 @@ internal sealed class StrategySnapshotSource
             new Dictionary<int, int>(definition.RegionCityIds));
         var people = definition.Officers.ToDictionary(o => o.State.Id, o => new OfficerDisplayDefinition(o.NameKey, o.CourtesyNameKey, o.BiographyKey, o.FlagGlyph));
         foreach (var person in (additions ?? SessionDefinitions.Empty).Officers)
-            people[person.Id] = new(person.NameKey, person.CourtesyNameKey, person.BiographyKey, -1);
+            people[person.Id] = new(person.NameKey, person.CourtesyNameKey, person.BiographyKey, person.FlagGlyph);
         _officers = people;
         _sessionForces = (additions ?? SessionDefinitions.Empty).Forces.ToDictionary(f => f.Id);
         _forces = definition.Forces.ToDictionary(force => force.Id);
@@ -103,15 +103,15 @@ internal sealed class StrategySnapshotSource
         string? rulerName = !force.IsBarbarian && force.LeaderId is int ruler && _officers.TryGetValue(ruler, out var person)
             ? person.NameKey : null;
         int? titleGlyph = force.CountryTitleId is int title ? Information.CountryTitles.Single(t => t.Id == title).FlagGlyph : null;
-        if (force.Origin is { } origin)
+        int? founderId = force.Origin?.FounderId ?? _sessionForces.GetValueOrDefault(force.Id)?.FounderId;
+        if (founderId is int founder)
         {
             int glyph = force.LeaderId is int leader ? _officers[leader].FlagGlyph : -1;
-            return (rulerName ?? _officers[origin.FounderId].NameKey, force.ColorCode, titleGlyph ?? glyph);
+            return (rulerName ?? _officers[founder].NameKey, force.ColorCode, titleGlyph ?? glyph);
         }
-        if (_sessionForces.TryGetValue(force.Id, out var added))
-            return (rulerName ?? _officers[added.FounderId].NameKey, force.ColorCode, titleGlyph ?? -1);
         var initial = _forces[force.Id];
-        return (rulerName ?? initial.NameKey, force.ColorCode, titleGlyph ?? initial.FlagGlyph);
+        int rulerGlyph = force.LeaderId is int current ? _officers[current].FlagGlyph : initial.FlagGlyph;
+        return (rulerName ?? initial.NameKey, force.ColorCode, titleGlyph ?? rulerGlyph);
     }
     public SettlementInitialState? Settlement(int id) => _settlements.GetValueOrDefault(id);
     public IReadOnlyList<string> SettlementIcons(int id) => _settlementIcons.GetValueOrDefault(id) ?? [];

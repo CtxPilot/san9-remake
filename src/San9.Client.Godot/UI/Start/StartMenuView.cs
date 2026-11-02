@@ -84,7 +84,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     {
         if (_officerEditor is not null) return;
         _controls.Hide();
-        _officerEditor = new CreatedOfficerEditor { Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Closed = () =>
+        _officerEditor = new CreatedOfficerEditor { Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Preferences = Preferences, Closed = () =>
         {
             _officerEditor!.QueueFree(); _officerEditor = null; _controls.Show();
             _controls.GetNode<StartMenuButton>("create-officer").GrabFocus();

@@ -35,8 +35,12 @@ public sealed class ContentCatalogTests
         try
         {
             var entries = Enumerable.Range(0, 20).Select(i => new ScenarioCatalogEntry($"custom-{i}", $"scenarios/custom/{i}")).ToArray();
-            var catalog = new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries);
+            var catalog = new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries)
+                { OfficerFlags = "shared/officer-flags.json" };
             await File.WriteAllTextAsync(Path.Combine(root, "catalog.json"), JsonSerializer.Serialize(catalog, PackageFiles.JsonOptions));
+            Directory.CreateDirectory(Path.Combine(root, "shared"));
+            var flags = new San9.Content.Authoring.OfficerFlagCatalog(1, new() { ["司"] = 66 }, [66]);
+            await File.WriteAllTextAsync(Path.Combine(root, "shared", "officer-flags.json"), JsonSerializer.Serialize(flags, PackageFiles.JsonOptions));
             foreach (var entry in entries)
             {
                 string package = PackageFiles.Resolve(root, entry.Package);
@@ -49,8 +53,11 @@ public sealed class ContentCatalogTests
                 await File.WriteAllTextAsync(Path.Combine(package, "content.json"), JsonSerializer.Serialize(manifest, PackageFiles.JsonOptions));
             }
             var loaded = await ContentCatalogFiles.LoadAsync(root);
+            Assert.Equal(66, (await ContentCatalogFiles.LoadOfficerFlagsAsync(root, loaded)).Resolve("司马"));
             Assert.Equal(entries[0].Package, loaded.RequireScenario("custom-0").Package);
             Assert.Throws<InvalidDataException>(() => loaded.RequireScenario("190"));
+            File.Delete(PackageFiles.Resolve(root, loaded.OfficerFlags));
+            await Assert.ThrowsAsync<FileNotFoundException>(() => ContentCatalogFiles.LoadOfficerFlagsAsync(root, loaded));
             var previews = await ContentCatalogFiles.LoadPreviewsAsync(root, loaded);
             Assert.Equal(20, previews.Length);
             Assert.All(previews, p => Assert.Equal("custom-category", p.CategoryId));

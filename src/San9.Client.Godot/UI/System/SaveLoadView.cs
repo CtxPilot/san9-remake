@@ -80,7 +80,7 @@ public partial class SaveLoadView : ModalView
                 content.AddChild(new AsyncPortrait { Service = Service, Role = entry.PortraitAssetId,
                     View = San9.Content.Images.PortraitView.Face, Position = new(80, 16), Size = new(64, 80), MouseFilter = MouseFilterEnum.Ignore });
             if (State.Flag(slot) is { } flag)
-                content.AddChild(new SaveSlotFlagView { Service = Service, Flag = flag, Position = new(-7, 44) });
+                content.AddChild(new FlagPreview { Service = Service, ColorCode = flag.Color, Glyph = flag.Glyph, Position = new(-7, 44) });
             RowLabel(entry.Ruler, new(176, 20), new(112, 32), 24, "5828c8");
             RowLabel($"{entry.Players}人游戏", new(296, 28), new(88, 24), 16, edge);
             if (entry.Historical is bool historical)

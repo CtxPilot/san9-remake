@@ -26,7 +26,7 @@ public sealed class UiPreferencesTests : IDisposable
         foreach (var group in Enum.GetValues<SelectionViewGroup>()) preferences.SetMap(group, false);
         preferences.SetMap(SelectionViewGroup.Cities, true);
         preferences.Update(p => p with { SaveLoadPage = 7, RosterPage = RosterPage.Units,
-            EdgeScrollMode = EdgeScrollMode.HoldLeftButton, ShowForces = false, ShowBoundaries = false });
+            EdgeScrollMode = EdgeScrollMode.HoldLeftButton, ShowForces = false, ShowBoundaries = false, AutoAssignOfficerFlag = false });
         var opening = new SaveLoadBrowser();
         opening.Open(SaveLoadMode.Load, preferences.Current.SaveLoadPage);
         opening.Close();
@@ -41,6 +41,7 @@ public sealed class UiPreferencesTests : IDisposable
         Assert.Equal(preferences.Current, restarted.Current);
         Assert.All(Enum.GetValues<SelectionViewGroup>(), group =>
             Assert.Equal(group == SelectionViewGroup.Cities, restarted.IsMap(group)));
+        Assert.False(restarted.Current.AutoAssignOfficerFlag);
         Assert.Equal(oldDraft, settingsStore.Load());
     }
 
@@ -67,6 +68,8 @@ public sealed class UiPreferencesTests : IDisposable
 
     [Theory]
     [InlineData("version", "9999")]
+    [InlineData("version", "1")]
+    [InlineData("preferences.autoAssignOfficerFlag", "null")]
     [InlineData("preferences", "null")]
     [InlineData("preferences.saveLoadPage", "-1")]
     [InlineData("preferences.rosterPage", "\"Unknown\"")]

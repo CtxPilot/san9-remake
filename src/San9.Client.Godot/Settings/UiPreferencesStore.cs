@@ -8,7 +8,7 @@ namespace San9.Client.Godot.Settings;
 
 public sealed class UiPreferencesStore
 {
-    private const int FormatVersion = 1;
+    private const int FormatVersion = 2;
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

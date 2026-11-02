@@ -1,5 +1,6 @@
 using San9.Application.Authoring;
 using San9.Application.Persistence;
+using San9.Application.Presentation;
 using San9.Content.Authoring;
 using San9.Content.Scenarios;
 using San9.Content.Text;
@@ -11,9 +12,9 @@ namespace San9.Application.Tests;
 public sealed class NewGameSetupTests
 {
     private static readonly CreatedOfficer First = new(Guid.Parse("10000000-0000-0000-0000-000000000000"), "甲")
-        { Surname = "新", BirthYear = 160, AppearanceYear = 180, Abilities = new(91, 92, 93, 94), PortraitKey = "portrait.42" };
+        { Surname = "新", FlagGlyph = 42, BirthYear = 160, AppearanceYear = 180, Abilities = new(91, 92, 93, 94), PortraitKey = "portrait.42" };
     private static readonly CreatedOfficer Second = new(Guid.Parse("20000000-0000-0000-0000-000000000000"), "乙")
-        { Surname = "新", BirthYear = 175, AppearanceYear = 189, ParentId = First.Id };
+        { Surname = "新", FlagGlyph = 66, BirthYear = 175, AppearanceYear = 189, ParentId = First.Id };
     private static ScenarioInitialState Source() => new(ScenarioInitialState.CurrentSchemaVersion, "created-start", 190, 1, 1, 12,
         [new(12, "force.old", 5, 100) { LeaderId = 1000 }],
         [new(1, "city.empty", null, 0, 0, 8000, 100, 100, 50, [])
@@ -35,6 +36,33 @@ public sealed class NewGameSetupTests
     });
     private static NewGameDraft Draft(params CreatedOfficer[] people) => new(Source(), Text(),
         new Dictionary<string, string> { ["catalog-person-1000"] = "portrait.1" }, CreatedOfficerLibrary.Empty with { Officers = [..people] });
+
+    [Fact]
+    public void CreatedForceFlagFollowsItsCurrentRulerWithCountryTitleTakingPriority()
+    {
+        var original = Source();
+        var source = original with
+        {
+            Officers = [original.Officers[0] with { FlagGlyph = 77, State = original.Officers[0].State with { Surname = "新" } }],
+            Information = original.Information with { CountryTitles = [new(new(5000, true, true, false, [], []), "title", 37)] }
+        };
+        var draft = new NewGameDraft(source, Text(), new Dictionary<string, string>(),
+            CreatedOfficerLibrary.Empty with { Officers = [First, Second with { FlagGlyph = -1 }] });
+        draft.SetForces([new(First.Id, 1)]); draft.Deploy([Second.Id], 1, true);
+        var session = GameSession.Start(source, 123, playerForceIds: [13], setup: draft.Setup);
+        var display = new StrategySnapshotSource(source, new ScenarioRules(source), session.Definitions);
+        var force = session.Snapshot.Forces.Single(f => f.Id == 13);
+
+        Assert.Equal(-1, session.View.Officers.Single(p => p.Id == 1002).FlagGlyph);
+        Assert.Equal(42, display.Force(force).FlagGlyph);
+        Assert.Equal(-1, display.Force(force with { LeaderId = 1002 }).FlagGlyph);
+        Assert.Equal(-1, display.Force(force with { LeaderId = null }).FlagGlyph);
+        Assert.Equal(37, display.Force(force with { LeaderId = 1002, CountryTitleId = 5000 }).FlagGlyph);
+        var historical = session.Snapshot.Forces.Single(f => f.Id == 12);
+        Assert.Equal(77, display.Force(historical).FlagGlyph);
+        Assert.Equal(42, display.Force(historical with { LeaderId = 1001 }).FlagGlyph);
+        Assert.Equal(-1, display.Force(historical with { LeaderId = 1002 }).FlagGlyph);
+    }
 
     [Fact]
     public void OpeningCityQueriesReflectAssignmentsWithoutApplyingStartupOrMutatingTheDraft()
@@ -172,8 +200,15 @@ public sealed class NewGameSetupTests
     [InlineData(GameMode.Fictional)]
     public void SaveAndCommandScriptUseWorldStateAndLocalDefinitionsAgainstTheBaseScenario(GameMode mode)
     {
-        var draft = Draft(First, Second); draft.SetForces([new(First.Id, 1)]); draft.Deploy([Second.Id], 1, true);
+        var original = Source();
+        var source = original with { Officers = [original.Officers[0] with
+            { FlagGlyph = 42, State = original.Officers[0].State with { Surname = "新" } }] };
+        var draft = new NewGameDraft(source, Text(), new Dictionary<string, string>(),
+            CreatedOfficerLibrary.Empty with { Officers = [First, Second] });
+        draft.SetForces([new(First.Id, 1)]); draft.Deploy([Second.Id], 1, true);
         var session = GameSession.Start(draft.Source, 123, playerForceIds: [13], setup: draft.Setup, settings: new() { Mode = mode });
+        Assert.Equal(42, draft.Preview().Forces.Single(f => f.Id == 13).FlagGlyph);
+        Assert.Equal(42, session.View.Forces.Single(f => f.Id == 13).FlagGlyph);
         foreach (var expected in draft.Compose().Officers.Where(p => p.State.Id != 1000).Select(p => p.State))
         {
             var initialized = session.Snapshot.Officers.Single(p => p.Id == expected.Id);
@@ -183,8 +218,12 @@ public sealed class NewGameSetupTests
                 initialized.Status == OfficerStatus.Ruler ? 100 : 99);
         }
         byte[] save = SaveService.Encode(session);
-        var restored = SaveService.Decode(save, Source());
+        var changedContent = source with { Officers = [source.Officers[0] with { FlagGlyph = 99 }] };
+        var restored = SaveService.Decode(save, changedContent);
         StateAssert.Equal(session.Capture(), restored.Capture());
+        Assert.Equal(42, restored.View.Forces.Single(f => f.Id == 13).FlagGlyph);
+        Assert.Equal(42, restored.View.Officers.Single(p => p.Id == 1001).FlagGlyph);
+        Assert.Equal(66, restored.View.Officers.Single(p => p.Id == 1002).FlagGlyph);
         Assert.Equal(First.Abilities, restored.Snapshot.Officers.Single(o => o.Id == 1001).BaseAbilities);
         var header = CommandLogService.CreateHeader(session);
         string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".jsonl");
@@ -193,12 +232,13 @@ public sealed class NewGameSetupTests
             CommandLogService.Write(path, header, []);
             Assert.Null(CommandLogService.Replay(path, restored).FirstFailure);
             StateAssert.Equal(session.Capture(), restored.Capture());
-            var wrong = GameSession.Start(Source(), 123);
+            var wrong = GameSession.Start(source, 123);
             Assert.Throws<CommandLogException>(() => CommandLogService.Replay(path, wrong));
         }
         finally { File.Delete(path); }
         // A player load changes random streams but retains the startup definitions.
-        var loaded = SaveService.Load(save, Source());
+        var loaded = SaveService.Load(save, changedContent);
+        Assert.Equal(42, loaded.View.Forces.Single(f => f.Id == 13).FlagGlyph);
         Assert.Equal(First.FullName, loaded.Definitions.Officers[0].Surname + loaded.Definitions.Officers[0].Name);
         var actual = session.AdvanceXun(); var next = restored.AdvanceXun();
         EventAssert.Equal(actual.Events, next.Events); StateAssert.Equal(session.Capture(), restored.Capture());
@@ -233,7 +273,7 @@ public sealed class NewGameSetupTests
         var saved = json.RootElement.GetProperty("session");
         Assert.False(saved.TryGetProperty("setup", out _));
         foreach (var person in saved.GetProperty("definitions").GetProperty("officers").EnumerateArray())
-            Assert.Equal(new[] { "biography", "courtesyName", "id", "name", "portraitKey", "surname" },
+            Assert.Equal(new[] { "biography", "courtesyName", "flagGlyph", "id", "name", "portraitKey", "surname" },
                 person.EnumerateObject().Select(p => p.Name).Order().ToArray());
         Assert.DoesNotContain("unrelated-library-person", json.RootElement.GetRawText());
         Assert.DoesNotContain(First.Id.ToString(), json.RootElement.GetRawText());

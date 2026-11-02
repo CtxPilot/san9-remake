@@ -59,7 +59,8 @@ public partial class Main : Node
             _preferences = new(preferences, preferenceStore.Save);
             if (options.OfficerEditor)
             {
-                ui.AddChild(new CreatedOfficerEditor { Store = new(DataPaths.CreatedOfficers), ContentRoot = options.ContentRoot, Closed = () => GetTree().Quit() });
+                ui.AddChild(new CreatedOfficerEditor { Store = new(DataPaths.CreatedOfficers), ContentRoot = options.ContentRoot,
+                    Preferences = _preferences, Closed = () => GetTree().Quit() });
                 return;
             }
             if (options.PackageRoot is null && options.ScenarioId is null)

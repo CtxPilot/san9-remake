@@ -58,7 +58,7 @@ public static class NewGameComposer
             int color = Enumerable.Range(0, 50).MinBy(c => forces.Count(f => f.ColorCode == c));
             forces.Add(new(id, NameKey(ids[created.RulerId]), color, 100)
             {
-                BaseTrust = 100, LeaderId = ids[created.RulerId], FlagGlyph = -1,
+                BaseTrust = 100, LeaderId = ids[created.RulerId], FlagGlyph = people[created.RulerId].FlagGlyph,
                 RankId = source.Information.Ranks.OrderBy(r => r.Precedence).ThenBy(r => r.Id).Select(r => (int?)r.Id).FirstOrDefault()
             });
             var economy = new SettlementState(city.Id, id, city.Soldiers, city.Durability, city.MaxDurability, city.Morale,
@@ -109,7 +109,7 @@ public static class NewGameComposer
                 ParentId = p.ParentId is Guid parent ? ids[parent] : p.ScenarioParentId, BloodlineId = Family(p)
             };
             officers.Add(new(NameKey(state.Id), state) { CourtesyNameKey = p.CourtesyName.Length > 0 ? $"created.{state.Id}.courtesy" : null,
-                BiographyKey = p.Biography.Length > 0 ? $"created.{state.Id}.biography" : null });
+                BiographyKey = p.Biography.Length > 0 ? $"created.{state.Id}.biography" : null, FlagGlyph = p.FlagGlyph });
         }
         var result = source with { Forces = forces.ToArray(), Officers = officers.ToArray(),
             Settlements = source.Settlements.Select(s => cities.GetValueOrDefault(s.Id) ?? s).ToArray(),
@@ -118,7 +118,8 @@ public static class NewGameComposer
         return new(result, new()
         {
             Officers = setup.Library.Officers.Where(p => included.Contains(p.Id)).OrderBy(p => p.Id)
-                .Select(p => new SessionOfficerDefinition(ids[p.Id], p.Surname, p.Name, p.CourtesyName, p.Biography, p.PortraitKey)).ToImmutableArray(),
+                .Select(p => new SessionOfficerDefinition(ids[p.Id], p.Surname, p.Name, p.CourtesyName, p.Biography, p.PortraitKey)
+                    { FlagGlyph = p.FlagGlyph }).ToImmutableArray(),
             Forces = setup.Forces.OrderBy(f => f.RulerId).Select(f => new SessionForceDefinition(rulerForces[f.RulerId], ids[f.RulerId])).ToImmutableArray()
         });
     }

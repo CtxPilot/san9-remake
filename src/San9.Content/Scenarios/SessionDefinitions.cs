@@ -7,6 +7,7 @@ namespace San9.Content.Scenarios;
 /// <summary>Display identity for a person added to this world. All gameplay values belong to OfficerState.</summary>
 public sealed record SessionOfficerDefinition(int Id, string Surname, string Name, string CourtesyName, string Biography, string? PortraitKey)
 {
+    [JsonRequired] public int FlagGlyph { get; init; } = -1;
     [JsonIgnore] public string NameKey => $"created.{Id}.name";
     [JsonIgnore] public string? CourtesyNameKey => CourtesyName.Length > 0 ? $"created.{Id}.courtesy" : null;
     [JsonIgnore] public string? BiographyKey => Biography.Length > 0 ? $"created.{Id}.biography" : null;
@@ -23,7 +24,7 @@ public sealed record SessionDefinitions
     public void Validate()
     {
         if (Officers.IsDefault || Forces.IsDefault || Officers.Any(p => p is null || p.Id < 0 || p.Surname is null ||
-            string.IsNullOrWhiteSpace(p.Name) || p.CourtesyName is null || p.Biography is null || p.PortraitKey is not null && string.IsNullOrWhiteSpace(p.PortraitKey)) ||
+            p.FlagGlyph < -1 || string.IsNullOrWhiteSpace(p.Name) || p.CourtesyName is null || p.Biography is null || p.PortraitKey is not null && string.IsNullOrWhiteSpace(p.PortraitKey)) ||
             Forces.Any(f => f is null || f.Id < 0 || !Officers.Any(p => p.Id == f.FounderId)) ||
             Officers.Select(p => p.Id).Distinct().Count() != Officers.Length || Forces.Select(f => f.Id).Distinct().Count() != Forces.Length)
             throw new InvalidDataException("Invalid session definitions.");
