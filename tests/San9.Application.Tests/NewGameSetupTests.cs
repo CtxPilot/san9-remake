@@ -132,7 +132,8 @@ public sealed class NewGameSetupTests
         var root = session.Snapshot.Corps.Single(c => c.OwnerId == force.Id);
         Assert.True(root.IsRoot); Assert.True(root.Treasury.Money >= 3000); Assert.True(root.Treasury.Food >= 30000);
         Assert.Equal(50, Assert.Single(scenario.Information.Relations).Value);
-        Assert.Equal(100, scenario.Officers.Last().State.Loyalty);
+        Assert.Equal(50, scenario.Officers.Last().State.Loyalty);
+        Assert.InRange(session.Snapshot.Officers.Single(p => p.Id == 1002).Loyalty, 95, 99);
     }
 
     [Fact]
@@ -166,11 +167,21 @@ public sealed class NewGameSetupTests
         Assert.Throws<InvalidDataException>(() => young.SetForces([new(First.Id, 1)]));
     }
 
-    [Fact]
-    public void SaveAndCommandScriptUseWorldStateAndLocalDefinitionsAgainstTheBaseScenario()
+    [Theory]
+    [InlineData(GameMode.Historical)]
+    [InlineData(GameMode.Fictional)]
+    public void SaveAndCommandScriptUseWorldStateAndLocalDefinitionsAgainstTheBaseScenario(GameMode mode)
     {
         var draft = Draft(First, Second); draft.SetForces([new(First.Id, 1)]); draft.Deploy([Second.Id], 1, true);
-        var session = GameSession.Start(draft.Source, 123, playerForceIds: [13], setup: draft.Setup);
+        var session = GameSession.Start(draft.Source, 123, playerForceIds: [13], setup: draft.Setup, settings: new() { Mode = mode });
+        foreach (var expected in draft.Compose().Officers.Where(p => p.State.Id != 1000).Select(p => p.State))
+        {
+            var initialized = session.Snapshot.Officers.Single(p => p.Id == expected.Id);
+            Assert.Equal(expected with { ForceLoyalties = initialized.ForceLoyalties }, initialized);
+            Assert.Equal(expected.LoyaltyTo(12), initialized.LoyaltyTo(12));
+            Assert.InRange(initialized.Loyalty, initialized.Status == OfficerStatus.Ruler ? 100 : 95,
+                initialized.Status == OfficerStatus.Ruler ? 100 : 99);
+        }
         byte[] save = SaveService.Encode(session);
         var restored = SaveService.Decode(save, Source());
         StateAssert.Equal(session.Capture(), restored.Capture());

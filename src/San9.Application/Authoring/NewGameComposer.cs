@@ -96,7 +96,7 @@ public static class NewGameComposer
             bool ruler = rulerForces.TryGetValue(p.Id, out int ownForce);
             int? owner = ruler ? ownForce : placements.TryGetValue(p.Id, out var placement) && placement.JoinForce ? cities[placement.CityId].OwnerId : null;
             bool future = source.NaturalDeathsEnabled && !ruler && p.AppearanceYear > source.Year;
-            var loyalty = forces.ToImmutableDictionary(f => f.Id, f => f.Id == owner ? 100 : 50);
+            var loyalty = forces.ToImmutableDictionary(f => f.Id, f => ruler && f.Id == owner ? 100 : 50);
             var state = new OfficerState(ids[p.Id], future ? null : owner, cityId, p.Abilities, false)
             {
                 IsDormant = cityId is null, Status = cityId is null ? OfficerStatus.Undiscovered : ruler ? OfficerStatus.Ruler :
