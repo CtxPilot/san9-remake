@@ -62,7 +62,9 @@ internal sealed class MapAnnotationLayer
                 GameTextPresenter.Draw(target, font, entry.Name, new(0, 31), style);
                 continue;
             }
-            int soldiersY = entry.Target.IsUnit ? 20 : 16;
+            int firstBarY = entry.Target.IsUnit ? 20 : 16;
+            // Calibrated for the 16px map font: 2px outlined digit bounds plus a 1px gap.
+            int soldiersY = firstBarY - 3;
             GameTextPresenter.Draw(target, font, entry.Soldiers.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 new(0, soldiersY), style, HorizontalAlignment.Right, 72);
             if (!entry.Target.IsUnit) Bar("durability", entry.Durability, entry.MaxDurability, new(0, 16), entry.Target.Id);
