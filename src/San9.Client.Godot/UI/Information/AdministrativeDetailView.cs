@@ -134,7 +134,7 @@ public partial class AdministrativeDetailView : FixedPage, IInformationPage
     private void BuildLocation()
     {
         bool city = Category == InformationCategory.Cities;
-        Badge("status",_data.Status == "正常" ? "一般" : _data.Status,new((city ? 372 : 432)+_titleExtra,50),new(72,32));
+        Badge("status",_data.Status,new((city ? 372 : 432)+_titleExtra,50),new(72,32));
         if (city && _data.Feature != "—") Badge("training",_data.Feature + "修行",new(444+_titleExtra,50),new(120,32));
         _panels.Add(new(76,100,548,292));
         var preview = Preview(State.CurrentId); preview.Position = new(94,116); preview.Size = new(512,256); _body.AddChild(preview);

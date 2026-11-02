@@ -1,15 +1,17 @@
 using San9.Application.Presentation;
 using San9.Content.Authoring;
+using San9.Content.Scenarios;
+using San9.Content.Text;
 
 namespace San9.Client.Godot;
 
 /// <summary>The opening roster has its own summary followed by the nine shared tactics pages.</summary>
 public static class OpeningOfficerCatalog
 {
-    public static IReadOnlyList<CatalogPage> Pages { get; } = new[]
+    public static IReadOnlyList<CatalogPage> Pages(ScenarioInitialState source, TextCatalog texts) => new[]
     {
-        new CatalogPage("君主", OfficerCatalog.Pages[0].Columns.Take(6).ToArray())
-    }.Concat(OfficerCatalog.Pages.Skip(4)).ToArray();
+        new CatalogPage("君主", OfficerCatalog.CorePages[0].Columns.Take(6).ToArray())
+    }.Concat(OfficerCatalog.Pages(source.Information.Tactics, source.Military?.Tactics ?? [], texts).Skip(4)).ToArray();
 
     public static CatalogCell Cell(CreatedOfficer person, string field)
     {

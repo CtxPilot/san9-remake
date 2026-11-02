@@ -127,7 +127,7 @@ public partial class WorldEditorDetailView : FixedPage
         {
             var data=Draft.ReadAdministrativeDetail(CurrentId);
             Name(data.Name,new(209,43,52,32));
-            Name(data.Status == "正常" ? "一般" : data.Status,new(269,43,52,32));
+            Name(data.Status,new(269,43,52,32));
             if (data.Feature != "—") Name(data.Feature + "修行",new(333,43,100,32));
         }
         else if(Draft.Kind == WorldEditorKind.Corps) Name(Draft.ReadAdministrativeDetail(CurrentId).Name,new(209,43,100,32));

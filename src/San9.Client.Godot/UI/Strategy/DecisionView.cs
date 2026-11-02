@@ -188,7 +188,7 @@ public partial class DecisionView : FixedPage
             Service = Service,
             Title = option.Title,
             HintText = option.Input == DecisionInputKind.Country ? "请选择国号。" : Draft.Prompt.BbCode,
-            Pages = person ? OfficerCatalog.Pages : treasure ? TreasureCatalog.Pages : [new(option.Title, [new("name", option.Title, 12, CatalogAlignment.Left)])],
+            Pages = person ? OfficerCatalog.Pages(Draft.Before, Texts) : treasure ? TreasureCatalog.Pages : [new(option.Title, [new("name", option.Title, 12, CatalogAlignment.Left)])],
             ReadRows = Read,
             Selection = selection,
             Portrait = person ? id => $"information-person-{id}" : null,

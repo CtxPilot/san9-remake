@@ -6,7 +6,7 @@ namespace San9.Application.Presentation;
 /// <summary>Construction-specific candidate facts followed by the common officer pages.</summary>
 public static class ConstructionOfficerCatalog
 {
-    public static IReadOnlyList<CatalogPage> Pages { get; } = Array.AsReadOnly<CatalogPage>([
+    public static IReadOnlyList<CatalogPage> Pages(SpecialDeploymentDraft draft, TextCatalog texts) => [
         new("建设", [
             new("name", "武将", 8, CatalogAlignment.Left),
             new("construction", "营造", 2, CatalogAlignment.Center),
@@ -17,11 +17,11 @@ public static class ConstructionOfficerCatalog
             new("intelligence", "智力", 3, CatalogAlignment.Right),
             new("politics", "政治", 3, CatalogAlignment.Right),
             new("learned", "学得", 2, CatalogAlignment.Right)]),
-        .. OfficerCatalog.Pages]);
+        .. OfficerCatalog.Pages(draft.View, texts)];
 
     public static CatalogRow[] Read(SpecialDeploymentDraft draft, TextCatalog texts, int page)
     {
-        if ((uint)page >= Pages.Count) throw new ArgumentOutOfRangeException(nameof(page));
+        if ((uint)page >= Pages(draft, texts).Count) throw new ArgumentOutOfRangeException(nameof(page));
         var common = OfficerCatalog.Read(draft.View, texts, page == 0 ? 0 : page-1, null, draft.Home.Id)
             .Rows.ToDictionary(row => row.Key.Id);
         var people = draft.View.World.Officers.ToDictionary(o => o.Id);

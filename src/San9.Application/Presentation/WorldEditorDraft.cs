@@ -27,7 +27,7 @@ public sealed class WorldEditorDraft
     };
     public IReadOnlyList<CatalogPage> Pages => Kind switch
     {
-        WorldEditorKind.Officers => OfficerCatalog.Pages, WorldEditorKind.Facilities => WorldEditorCatalog.Facilities,
+        WorldEditorKind.Officers => OfficerCatalog.Pages(Preview, _texts), WorldEditorKind.Facilities => WorldEditorCatalog.Facilities,
         WorldEditorKind.Obstacles => WorldEditorCatalog.Obstacles, _ => AdministrativeCatalog.Pages(Category)
     };
     public StrategySnapshot Preview

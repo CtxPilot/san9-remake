@@ -190,9 +190,9 @@ public partial class DeploymentView : FixedPage
     private void SelectOfficers()
     {
         var selection = new CatalogSelection(Draft.Candidates, Draft.Members, Draft.MemberLimit);
-        var departure = new CatalogPage("出征", [OfficerCatalog.Pages[0].Columns[0],
-            OfficerCatalog.Pages[3].Columns[1], OfficerCatalog.Pages[3].Columns[2],
-            .. OfficerCatalog.Pages[0].Columns[1..6], OfficerCatalog.Pages[1].Columns[^1], OfficerCatalog.Pages[3].Columns[5]]);
+        var departure = new CatalogPage("出征", [OfficerCatalog.CorePages[0].Columns[0],
+            OfficerCatalog.CorePages[3].Columns[1], OfficerCatalog.CorePages[3].Columns[2],
+            .. OfficerCatalog.CorePages[0].Columns[1..6], OfficerCatalog.CorePages[1].Columns[^1], OfficerCatalog.CorePages[3].Columns[5]]);
         var ability = OfficerCatalog.Read(Draft.View, Texts, 0, null, Draft.Home.Id).Rows.ToDictionary(r => r.Key.Id);
         var personal = OfficerCatalog.Read(Draft.View, Texts, 3, null, Draft.Home.Id).Rows.ToDictionary(r => r.Key.Id);
         var belonging = OfficerCatalog.Read(Draft.View, Texts, 1, null, Draft.Home.Id).Rows.ToDictionary(r => r.Key.Id);
@@ -206,7 +206,7 @@ public partial class DeploymentView : FixedPage
         {
             Title = "选择武将",
             HintText = $"选择执行武将（最多{Draft.MemberLimit}人）。",
-            Pages = [departure, .. OfficerCatalog.Pages],
+            Pages = [departure, .. OfficerCatalog.Pages(Draft.View, Texts)],
             ReadRows = Rows,
             Service = Service,
             Textures = Textures,

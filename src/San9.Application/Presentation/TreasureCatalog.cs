@@ -24,11 +24,10 @@ public static class TreasureCatalog
                    [texts.Resolve(definition.NameKey), definition.Category switch { 0 => "名马", 1 => "武器", 2 => "兵书", 3 => "政书", 4 => "史书", 5 => "经书", 6 => "论文",
                            7 => "地图", 8 => "医书", 9 => "奇书", 10 => "玉玺", 11 => "宝物", 12 => "装饰", _ => throw new InvalidOperationException("Unknown treasure category.") },
                        definition.Category switch { 2 => "统率", 1 => "武力", 5 or 9 => "智力", 3 or 4 or 6 => "政治", _ => "" },
-                       definition.AbilityBonus, Tactic(definition.TacticId), definition.Category switch { 0 => new CatalogCell("安然撤退"), 10 => new CatalogCell("信望+100"), _ => CatalogCell.Unavailable }, texts.Resolve(holder.NameKey)], holder.SettlementId);
+                       definition.AbilityBonus, Tactic(view, texts, definition.TacticId), definition.Category switch { 0 => new CatalogCell("安然撤退"), 10 => new CatalogCell("信望+100"), _ => CatalogCell.Unavailable }, texts.Resolve(holder.NameKey)], holder.SettlementId);
         return new("宝物一览", ["特征"], Pages[0].Columns.Select(c => c.Title).ToArray(), rows.ToArray());
     }
 
-    private static CatalogCell Tactic(int? id) => id is null ? new("") :
-        OfficerCatalog.Pages.Skip(4).SelectMany(p => p.Columns.Skip(1)).FirstOrDefault(c => c.Id == $"tactic.{id}") is { } column
-            ? new(column.Title) : CatalogCell.Unavailable;
+    private static CatalogCell Tactic(StrategySnapshot view, TextCatalog texts, int? id) => id is null ? new("") :
+        new(texts.Resolve(view.Information.Tactics.Single(t => t.Id == id).NameKey));
 }

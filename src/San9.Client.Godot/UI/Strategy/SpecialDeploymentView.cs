@@ -111,7 +111,7 @@ public partial class SpecialDeploymentView : FixedPage
     private void SelectOfficers()
     {
         var picker = new CatalogView { Title = "选择武将", HintText = Text("need-officers"), CloseTitle = "中止",
-            Textures = Textures, Service = Service, Pages = Construction ? ConstructionOfficerCatalog.Pages : TransportOfficerCatalog.Pages,
+            Textures = Textures, Service = Service, Pages = Construction ? ConstructionOfficerCatalog.Pages(Draft, Texts) : TransportOfficerCatalog.Pages(Draft, Texts),
             ReadRows = page => Construction ? ConstructionOfficerCatalog.Read(Draft, Texts, page) : TransportOfficerCatalog.Read(Draft, Texts, page),
             Portrait = Construction ? null : id => $"catalog-person-{id}", Closed = CloseChild,
             Selection = Construction ? new CatalogSelection(Draft.Candidates,Draft.Members,Draft.MemberLimit) : null,

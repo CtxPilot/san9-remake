@@ -49,7 +49,7 @@ public static class UnitDetails
             view.Settlements.FirstOrDefault(s => s.Id == unit.ServicePlaceId)?.ResolveName(texts) ?? "无",
             capacity is uint max ? $"{unit.Soldiers}/{max}" : unit.Soldiers.ToString(), unit.Wounded.ToString(), unit.Morale.ToString(),
             land is null ? "—" : texts.Resolve(land.NameKey), water is null ? "—" : texts.Resolve(water.NameKey),
-            [new("命令", command.Order.Text), new("目标", command.Target.Text), new("敌接近时", Policy(unit.Policies.AttackApproachingEnemies ? "迎击" : "无视")),
+            [new("命令", command.Order.Text), new("目标", command.Target.Text), new("敌接近时", Policy(unit.Policies.AttackApproachingEnemies ? "攻击" : "无视")),
              new("自主撤退", Policy(unit.Policies.AutonomousRetreat ? "许可" : "不许可")), new("追击", Policy(unit.Policies.Pursue ? "许可" : "不许可")),
              new("事后命令", Policy(unit.Policies.AttackAfterAction ? "攻击" : "撤退"))],
             UnitCombatPreview.Read(unit, members, rules, false), UnitCombatPreview.Read(unit, members, rules, true),

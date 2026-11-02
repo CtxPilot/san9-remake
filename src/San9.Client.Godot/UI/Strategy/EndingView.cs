@@ -105,7 +105,7 @@ public partial class EndingView : FixedPage
             Textures = Textures,
             Service = Service,
             Title = title,
-            Pages = EndingOfficeCatalog.Pages(Draft.CurrentOffice),
+            Pages = EndingOfficeCatalog.Pages(Draft.View, Texts, Draft.CurrentOffice),
             Selection = new(candidates, [], 1),
             ReadRows = _ => EndingOfficeCatalog.Read(Draft, Texts),
             Portrait = id => $"information-person-{id}",

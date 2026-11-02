@@ -111,6 +111,7 @@ internal static partial class CommandTextSources
         ("page.features", 0x21bfac),
         ("policy.capture-facility", 0x21bd28),
         ("policy.defeat-force", 0x21bd34),
+        ("policy.general", 0x21c9ac),
         ("policy.domestic", 0x21bd40),
         ("rank.fill", 0x21bdf0),
         ("rank.individual", 0x21be20),

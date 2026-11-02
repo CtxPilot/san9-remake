@@ -34,7 +34,7 @@ public partial class CorpsCommandView : CommandPreparationView
         Caption(CommandText.Resolve(Texts, "label.governor"),at+new Vector2(0,80),new(96,32));
         Person(Draft.View,Draft.GovernorId,at+new Vector2(104,80));
         window.ActionButton(CommandText.Resolve(Texts, "label.corps-policy"),"edit",new(0,208,104,40),SelectPolicy).Disabled = !ready;
-        string policy = Draft.Policy switch { null => "", GeneralDelegation => CommandText.Resolve(Texts, "title.delegate"), DomesticDelegation => CommandText.Resolve(Texts, "policy.domestic"), DefeatForceDelegation => CommandText.Resolve(Texts, "policy.defeat-force"), _ => CommandText.Resolve(Texts, "policy.capture-facility") };
+        string policy = Draft.Policy switch { null => "", GeneralDelegation => CommandText.Resolve(Texts, "policy.general"), DomesticDelegation => CommandText.Resolve(Texts, "policy.domestic"), DefeatForceDelegation => CommandText.Resolve(Texts, "policy.defeat-force"), _ => CommandText.Resolve(Texts, "policy.capture-facility") };
         Value(policy,at+new Vector2(104,208),new(80,32));
         Caption(CommandText.Resolve(Texts, "label.target"),at+new Vector2(0,248),new(96,32));
         string target = Draft.Policy switch
@@ -86,7 +86,7 @@ public partial class CorpsCommandView : CommandPreparationView
         var corps = Draft.Selected;
         string PolicyName(CorpsDelegation? policy) => CommandText.Resolve(Texts, policy switch {
             DomesticDelegation => "policy.domestic", DefeatForceDelegation => "policy.defeat-force",
-            CaptureSettlementDelegation => "policy.capture-facility", _ => "title.delegate" });
+            CaptureSettlementDelegation => "policy.capture-facility", _ => "policy.general" });
         string name = corps?.LeaderId is int leader ? Texts.Resolve(Draft.View.Officers.Single(p => p.Id == leader).NameKey) : "";
         Value(name, at + new Vector2(112,0), new(288,32));
         Caption(CommandText.Resolve(Texts, "corps.current-control"), at + new Vector2(0,40), new(104,32));

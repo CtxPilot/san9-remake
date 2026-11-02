@@ -57,6 +57,7 @@ public sealed class InformationBrowserTests
             Information = new([new(0, "rank", 60000, 1000, 5, 0)], [], [new(0, "treasure", 1, 5, 10, 2) { AbilityBonuses = new(5, 0, 0, 0) }],
                 [new(5, 5, 1, new(100, 200)) { IsRoot = true }], [new(0, 1, TreasureDiscovery.Discovered, 15)])
         };
+        scenario = PresentationTacticFixture.WithInfantry(scenario);
         if (adjusted)
         {
             var officer = scenario.Officers[0];
@@ -65,6 +66,7 @@ public sealed class InformationBrowserTests
                 Information = scenario.Information with { Offices = [new(900, "office", 10000, 0) { AbilityBonuses = new(3, 0, 0, 0) }] } };
         }
         var text = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new[] { "force", "city", "region", "ruler", "free", "rank", "treasure", "office" }.ToDictionary(s => s, s => s));
+        PresentationTacticFixture.AddNames(text);
         var session = GameSession.Start(scenario, 1);
         return (session, new(session, ChronicleTestContent.AddTo(text), ChronicleTestContent.Definition()));
     }
@@ -75,7 +77,7 @@ public sealed class InformationBrowserTests
         var (session, _) = Fixture();
         var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new()
         {
-            ["treasure"] = "测试宝物", ["ruler"] = "持有人",
+            ["treasure"] = "测试宝物", ["ruler"] = "持有人", ["tactic.2"] = "奋迅",
             [TreasureText.DescriptionKey(0)] = "第一行\n第二行"
         });
         long revision = session.Snapshot.Revision;
@@ -205,6 +207,7 @@ public sealed class InformationBrowserTests
         // The fixture names are their own display strings.
         foreach (string key in session.View.Officers.Select(o => o.NameKey).Concat(session.View.RegionNameKeys.Values)
             .Concat(session.View.Information.Offices.Select(o => o.NameKey))) texts.Entries[key] = key;
+        PresentationTacticFixture.AddNames(texts);
         long before = session.Snapshot.Revision;
         var detail = OfficerDetails.Read(session.View, texts, 1);
         Assert.Equal(new[] { 6, 4, 5, 6 }, detail.Fields.Select(c => c.Length));

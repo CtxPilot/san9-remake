@@ -352,7 +352,7 @@ public sealed class AdministrativeInformationTests
         Assert.Equal(new[]{20},query.Read(InformationCategory.Ranks).Rows.Select(r=>r.Key.Id));
         Assert.Equal("rank-description",Cell(query.Read(InformationCategory.Ranks),20,"说明").Text);
         Assert.Equal("province",Cell(query.Read(InformationCategory.Cities),15,"州").Text);
-        Assert.Equal("内政",Cell(query.Read(InformationCategory.Corps),11,"方针").Text);
+        Assert.Equal("重视内政",Cell(query.Read(InformationCategory.Corps),11,"方针").Text);
         Assert.True(Cell(query.Read(InformationCategory.Corps),11,"目标").IsUnavailable);
         Assert.True(Cell(query.Read(InformationCategory.Corps),10,"方针").IsUnavailable);
     }

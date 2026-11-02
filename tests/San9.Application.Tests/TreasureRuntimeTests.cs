@@ -21,8 +21,10 @@ public sealed class TreasureRuntimeTests
                 [new(0, null, TreasureDiscovery.Buried, 15), new(1, 2, TreasureDiscovery.Discovered, 15),
                  new(100, null, TreasureDiscovery.Disabled, 15)])
         };
+        definition = PresentationTacticFixture.WithInfantry(definition);
         var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new[] { "force", "region", "visible", "hidden", "buried", "owned" }
             .ToDictionary(key => key, key => key));
+        PresentationTacticFixture.AddNames(texts);
         foreach (int id in new[] { 0, 1 }) texts.Entries.Add(TreasureText.DescriptionKey(id), "Description");
         var initial = GameSession.Start(definition, 1).View;
         Assert.Equal(2, initial.World.Officers.Count);

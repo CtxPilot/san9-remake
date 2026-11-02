@@ -15,6 +15,9 @@ public enum TacticEffect
 public sealed record TacticRule(int Id, int? Category, TacticEffect Effect, int Power, int MinimumInterval,
     int TrainingRequirement, bool Selectable, bool AffectsFacilities, ImmutableArray<int> CompatibleFormations)
 {
+    [JsonIgnore] public bool IsOfficerTactic => Category is not null &&
+        (Selectable || Effect is TacticEffect.FormationTechnology or TacticEffect.Construction or TacticEffect.StoneFormation);
+
     [JsonRequired] public int EffectRadius { get; init; }
     [JsonRequired] public bool CanRescuePrisoners { get; init; }
     [JsonRequired] public int? SnipingProficiencyCategory { get; init; }

@@ -24,7 +24,7 @@ public partial class CorpsPolicyDialog : FixedPage
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
             MouseFilter = MouseFilterEnum.Ignore };
         AddChild(title); text.Apply(title,GameTextStyles.CatalogRow with { FontSize = 24 });
-        string[] names = [CommandText.Resolve(Texts, "title.delegate"),CommandText.Resolve(Texts, "policy.domestic"),CommandText.Resolve(Texts, "policy.defeat-force"),CommandText.Resolve(Texts, "policy.capture-facility")];
+        string[] names = [CommandText.Resolve(Texts, "policy.general"),CommandText.Resolve(Texts, "policy.domestic"),CommandText.Resolve(Texts, "policy.defeat-force"),CommandText.Resolve(Texts, "policy.capture-facility")];
         for (int i = 0; i < names.Length; i++)
         {
             int choice = i;

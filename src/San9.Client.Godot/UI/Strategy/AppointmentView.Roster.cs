@@ -55,7 +55,7 @@ public partial class AppointmentView
                 .OrderBy(r => Draft.Candidates.IndexOf(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id,r.Cells.ToArray())).ToArray();
         ReplaceChild(new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), Textures = Textures, Service = Service,
             HintText = Texts.Resolve(AppointmentText.Key(Draft.Kind, "select")),
-            Pages = [new(CommandText.Resolve(Texts, "title." + Draft.Kind),columns.Select(c => OfficerCatalog.Pages[c.Page].Columns[c.Column]).ToArray()), .. OfficerCatalog.Pages],
+            Pages = [new(CommandText.Resolve(Texts, "title." + Draft.Kind),columns.Select(c => OfficerCatalog.CorePages[c.Page].Columns[c.Column]).ToArray()), .. OfficerCatalog.Pages(Draft.View, Texts)],
             ReadRows = Rows, Portrait = id => $"catalog-person-{id}", Selection = new(Draft.Candidates,Draft.Members,Draft.SelectionLimit),
             ConfirmSelection = ids => { if (Draft.SetMembers(ids)) CloseChild(); }, Closed = CloseChild });
     }

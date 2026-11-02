@@ -114,7 +114,7 @@ internal sealed class InformationPageFactory
             var catalog = new CatalogView
             {
                 Service = Service,
-                TableState = State.Catalog, Title = "武将一览", HintText = Texts.ResolveRich(StrategyHintText.Key("catalog-officers")), Pages = OfficerCatalog.Pages, Textures = Textures,
+                TableState = State.Catalog, Title = "武将一览", HintText = Texts.ResolveRich(StrategyHintText.Key("catalog-officers")), Pages = OfficerCatalog.Pages(Session.View, Texts), Textures = Textures,
                 ReadRows = page => Query.Read(State.Category, page, State.ForceFilter, State.SettlementFilter, State.CorpsFilter, State.RegionFilter, State.OfficerFilter, State.UnitFilter).Rows
                     .Select(row => new CatalogRow(row.Key.Id, row.Cells)).ToArray(),
                 Portrait = id => $"catalog-person-{id}",
