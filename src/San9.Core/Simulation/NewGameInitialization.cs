@@ -32,8 +32,9 @@ internal static class NewGameInitialization
                 throw new ArgumentException("A founded force requires a ruler in its city.");
             uint transfer = city.DraftPopulation / 10;
             uint increase = Math.Min(12000u, transfer + 5000);
+            uint soldiers = (uint)Math.Min(city.SoldierCapacity, (long)city.Soldiers + increase);
             world.Replace(city with { DraftPopulation = city.DraftPopulation - transfer,
-                Soldiers = (uint)Math.Min(city.SoldierCapacity, (long)city.Soldiers + increase) });
+                Soldiers = soldiers, Morale = soldiers > 0 ? EconomyMath.RecruitMorale(force.Trust) : 0 });
         }
     }
 

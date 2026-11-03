@@ -24,21 +24,25 @@ public sealed class NewGameInitializationTests
         { SoldierCapacity = 30000, DraftPopulation = 1234 };
 
     [Theory]
-    [InlineData(0u, 8000u, 13000u, 0u)]
-    [InlineData(50000u, 8000u, 18000u, 45000u)]
-    [InlineData(90000u, 8000u, 20000u, 81000u)]
-    [InlineData(50000u, 499000u, 500000u, 45000u)]
-    public void FoundedCityRecruitmentUsesDraftPopulationAndCapacity(uint draftPopulation, uint soldiers, uint expectedSoldiers, uint expectedDraft)
+    [InlineData(0u, 0u, 5000u, 0u, 0, 100, 50)]
+    [InlineData(0u, 8000u, 13000u, 0u, 95, 100, 50)]
+    [InlineData(50000u, 8000u, 18000u, 45000u, 0, 400, 60)]
+    [InlineData(90000u, 8000u, 20000u, 81000u, 95, 100, 50)]
+    [InlineData(50000u, 499000u, 500000u, 45000u, 95, 100, 50)]
+    [InlineData(50000u, 500000u, 500000u, 45000u, 95, 400, 60)]
+    public void FoundedCityRecruitmentUsesDraftPopulationCapacityAndForceMorale(uint draftPopulation, uint soldiers,
+        uint expectedSoldiers, uint expectedDraft, int morale, int trust, int expectedMorale)
     {
         var city = Place(1, 1) with { Kind = SettlementKind.City, SoldierCapacity = 500000,
-            DraftPopulation = draftPopulation, Soldiers = soldiers, CorpsId = 1 };
+            DraftPopulation = draftPopulation, Soldiers = soldiers, Morale = morale, CorpsId = 1 };
         var world = WorldState.Create(new(190, 1, 1), 19,
-            [new(1, 100) { LeaderId = 10 }], [city],
+            [new(1, trust) { LeaderId = 10 }], [city],
             [new(10, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler }],
             corps: [new(1, 1, 10, new(0, 0)) { IsRoot = true }], foundedForceIds: new HashSet<int> { 1 }).CreateSnapshot();
         var actual = Assert.Single(world.Settlements);
         Assert.Equal(expectedSoldiers, actual.Soldiers);
         Assert.Equal(expectedDraft, actual.DraftPopulation);
+        Assert.Equal(expectedMorale, actual.Morale);
         Assert.Equal(soldiers, city.Soldiers);
     }
 

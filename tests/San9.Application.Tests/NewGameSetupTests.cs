@@ -17,7 +17,7 @@ public sealed class NewGameSetupTests
         { Surname = "新", FlagGlyph = 66, BirthYear = 175, AppearanceYear = 189, ParentId = First.Id };
     private static ScenarioInitialState Source() => new(ScenarioInitialState.CurrentSchemaVersion, "created-start", 190, 1, 1, 12,
         [new(12, "force.old", 5, 100) { LeaderId = 1000 }],
-        [new(1, "city.empty", null, 0, 0, 8000, 100, 100, 50, [])
+        [new(1, "city.empty", null, 0, 0, 8000, 100, 100, 0, [])
             { Kind = SettlementKind.City, Population = 100000, DraftPopulation = 20000, Commerce = 300, MaxCommerce = 1000, Cultivation = 600, MaxCultivation = 1000 },
          new(2, "city.old", 12, 1, 0, 10000, 100, 100, 50, []) { Kind = SettlementKind.City, CorpsId = 70 }],
         new() { [1] = "city.empty", [2] = "city.old" }, new() { [1] = 1, [2] = 2 })
@@ -135,8 +135,9 @@ public sealed class NewGameSetupTests
     {
         var draft = Draft(First); draft.SetForces([new(First.Id, 1)]);
         var session = GameSession.Start(draft.Source, 123, playerForceIds: [12], setup: draft.Setup,
-            settings: new NewGameSettings { Difficulty = GameDifficulty.Advanced, SoldierBonus = 3000 });
+            settings: new NewGameSettings { Difficulty = GameDifficulty.Advanced, SoldierBonus = 3000, MoraleBonus = 20 });
         Assert.Equal(28000u, session.Snapshot.Settlements.Single(s => s.Id == 1).Soldiers);
+        Assert.Equal(70, session.Snapshot.Settlements.Single(s => s.Id == 1).Morale);
         Assert.Equal(18000u, session.Snapshot.Settlements.Single(s => s.Id == 1).DraftPopulation);
         Assert.Equal(10000u, session.Snapshot.Settlements.Single(s => s.Id == 2).Soldiers);
     }
@@ -157,6 +158,7 @@ public sealed class NewGameSetupTests
         Assert.Equal(force.Id, session.View.PlayerForceId);
         var city = session.Snapshot.Settlements.Single(s => s.Id == 1);
         Assert.Equal(15000u, city.Soldiers); Assert.Equal(18000u, city.DraftPopulation);
+        Assert.Equal(50, city.Morale);
         var root = session.Snapshot.Corps.Single(c => c.OwnerId == force.Id);
         Assert.True(root.IsRoot); Assert.True(root.Treasury.Money >= 3000); Assert.True(root.Treasury.Food >= 30000);
         Assert.Equal(50, Assert.Single(scenario.Information.Relations).Value);
@@ -217,10 +219,17 @@ public sealed class NewGameSetupTests
             Assert.InRange(initialized.Loyalty, initialized.Status == OfficerStatus.Ruler ? 100 : 95,
                 initialized.Status == OfficerStatus.Ruler ? 100 : 99);
         }
+        var initialCity = session.Snapshot.Settlements.Single(s => s.Id == 1);
+        Assert.Equal(50, initialCity.Morale);
+        var capture = session.Capture();
+        session = GameSession.Restore(source, capture with { World = capture.World with {
+            Settlements = capture.World.Settlements.Select(s => s.Id == 1 ? s with { Morale = 23 } : s).ToArray()
+        } });
         byte[] save = SaveService.Encode(session);
         var changedContent = source with { Officers = [source.Officers[0] with { FlagGlyph = 99 }] };
         var restored = SaveService.Decode(save, changedContent);
         StateAssert.Equal(session.Capture(), restored.Capture());
+        Assert.Equal(23, restored.Snapshot.Settlements.Single(s => s.Id == 1).Morale);
         Assert.Equal(42, restored.View.Forces.Single(f => f.Id == 13).FlagGlyph);
         Assert.Equal(42, restored.View.Officers.Single(p => p.Id == 1001).FlagGlyph);
         Assert.Equal(66, restored.View.Officers.Single(p => p.Id == 1002).FlagGlyph);
