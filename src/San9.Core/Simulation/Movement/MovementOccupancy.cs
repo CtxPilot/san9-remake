@@ -43,10 +43,9 @@ internal sealed class MovementOccupancy
     internal static IReadOnlyList<MapOccupancy> Snapshot(WorldSnapshot world, MilitaryRulebook rules, int owner, UnitPolicies policies, bool includeUnits,
         int? movingUnit = null)
     {
-        var units = world.Units.ToDictionary(u => u.Id);
-        var places = world.Settlements.Where(s => !s.IsDormant).ToDictionary(s => s.Id);
-        return new MovementOccupancy(places.Values, includeUnits ? world.Units : [], rules)
-            .Query(units, places, policies, other => MilitaryDiplomacy.AutomaticEnemy(world, owner, other), owner, movingUnit);
+        var query = new WorldQuery(world);
+        return new MovementOccupancy(query.Settlements.Values, includeUnits ? world.Units : [], rules)
+            .Query(query, owner, policies, movingUnit);
     }
 
     internal void Set(UnitState unit) => Set((true, unit.Id), unit.FormationId is int id
@@ -74,11 +73,14 @@ internal sealed class MovementOccupancy
             }
     }
 
-    internal IReadOnlyList<MapOccupancy> Query(IWorldQuery world, int owner, UnitPolicies policies, int? movingUnit = null, int? entry = null)
-        => Query(world.Units, world.Settlements, policies, other => MilitaryDiplomacy.AutomaticEnemy(world, owner, other), owner, movingUnit, entry);
+    internal IReadOnlyList<MapOccupancy> Query(IWorldQuery world, int owner, UnitPolicies policies, int? movingUnit = null, int? entry = null, UnitState? mover = null)
+        => Query(world.Units, world.Settlements, policies, other => MilitaryDiplomacy.AutomaticEnemy(world, owner, other),
+            other => (mover ?? (movingUnit is int id ? world.Units.GetValueOrDefault(id) : null)) is { } source
+                ? MilitaryDiplomacy.ApproachEnemy(world, source, other) : MilitaryDiplomacy.AutomaticEnemy(world, owner, other),
+            owner, movingUnit, entry);
 
     private IReadOnlyList<MapOccupancy> Query(IReadOnlyDictionary<int, UnitState> units, IReadOnlyDictionary<int, SettlementState> places,
-        UnitPolicies policies, Func<int?, bool> enemyOf, int owner, int? movingUnit = null, int? entry = null)
+        UnitPolicies policies, Func<int?, bool> enemyOf, Func<int, bool> unitEnemyOf, int owner, int? movingUnit = null, int? entry = null)
     {
         var result = new List<MapOccupancy>();
         foreach (var (key, area) in areas)
@@ -89,7 +91,7 @@ internal sealed class MovementOccupancy
                 var unit = units[key.Id];
                 if (unit.IsEmbedded || unit.IsPersonnel) continue;
                 bool enemy = unit.OwnerId != owner;
-                result.Add(area with { Hard = enemy && policies.AttackApproachingEnemies,
+                result.Add(area with { Hard = unitEnemyOf(unit.OwnerId) && policies.AttackApproachingEnemies,
                     Avoidance = enemy ? NavigationAvoidance.Hostile : NavigationAvoidance.Friendly });
             }
             else
@@ -140,7 +142,7 @@ public static class MilitaryRouteQuery
         var target = order.IsAttack ? MilitaryCombat.TargetArea(world, order, rules) :
             order.Construction is { } site ? rules.FacilityArea(site.Position, site.FacilityTypeId) :
             order.SettlementId is int home ? rules.SettlementArea(world.Settlements[home]) : new MapOccupancy(order.Position!.Value, new(1, 1));
-        var occupancy = world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId);
+        var occupancy = world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit);
         var cells = ImmutableArray.CreateBuilder<MapCell>();
         long cost = 0;
         WorldPosition start = unit.Position;

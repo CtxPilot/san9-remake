@@ -56,7 +56,7 @@ public sealed class MilitaryRouteQueryContext(WorldSnapshot snapshot, MilitaryRu
             route = new(RouteReachability.Reachable) { Cells = connectivityOnly ? [] : [MapCoordinates.Cell(unit.Position)] };
         else
             route = travel.Map.EstimateTravelCost(unit.Position, target, travel.Shape, travel.Mode,
-                query.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId),
+                query.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit),
                 new NavigationWorkBudget(maximumExpanded), intoRange: intoRange, includeCells: !connectivityOnly);
         if (route.Status != RouteReachability.Incomplete) reachability[key] = route.Status;
         return route;

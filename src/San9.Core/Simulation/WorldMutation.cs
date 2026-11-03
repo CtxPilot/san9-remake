@@ -17,8 +17,8 @@ internal sealed partial class WorldMutation : IWorldQuery
     IReadOnlyDictionary<(int FirstId, int SecondId), ForceRelation> IWorldQuery.Relations => Relations;
     IEnumerable<OfficerState> IWorldQuery.ServingUnitMembers(int unitId) => ServingUnitMembers(unitId);
     bool IWorldQuery.HasTreasureTactic(int officerId, int tacticId, TreasureRulebook rules) => HasTreasureTactic(officerId, tacticId, rules);
-    IReadOnlyList<MapOccupancy> IWorldQuery.MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry) =>
-        MovementOccupancy(rules, owner, policies, movingUnit, entry);
+    IReadOnlyList<MapOccupancy> IWorldQuery.MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry, UnitState? mover) =>
+        MovementOccupancy(rules, owner, policies, movingUnit, entry, mover);
 
     bool IWorldQuery.BlocksWaterContact(MilitaryRulebook rules, WorldPosition position, int? target) =>
         OccupancyFor(rules).BlocksContact(position, target);
@@ -33,8 +33,8 @@ internal sealed partial class WorldMutation : IWorldQuery
     private EngagementView? _engagements;
     internal EngagementView? EngagementCache => _engagements;
     private MovementOccupancy? _movementOccupancy;
-    internal IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry) =>
-        OccupancyFor(rules).Query(this, owner, policies, movingUnit, entry);
+    internal IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry, UnitState? mover = null) =>
+        OccupancyFor(rules).Query(this, owner, policies, movingUnit, entry, mover);
 
     private MovementOccupancy OccupancyFor(MilitaryRulebook rules)
     {

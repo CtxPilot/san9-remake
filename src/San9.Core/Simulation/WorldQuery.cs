@@ -16,7 +16,7 @@ internal interface IWorldQuery
     IEnumerable<OfficerState> ServingUnitMembers(int unitId);
     bool HasTreasureTactic(int officerId, int tacticId, TreasureRulebook rules);
     bool BlocksWaterContact(MilitaryRulebook rules, WorldPosition position, int? target);
-    IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry);
+    IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry, UnitState? mover = null);
 }
 
 /// <summary>Indexes immutable snapshot records without restoring an executable world.</summary>
@@ -46,7 +46,7 @@ internal sealed class WorldQuery : IWorldQuery
     private readonly ILookup<int, TreasureState> treasures;
     private readonly ILookup<int, OfficerState> members;
     private MovementOccupancy? occupancy;
-    private readonly Dictionary<(int Owner, UnitPolicies Policies, int? MovingUnit, int? Entry), IReadOnlyList<MapOccupancy>> passages = [];
+    private readonly Dictionary<(int Owner, UnitPolicies Policies, int? MovingUnit, int? Entry, MilitaryOrder? Order, MilitaryOrder? EffectiveOrder), IReadOnlyList<MapOccupancy>> passages = [];
 
     internal void SetForecastUnit(UnitState unit)
     {
@@ -74,13 +74,14 @@ internal sealed class WorldQuery : IWorldQuery
         return occupancy;
     }
 
-    public IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry)
+    public IReadOnlyList<MapOccupancy> MovementOccupancy(MilitaryRulebook rules, int owner, UnitPolicies policies, int? movingUnit, int? entry, UnitState? mover = null)
     {
         var current = OccupancyFor(rules);
-        var key = (owner, policies, movingUnit, entry);
+        mover ??= movingUnit is int id ? Units.GetValueOrDefault(id) : null;
+        var key = (owner, policies, movingUnit, entry, mover?.Order, mover?.EffectiveOrder);
         if (!passages.TryGetValue(key, out var result))
         {
-            result = current.Query(this, owner, policies, movingUnit, entry).ToImmutableArray();
+            result = current.Query(this, owner, policies, movingUnit, entry, mover).ToImmutableArray();
             passages.Add(key, result);
         }
         return result;

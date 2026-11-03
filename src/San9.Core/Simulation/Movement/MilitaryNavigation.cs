@@ -23,7 +23,7 @@ internal static class MilitaryNavigation
             return new(AdvanceDestination(world, unit, movingUnit, rules, budget, work, seed));
         var travel = rules.Travel(unit);
         var first = travel.Map.Navigate(unit.Position, new(via, new(1, 1)), false,
-            travel.Shape, travel.Mode, world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null),
+            travel.Shape, travel.Mode, world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null, unit),
             budget, work: work, lookahead: unit.Lookahead, randomSeed: seed, mobility: rules.Formation(unit).MovementBudget / 5,
             excluded: unit.EffectiveOrder?.SettlementId is int destination ? rules.SettlementArea(world.Settlements[destination]) : null);
         if (!first.Arrived) return new(first);
@@ -43,7 +43,7 @@ internal static class MilitaryNavigation
         var travel = rules.Travel(unit);
         if (order.IsAttack)
             return NavigationArrivalForecast.Advance(travel, unit.Position, MilitaryCombat.TargetArea(world, order, rules), true,
-                world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null), budget, work, unit.Lookahead,
+                world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null, unit), budget, work, unit.Lookahead,
                 range: position => MilitaryCombat.ApproachRange(world, unit, order, rules, position), rectangularReach: true,
                 maximumRange: Math.Max(Range(formation), Range(naval)),
                 lookaheadCells: order.UnitId is null ? 25 : 6, randomSeed: seed, continueApproach: true, mobility: rules.Formation(unit).MovementBudget / 5,
@@ -57,7 +57,7 @@ internal static class MilitaryNavigation
             new MapOccupancy(unit.Position, rules.UnitFootprint(unit)).Overlaps(target))
             return new(unit.Position, 0, NavigationStatus.Arrived);
         return NavigationArrivalForecast.Advance(travel, unit.Position, target, order.Construction is not null || order.SettlementId is not null,
-            world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId), budget, work, unit.Lookahead, randomSeed: seed, mobility: rules.Formation(unit).MovementBudget / 5,
+            world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit), budget, work, unit.Lookahead, randomSeed: seed, mobility: rules.Formation(unit).MovementBudget / 5,
             requireTargetClearance: order.Construction is not null);
     }
 

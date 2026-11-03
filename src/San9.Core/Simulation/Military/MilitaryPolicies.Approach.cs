@@ -12,13 +12,10 @@ internal static partial class MilitaryPolicies
             var unit = world.Units[id];
             if (unit.IsEmbedded || unit.IsPersonnel || unit.FormationId is null) continue;
             var visible = UnitPolicyQueries.VisibleForeignCombatants(world, unit, rules).ToArray();
-            int? primaryOwner = MilitaryDiplomacy.TargetOwner(world, unit.Order);
-            int? currentOwner = MilitaryDiplomacy.TargetOwner(world, unit.EffectiveOrder);
             var leader = Commander(world, unit);
             var candidates = visible.Where(actor => !actor.IsSettlement)
                 .Select(actor => world.Units[actor.Id]).Where(other =>
-                    MilitaryDiplomacy.AutomaticEnemy(world, unit.OwnerId, other.OwnerId) ||
-                    other.OwnerId == primaryOwner || other.OwnerId == currentOwner)
+                    MilitaryDiplomacy.ApproachEnemy(world, unit, other.OwnerId))
                 .Where(other => !other.AutonomousReturn || leader is not null &&
                     MayPursue(world, unit, other, leader.Personality, rules)).ToArray();
             bool notifyAvoidance = unit.ApproachNotificationPending;
