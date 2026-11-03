@@ -10,6 +10,30 @@ namespace San9.Application.Tests;
 
 public sealed class AdministrativeInformationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ForceCatalogAndRankHoldersFollowCurrentEliminationState(bool eliminated)
+    {
+        var (session, text, definition) = Fixture();
+        var world = session.View.World;
+        var view = new StrategySnapshot(definition, world with {
+            Forces = world.Forces.Select(f => f with {
+                IsEliminated = eliminated, LeaderId = eliminated ? null : f.LeaderId
+            }).ToArray()
+        });
+        var catalog = new AdministrativeCatalog(view, text);
+        int[] expected = eliminated ? [] : [5];
+
+        for (int page = 0; page < AdministrativeCatalog.Pages(InformationCategory.Forces).Count; page++)
+        {
+            Assert.Equal(expected, catalog.Read(InformationCategory.Forces, page).Rows.Select(r => r.Key.Id));
+            Assert.Equal(expected, catalog.Read(InformationCategory.Forces, page, force: 5).Rows.Select(r => r.Key.Id));
+        }
+        Assert.Equal(eliminated ? "" : "person1", catalog.Cell(InformationCategory.Ranks, 20, "holders").Text);
+        Assert.Equal(eliminated, Assert.Single(view.Forces).IsEliminated);
+    }
+
     [Fact]
     public void IncomeCatalogUsesTheCapturedHostRatesAndCurrentForceControl()
     {

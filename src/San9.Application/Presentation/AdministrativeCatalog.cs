@@ -88,7 +88,7 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
     private string Tactics(IEnumerable<int> ids) => string.Join("‧", ids.Select(id => texts.Resolve(view.Information.Tactics.Single(t => t.Id == id).NameKey)));
     private string RankHolders(int rankId)
     {
-        var names = view.Forces.Where(f => f.RankId == rankId).Select(f => texts.Resolve(f.NameKey)).ToArray();
+        var names = view.Forces.Where(f => !f.IsEliminated && f.RankId == rankId).Select(f => texts.Resolve(f.NameKey)).ToArray();
         return names.Length <= 3 ? string.Join("‧", names)
             : $"{string.Join("‧", names.Take(2))}及其他{names.Length - 2}势力";
     }
@@ -100,7 +100,7 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
         IEnumerable<int> ids = category switch
         {
             InformationCategory.Ranks => view.Information.Ranks.Where(r => !r.IsUnranked).OrderByDescending(r => r.Precedence).Select(r => r.Id),
-            InformationCategory.Forces => view.Forces.Where(f => force is null || f.Id == force).Select(f => f.Id),
+            InformationCategory.Forces => view.Forces.Where(f => !f.IsEliminated && (force is null || f.Id == force)).Select(f => f.Id),
             InformationCategory.Corps => view.World.Corps.Where(c => _forces.ContainsKey(c.OwnerId) && (force is null || c.OwnerId == force) && (corps is null || c.Id == corps)).Select(c => c.Id),
             InformationCategory.Cities => view.Settlements.Where(s => s.Kind == SettlementKind.City && (force is null || s.OwnerId == force) && (corps is null || s.CorpsId == corps) && (settlement is null || s.Id == settlement)).Select(s => s.Id),
             InformationCategory.Regions => view.RegionNameKeys.Keys.Where(id => (region is null || id == region) &&
