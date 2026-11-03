@@ -97,11 +97,11 @@ public sealed class AdministrativeInformationTests
     }
 
     [Fact]
-    public void DetailCapacityUsesRuntimeRulesAndMapSummaryKeepsPlainAmounts()
+    public void DetailAndMapSummaryUseRuntimeLimitsWhileMapTroopsKeepPlainAmounts()
     {
         var (session, text, definition) = Fixture();
         var world = session.View.World with { Settlements = session.View.World.Settlements.Select(s => s.Id == 15
-            ? s with { SoldierCapacity = 123456, MaxCommerce = 4321 } : s).ToArray() };
+            ? s with { SoldierCapacity = 123456, MaxCommerce = 4321, MaxCultivation = 2345, MaxDurability = 3456 } : s).ToArray() };
         var view = new StrategySnapshot(definition, world);
         var detail = AdministrativeDetails.Read(view, text, new(InformationCategory.Cities, 15));
         var fields = detail.Sections.SelectMany(s => s.Fields).ToArray();
@@ -109,8 +109,24 @@ public sealed class AdministrativeInformationTests
         Assert.Equal("100/4321", fields.Single(f => f.Label == "收益").Value);
         Assert.Equal($"10/{MilitaryRulebook.WoundedCapacity}", fields.Single(f => f.Label == "伤兵").Value);
         var summary = AdministrativeMap.Summary(view, text, new(InformationCategory.Cities,15));
+        Assert.Equal("500/3456",summary.Single(f => f.Label == "耐久").Value);
+        Assert.Equal("100/4321",summary.Single(f => f.Label == "收益").Value);
+        Assert.Equal("100/2345",summary.Single(f => f.Label == "收获").Value);
+        Assert.Equal("100",summary.Single(f => f.Label == "民心").Value);
         Assert.Equal("100",summary.Single(f => f.Label == "士兵").Value);
+        Assert.Equal("10",summary.Single(f => f.Label == "伤兵").Value);
         Assert.Equal(100U,world.Settlements.Single(s => s.Id == 15).Soldiers);
+    }
+
+    [Theory]
+    [InlineData(InformationCategory.Cities, 15, "大将", "士兵")]
+    [InlineData(InformationCategory.Forces, 5, "官爵", "信望")]
+    public void MapSummaryCentersNamedFieldsAndRightAlignsAmounts(InformationCategory category, int id, string named, string amount)
+    {
+        var (session, text, _) = Fixture();
+        var summary = AdministrativeMap.Summary(session.View, text, new(category, id));
+        Assert.Equal(CatalogAlignment.Center,summary.Single(f => f.Label == named).Alignment);
+        Assert.Equal(CatalogAlignment.Right,summary.Single(f => f.Label == amount).Alignment);
     }
 
     [Theory]

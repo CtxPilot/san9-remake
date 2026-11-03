@@ -31,8 +31,9 @@ public partial class InformationMapView : FixedPage, IInformationPage
     private CatalogBulkButton? _clearSelection;
     private static readonly Vector2 Origin = new(86,86);
     private static readonly Vector2 SummaryOrigin = new(92,496);
-    private static readonly int[] SummaryColumns = [16,196,376,572];
-    private static readonly int[] SummaryWidths = [176,176,192,192];
+    // Local text areas follow the summary artwork; its last two label plates are wider.
+    private static readonly (int X, int Width, int LabelWidth)[] SummaryColumns =
+        [(16,176,80), (196,176,80), (376,192,96), (572,192,96)];
     private OverviewMapLayer _map = null!;
     private InformationMapMarker[] _markers = [];
     private int? _hovered;
@@ -47,10 +48,10 @@ public partial class InformationMapView : FixedPage, IInformationPage
     private readonly Dictionary<int, Vector3> _targetCodes = [];
     private StrategySnapshot? _snapshot;
     private AdministrativeCatalog _catalog = null!;
-    private readonly Dictionary<int, InformationField[]> _summaries = [];
+    private readonly Dictionary<int, InformationMapField[]> _summaries = [];
     private Vector2? _lastMousePosition;
 
-    private InformationField[] Summary(int id)
+    private InformationMapField[] Summary(int id)
     {
         if (!_summaries.TryGetValue(id, out var fields))
             _summaries.Add(id, fields = AdministrativeMap.Summary(_catalog, new(Category, id)));
@@ -68,15 +69,20 @@ public partial class InformationMapView : FixedPage, IInformationPage
         _markerLayer.Draw += DrawMarkers;
         AddChild(_territories); AddChild(_borders); AddChild(_markerLayer);
         RefreshData();
-        Label(Title.Length > 0 ? Title : InformationQuery.MenuTitle(Category)[1..]+"一览",new(88,22),new(192,36),24);
+        Label(Title.Length > 0 ? Title : InformationQuery.MenuTitle(Category)[1..]+"一览",new(48,28),new(192,36),24);
         var candidates = ReadCandidates();
         var fields = candidates.Length > 0 ? Summary(candidates[0]) : [];
         for(int i=0;i<fields.Length;i++)
         {
-            int column = i/4;
-            var p=SummaryOrigin+new Vector2(SummaryColumns[column],16+i%4*32);
-            Label(fields[i].Label,p+new Vector2(2,0),new(80,24));
-            _values.Add(Label("",p+new Vector2(88,0),new(SummaryWidths[column]-92,24),16,HorizontalAlignment.Right));
+            var column = SummaryColumns[i/4];
+            var p = SummaryOrigin + new Vector2(column.X,20+i%4*32);
+            Label(fields[i].Label,p+new Vector2(2,0),new(column.LabelWidth,24));
+            var alignment = fields[i].Alignment switch {
+                CatalogAlignment.Center => HorizontalAlignment.Center,
+                CatalogAlignment.Right => HorizontalAlignment.Right,
+                _ => HorizontalAlignment.Left
+            };
+            _values.Add(Label("",p+new Vector2(column.LabelWidth+8,0),new(column.Width-column.LabelWidth-12,24),16,alignment));
         }
         Button("一览",new(Selection is null && Confirmed is null ? 612 : 528,680),ShowList,true); Button(CloseTitle,new(808,696),Closed,false);
         if (Confirmed is not null)
