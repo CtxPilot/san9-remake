@@ -168,10 +168,13 @@ public sealed partial class OriginalAiMilitaryTests
     }
 
     [Theory]
-    [InlineData(MilitaryOrderKind.Move, 1)]
-    [InlineData(MilitaryOrderKind.AttackSettlement, 1)]
-    [InlineData(MilitaryOrderKind.AttackUnit, 0)]
-    public void BarbarianRecallHandlesEveryMarchTargetKind(MilitaryOrderKind kind, int expected)
+    [InlineData(MilitaryOrderKind.Move, UnitCondition.Normal, 1)]
+    [InlineData(MilitaryOrderKind.AttackSettlement, UnitCondition.Normal, 1)]
+    [InlineData(MilitaryOrderKind.AttackUnit, UnitCondition.Normal, 0)]
+    [InlineData(MilitaryOrderKind.Move, UnitCondition.HighSpirits, 1)]
+    [InlineData(MilitaryOrderKind.AttackSettlement, UnitCondition.HighSpirits, 1)]
+    [InlineData(MilitaryOrderKind.AttackUnit, UnitCondition.HighSpirits, 0)]
+    public void BarbarianRecallHandlesEveryMarchTargetKind(MilitaryOrderKind kind, UnitCondition condition, int expected)
     {
         var content = Fixture();
         var order = kind switch
@@ -185,7 +188,9 @@ public sealed partial class OriginalAiMilitaryTests
             Forces = w.Forces.Select(f => f.Id == 1 ? f with { IsBarbarian = true } : f).ToArray(),
             Officers = w.Officers.Select(p => p.Id == 2 ? p with { SettlementId = null, UnitId = 901 } : p).ToArray(),
             Units = [new(901, 1, new(17, 7), 5000) { FormationId = 400, CommanderId = 2, Morale = 100,
-                CorpsId = 1, ServicePlaceId = 1, Order = order,
+                CorpsId = 1, ServicePlaceId = 1, Order = order, Condition = condition,
+                ConditionDaysRemaining = condition == UnitCondition.HighSpirits ? 5 : 0,
+                HighSpiritsMoralePenaltyPending = condition == UnitCondition.HighSpirits,
                 MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle)) },
                 new(902, 2, new(47, 7), 5000) { FormationId = 400, ServicePlaceId = 2, Morale = 100,
                     Order = new(MilitaryOrderKind.Move, new(47, 7), null) }],
@@ -199,6 +204,9 @@ public sealed partial class OriginalAiMilitaryTests
     [Theory]
     [InlineData(UnitCondition.Normal, 0)]
     [InlineData(UnitCondition.Confused, 1)]
+    [InlineData(UnitCondition.Disguised, 1)]
+    [InlineData(UnitCondition.NoFormation, 1)]
+    [InlineData(UnitCondition.Routed, 1)]
     [InlineData(UnitCondition.HighSpirits, 0)]
     public void RetreatBudgetOnlyCountsEligibleReturningConditions(UnitCondition condition, int expected)
     {
@@ -214,6 +222,7 @@ public sealed partial class OriginalAiMilitaryTests
                     new(902, 1, new(17, 7), 5000) { FormationId = 400, CommanderId = 2, Morale = 100,
                         CorpsId = 1, ServicePlaceId = 1, Condition = condition,
                         ConditionDaysRemaining = condition == UnitCondition.Normal ? 0 : 5,
+                        HighSpiritsMoralePenaltyPending = condition == UnitCondition.HighSpirits,
                         Order = new(MilitaryOrderKind.Return, null, 1),
                         MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle)) },
                     new(903, 1, new(22, 7), 5000) { FormationId = 400, CommanderId = 3, Morale = 100,

@@ -49,7 +49,7 @@ internal sealed partial class OriginalAiMilitary
         {
             if (!More) break;
             var available = World.Units.Where(u => Direct(u) && Departed(u) &&
-                u.Condition == UnitCondition.Normal && !processed.Contains(u.Id));
+                u.Condition is (UnitCondition.Normal or UnitCondition.HighSpirits) && !processed.Contains(u.Id));
             if (Force.IsBarbarian)
             {
                 foreach (var unit in available.Where(BarbarianRecall).Where(u => UnitTo(u, home.Id) is not null).ToArray())

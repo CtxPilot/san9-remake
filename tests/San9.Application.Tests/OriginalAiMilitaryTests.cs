@@ -1142,8 +1142,11 @@ public sealed partial class OriginalAiMilitaryTests
 
     [Theory]
     [InlineData(UnitCondition.Normal, true)]
-    [InlineData(UnitCondition.HighSpirits, false)]
+    [InlineData(UnitCondition.HighSpirits, true)]
     [InlineData(UnitCondition.Confused, false)]
+    [InlineData(UnitCondition.Disguised, false)]
+    [InlineData(UnitCondition.NoFormation, false)]
+    [InlineData(UnitCondition.Routed, false)]
     public void StrategicRecallUsesItsOwnConditionGate(UnitCondition condition, bool expected)
     {
         var content = Fixture();
@@ -1157,7 +1160,8 @@ public sealed partial class OriginalAiMilitaryTests
                 Units = enemy.Units.ToImmutableArray().Add(new(901, 1, new(17, 7), 5000)
                 {
                     FormationId = 400, CommanderId = 2, CorpsId = 1, ServicePlaceId = 1, Morale = 100, CommandedThisXun = true,
-                    Condition = condition, ConditionDaysRemaining = 2, Order = new(MilitaryOrderKind.Move, new(47, 7), null),
+                    Condition = condition, ConditionDaysRemaining = 2, HighSpiritsMoralePenaltyPending = condition == UnitCondition.HighSpirits,
+                    Order = new(MilitaryOrderKind.Move, new(47, 7), null),
                     MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle))
                 }),
                 Simulation = enemy.Simulation with { NextUnitId = 902 }
@@ -1165,7 +1169,16 @@ public sealed partial class OriginalAiMilitaryTests
         });
 
         Assert.Equal(expected ? 1 : 0, h.Run(OriginalAiWork.Retreat, 1).Submitted);
-        if (expected) Assert.Equal(901, Assert.IsType<OrderUnitCommand>(Assert.Single(h.Commands)).UnitId);
+        if (expected)
+        {
+            Assert.Equal(901, Assert.IsType<OrderUnitCommand>(Assert.Single(h.Commands)).UnitId);
+            var recalled = Assert.Single(h.Engine.Snapshot.Units, u => u.Id == 901);
+            Assert.Equal(MilitaryOrderKind.Return, recalled.Order!.Kind);
+            Assert.Equal(1, recalled.Order.SettlementId);
+            Assert.Equal(condition, recalled.Condition);
+            Assert.Equal(2, recalled.ConditionDaysRemaining);
+            Assert.Equal(condition == UnitCondition.HighSpirits, recalled.HighSpiritsMoralePenaltyPending);
+        }
         else Assert.Empty(h.Commands);
     }
 
