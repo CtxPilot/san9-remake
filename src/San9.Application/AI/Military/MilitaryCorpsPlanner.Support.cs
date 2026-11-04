@@ -88,11 +88,14 @@ internal sealed partial class MilitaryCorpsPlanner
             foreach (var guard in campaign.Support.Where(s => s.Role == MilitaryCommitmentRole.Field))
             {
                 var escort = engine.Snapshot.Units.FirstOrDefault(u => u.Id == guard.UnitId);
-                if (escort is null || !Controls(escort) || !escort.CanReceiveOrders || escort.CommandedThisXun ||
-                    escort.Order?.UnitId is not int prior || queries.Observation.Forces.Find(new(prior, false)) is not null) continue;
+                if (escort is null || !Controls(escort) || !escort.CanReceiveOrders || escort.CommandedThisXun) continue;
+                bool fieldTargetAlive = escort.Order?.Kind == MilitaryOrderKind.AttackUnit && escort.Order.UnitId is int prior &&
+                    queries.Observation.Forces.Find(new(prior, false)) is not null;
+                if (fieldTargetAlive || escort.Order is { Kind: MilitaryOrderKind.AttackSettlement } existing && existing.SettlementId == campaign.TargetId) continue;
+                if (queries.FromUnit(escort.Id, target.Object, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) continue;
                 var identity = Identity();
-                Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, escort.Id,
-                    new(MilitaryOrderKind.AttackSettlement, null, campaign.TargetId)));
+                if (Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, escort.Id,
+                    new(MilitaryOrderKind.AttackSettlement, null, campaign.TargetId)))) return true;
             }
             int window = (int)Math.Clamp(campaign.PlannedArrivalDay - world.Clock.DayNumber, 1, 60);
             var battlefield = batch.Battlefield(queries, rules, target.Object.Id, window);

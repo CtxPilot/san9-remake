@@ -56,7 +56,7 @@ internal sealed partial class MilitaryCorpsPlanner
                 !batch.State.Campaigns.Any(c => c.Stage is not (MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled) && c.UnitIds.Contains(u.Id)))
                 .OrderBy(u => rules.Travel(u).AreaAt(u.Position).DistanceTo(rules.SettlementArea(target.Place))).ThenBy(u => u.Id).Take(2))
             {
-                var travel = queries.FromUnit(available.Id, new(enemy.UnitId, false), verifyApproach: true);
+                var travel = queries.FromUnit(available.Id, new(enemy.UnitId, false), verifyApproach: true, newOrder: true);
                 if (travel.Status != ArrivalEstimateStatus.Known || travel.Days > survival && available.Soldiers < incoming) continue;
                 var identity = Identity();
                 if (!Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, available.Id,

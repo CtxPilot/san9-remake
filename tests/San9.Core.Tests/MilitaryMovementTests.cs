@@ -596,13 +596,15 @@ public sealed class MilitaryMovementTests
         StateAssert.Equal(before, engine.Snapshot);
     }
 
-    [Fact]
-    public void LostTransportDestinationReturnsToHomeWithoutUnloadingToNewOwner()
+    [Theory]
+    [InlineData(TransportOfficerDisposition.ReturnToSource)]
+    [InlineData(TransportOfficerDisposition.StayAtDestination)]
+    public void LostTransportDestinationReturnsToHomeWithoutUnloadingToNewOwner(TransportOfficerDisposition disposition)
     {
         var world = World();
         var rules = Rules();
         var engine = Engine(world, rules);
-        Assert.True(engine.Execute(Player, Deploy()).Submission.Accepted);
+        Assert.True(engine.Execute(Player, Deploy() with { OfficerDisposition = disposition }).Submission.Accepted);
         var mutation = world.BeginMutation();
         mutation.Replace(mutation.Settlements[2] with { OwnerId = null });
         world.Commit(mutation);
@@ -654,4 +656,84 @@ public sealed class MilitaryMovementTests
         Assert.Single(events.OfType<UnitOrderChangedEvent>());
         Assert.Empty(events.OfType<UnitAbsorbedEvent>());
     }
+    [Theory]
+    [InlineData(TransportOfficerDisposition.ReturnToSource, 1)]
+    [InlineData(TransportOfficerDisposition.StayAtDestination, 2)]
+    public void TransportOfficerDispositionSurvivesTheJourneyAndControlsOnlyPersonnelPlacement(TransportOfficerDisposition disposition, int expected)
+    {
+        var engine = Engine(World(), Rules(10));
+        var command = Deploy() with { OfficerDisposition = disposition };
+        Assert.True(engine.Validate(Player, command).Accepted);
+        Assert.True(engine.Execute(Player, command).Submission.Accepted);
+        Assert.Equal(disposition, Assert.Single(engine.Snapshot.Units).Order!.OfficerDisposition);
+        var restored = Engine(WorldState.Restore(engine.CaptureStableState()), Rules(10));
+        var result = Advance(engine);
+        EventAssert.Equal(result.Events, Advance(restored).Events);
+        StateAssert.Equal(engine.Snapshot, restored.Snapshot);
+        Assert.Equal(expected, Assert.Single(engine.Snapshot.Officers).SettlementId);
+        Assert.Equal(500u, engine.Snapshot.Settlements.Single(s => s.Id == 2).Soldiers);
+        Assert.Empty(engine.Snapshot.Units);
+        Assert.Single(result.Events.OfType<UnitAbsorbedEvent>());
+        Assert.Equal(disposition == TransportOfficerDisposition.ReturnToSource,
+            result.Events.OfType<TaskStartedEvent>().Any(e => e.Task.Kind == "personnel-return"));
+    }
+
+    [Fact]
+    public void InvalidTransportDispositionIsRejectedWithoutSpendingResourcesOrIdentities()
+    {
+        var engine = Engine(World(), Rules());
+        var before = engine.Snapshot;
+        Assert.False(engine.Execute(Player, Deploy() with { OfficerDisposition = (TransportOfficerDisposition)999 }).Submission.Accepted);
+        StateAssert.Equal(before, engine.Snapshot);
+        Assert.False(new MilitaryOrder(MilitaryOrderKind.Return, null, 1) { OfficerDisposition = TransportOfficerDisposition.StayAtDestination }.IsValid);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StayingAcrossCorpsRepairsTheSourceLeadershipAndPreservesTreasuryOwnership(bool successor)
+    {
+        var world = WorldState.Create(new(190, 1, 1), 42,
+            [new(1, 0) { LeaderId = 12 }],
+            [new(1, 1, 100, 100, 100, 70, 500, 0, 100, 0, 100) { CorpsId = 11 },
+             new(2, 1, 100, 100, 100, 30, 500, 0, 100, 0, 100) { CorpsId = 10 }],
+            [new(11, 1, null, new(70, 70, 70, 70), false) { UnitId = 0, Status = OfficerStatus.Governor },
+             new(12, 1, 2, new(70, 70, 70, 70), false) { Status = OfficerStatus.Ruler },
+             new(13, 1, successor ? 1 : 2, new(60, 60, 60, 60), false)],
+            units: [new(0, 1, new(36, 7), 400) { CorpsId = 11, ServicePlaceId = 1, FormationId = 70,
+                Morale = 70, CargoMoney = 200, CargoFood = 300,
+                Order = new(MilitaryOrderKind.Transport, null, 2) { OfficerDisposition = TransportOfficerDisposition.StayAtDestination } }],
+            corps: [new(10, 1, 12, new(10000, 10000)) { IsRoot = true }, new(11, 1, 11, new(2000, 3000))]);
+        var mutation = world.BeginMutation();
+        var events = new List<DomainEvent>();
+        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, Rules(10), events), Rules(10), new([]), PersonnelRulebook.Empty, events);
+        world.Commit(mutation);
+        var state = world.CreateSnapshot();
+        Assert.Empty(state.Units);
+        Assert.Equal(2, state.Officers.Single(p => p.Id == 11).SettlementId);
+        Assert.Equal(OfficerStatus.Serving, state.Officers.Single(p => p.Id == 11).Status);
+        Assert.Empty(state.Simulation.Tasks);
+        Assert.Equal(successor ? 10200u : 12200u, state.Corps.Single(c => c.IsRoot).Treasury.Money);
+        Assert.Equal(successor ? 10300u : 13300u, state.Corps.Single(c => c.IsRoot).Treasury.Food);
+        if (successor) Assert.Equal(13, state.Corps.Single(c => c.Id == 11).LeaderId);
+        else Assert.DoesNotContain(state.Corps, c => c.Id == 11);
+    }
+
+    [Fact]
+    public void ExistingTransportCanChangeItsArrivalDispositionThroughThePublicOrder()
+    {
+        var engine = Engine(World(), Rules(10));
+        Assert.True(engine.Execute(Player, Deploy()).Submission.Accepted);
+        var unit = Assert.Single(engine.Snapshot.Units);
+        var command = new OrderUnitCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, unit.Id,
+            new(MilitaryOrderKind.Transport, null, 2) { OfficerDisposition = TransportOfficerDisposition.StayAtDestination });
+        var changed = engine.Execute(Player, command);
+        Assert.True(changed.Submission.Accepted);
+        Assert.Single(changed.Events.OfType<UnitOrderChangedEvent>());
+        var arrival = Advance(engine);
+        Assert.Single(arrival.Events.OfType<UnitAbsorbedEvent>());
+        Assert.Equal(2, Assert.Single(engine.Snapshot.Officers).SettlementId);
+        Assert.DoesNotContain(arrival.Events.OfType<TaskStartedEvent>(), e => e.Task.Kind == "personnel-return");
+    }
+
 }

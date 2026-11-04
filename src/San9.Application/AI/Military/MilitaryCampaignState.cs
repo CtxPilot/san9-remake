@@ -52,12 +52,26 @@ public sealed record MilitaryCampaignState
             var c = original with { Reservations = original.Reservations.Where(r => r.ExpiresDay >= world.Clock.DayNumber &&
                 places.GetValueOrDefault(r.SourceId)?.OwnerId == original.ForceId &&
                 corps.GetValueOrDefault(r.CorpsId)?.OwnerId == original.ForceId &&
+                (places.GetValueOrDefault(r.SourceId)?.CorpsId == r.CorpsId || places.GetValueOrDefault(r.SourceId)?.CorpsId is null && corps.GetValueOrDefault(r.CorpsId)?.IsRoot == true) &&
                 r.OfficerIds.All(id => world.Officers.Any(p => p.Id == id && p.OwnerId == original.ForceId && p.SettlementId == r.SourceId && p.IsServing && !p.IsDormant && p.UnitId is null)))
                 .ToImmutableArray() };
             bool done = c.Stage is MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled;
             if (done) return c with { ReservedOfficers = [], Reservations = [] };
             var physical = c.UnitId is int body ? units.GetValueOrDefault(body) : null;
             var living = c.UnitIds.Select(id => units.GetValueOrDefault(id)).OfType<UnitState>().Where(u => u.OwnerId == c.ForceId).ToArray();
+            var organizer = world.Officers.FirstOrDefault(p => p.Id == c.DeliveryOfficerId);
+            int? organizerCorps = organizer?.SettlementId is int organizerHome ? places.GetValueOrDefault(organizerHome)?.CorpsId : null;
+            int? actualCorps = physical?.OwnerId == c.ForceId ? physical.CorpsId :
+                c.Stage == MilitaryCampaignStage.Assembling && organizerCorps is not null ? organizerCorps :
+                places.GetValueOrDefault(c.TargetId) is { } assignedPlace && assignedPlace.OwnerId == c.ForceId ? assignedPlace.CorpsId : null;
+            if (actualCorps is int assigned && corps.TryGetValue(assigned, out var actual) && actual.OwnerId == c.ForceId)
+                c = c with { CorpsId = assigned };
+            if (!corps.TryGetValue(c.CorpsId, out var controller) || controller.OwnerId != c.ForceId)
+            {
+                var root = world.Corps.FirstOrDefault(p => p.OwnerId == c.ForceId && p.IsRoot);
+                if (root is null) return c with { Stage = MilitaryCampaignStage.Cancelled };
+                c = c with { CorpsId = root.Id };
+            }
             if (c.Purpose is MilitaryCampaignPurpose.Evacuation or MilitaryCampaignPurpose.Recovery)
             {
                 var officer = world.Officers.FirstOrDefault(p => p.Id == c.DeliveryOfficerId);
@@ -81,6 +95,11 @@ public sealed record MilitaryCampaignState
                             ProgressAt = c.Stage == MilitaryCampaignStage.Consolidating ? c.ProgressAt : world.Clock };
                 return c with { Stage = MilitaryCampaignStage.Marching };
             }
+            if (c.Stage == MilitaryCampaignStage.Assembling &&
+                (!places.TryGetValue(c.ObjectiveId, out var final) || final.IsDestroyed || final.OwnerId == c.ForceId ||
+                    !MilitaryDiplomacy.AutomaticEnemy(world, c.ForceId, final.OwnerId)))
+                return c with { Stage = final?.OwnerId == c.ForceId ? living.Length == 0 ? MilitaryCampaignStage.Completed : MilitaryCampaignStage.Consolidating :
+                    living.Length == 0 ? MilitaryCampaignStage.Cancelled : MilitaryCampaignStage.Withdrawing, ProgressAt = world.Clock };
             if (physical is null && living.Length > 0)
             {
                 physical = living.OrderBy(u => u.Order?.Kind == MilitaryOrderKind.AttackSettlement ? 0 : 1).ThenBy(u => u.Id).First();
@@ -93,7 +112,8 @@ public sealed record MilitaryCampaignState
                 var staging = places.GetValueOrDefault(c.TargetId);
                 if (officer?.OwnerId != c.ForceId || !officer.IsServing || staging?.OwnerId != c.ForceId)
                     return c with { Stage = physical is null ? MilitaryCampaignStage.Cancelled : MilitaryCampaignStage.Withdrawing };
-                if (officer.SettlementId == staging.Id && staging.Soldiers > 0)
+                if (physical is null && officer.SettlementId == staging.Id && staging.Soldiers > 0 &&
+                    !world.Simulation.Tasks.Any(t => t.OfficerId == officer.Id))
                 {
                     if (officer.Acted) return c;
                     c = c with { Stage = MilitaryCampaignStage.Preparing, UnitId = null, ProgressAt = world.Clock };
@@ -102,16 +122,6 @@ public sealed record MilitaryCampaignState
                     return c with { Stage = MilitaryCampaignStage.Cancelled };
                 else return physical is not null && physical.Position != c.LastPosition
                     ? c with { LastPosition = physical.Position, ProgressAt = world.Clock } : c;
-            }
-            int? actualCorps = physical?.OwnerId == c.ForceId ? physical.CorpsId :
-                places.GetValueOrDefault(c.TargetId) is { } assignedPlace && assignedPlace.OwnerId == c.ForceId ? assignedPlace.CorpsId : null;
-            if (actualCorps is int assigned && corps.TryGetValue(assigned, out var actual) && actual.OwnerId == c.ForceId)
-                c = c with { CorpsId = assigned };
-            if (!corps.TryGetValue(c.CorpsId, out var controller) || controller.OwnerId != c.ForceId)
-            {
-                var root = world.Corps.FirstOrDefault(p => p.OwnerId == c.ForceId && p.IsRoot);
-                if (root is null) return c with { Stage = MilitaryCampaignStage.Cancelled };
-                c = c with { CorpsId = root.Id };
             }
             if (!places.TryGetValue(c.ObjectiveId, out var objective) || objective.IsDestroyed)
                 return c with { Stage = physical is null ? MilitaryCampaignStage.Cancelled : MilitaryCampaignStage.Withdrawing };

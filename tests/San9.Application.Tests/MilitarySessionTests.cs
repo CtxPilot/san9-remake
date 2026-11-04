@@ -520,19 +520,25 @@ public sealed partial class MilitarySessionTests
             [new(1, new(2, 7), new(1, 1)), new(2, new(37, 7), new(1, 1))]) { TransportFormations = new(70, null) }
     , Information = new([], [], [], [new San9.Core.Domain.CorpsState(1, 1, null, new(10000, 10000)) { IsRoot = true }], []) };
 
-    [Fact]
-    public void PublicCommandSurvivesSaveWithCurrentLocationQueries()
+    [Theory]
+    [InlineData(TransportOfficerDisposition.ReturnToSource)]
+    [InlineData(TransportOfficerDisposition.StayAtDestination)]
+    public void PublicCommandSurvivesSaveWithCurrentLocationQueries(TransportOfficerDisposition disposition)
     {
         var definition = Fixture();
         var session = GameSession.Start(definition, 42);
         var command = new TransportUnitCommand(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence,
-            1, [1], 400, 2, 200, 300) { Policies = new(true, false, true, false) };
+            1, [1], 400, 2, 200, 300) { Policies = new(true, false, true, false), OfficerDisposition = disposition };
         Assert.True(session.Execute(new("player"), command).Submission.Accepted);
         Assert.Equal(command.Policies, Assert.Single(session.Snapshot.Units).Policies);
         Assert.Equal(1, Assert.Single(session.Snapshot.Units).CommanderId);
         var save = System.Text.Json.Nodes.JsonNode.Parse(SaveService.Encode(session))!;
         var savedUnit = save["session"]!["world"]!["units"]![0]!.AsObject();
         Assert.False(savedUnit.ContainsKey("memberOrder"));
+        var missingDisposition = System.Text.Json.Nodes.JsonNode.Parse(SaveService.Encode(session))!;
+        missingDisposition["session"]!["world"]!["units"]![0]!["order"]!.AsObject().Remove("officerDisposition");
+        Assert.Equal(SaveFailure.InvalidFormat, Assert.Throws<SaveException>(() =>
+            SaveService.Decode(System.Text.Encoding.UTF8.GetBytes(missingDisposition.ToJsonString()), definition)).Failure);
         savedUnit["memberOrder"] = System.Text.Json.JsonSerializer.SerializeToNode(new[] { 1 });
         Assert.Equal(SaveFailure.InvalidFormat, Assert.Throws<SaveException>(() =>
             SaveService.Decode(System.Text.Encoding.UTF8.GetBytes(save.ToJsonString()), definition)).Failure);
@@ -546,6 +552,7 @@ public sealed partial class MilitarySessionTests
         List<DomainEvent> transportEvents = [.. session.AdvanceXun().Events];
         Assert.NotEmpty(session.Snapshot.Units);
         var restored = SaveService.Decode(SaveService.Encode(session), definition);
+        Assert.Equal(disposition, Assert.Single(restored.Snapshot.Units).Order!.OfficerDisposition);
         Assert.Equal(policies, Assert.Single(restored.Snapshot.Units).Policies);
         Assert.Equal(1, Assert.Single(restored.Snapshot.Units).CommanderId);
         Assert.Equal(123u, restored.View.Settlements.Single(s => s.Id == 1).Wounded);
@@ -559,7 +566,7 @@ public sealed partial class MilitarySessionTests
         }
         Assert.Empty(session.Snapshot.Units);
         Assert.Equal(2, Assert.Single(transportEvents.OfType<UnitAbsorbedEvent>()).SettlementId);
-        Assert.Equal(1, session.View.Officers[0].SettlementId);
+        Assert.Equal(disposition == TransportOfficerDisposition.ReturnToSource ? 1 : 2, session.View.Officers[0].SettlementId);
         Assert.Null(session.View.Officers[0].UnitId);
         Assert.DoesNotContain(session.Snapshot.Simulation.Tasks, task => task.OfficerId == 1);
     }

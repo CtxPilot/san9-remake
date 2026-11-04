@@ -446,14 +446,17 @@ public sealed partial class MilitaryRulebook
     }
 }
 
+public enum TransportOfficerDisposition { ReturnToSource, StayAtDestination }
 public enum MilitaryOrderKind { Move, Return, Transport, AttackUnit, AttackSettlement, Construct }
 public sealed record ConstructionPlan(int RegionId, int FacilityTypeId, WorldPosition Position, int LeaderId);
 public sealed record MilitaryOrder(MilitaryOrderKind Kind, WorldPosition? Position, int? SettlementId)
 {
+    [JsonRequired] public TransportOfficerDisposition OfficerDisposition { get; init; }
     [JsonRequired] public ConstructionPlan? Construction { get; init; }
     [JsonRequired] public int? UnitId { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public bool IsAttack => Kind is MilitaryOrderKind.AttackUnit or MilitaryOrderKind.AttackSettlement;
-    [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => Enum.IsDefined(Kind) && (Kind == MilitaryOrderKind.Construct || Construction is null) && (Kind switch
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => Enum.IsDefined(Kind) && Enum.IsDefined(OfficerDisposition) &&
+        (Kind == MilitaryOrderKind.Transport || OfficerDisposition == TransportOfficerDisposition.ReturnToSource) && (Kind == MilitaryOrderKind.Construct || Construction is null) && (Kind switch
     {
         MilitaryOrderKind.Construct => Position is null && SettlementId is null && UnitId is null &&
             Construction is { RegionId: >= 0, FacilityTypeId: >= 0, LeaderId: >= 0, Position.X: >= 0, Position.Y: >= 0 },

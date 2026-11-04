@@ -32,22 +32,51 @@ internal sealed partial class MilitaryCorpsPlanner
         {
             var unit = engine.Snapshot.Units.FirstOrDefault(u => u.Id == unitId);
             if (unit is null || unit.IsEmbedded || !Controls(unit) || !unit.CanReceiveOrders || unit.CommandedThisXun) continue;
-            if (unit.Order?.Kind == MilitaryOrderKind.Return) continue;
+            var currentHome = engine.Snapshot.Settlements.FirstOrDefault(p => p.Id == unit.Order?.SettlementId && Friendly(p));
+            if (unit.Order?.Kind == MilitaryOrderKind.Return && currentHome is not null &&
+                (long)unit.Soldiers + unit.Wounded <= MilitaryResourceLedger.ReceivingSpace(engine.Snapshot, currentHome, unit.Id) &&
+                queries.PotentialThreats(currentHome.Id, 10).Candidates.Sum(t => (long)t.Soldiers) <= currentHome.Soldiers) continue;
+            bool returning = false;
             var candidates = engine.Snapshot.Settlements.Where(Friendly)
-                .Where(p => (long)unit.Soldiers + unit.Wounded <= MilitaryResourceLedger.ReceivingSpace(engine.Snapshot, p))
+                .Where(p => (long)unit.Soldiers + unit.Wounded <= MilitaryResourceLedger.ReceivingSpace(engine.Snapshot, p, unit.Id))
                 .OrderBy(p => rules.SettlementArea(p).DistanceTo(rules.Travel(unit).AreaAt(unit.Position)))
                 .ThenBy(p => p.Id).Take(4).ToArray();
             foreach (var place in candidates)
             {
                 var threats = queries.PotentialThreats(place.Id, 10).Candidates;
                 if (threats.Sum(p => (long)p.Soldiers) > place.Soldiers + unit.Soldiers) continue;
-                var arrival = queries.FromUnit(unit.Id, new(place.Id, true), arrival: NavigationArrival.Region, verifyApproach: true);
+                var arrival = queries.FromUnit(unit.Id, new(place.Id, true), arrival: NavigationArrival.Region, verifyApproach: true, newOrder: true);
                 if (arrival.Status != ArrivalEstimateStatus.Known) continue;
                 if (threats.Any(t => t.EarliestDays < arrival.Days && t.Soldiers > place.Soldiers)) continue;
                 var id = Identity();
-                if (Submit(new OrderUnitCommand(id.Id, corps.OwnerId, id.Sequence, unit.Id, new(MilitaryOrderKind.Return, null, place.Id)))) break;
+                if (Submit(new OrderUnitCommand(id.Id, corps.OwnerId, id.Sequence, unit.Id, new(MilitaryOrderKind.Return, null, place.Id))))
+                { returning = true; break; }
             }
+            if (!returning) Rally(unit, queries);
             queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
         }
     }
+    private void Rally(UnitState unit, MilitaryTravelQueries queries)
+    {
+        var current = rules.Travel(unit).AreaAt(unit.Position);
+        var allies = queries.Observation.Forces.ForForce(corps.OwnerId).Where(p => p.Kind == MilitaryPresenceKind.Unit && p.Object.Id != unit.Id && p.Soldiers >= unit.Soldiers)
+            .OrderBy(p => p.Area.DistanceTo(current)).ThenBy(p => p.Object.Id).Take(2);
+        foreach (var ally in allies)
+        foreach (var offset in new[] { new WorldPosition(-6, 0), new(0, -6), new(6, 0), new(0, 6) })
+        {
+            var point = new WorldPosition(ally.Area.Position.X + offset.X, ally.Area.Position.Y + offset.Y);
+            if (point.X < 0 || point.Y < 0 || point.X >= rules.Map.FineWidth || point.Y >= rules.Map.FineHeight || point == unit.Position) continue;
+            var area = rules.Travel(unit).AreaAt(point);
+            var threats = queries.Observation.Forces.Nearby(area, 20).Objects.Where(p => p.Kind == MilitaryPresenceKind.Unit &&
+                MilitaryDiplomacy.AutomaticEnemy(engine.Snapshot, corps.OwnerId, p.OwnerId)).ToArray();
+            long enemies = threats.Sum(p => (long)p.Soldiers);
+            if (enemies > (long)ally.Soldiers + unit.Soldiers || threats.Any(p => p.Area.DistanceTo(area) < p.Area.DistanceTo(current))) continue;
+            if (unit.Order is { Kind: MilitaryOrderKind.Move } order && order.Position == point) return;
+            if (queries.FromUnitToPosition(unit.Id, point, new(), verifyApproach: true).Status != ArrivalEstimateStatus.Known) continue;
+            var id = Identity();
+            if (Submit(new OrderUnitCommand(id.Id, corps.OwnerId, id.Sequence, unit.Id, new(MilitaryOrderKind.Move, point, null)) { Policies = new() })) return;
+        }
+        // If no legal safer endpoint is established, retain the current resistance rather than inventing an escape.
+    }
+
 }

@@ -19,6 +19,7 @@ public sealed record TransportUnitCommand(Guid CommandId, int IssuerId, long Seq
     ImmutableArray<int> OfficerIds, uint Soldiers, int DestinationId, uint CargoMoney = 0, uint CargoFood = 0)
     : GameCommand(CommandId, IssuerId, Sequence)
 {
+    [JsonRequired] public TransportOfficerDisposition OfficerDisposition { get; init; }
     [JsonRequired] public UnitPolicies Policies { get; init; } = new();
     [JsonRequired] public WorldPosition? Waypoint { get; init; }
 }
@@ -112,7 +113,7 @@ internal static class MilitaryMovement
 
     private static DeployUnitCommand TransportDeployment(TransportUnitCommand command, FixedUnitFormations pair) =>
         new(command.CommandId, command.IssuerId, command.Sequence, command.SettlementId, command.OfficerIds,
-            command.Soldiers, pair.LandFormationId, new(MilitaryOrderKind.Transport, null, command.DestinationId))
+            command.Soldiers, pair.LandFormationId, new(MilitaryOrderKind.Transport, null, command.DestinationId) { OfficerDisposition = command.OfficerDisposition })
         { NavalFormationId = pair.NavalFormationId, Policies = command.Policies, Waypoint = command.Waypoint };
 
     internal static CommandRejection Deploy(WorldMutation world, DeployUnitCommand command, MilitaryRulebook? rules,
@@ -329,7 +330,7 @@ internal static class MilitaryMovement
     internal static void Absorb(WorldMutation world, UnitState unit, int destinationId, GovernanceRulebook governance, PersonnelRulebook geography, MilitaryRulebook military, List<DomainEvent> events)
     {
         var home = world.Settlements[destinationId];
-        var returnHome = unit.EffectiveOrder?.Kind == MilitaryOrderKind.Transport && unit.ServicePlaceId != home.Id
+        var returnHome = unit.EffectiveOrder is { Kind: MilitaryOrderKind.Transport, OfficerDisposition: TransportOfficerDisposition.ReturnToSource } && unit.ServicePlaceId != home.Id
             ? PersonnelReturns.TransportDestination(world, unit, home, military) : home;
         int root = ResourceAccounts.Root(world, unit.OwnerId).Id;
         int sourceCorps = unit.CorpsId ?? root, previousCorps = home.CorpsId ?? root;

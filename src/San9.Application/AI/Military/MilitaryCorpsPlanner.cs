@@ -313,7 +313,8 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                         pair.NavalFormationId, shipped).Routes[0];
                     if (arrival.Status != TravelFieldStatus.Reachable) continue;
                     deliveryDays = arrival.Days!.Value;
-                    delivery = new TransportUnitCommand(id.Id, force.Id, id.Sequence, source.Id, [courier.Id], shipped, front.Id);
+                    delivery = new TransportUnitCommand(id.Id, force.Id, id.Sequence, source.Id, [courier.Id], shipped, front.Id)
+                        { OfficerDisposition = TransportOfficerDisposition.StayAtDestination };
                 }
                 else
                 {
@@ -326,7 +327,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 // Delivery does not grant an extra order. Include arrival/action recovery and the next xun boundary.
                 int readyDay = checked((deliveryDays / 10 + 1) * 10);
                 var attacks = queries.Transport(front.Id, targets.Select(t => t.Object.Id), best.FormationId,
-                    best.NavalFormationId, best.Soldiers, passage: MilitaryTransitPassage.Terrain);
+                    best.NavalFormationId, best.Soldiers, horizonDays: 256, passage: MilitaryTransitPassage.Terrain);
                 var attackTravel = rules.Travel(best.FormationId, best.NavalFormationId, best.Soldiers);
                 foreach (var attack in attacks.Routes.Where(r => r.Status == TravelFieldStatus.Reachable))
                 {
@@ -337,7 +338,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                     long value = target.SettlementKind == SettlementKind.City ? 30000 : 12000;
                     long score = value - (readyDay + days) * (200L + best.Soldiers / 100) - target.Soldiers / 2 - best.Money;
                     if (score > 0) options.Add(new(delivery, source.Id, attack.TargetId, front.Id, score,
-                        MilitaryCampaignStage.Assembling, courier.Id, readyDay + days, best.Members.Select(m => m.OfficerId).ToImmutableArray()));
+                        MilitaryCampaignStage.Assembling, best.CommanderId, readyDay + days, best.Members.Select(m => m.OfficerId).ToImmutableArray()));
                 }
             }
         }
@@ -347,14 +348,34 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         var target = queries.Observation.Forces.Find(new(campaign.ObjectiveId, true));
         if (target is null || !Target(target)) { Replace(campaign, campaign with { Stage = MilitaryCampaignStage.Withdrawing }); return; }
         var travel = rules!.Travel(unit);
+        var staging = engine.Snapshot.Settlements.FirstOrDefault(s => s.Id == campaign.TargetId && OwnSource(s));
+        if (staging is not null && rules.TransportFormations is { } convoy &&
+            (long)unit.Soldiers + unit.Wounded <= MilitaryResourceLedger.ReceivingSpace(engine.Snapshot, staging, unit.Id))
+        {
+            int direct = NavigationArrivalForecast.EarliestDays(travel, unit.Position, target.Area);
+            bool relayAdvantage = engine.Snapshot.Settlements.Where(s => s.Id != staging.Id && OwnSource(s) &&
+                unit.Soldiers <= MilitaryResourceLedger.ReceivingSpace(engine.Snapshot, s)).Any(front =>
+                    10L + NavigationArrivalForecast.EarliestDays(rules.Travel(convoy.LandFormationId, convoy.NavalFormationId, unit.Soldiers),
+                        rules.SettlementArea(staging).Position, rules.SettlementArea(front)) +
+                    NavigationArrivalForecast.EarliestDays(travel, rules.SettlementArea(front).Position, target.Area) + 10 < direct);
+            if (relayAdvantage)
+            {
+                if (unit.Order is { Kind: MilitaryOrderKind.Return } returning && returning.SettlementId == staging.Id) return;
+                if (queries.FromUnit(unit.Id, new(staging.Id, true), arrival: NavigationArrival.Region, verifyApproach: true, newOrder: true).Status == ArrivalEstimateStatus.Known)
+                {
+                    var identity = Identity();
+                    if (Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, unit.Id, new(MilitaryOrderKind.Return, null, staging.Id)))) return;
+                }
+            }
+        }
         if (!queries.Budget.BeginSourceField()) { incomplete = true; return; }
         var work = new NavigationWorkBudget(queries.Budget.RemainingExpanded, () => queries.Budget.Spend(1));
         var field = BattlefieldTravelField.Build(travel.Map, [unit.Position], [new(target.Object.Id, target.Area)],
-            travel.Mode, 60L * travel.DailyBudget, work);
+            travel.Mode, 256L * travel.DailyBudget, work);
         if (!field.Complete) { incomplete = true; return; }
         if (field.Routes[0].Status != TravelFieldStatus.Reachable) return;
         var next = FirstObjective(field.Routes[0].Cells, queries.Observation, campaign.TargetId, campaign.ObjectiveId)?.Target;
-        if (next is null || queries.FromUnit(unit.Id, next.Object, verifyApproach: true).Status != ArrivalEstimateStatus.Known) return;
+        if (next is null || queries.FromUnit(unit.Id, next.Object, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) return;
         var id = Identity();
         if (Submit(new OrderUnitCommand(id.Id, corps.OwnerId, id.Sequence, unit.Id,
                 new(MilitaryOrderKind.AttackSettlement, null, next.Object.Id))))

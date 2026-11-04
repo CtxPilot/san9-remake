@@ -264,4 +264,89 @@ public sealed class MilitaryCoordinationTests
         Assert.Equal(MilitaryCampaignStage.Marching, rescue.Stage);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GuardWhoseFieldTargetDisappearedRejoinsTheExistingBattlefield(bool automaticallyReturning)
+    {
+        var (definition, engine) = Setup(w => w with
+        {
+            Units = [new(50, 1, new(52, 7), 4000) { FormationId = 10, Morale = 100, CorpsId = 1, ServicePlaceId = 999, CommanderId = 1,
+                Order = new(MilitaryOrderKind.AttackSettlement, null, 1002) },
+                new(51, 1, new(37, 12), 3000) { FormationId = 10, Morale = 100, CorpsId = 3, ServicePlaceId = 1001, CommanderId = 3,
+                    Order = automaticallyReturning ? new(MilitaryOrderKind.Return, null, 1001) : null, AutonomousReturn = automaticallyReturning }],
+            Officers = w.Officers.Select(p => p.Id is 1 or 3 ? p with { UnitId = p.Id == 1 ? 50 : 51, SettlementId = null } : p).ToArray()
+        });
+        var campaign = Campaign(engine.Snapshot, 50) with { TargetId = 1002, Support = [new(51, 1001, 3, MilitaryCommitmentRole.Field, 3000, null)] };
+        var batch = new MilitaryTurnBatch(null, new() { NextId = 1, Campaigns = [campaign] });
+        var events = new List<DomainEvent>();
+        Run(definition, engine, batch, events);
+        Assert.Contains(events.OfType<UnitOrderChangedEvent>(), e => e.UnitId == 51 && e.Order?.SettlementId == 1002 && e.Order.Kind == MilitaryOrderKind.AttackSettlement);
+        Assert.Empty(events.OfType<UnitDeployedEvent>());
+        Assert.Single(batch.State.Campaigns);
+    }
+
+    [Theory]
+    [InlineData(35, MilitaryCampaignStage.Withdrawing)]
+    [InlineData(45, MilitaryCampaignStage.Marching)]
+    public void MajorLossesStopFurtherInvestmentButDoNotAbandonAnImminentCapture(int position, MilitaryCampaignStage expected)
+    {
+        var (definition, engine) = Setup(w => w with
+        {
+            Settlements = w.Settlements.Select(s => s.Id == 1002 ? s with { Soldiers = 10000, Morale = 100 } : s).ToArray(),
+            Units = [new(50, 1, new(position, 7), 1000) { FormationId = 10, Morale = 100, CorpsId = 3, ServicePlaceId = 1001, CommanderId = 3,
+                Order = new(MilitaryOrderKind.AttackSettlement, null, 1002) }],
+            Officers = w.Officers.Select(p => p.Id == 3 ? p with { UnitId = 50, SettlementId = null } : p).ToArray()
+        });
+        var campaign = Campaign(engine.Snapshot, 50) with { CorpsId = 3, TargetId = 1002, InitialSoldiers = 20000, LastPosition = new(position, 7) };
+        var batch = new MilitaryTurnBatch(null, new() { NextId = 1, Campaigns = [campaign] });
+        var events = new List<DomainEvent>();
+        Run(definition, engine, batch, events);
+        Assert.Equal(expected, Assert.Single(batch.State.Campaigns).Stage);
+        Assert.Empty(events.OfType<UnitDeployedEvent>());
+        if (expected == MilitaryCampaignStage.Withdrawing)
+            Assert.Contains(events.OfType<UnitOrderChangedEvent>(), e => e.UnitId == 50 && e.Order?.Kind == MilitaryOrderKind.Return);
+        else Assert.Equal(MilitaryOrderKind.AttackSettlement, engine.Snapshot.Units.Single(u => u.Id == 50).Order!.Kind);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WithdrawalWithoutReceivingSpaceUsesAReachableRallyOrKeepsItsCurrentResistance(bool hasAlly)
+    {
+        var (definition, engine) = Setup(w => w with
+        {
+            Settlements = w.Settlements.Select(s => s with { SoldierCapacity = Math.Max(1u, s.Soldiers) }).ToArray(),
+            Units = new[] { new UnitState(51, 1, new(37, 12), 3000) { FormationId = 10, Morale = 100, CorpsId = 3, ServicePlaceId = 1001, CommanderId = 3,
+                Order = new(MilitaryOrderKind.AttackSettlement, null, 1003) } }.Concat(hasAlly ? [new UnitState(50, 1, new(22, 7), 4000)
+                    { FormationId = 10, Morale = 100, CorpsId = 1, ServicePlaceId = 999, CommanderId = 1 }] : []).ToArray(),
+            Officers = w.Officers.Select(p => p.Id == 3 || p.Id == 1 && hasAlly ? p with { UnitId = p.Id == 1 ? 50 : 51, SettlementId = null } : p).ToArray()
+        });
+        var campaign = Campaign(engine.Snapshot, 51, MilitaryCampaignStage.Withdrawing) with { CorpsId = 3, LastPosition = new(37, 12) };
+        var batch = new MilitaryTurnBatch(null, new() { NextId = 1, Campaigns = [campaign] });
+        var events = new List<DomainEvent>();
+        Run(definition, engine, batch, events);
+        Assert.DoesNotContain(events.OfType<UnitOrderChangedEvent>(), e => e.Order?.Kind == MilitaryOrderKind.Return);
+        Assert.Equal(hasAlly ? MilitaryOrderKind.Move : MilitaryOrderKind.AttackSettlement, engine.Snapshot.Units.Single(u => u.Id == 51).Order!.Kind);
+    }
+
+    [Fact]
+    public void NewOrdersDiscardOldWaitingAndWaypointsButKeepRealMovementRemainder()
+    {
+        var (definition, engine) = Setup();
+        var world = engine.Snapshot with { Units = [new(50, 1, new(22, 7), 1000) { FormationId = 10, Morale = 100 }] };
+        var rules = definition.MilitaryRules!;
+        var observation = MilitaryIntelligencePublication.Publish(world, rules).Observe(world, rules, 1);
+        var queries = new MilitaryTravelQueries(observation, rules, new(rules), new(), (_, other) => other == 2,
+            new Dictionary<int, MilitaryOwnJourney> { [50] = new(9, 0, new(37, 7)) });
+        var existing = queries.FromUnit(50, new(1001, true), verifyApproach: true);
+        var reassigned = queries.FromUnit(50, new(1001, true), verifyApproach: true, newOrder: true);
+        Assert.Equal(ArrivalEstimateStatus.Known, reassigned.Status);
+        Assert.True(existing.Days > reassigned.Days + 9, System.Text.Json.JsonSerializer.Serialize(new { existing, reassigned }));
+        var point = queries.FromUnitToPosition(50, new(17, 12), verifyApproach: true);
+        Assert.Equal(ArrivalEstimateStatus.Known, point.Status);
+        Assert.False(point.TargetIsMoving);
+        Assert.True(point.Days < 9);
+    }
+
 }

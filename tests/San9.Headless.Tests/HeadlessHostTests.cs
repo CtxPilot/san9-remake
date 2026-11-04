@@ -505,8 +505,10 @@ AdvanceInput();
         StateAssert.Equal(session.Capture(), SaveService.Read(FilePath("resolved.json"), definition).Capture());
     }
 
-    [Fact]
-    public void MilitaryScriptReportsDeploymentMovementAndSingleAbsorption()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MilitaryScriptReportsDeploymentMovementAndSingleAbsorption(bool stay)
     {
         var definition = new San9.Content.Scenarios.ScenarioInitialState(San9.Content.Scenarios.ScenarioInitialState.CurrentSchemaVersion,
             "military-cli", 190, 1, 1, 1, [new(1, "force", 1, 100)],
@@ -537,7 +539,7 @@ AdvanceInput();
         }
         SessionResult AdvanceInput() => ApplyInput(session.Request(new AdvanceOperation()));
         Assert.True(ExecuteInput(new("player"), new San9.Core.Simulation.TransportUnitCommand(Guid.NewGuid(), 1, 0,
-            1, [1], 400, 2, 20, 30)).Submission.Accepted);
+            1, [1], 400, 2, 20, 30) { OfficerDisposition = stay ? San9.Core.Domain.TransportOfficerDisposition.StayAtDestination : San9.Core.Domain.TransportOfficerDisposition.ReturnToSource }).Submission.Accepted);
 AdvanceInput();
         File.WriteAllBytes(FilePath("scenario.json"), San9.Core.Simulation.CanonicalJson.Encode(definition));
         CommandLogService.Write(FilePath("military.commands.jsonl"), inputHeader, requests);

@@ -128,6 +128,9 @@ public sealed class MilitaryCampaignSessionTests
             var advance = session.AdvanceXun();
             EventAssert.Equal(advance.Events, restored.AdvanceXun().Events);
             StateAssert.Equal(session.Capture(), restored.Capture());
+            Assert.NotEqual(MilitaryCampaignStage.Cancelled, session.MilitaryCampaigns.Campaigns.Single(c => c.Id == campaign.Id).Stage);
+            if (ship) Assert.DoesNotContain(advance.Events.OfType<TaskStartedEvent>(), e => e.Task.OfficerId == 3 &&
+                e.Task.Kind is "personnel-return" or "personnel-move");
             attacked = advance.Events.OfType<UnitDeployedEvent>().Any(e => e.SettlementId == 1000);
         }
         Assert.True(attacked);
@@ -200,6 +203,52 @@ public sealed class MilitaryCampaignSessionTests
         Assert.Empty(result.Events.OfType<UnitDeployedEvent>());
         Assert.Empty(session.MilitaryCampaigns.Campaigns);
         Assert.Equal(20000u, session.Snapshot.Settlements.Single(s => s.Id == 1001).Soldiers);
+    }
+
+    [Fact]
+    public void RelayTransportRetainsTheFinalGoalAcrossTwoActualDeliveriesAndAnIntermediateBattle()
+    {
+        var basis = Fixture();
+        var front = basis.Settlements.Single(s => s.Id == 1000);
+        var content = basis with
+        {
+            CityIndependenceEnabled = false, ForceEmergenceEnabled = false, ForceConsolidationEnabled = false,
+            Officers = basis.Officers.Append(new("front-general", new(4, 1, 1000, new(95, 90, 80, 100), false) { BirthYear = 160 })).ToArray(),
+            Settlements = basis.Settlements.Select(s => s.Id == 1000 ? s with { X = 5, Y = 0 } : s.Id == 1002 ? s with { Soldiers = 4000, Morale = 100 } : s)
+                .Append(front with { Id = 1004, X = 18, Y = 0 }).ToArray(),
+            RegionCityIds = basis.RegionCityIds.Append(new KeyValuePair<int, int>(1004, 1000)).ToDictionary(),
+            RegionNameKeys = basis.RegionNameKeys.Append(new KeyValuePair<int, string>(1004, "region.1004")).ToDictionary(),
+            Military = basis.Military! with
+            {
+                Places = basis.Military.Places.Select(p => p.Id == 1000 ? p with { Position = new(27, 2) } : p.Id == 1002 ? p with { Footprint = new(1, 15) } : p)
+                    .Append(new BattlefieldPlace(1004, new(92, 2), new(1, 1)) { Combat = new(1, 1, 1, 1, 10) }).ToImmutableArray(),
+                Formations = [basis.Military.Formations[0] with { MovementBudget = 1 }, new(20, 40, 0, 10000, 1, new(1, 1), TravelMode.Land)],
+                TransportFormations = new(20, null)
+            }
+        };
+        var session = GameSession.Start(content, 281, playerForceIds: [1, 2]);
+        var starts = session.EndControl(new("player"));
+        var first = Assert.Single(starts.Events.OfType<UnitDeployedEvent>());
+        Assert.Equal(1001, first.SettlementId);
+        Assert.Equal(MilitaryOrderKind.Transport, session.Snapshot.Units.Single(u => u.Id == first.UnitId).Order!.Kind);
+        var original = Assert.Single(session.MilitaryCampaigns.Campaigns);
+        Assert.Equal(1000, original.TargetId);
+        Assert.Equal(1003, original.ObjectiveId);
+        var restored = SaveService.Decode(SaveService.Encode(session), content);
+        bool secondLeg = false, finalAttack = false;
+        for (int i = 0; i < 25 && !finalAttack; i++)
+        {
+            var result = session.AdvanceXun();
+            EventAssert.Equal(result.Events, restored.AdvanceXun().Events);
+            StateAssert.Equal(session.Capture(), restored.Capture());
+            var current = session.MilitaryCampaigns.Campaigns.Single(c => c.Id == original.Id);
+            secondLeg |= result.Events.OfType<UnitAbsorbedEvent>().Any(e => e.WasTransport && e.SettlementId == 1004);
+            finalAttack |= secondLeg && result.Events.OfType<UnitDeployedEvent>().Any(e => e.SettlementId == 1004);
+        }
+        Assert.True(secondLeg, System.Text.Json.JsonSerializer.Serialize(session.MilitaryCampaigns));
+        Assert.True(finalAttack);
+        Assert.Equal(1001, session.MilitaryCampaigns.Campaigns.Single(c => c.Id == original.Id).SourceId);
+        Assert.Equal(1003, session.MilitaryCampaigns.Campaigns.Single(c => c.Id == original.Id).ObjectiveId);
     }
 
     internal static ScenarioInitialState Fixture()

@@ -79,7 +79,7 @@ public sealed class MilitaryTravelQueries
     }
 
     public MilitaryTravelEstimate FromUnit(int unitId, MapObjectReference targetIdentity, UnitPolicies? policies = null,
-        NavigationArrival arrival = NavigationArrival.Range, bool verifyApproach = false)
+        NavigationArrival arrival = NavigationArrival.Range, bool verifyApproach = false, bool newOrder = false)
     {
         var source = Observation.Forces.Find(new(unitId, false));
         var target = Observation.Forces.Find(targetIdentity);
@@ -87,7 +87,8 @@ public sealed class MilitaryTravelQueries
             return new(ArrivalEstimateStatus.NotApplicable, null, 0, [], 0, !targetIdentity.IsSettlement);
         var travel = rules.Travel(formation, source.NavalFormationId, source.Soldiers);
         var own = source.OwnerId == Observation.ViewerForceId ? ownJourneys.GetValueOrDefault(unitId) : null;
-        return Estimate(source, target, travel, unitId, own, policies ?? new(), arrival, verifyApproach);
+        if (newOrder && own is not null) own = own with { PreparationDays = 0, Waypoint = null };
+        return Estimate(source, target.Area, target.Object, travel, unitId, own, policies ?? new(), arrival, verifyApproach);
     }
 
     public MilitaryTravelEstimate FromSettlement(int settlementId, MapObjectReference targetIdentity, int formationId,
@@ -105,35 +106,46 @@ public sealed class MilitaryTravelQueries
         if (start is null) return new(ArrivalEstimateStatus.Unreachable, null, 0, [], 0, !targetIdentity.IsSettlement);
         var prospective = source with { Area = new(start.Value, travel.Shape), FormationId = formationId,
             NavalFormationId = navalFormationId, Soldiers = soldiers };
-        return Estimate(prospective, target, travel, null, new(preparationDays, 0, null), policies, arrival, verifyApproach);
+        return Estimate(prospective, target.Area, target.Object, travel, null, new(preparationDays, 0, null), policies, arrival, verifyApproach);
     }
 
-    private MilitaryTravelEstimate Estimate(MilitaryPresence source, MilitaryPresence target, UnitTravel travel,
+    public MilitaryTravelEstimate FromUnitToPosition(int unitId, WorldPosition position, UnitPolicies? policies = null, bool verifyApproach = false)
+    {
+        var source = Observation.Forces.Find(new(unitId, false));
+        if (source?.FormationId is not int formation || source.Kind != MilitaryPresenceKind.Unit || position.X < 0 || position.Y < 0 ||
+            position.X >= rules.Map.FineWidth || position.Y >= rules.Map.FineHeight)
+            return new(ArrivalEstimateStatus.NotApplicable, null, 0, [], 0, false);
+        var own = source.OwnerId == Observation.ViewerForceId ? ownJourneys.GetValueOrDefault(unitId) : null;
+        if (own is not null) own = own with { PreparationDays = 0, Waypoint = null };
+        return Estimate(source, new(position, new(1, 1)), null, rules.Travel(formation, source.NavalFormationId, source.Soldiers),
+            unitId, own, policies ?? new(), NavigationArrival.Point, verifyApproach);
+    }
+
+    private MilitaryTravelEstimate Estimate(MilitaryPresence source, MapOccupancy target, MapObjectReference? targetIdentity, UnitTravel travel,
         int? moving, MilitaryOwnJourney? own, UnitPolicies policies, NavigationArrival arrival, bool verifyApproach)
     {
-        var targetIdentity = target.Object;
         int formation = source.FormationId!.Value;
         int preparation = own?.PreparationDays ?? 0, remainder = own?.MovementRemainder ?? 0;
         int Range(int id) => rules.Formations[id].Attack is { } attack ? checked(attack.Range + attack.MaximumElevationBonus) : 1;
         int reach = arrival == NavigationArrival.Range ? Math.Max(Range(formation), source.NavalFormationId is int ship ? Range(ship) : 1) : 0;
         int earliest = NavigationArrivalForecast.EarliestDays(travel, source.Area.Position,
-            arrival == NavigationArrival.Region ? target.Area.CoveringCells() : target.Area, preparation,
+            arrival == NavigationArrival.Region ? target.CoveringCells() : target, preparation,
             own is not null ? remainder : null, maximumRange: reach);
         if (travel.DailyBudget <= 0 || source.Condition == UnitCondition.Confused)
-            return new(ArrivalEstimateStatus.Waiting, null, earliest, [], 0, !targetIdentity.IsSettlement);
+            return new(ArrivalEstimateStatus.Waiting, null, earliest, [], 0, targetIdentity is { IsSettlement: false });
         if (!Budget.BeginDetailedRoute() || Budget.RemainingExpanded == 0)
         {
             if (Budget.RemainingExpanded == 0) Budget.Spend(1);
-            return new(ArrivalEstimateStatus.Incomplete, null, earliest, [], 0, !targetIdentity.IsSettlement);
+            return new(ArrivalEstimateStatus.Incomplete, null, earliest, [], 0, targetIdentity is { IsSettlement: false });
         }
         var occupancy = Occupancy(moving, policies, targetIdentity, source.OwnerId!.Value);
         var work = new NavigationWorkBudget(Budget.RemainingExpanded, () => Budget.Spend(1));
         if (verifyApproach)
         {
-            var prediction = NavigationArrivalForecast.Evaluate(new(travel, source.Area.Position, target.Area, occupancy,
+            var prediction = NavigationArrivalForecast.Evaluate(new(travel, source.Area.Position, target, occupancy,
                 arrival, preparation, remainder, RectangularReach: true, Range: Math.Max(1, reach), Waypoint: own?.Waypoint), work, maximumDays: 256);
             if (work.Exhausted) Budget.Spend(1);
-            return new(prediction.Status, prediction.Days, earliest, [], work.Expanded, !targetIdentity.IsSettlement);
+            return new(prediction.Status, prediction.Days, earliest, [], work.Expanded, targetIdentity is { IsSettlement: false });
         }
         var cells = ImmutableArray.CreateBuilder<MapCell>();
         long cost = 0;
@@ -141,13 +153,13 @@ public sealed class MilitaryTravelQueries
         if (own?.Waypoint is { } waypoint)
         {
             var first = travel.Map.EstimateTravelCost(start, new(waypoint, new(1, 1)), travel.Shape, travel.Mode,
-                occupancy, work, arrival: NavigationArrival.Point, includeCells: true, excluded: targetIdentity.IsSettlement ? target.Area : null);
+                occupancy, work, arrival: NavigationArrival.Point, includeCells: true, excluded: targetIdentity is { IsSettlement: true } ? target : null);
             if (first.Status != RouteReachability.Reachable) { cells.AddRange(first.Cells); return Result(first.Status, null); }
             cost = first.Cost;
             cells.AddRange(first.Cells);
             start = waypoint;
         }
-        var route = travel.Map.EstimateTravelCost(start, target.Area, travel.Shape, travel.Mode, occupancy, work,
+        var route = travel.Map.EstimateTravelCost(start, target, travel.Shape, travel.Mode, occupancy, work,
             arrival: arrival, range: Math.Max(1, reach), rectangularReach: true, includeCells: true);
         cells.AddRange(route.Cells.Where(p => cells.Count == 0 || cells[^1] != p));
         if (route.Status != RouteReachability.Reachable) return Result(route.Status, null);
@@ -159,7 +171,7 @@ public sealed class MilitaryTravelQueries
             if (work.Exhausted) Budget.Spend(1);
             return new(status switch { RouteReachability.Reachable => ArrivalEstimateStatus.Known,
                 RouteReachability.Unreachable => ArrivalEstimateStatus.Unreachable, _ => ArrivalEstimateStatus.Incomplete },
-                days, earliest, cells.ToImmutable(), work.Expanded, !targetIdentity.IsSettlement);
+                days, earliest, cells.ToImmutable(), work.Expanded, targetIdentity is { IsSettlement: false });
         }
     }
 
@@ -176,10 +188,10 @@ public sealed class MilitaryTravelQueries
         return new(settlementId, place.Soldiers, place.Wounded, incoming);
     }
 
-    private ImmutableArray<MapOccupancy> Occupancy(int? moving, UnitPolicies policies, MapObjectReference target, int owner)
+    private ImmutableArray<MapOccupancy> Occupancy(int? moving, UnitPolicies policies, MapObjectReference? target, int owner)
     {
         var result = ImmutableArray.CreateBuilder<MapOccupancy>();
-        int? targetOwner = Observation.Forces.Find(target)?.OwnerId;
+        int? targetOwner = target is not null ? Observation.Forces.Find(target)?.OwnerId : null;
         foreach (var p in Observation.Forces.Objects)
         {
             if (!p.Object.IsSettlement && (p.Object.Id == moving || p.Kind == MilitaryPresenceKind.Personnel)) continue;

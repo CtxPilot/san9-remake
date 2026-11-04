@@ -6,10 +6,10 @@ namespace San9.Application.AI.Military;
 /// <summary>Current resources and actual inbound commitments. No future arrival pays a current command.</summary>
 internal static class MilitaryResourceLedger
 {
-    internal static long ReceivingSpace(WorldSnapshot world, SettlementState destination)
+    internal static long ReceivingSpace(WorldSnapshot world, SettlementState destination, int? excludingUnitId = null)
     {
         long occupied = (long)destination.Soldiers + destination.Wounded;
-        occupied += world.Units.Where(u => !u.IsEmbedded && u.OwnerId == destination.OwnerId &&
+        occupied += world.Units.Where(u => u.Id != excludingUnitId && !u.IsEmbedded && u.OwnerId == destination.OwnerId &&
             u.Order?.SettlementId == destination.Id && u.Order.Kind is MilitaryOrderKind.Return or MilitaryOrderKind.Transport)
             .Sum(u => (long)u.Soldiers + u.Wounded);
         occupied += world.Simulation.Tasks.Where(t => t.ForceId == destination.OwnerId && t.Reinforcements is not null &&
