@@ -7,7 +7,7 @@ namespace San9.Client.Godot;
 /// <summary>Published layout is shared by drawing and picking, independent of draw callbacks.</summary>
 internal sealed class MapAnnotationLayer
 {
-    private sealed record Entry(MapObjectTarget Target, Vector2 Position, string Name, uint Soldiers,
+    private sealed record Entry(MapObjectTarget Target, Vector2 Position, double GroundDepth, string Name, uint Soldiers,
         int Morale, int Durability, int MaxDurability, string[] Icons, Rect2? HitBounds, bool IsWork = false);
     private Entry[] _entries = [];
     public bool HasAnimatedBars { get; private set; }
@@ -19,7 +19,7 @@ internal sealed class MapAnnotationLayer
             var value = frame.Region.Scene.Settlements[building.Id];
             var bounds = frame.Region.Scene.AnnotationBounds(building);
             if (!frame.Region.Bounds.Intersects(bounds)) continue;
-            entries.Add(new(new(building.Id, false), bounds.Position, value.ResolveName(texts), value.Soldiers,
+            entries.Add(new(new(building.Id, false), bounds.Position, building.X + building.Y, value.ResolveName(texts), value.Soldiers,
                 value.Morale, value.Durability, value.MaxDurability, value.Icons.ToArray(), null, value.IsWork));
         }
         var units = frame.Region.Scene.State.World.Units.ToDictionary(u => u.Id);
@@ -30,7 +30,7 @@ internal sealed class MapAnnotationLayer
             float width = Math.Max(76, font.GetStringSize(name, fontSize: fontSize).X);
             var bounds = new Rect2(unit.LabelX, unit.LabelY, width, 47 + font.GetDescent(fontSize));
             if (!frame.Region.Bounds.Intersects(bounds)) continue;
-            entries.Add(new(new(unit.Id, true), new(unit.LabelX, unit.LabelY), name, unit.Soldiers,
+            entries.Add(new(new(unit.Id, true), new(unit.LabelX, unit.LabelY), unit.Depth, name, unit.Soldiers,
                 unit.Morale, 0, 0, frame.Region.Scene.State.UnitPurpose(units[unit.Id]) switch
                 {
                     San9.Core.Domain.UnitPurpose.Construction => ["construction"],
@@ -38,7 +38,9 @@ internal sealed class MapAnnotationLayer
                     _ => []
                 }, bounds));
         }
-        _entries = entries.ToArray();
+        // Both kinds share the same ground-depth scale (cell X + Y). Label offsets and elevation
+        // affect placement, not overlap order; stable ties preserve the scene's insertion order.
+        _entries = entries.OrderBy(e => e.GroundDepth).ToArray();
         HasAnimatedBars = _entries.Any(e => !e.IsWork && Animated(e.Morale, 100) || !e.Target.IsUnit && Animated(e.Durability, e.MaxDurability));
         static bool Animated(int value, int maximum) => BuildingInfoGeometry.FillWidth(value, maximum) > 0 &&
             BuildingInfoGeometry.FillState(value, maximum) != "normal";
