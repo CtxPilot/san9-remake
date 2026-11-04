@@ -15,9 +15,7 @@ internal static partial class MilitaryPolicies
             var leader = Commander(world, unit);
             var candidates = visible.Where(actor => !actor.IsSettlement)
                 .Select(actor => world.Units[actor.Id]).Where(other =>
-                    MilitaryDiplomacy.ApproachEnemy(world, unit, other.OwnerId))
-                .Where(other => !other.AutonomousReturn || leader is not null &&
-                    MayPursue(world, unit, other, leader.Personality, rules)).ToArray();
+                    MilitaryDiplomacy.ApproachEnemy(world, unit, other.OwnerId)).ToArray();
             bool notifyAvoidance = unit.ApproachNotificationPending;
             unit = unit with { ApproachNotificationPending = candidates.Length == 0 };
             world.Replace(unit);

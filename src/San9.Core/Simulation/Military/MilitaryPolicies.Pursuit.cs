@@ -4,7 +4,7 @@ namespace San9.Core.Simulation;
 
 internal static partial class MilitaryPolicies
 {
-    // Starting an interception and continuing one use the same rule for a retreating target.
+    // Pursuit decides whether to retain an existing target when it starts an autonomous return.
     private static bool MayPursue(WorldMutation world, UnitState unit, UnitState target, int personality,
         MilitaryRulebook rules)
     {

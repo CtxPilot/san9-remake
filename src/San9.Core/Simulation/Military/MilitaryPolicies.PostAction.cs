@@ -19,7 +19,6 @@ internal static partial class MilitaryPolicies
         var area = MilitaryCombat.Area(unit, rules);
         var candidate = UnitPolicyQueries.ActiveFieldUnits(world)
             .Where(other => other.Id != unit.Id && MilitaryDiplomacy.AutomaticEnemy(world, unit.OwnerId, other.OwnerId) &&
-                (!other.AutonomousReturn || MayPursue(world, unit, other, leader.Personality, rules)) &&
                 area.IntersectsExpanded(MilitaryCombat.Area(other, rules), rules.PolicyRadius) &&
                 MilitaryOrders.ValidMission(world, unit, Attack(other), rules))
             .Select(other => (Unit: other, Distance: area.DistanceTo(MilitaryCombat.Area(other, rules))))
