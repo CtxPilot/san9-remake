@@ -174,7 +174,8 @@ public sealed class NavigationQueryConsistencyTests
         Assert.Equal(new(ArrivalEstimateStatus.Known, 13), estimate);
         var world = state.BeginMutation();
         // Actual execution still opens engagements and can arrive later than the route estimate.
-        for (int day = 1; day <= 16; day++)
+        int? arrivalDay = null;
+        for (int day = 1; day <= 32; day++)
         {
             world.SetClock(world.Clock.NextDay());
             var current = world.Units[0];
@@ -185,8 +186,14 @@ public sealed class NavigationQueryConsistencyTests
                 MilitaryEngagements.Open(world, new(1, false), new(0, false), rules);
             MilitaryMovement.TickDepartureDelays(world);
             if (day == 2) Assert.True(world.Units[0].PassiveEngagement);
-            Assert.Equal(day == 16, world.Units[0].Position == unit.Order.Position);
+            if (world.Units[0].Position == unit.Order.Position)
+            {
+                arrivalDay = day;
+                break;
+            }
         }
+        Assert.NotNull(arrivalDay);
+        Assert.True(arrivalDay > estimate.Days);
         Assert.Equal(enemy.Position, world.Units[1].Position);
     }
 

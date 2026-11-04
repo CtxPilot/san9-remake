@@ -107,8 +107,12 @@ public sealed partial class UnitPolicyTests
         mutation.Replace(mutation.Units[2] with { Position = new(22, 10) });
         var events = new List<DomainEvent>(); var rules = Rules();
         MilitaryPolicies.ApproachDay(mutation, rules, events);
-        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
+        // Advance the interceptor alone so the target's own route does not decide combat eligibility.
+        var interceptor = mutation.Units[1];
+        MilitaryNavigation.Commit(mutation, interceptor,
+            MilitaryNavigation.Advance(mutation, interceptor, interceptor.Id, rules, MilitaryNavigation.Budget(interceptor, rules)), rules, events);
         Assert.Equal(new WorldPosition(21, 10), mutation.Units[1].Position);
+        Assert.Equal(new WorldPosition(22, 10), mutation.Units[2].Position);
         MilitaryCombat.AdvanceDay(mutation, new() { Military = rules }, events);
         Assert.Contains(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 1 && e.TargetUnitId == 2 && e.SoldierLoss > 0);
         Assert.Equal(Mission, mutation.Units[1].Order);

@@ -167,18 +167,20 @@ internal sealed class BattlefieldPathSearch : IDisposable
         return new(MapCoordinates.Center(MapCoordinates.Cell(position)), new(5, 5));
     }
 
-    // Ring boundary coverage is deliberately asymmetric; do not replace with rectangle-depth distance.
+    // Cover the half-open footprint completely, with equal costs at equal inward depths.
     internal static void RasterizeGradient(MapOccupancy area, int initial, int increment, Action<int, int, int> paint)
+        => RasterizeGradient(area, area, initial, increment, paint);
+
+    private static void RasterizeGradient(MapOccupancy area, MapOccupancy window, int initial, int increment,
+        Action<int, int, int> paint)
     {
-        for (int y = (int)area.Top; y <= area.Bottom; y++)
-        for (int x = (int)area.Left; x <= area.Right; x++)
+        // The window limits writes; inward depth always uses the complete object's boundaries.
+        for (int y = (int)Math.Max(area.Top, window.Top); y < Math.Min(area.Bottom, window.Bottom); y++)
+        for (int x = (int)Math.Max(area.Left, window.Left); x < Math.Min(area.Right, window.Right); x++)
         {
-            int layer = (int)Math.Min(Math.Min(x - area.Left, area.Right - x), Math.Min(y - area.Top, area.Bottom - y));
-            long l = area.Left + layer, r = area.Right - layer, t = area.Top + layer, b = area.Bottom - layer;
-            if (l >= r || t >= b) continue;
-            bool horizontalEdge = x >= l && x < r && (y == t || y == b);
-            bool verticalEdge = y > t && y < b - 1 && (x == l || x == r);
-            if (horizontalEdge || verticalEdge) paint(x, y, Math.Min(250, initial + layer * increment));
+            int layer = (int)Math.Min(Math.Min(x - area.Left, area.Right - 1 - x),
+                Math.Min(y - area.Top, area.Bottom - 1 - y));
+            paint(x, y, Math.Min(250, initial + layer * increment));
         }
     }
 
@@ -189,12 +191,10 @@ internal sealed class BattlefieldPathSearch : IDisposable
         Action<int, int, int> paint)
     {
         if ((!obstacle.Hard && obstacle.Avoidance == NavigationAvoidance.None) || !obstacle.Overlaps(window)) return;
-        int left = (int)Math.Max(obstacle.Left, window.Left), top = (int)Math.Max(obstacle.Top, window.Top);
-        int width = (int)(Math.Min(obstacle.Right, window.Right) - left);
-        int height = (int)(Math.Min(obstacle.Bottom, window.Bottom) - top);
         int padding = obstacle.Hard ? 0 : shape.Width / 2 + 1;
-        var field = new MapOccupancy(new(left + width / 2, top + height / 2), new(width + 2 * padding, height + 2 * padding));
-        RasterizeGradient(field, obstacle.Hard ? mobility + 75 : 25, obstacle.Hard ? 5 : 10, paint);
+        var field = new MapOccupancy(obstacle.Position,
+            new(obstacle.Footprint.Width + 2 * padding, obstacle.Footprint.Height + 2 * padding));
+        RasterizeGradient(field, window, obstacle.Hard ? mobility + 75 : 25, obstacle.Hard ? 5 : 10, paint);
     }
 
     internal NavigationStep Daily(WorldPosition start, MapOccupancy target, Footprint shape, TravelMode mode,

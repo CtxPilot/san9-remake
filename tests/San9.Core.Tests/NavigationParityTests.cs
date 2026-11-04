@@ -89,23 +89,53 @@ public sealed class NavigationParityTests
         Assert.Equal(MapCoordinates.Cell(building.Position), arrival.Cells[^1]);
     }
 
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(1, 8)]
+    [InlineData(8, 1)]
+    [InlineData(4, 4)]
+    [InlineData(5, 5)]
+    [InlineData(4, 7)]
+    [InlineData(7, 4)]
+    public void GradientCoversHalfOpenFootprintWithoutDirectionalGaps(int width, int height)
+    {
+        var area = new MapOccupancy(new(12, 12), new(width, height));
+        var cells = new Dictionary<(int, int), int>();
+        BattlefieldPathSearch.RasterizeGradient(area, 25, 10,
+            (x, y, cost) => Assert.True(cells.TryAdd((x, y), cost)));
+        Assert.Equal(width * height, cells.Count);
+        Assert.All(cells, cell =>
+        {
+            var (x, y) = cell.Key;
+            Assert.True(area.Contains(new(x, y)));
+            Assert.InRange(cell.Value, 25, 250);
+            Assert.Equal(cell.Value, cells[((int)(area.Left + area.Right - 1 - x), y)]);
+            Assert.Equal(cell.Value, cells[(x, (int)(area.Top + area.Bottom - 1 - y))]);
+        });
+    }
+
     [Fact]
-    public void GradientIncludesOriginalLowerAndRightEdgesWithoutFillingCorner()
+    public void GradientIncreasesInwardAndSaturatesWithoutOpeningCornerChannels()
     {
         var cells = new Dictionary<(int, int), int>();
-        BattlefieldPathSearch.RasterizeGradient(new(new(12, 12), new(4, 4)), 25, 10,
-            (x, y, cost) => cells[(x, y)] = Math.Max(cells.GetValueOrDefault((x, y)), cost));
-        Assert.Equal(25, cells[(10, 14)]);
-        Assert.Equal(25, cells[(14, 11)]);
-        Assert.Equal(35, cells[(11, 11)]);
-        Assert.False(cells.ContainsKey((14, 14)));
-        Assert.False(cells.ContainsKey((14, 13)));
+        BattlefieldPathSearch.RasterizeGradient(new(new(12, 12), new(5, 5)), 25, 10,
+            (x, y, cost) => cells[(x, y)] = cost);
+        Assert.Equal(25, cells[(14, 14)]);
+        Assert.Equal(35, cells[(13, 13)]);
+        Assert.Equal(45, cells[(12, 12)]);
+
+        cells.Clear();
+        BattlefieldPathSearch.RasterizeGradient(new(new(12, 12), new(5, 5)), 240, 10,
+            (x, y, cost) => cells[(x, y)] = cost);
+        Assert.Equal(240, cells[(14, 14)]);
+        Assert.Equal(250, cells[(13, 13)]);
+        Assert.Equal(250, cells[(12, 12)]);
     }
 
     [Theory]
-    [InlineData(true, 95)]
-    [InlineData(false, 55)]
-    public void ObstacleGradientStartsAtClippedWindowBoundary(bool hard, int expectedEdgeCost)
+    [InlineData(true, 115)]
+    [InlineData(false, 95)]
+    public void ObstacleGradientRetainsFullObjectDepthAtWindowBoundary(bool hard, int expectedEdgeCost)
     {
         var cells = new Dictionary<(int, int), int>();
         BattlefieldPathSearch.RasterizeObstacle(
@@ -113,5 +143,39 @@ public sealed class NavigationParityTests
             new(new(15, 15), new(10, 10)), new(4, 4), 20,
             (x, y, cost) => cells[(x, y)] = cost);
         Assert.Equal(expectedEdgeCost, cells[(10, 15)]);
+        Assert.Equal(100, cells.Count);
+        Assert.All(cells.Keys, p => Assert.InRange(p.Item1, 10, 19));
+        Assert.All(cells.Keys, p => Assert.InRange(p.Item2, 10, 19));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ObstacleGradientCostsStayEqualAcrossWindows(bool hard)
+    {
+        var obstacle = new MapOccupancy(new(10, 10), new(21, 17))
+            { Hard = hard, Avoidance = NavigationAvoidance.Friendly };
+        var full = new Dictionary<(int, int), int>();
+        BattlefieldPathSearch.RasterizeObstacle(obstacle, new(new(10, 10), new(40, 40)), new(4, 4), 20,
+            (x, y, cost) => full.Add((x, y), cost));
+        MapOccupancy[] windows = [new(new(15, 15), new(10, 10)), new(new(5, 5), new(10, 10))];
+        foreach (var window in windows)
+        {
+            var clipped = new Dictionary<(int, int), int>();
+            BattlefieldPathSearch.RasterizeObstacle(obstacle, window, new(4, 4), 20,
+                (x, y, cost) => clipped.Add((x, y), cost));
+            var expected = full.Where(p => window.Contains(new(p.Key.Item1, p.Key.Item2))).ToArray();
+            Assert.Equal(expected.Length, clipped.Count);
+            Assert.All(expected, p => Assert.Equal(p.Value, clipped[p.Key]));
+        }
+    }
+
+    [Fact]
+    public void SoftObstacleOutsideWindowDoesNotEnterThroughPadding()
+    {
+        BattlefieldPathSearch.RasterizeObstacle(
+            new(new(5, 5), new(10, 10)) { Hard = false, Avoidance = NavigationAvoidance.Friendly },
+            new(new(15, 5), new(10, 10)), new(4, 4), 20,
+            (_, _, _) => Assert.Fail("The original footprint does not overlap the window."));
     }
 }
