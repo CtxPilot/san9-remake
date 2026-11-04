@@ -28,6 +28,10 @@ public sealed partial class MilitaryRulebook
         tactic.CompatibleFormations.Contains(formation.Id) || companion.EnableNavalTacticFallback &&
         CompanionTactics?.NavalFallback is { } fallback && fallback.FormationId == formation.Id && fallback.FallbackTacticId == tactic.Id;
 
+    public bool SupportsTacticTarget(TacticRule tactic, FormationRule formation, CompanionSettings companion, bool settlement) =>
+        SupportsTactic(tactic, formation, companion) &&
+        (!settlement || tactic.AffectsFacilities && TacticContactRange(tactic, formation, companion) is null);
+
     public int? TacticContactRange(TacticRule tactic, FormationRule formation, CompanionSettings companion) =>
         companion.EnableNavalTacticFallback && CompanionTactics?.NavalFallback is { } fallback &&
         fallback.FormationId == formation.Id && fallback.PreferredTacticId == tactic.Id

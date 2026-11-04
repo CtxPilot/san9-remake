@@ -57,6 +57,8 @@ internal static class MilitaryTurnRunner
                     MilitaryReason = after.Submitted > 0 || after.MilitaryReason is MilitaryDecisionReason.Withdrawing or MilitaryDecisionReason.AnalysisIncomplete
                         ? after.MilitaryReason : before.MilitaryReason,
                     GroupEvaluations = before.GroupEvaluations + after.GroupEvaluations,
+                    GroupBaselines = before.GroupBaselines + after.GroupBaselines,
+                    GroupImprovements = before.GroupImprovements + after.GroupImprovements,
                     ElapsedTimestampTicks = before.ElapsedTimestampTicks + after.ElapsedTimestampTicks,
                     AllocatedBytes = before.AllocatedBytes + after.AllocatedBytes, PathQueries = before.PathQueries + after.PathQueries,
                     PathSearches = before.PathSearches + after.PathSearches, PathExpanded = before.PathExpanded + after.PathExpanded,

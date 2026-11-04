@@ -10,8 +10,8 @@ internal sealed class MilitaryTurnBatch(MilitaryIntelligencePublication? publica
     private MilitaryTransportNetwork? network;
     private readonly Dictionary<int, MilitaryQueryBudget> budgets = [];
     private readonly Dictionary<int, MilitaryQueryBudget> allocationBudgets = [];
-    private readonly Dictionary<int, int> groups = [];
-    private readonly Dictionary<int, int> groupCeilings = [];
+    private readonly Dictionary<int, int> improvements = [];
+    private readonly Dictionary<int, int> improvementCeilings = [];
     private readonly Dictionary<int, MilitaryQueryBudget> slices = [];
     private readonly Dictionary<(MilitaryForceIndex Forces, int Target, int Days), MilitaryBattlefield> battlefields = [];
     private readonly Dictionary<(MilitaryForceIndex Forces, UnitState Unit, MapObjectReference Target), MilitaryTravelEstimate> committedArrivals = [];
@@ -35,8 +35,8 @@ internal sealed class MilitaryTurnBatch(MilitaryIntelligencePublication? publica
             allocationBudgets[force] = total.Partition(196608, 4, 8);
         }
         slices[force] = (finalizing ? total : allocationBudgets[force]).Slice(remainingCorps);
-        int spent = groups.GetValueOrDefault(force);
-        groupCeilings[force] = Math.Min(32, spent + Math.Max(1, (32 - spent) / Math.Max(1, remainingCorps)));
+        int spent = improvements.GetValueOrDefault(force);
+        improvementCeilings[force] = Math.Min(32, spent + Math.Max(1, (32 - spent) / Math.Max(1, remainingCorps)));
     }
 
     internal MilitaryBattlefield Battlefield(MilitaryTravelQueries queries, MilitaryRulebook rules, int target, int days)
@@ -49,11 +49,11 @@ internal sealed class MilitaryTurnBatch(MilitaryIntelligencePublication? publica
         return value;
     }
 
-    internal int RemainingGroups(int force) => groupCeilings.GetValueOrDefault(force, 32) - groups.GetValueOrDefault(force);
-    internal void SpendGroups(int force, int count)
+    internal int RemainingImprovements(int force) => improvementCeilings.GetValueOrDefault(force, 32) - improvements.GetValueOrDefault(force);
+    internal void SpendImprovements(int force, int count)
     {
-        if (count < 0 || count > RemainingGroups(force)) throw new ArgumentOutOfRangeException(nameof(count));
-        groups[force] = groups.GetValueOrDefault(force) + count;
+        if (count < 0 || count > RemainingImprovements(force)) throw new ArgumentOutOfRangeException(nameof(count));
+        improvements[force] = improvements.GetValueOrDefault(force) + count;
     }
 
     internal MilitaryTravelQueries Queries(WorldSnapshot world, MilitaryRulebook rules, int force)

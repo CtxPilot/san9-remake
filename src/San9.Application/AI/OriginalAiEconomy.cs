@@ -11,6 +11,8 @@ public sealed record OriginalAiWorkReport(int CorpsId, OriginalAiWork Work, Orig
     public string Executor { get; init; } = "original";
     public Military.MilitaryDecisionReason? MilitaryReason { get; init; }
     public int GroupEvaluations { get; init; }
+    public int GroupBaselines { get; init; }
+    public int GroupImprovements { get; init; }
     public long InputRevision { get; init; }
     public long ElapsedTimestampTicks { get; init; }
     public long AllocatedBytes { get; init; }

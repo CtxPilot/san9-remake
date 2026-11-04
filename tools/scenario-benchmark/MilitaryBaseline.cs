@@ -42,6 +42,8 @@ public sealed record BaselineWork(string Work, int Reports, int Attempts, int Su
 {
     public string Executor { get; init; } = "original";
     public int GroupEvaluations { get; init; }
+    public int GroupBaselines { get; init; }
+    public int GroupImprovements { get; init; }
 }
 
 public sealed record BaselineXun(string Started, string Ended, double Milliseconds, double PreparationMilliseconds,
@@ -217,7 +219,8 @@ public static class MilitaryBaseline
             g.Count(), g.Sum(r => r.Attempts), g.Sum(r => r.Submitted), g.Sum(r => r.Rejected), g.Sum(r => r.EmptyPlans),
             g.Sum(r => r.ElapsedTimestampTicks) * 1000.0 / Stopwatch.Frequency, g.Sum(r => r.AllocatedBytes),
             g.Sum(r => r.PathQueries), g.Sum(r => r.PathSearches), g.Sum(r => r.PathExpanded), g.Sum(r => r.PathEndpointExpanded))
-            { Executor = g.Key.Executor, GroupEvaluations = g.Sum(r => r.GroupEvaluations) }).ToArray();
+            { Executor = g.Key.Executor, GroupEvaluations = g.Sum(r => r.GroupEvaluations),
+                GroupBaselines = g.Sum(r => r.GroupBaselines), GroupImprovements = g.Sum(r => r.GroupImprovements) }).ToArray();
         return (new(started.ToString(), session.Snapshot.Clock.ToString(), (ended - begin) * 1000.0 / Stopwatch.Frequency,
             (prepared - begin) * 1000.0 / Stopwatch.Frequency, (ended - prepared) * 1000.0 / Stopwatch.Frequency,
             allocatedBytes, paths?.Queries ?? 0, paths?.Expanded ?? 0, paths?.EndpointExpanded ?? 0,

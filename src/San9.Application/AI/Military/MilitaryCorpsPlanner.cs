@@ -9,7 +9,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
     CorpsState corps, CommandContext context, MilitaryTurnBatch batch, List<DomainEvent> events)
 {
     private readonly MilitaryRulebook rules = definition.MilitaryRules!;
-    private int attempts, submitted, rejected, empty, groups;
+    private int attempts, submitted, rejected, empty, groups, groupBaselines, groupImprovements;
     private bool incomplete;
     private MilitaryDecisionReason reason = MilitaryDecisionReason.NoMap;
     private sealed record RouteObjective(MilitaryPresence Target, int CellIndex);
@@ -64,6 +64,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
             if (pass != MilitaryPlanningPass.Allocate)
             {
                 queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
+                EquipExistingUnits(queries);
                 ReviewCampaigns(queries);
                 foreach (var withdrawing in batch.State.Campaigns.Where(c => c.ForceId == corps.OwnerId && c.Stage == MilitaryCampaignStage.Withdrawing).ToArray())
                     Withdraw(withdrawing, batch.Queries(engine.Snapshot, rules, corps.OwnerId));
@@ -73,7 +74,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         return new(corps.Id, OriginalAiWork.Attack, incomplete ? OriginalAiWorkEnd.AnalysisIncomplete :
             OriginalAiWorkEnd.NoCandidates, attempts, submitted)
         {
-            Executor = "military-campaign-v1", GroupEvaluations = groups,
+            Executor = "military-campaign-v1", GroupEvaluations = groups, GroupBaselines = groupBaselines, GroupImprovements = groupImprovements,
             MilitaryReason = submitted > 0 ? MilitaryDecisionReason.Committed : incomplete ? MilitaryDecisionReason.AnalysisIncomplete :
                 rejected > 0 ? MilitaryDecisionReason.PublicRejected : reason, InputRevision = revision, Rejected = rejected, EmptyPlans = empty,
             ElapsedTimestampTicks = System.Diagnostics.Stopwatch.GetTimestamp() - started,
@@ -89,6 +90,29 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
     bool Target(MilitaryPresence p) => p.Kind == MilitaryPresenceKind.Settlement &&
         MilitaryCampaignPolicy.AllowsObjective(engine.Snapshot, corps, p.Object.Id);
     UnitPolicies CombatPolicies => MilitaryCampaignPolicy.CombatPolicies(engine.Snapshot.Forces.Single(f => f.Id == corps.OwnerId));
+    MilitaryGroupEvaluator GroupEvaluator() => new(rules, definition.Rules.Governance,
+        definition.Content.Information.Ranks.ToDictionary(r => r.Id, r => r.CommandCapacity), engine.Companion);
+    MilitaryGroupObjective Objective(MilitaryPresence target, SettlementState source) => new(target,
+        rules.SettlementArea(source).Position, target.Object.IsSettlement && (target.FacilityTypeId is int facility
+            ? rules.Facilities[facility].CanHostPersons
+            : definition.Content.Settlements.Single(s => s.Id == target.Object.Id).CanHostPersons));
+    void RecordGroup(MilitaryGroupEvaluation group)
+    {
+        groups += group.Evaluations;
+        groupBaselines += group.BaselineEvaluations;
+        groupImprovements += group.Improvements;
+        batch.SpendImprovements(corps.OwnerId, group.Improvements);
+    }
+    IEnumerable<MilitaryFormationPair> FormationAlternatives(ForceState force)
+    {
+        var ships = rules.Formations.Values.Where(f => f.TravelMode == TravelMode.Water &&
+            rules.Purpose(f.Id) == UnitPurpose.Combat && rules.CanSelectFormation(force, f.Id)).OrderBy(f => f.Id).Select(f => (int?)f.Id).ToArray();
+        if (ships.Length == 0) ships = [null];
+        foreach (var land in rules.Formations.Values.Where(f => f.TravelMode == TravelMode.Land &&
+            rules.Purpose(f.Id) == UnitPurpose.Combat && f.Id != rules.UnformedFormationId && rules.CanSelectFormation(force, f.Id)).OrderBy(f => f.Id))
+        foreach (var ship in ships)
+            if (rules.ValidFormationPair(land.Id, ship)) yield return new(land.Id, ship);
+    }
     void Replace(MilitaryCampaign old, MilitaryCampaign next) =>
         batch.State = batch.State with { Campaigns = batch.State.Campaigns.Replace(old, next) };
     bool Submit(GameCommand command)
@@ -123,7 +147,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         var world = engine.Snapshot;
         var force = world.Forces.Single(f => f.Id == corps.OwnerId);
         var busy = world.Simulation.Tasks.Select(t => t.OfficerId).ToHashSet();
-        var evaluator = new MilitaryGroupEvaluator(rules!);
+        var evaluator = GroupEvaluator();
         int? requested = MilitaryCampaignPolicy.RequestedObjective(world, corps);
         int lastSource = batch.State.LastSources.GetValueOrDefault(corps.Id, -1);
         var eligible = world.Settlements.Where(s => OwnSource(s) && s.Soldiers > 0 &&
@@ -136,13 +160,11 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         if (sources.Length == 0) { reason = MilitaryDecisionReason.NoSource; return; }
         if (targets.Length == 0) { reason = MilitaryDecisionReason.NoTarget; return; }
         reason = MilitaryDecisionReason.NoGroup;
-        var alternatives = rules!.Formations.Values.Where(f => f.TravelMode == TravelMode.Land &&
-            rules.Purpose(f.Id) == UnitPurpose.Combat && f.Id != rules.UnformedFormationId)
-            .OrderBy(f => f.Id).Select(f => new MilitaryFormationPair(f.Id, rules.BasicNavalFormationId)).ToArray();
+        var alternatives = FormationAlternatives(force).ToArray();
         var options = new List<ActionOption>();
         foreach (var source in sources)
         {
-            if (queries.Budget.RemainingSourceFields == 0 || batch.RemainingGroups(corps.OwnerId) == 0) { incomplete = true; break; }
+            if (queries.Budget.RemainingSourceFields == 0) { incomplete = true; break; }
             batch.State = batch.State with { LastSources = batch.State.LastSources.SetItem(corps.Id, source.Id) };
             var people = world.Officers.Where(p => p.OwnerId == force.Id && p.SettlementId == source.Id && !busy.Contains(p.Id) &&
                 !MilitaryResourceLedger.OfficerReserved(batch.State, p.Id, continuation?.Id))
@@ -151,22 +173,12 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
             long reserve = queries.PotentialThreats(source.Id, 10).Candidates.Sum(p => (long)p.Soldiers);
             uint available = (uint)Math.Max(0, source.Soldiers - reserve - MilitaryResourceLedger.ReservedSoldiers(batch.State, source.Id, continuation?.Id));
             var group = evaluator.Search(force, people, alternatives, source.Id, available, Math.Max(0, engine.Snapshot.Corps.Single(c => c.Id == corps.Id).Treasury.Money - MilitaryResourceLedger.ReservedMoney(batch.State, corps.Id, continuation?.Id)),
-                rules.SettlementArea(source).Position, MilitaryGroupRole.Siege,
-                queries.Observation.Units.Where(u => u.OwnerId != corps.OwnerId).SelectMany(u => u.Equipment),
-                maximumEvaluations: Math.Min(8, batch.RemainingGroups(corps.OwnerId)));
-            groups += group.Evaluations;
-            batch.SpendGroups(corps.OwnerId, group.Evaluations);
+                rules.SettlementArea(source).Position, MilitaryGroupRole.Mobile,
+                maximumImprovements: 0, morale: source.Morale);
+            RecordGroup(group);
             if (group.Best is not { } best) { empty++; continue; }
             reason = MilitaryDecisionReason.Unreachable;
             var commander = world.Officers.Single(p => p.Id == best.CommanderId);
-            uint capacity = CommanderCapacity.Read(commander.Id == force.LeaderId,
-                definition.Content.Information.Ranks.FirstOrDefault(r => r.Id == force.RankId)?.CommandCapacity,
-                definition.Content.Information.Offices.FirstOrDefault(o => o.Id == commander.OfficeId)?.CommandCapacity);
-            best = best with { Soldiers = Math.Min(best.Soldiers, capacity) };
-            var equipment = new Dictionary<int, MilitaryGroupOption>
-            {
-                [rules.Formation(best.FormationId, best.NavalFormationId, rules.SettlementArea(source).Position).Id] = best
-            };
             var travel = rules.Travel(best.FormationId, best.NavalFormationId, best.Soldiers);
             var orderedTargets = targets.OrderBy(p => p.Object.Id == requested ? 0 : 1).ThenBy(p => NavigationArrivalForecast.EarliestDays(travel,
                 rules.SettlementArea(source).Position, p.Area)).ThenBy(p => p.Object.Id).Take(8).ToArray();
@@ -185,38 +197,41 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 var objective = FirstObjective(route.Cells, queries.Observation, source.Id, route.TargetId);
                 if (objective is null) continue;
                 var target = objective.Target;
-                int activeFormation = rules.Formation(best.FormationId, best.NavalFormationId, target.Area.Position).Id;
-                if (!equipment.TryGetValue(activeFormation, out var battleGroup))
-                {
-                    if (batch.RemainingGroups(corps.OwnerId) == 0) { incomplete = true; continue; }
-                    var adapted = evaluator.Search(force, people, [new(best.FormationId, best.NavalFormationId)], source.Id,
-                        best.Soldiers, Math.Max(0, engine.Snapshot.Corps.Single(c => c.Id == corps.Id).Treasury.Money - MilitaryResourceLedger.ReservedMoney(batch.State, corps.Id, continuation?.Id)), target.Area.Position, MilitaryGroupRole.Siege,
-                        queries.Observation.Units.Where(u => u.OwnerId != corps.OwnerId).SelectMany(u => u.Equipment), maximumEvaluations: 1);
-                    groups += adapted.Evaluations; batch.SpendGroups(corps.OwnerId, adapted.Evaluations);
-                    if (adapted.Best is null) continue;
-                    var leader = world.Officers.Single(p => p.Id == adapted.Best.CommanderId);
-                    uint limit = CommanderCapacity.Read(leader.Id == force.LeaderId,
-                        definition.Content.Information.Ranks.FirstOrDefault(r => r.Id == force.RankId)?.CommandCapacity,
-                        definition.Content.Information.Offices.FirstOrDefault(o => o.Id == leader.OfficeId)?.CommandCapacity);
-                    equipment[activeFormation] = battleGroup = adapted.Best with { Soldiers = Math.Min(adapted.Best.Soldiers, limit) };
-                }
                 // Mobilize to the task, including zero-garrison defenses; this is a heuristic, not an eligibility gate.
-                uint soldiers = (uint)Math.Min(battleGroup.Soldiers, Math.Max(1000L, 2L * target.Soldiers));
-                soldiers = DepartureLimit(source, soldiers, battleGroup.Members.Select(m => m.OfficerId), queries);
+                uint wanted = (uint)Math.Min(available, Math.Max(1000L, 2L * target.Soldiers));
+                var adapted = evaluator.Search(force, people, alternatives, source.Id, wanted,
+                    Math.Max(0, engine.Snapshot.Corps.Single(c => c.Id == corps.Id).Treasury.Money - MilitaryResourceLedger.ReservedMoney(batch.State, corps.Id, continuation?.Id)),
+                    target.Area.Position, MilitaryGroupRole.Siege, RelevantEquipment(queries, target),
+                    maximumImprovements: Math.Min(8, batch.RemainingImprovements(corps.OwnerId)), objective: Objective(target, source), morale: source.Morale,
+                    sourceCapacity: ids => DepartureAllowance(source, ids, queries).Maximum);
+                RecordGroup(adapted);
+                if (adapted.Best is not { } battleGroup) continue;
+                uint soldiers = battleGroup.Soldiers;
                 if (soldiers == 0) { reason = MilitaryDecisionReason.SourceExposed; continue; }
-                int days = (int)((route.CumulativeCosts[objective.CellIndex] + travel.DailyBudget - 1) / travel.DailyBudget);
+                var battleTravel = rules.Travel(battleGroup.FormationId, battleGroup.NavalFormationId, soldiers);
+                var actualRoute = route;
+                if (battleTravel != travel)
+                {
+                    var verified = queries.Transport(source.Id, [route.TargetId], battleGroup.FormationId, battleGroup.NavalFormationId,
+                        soldiers, horizonDays: 256, passage: MilitaryTransitPassage.Terrain).Routes[0];
+                    if (verified.Status != TravelFieldStatus.Reachable) { incomplete |= verified.Status == TravelFieldStatus.Incomplete; continue; }
+                    var actualObjective = FirstObjective(verified.Cells, queries.Observation, source.Id, route.TargetId);
+                    if (actualObjective?.Target.Object != target.Object) { incomplete = true; continue; }
+                    actualRoute = verified; objective = actualObjective;
+                }
+                int days = (int)((actualRoute.CumulativeCosts[objective.CellIndex] + battleTravel.DailyBudget - 1) / battleTravel.DailyBudget);
                 long nearby = queries.PotentialThreats(target.Object.Id, days).Candidates
                     .Sum(p => (long)p.Soldiers);
                 long value = target.SettlementKind == SettlementKind.City ? 30000 : 12000;
-                long score = value - days * (200L + soldiers / 100) - (target.Soldiers + nearby) / 2 - best.Money;
+                long score = value - days * (200L + soldiers / 100) - (target.Soldiers + nearby) / 2 - battleGroup.Money;
                 if (score <= 0) { reason = MilitaryDecisionReason.NotWorthwhile; continue; }
                 var id = Identity();
                 var members = battleGroup.Members.OrderBy(p => p.OfficerId == battleGroup.CommanderId ? 0 : 1).ThenBy(p => p.OfficerId).ToArray();
                 options.Add(new(new DeployUnitCommand(id.Id, corps.OwnerId, id.Sequence, source.Id,
-                    members.Select(p => p.OfficerId).ToImmutableArray(), soldiers, best.FormationId,
+                    members.Select(p => p.OfficerId).ToImmutableArray(), soldiers, battleGroup.FormationId,
                     new(MilitaryOrderKind.AttackSettlement, null, target.Object.Id))
                 {
-                    NavalFormationId = best.NavalFormationId,
+                    NavalFormationId = battleGroup.NavalFormationId,
                     Policies = CombatPolicies, ConfirmAttack = true,
                     Positions = members.ToImmutableDictionary(p => p.OfficerId, p => p.Position),
                     Tactics = members.ToImmutableDictionary(p => p.OfficerId, p => p.TacticId)
@@ -235,8 +250,9 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 long extraOpposition = Math.Max(0, battlefield.PossibleAt(option.ArrivalDays) - battlefield.PublishedAt(0));
                 var source = engine.Snapshot.Settlements.Single(s => s.Id == planned.SettlementId);
                 var leader = engine.GetAbilities(engine.Snapshot)[planned.OfficerIds[0]];
-                int siege = Math.Max(1, queries.Observation.Forces.Find(new(option.Target, true))!.Durability /
-                    Math.Max(1, CombatMath.DurabilityDamage(planned.Soldiers, leader.Leadership, rules.Formations[planned.FormationId].Combat?.AgainstWalls ?? 0, int.MaxValue)));
+                var goal = Objective(queries.Observation.Forces.Find(new(option.Target, true))!, source);
+                int siege = goal.RequiresCombat ? Math.Max(1, goal.Target.Durability /
+                    Math.Max(1, CombatMath.DurabilityDamage(planned.Soldiers, leader.Leadership, rules.Formations[planned.FormationId].Combat?.AgainstWalls ?? 0, int.MaxValue))) : 1;
                 var food = MilitaryResourceLedger.DeploymentFood(engine.Snapshot, corps.OwnerId, corps.Id, source,
                     planned.Soldiers, option.ArrivalDays, Math.Min(60, siege), engine.Companion);
                 long failures = batch.State.Campaigns.Count(c => c.Stage == MilitaryCampaignStage.Cancelled && c.SourceId == option.SourceId && c.ObjectiveId == option.Objective);
@@ -294,7 +310,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 NavigationArrivalForecast.EarliestDays(rules.Travel(rules.Formations.Values.First(f => f.TravelMode == TravelMode.Land).Id, rules.BasicNavalFormationId, 1000), rules.SettlementArea(source).Position, t.Area)))
             .OrderBy(s => s.Id).Take(3))
         {
-            if (batch.RemainingGroups(corps.OwnerId) == 0 || queries.Budget.Exhausted) { incomplete = true; return; }
+            if (queries.Budget.Exhausted) { incomplete = true; return; }
             var pending = world.Simulation.Tasks.Select(t => t.OfficerId).ToHashSet();
             var projected = world.Officers.Where(p => p.OwnerId == force.Id && p.SettlementId == front.Id && !pending.Contains(p.Id) && !MilitaryResourceLedger.OfficerReserved(batch.State, p.Id))
                 .Append(courier with { SettlementId = front.Id, Acted = false, UnitId = null }).DistinctBy(p => p.Id)
@@ -314,14 +330,11 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 uint ready = (uint)Math.Min(front.SoldierCapacity, (long)front.Soldiers + shipped);
                 if (ready == 0) continue;
                 if (shipped > MilitaryResourceLedger.ReceivingSpace(world, front)) continue;
-                var alternatives = rules!.Formations.Values.Where(f => f.TravelMode == TravelMode.Land &&
-                    rules.Purpose(f.Id) == UnitPurpose.Combat && f.Id != rules.UnformedFormationId)
-                    .OrderBy(f => f.Id).Select(f => new MilitaryFormationPair(f.Id, rules.BasicNavalFormationId));
-                var group = new MilitaryGroupEvaluator(rules).Search(force, projected, alternatives, front.Id, ready,
+                var alternatives = FormationAlternatives(force);
+                var group = GroupEvaluator().Search(force, projected, alternatives, front.Id, ready,
                     corps.Treasury.Money, rules.SettlementArea(front).Position, MilitaryGroupRole.Siege,
-                    maximumEvaluations: Math.Min(4, batch.RemainingGroups(corps.OwnerId)));
-                groups += group.Evaluations;
-                batch.SpendGroups(corps.OwnerId, group.Evaluations);
+                    maximumImprovements: Math.Min(4, batch.RemainingImprovements(corps.OwnerId)), morale: front.Morale);
+                RecordGroup(group);
                 if (group.Best is not { } best) continue;
                 int deliveryDays;
                 var id = Identity();

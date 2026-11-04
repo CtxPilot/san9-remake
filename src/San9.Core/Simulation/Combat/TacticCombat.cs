@@ -293,11 +293,11 @@ internal static class TacticCombat
         MilitaryOrder target, MilitaryRulebook military, IEnumerable<TacticRule> tactics)
     {
         var available = tactics
-            .Where(t => military.SupportsTactic(t, formation, world.Companion) && (target.UnitId is not null || t.AffectsFacilities));
+            .Where(t => military.SupportsTacticTarget(t, formation, world.Companion, target.UnitId is null));
         var position = target.UnitId is int unitId ? world.Units[unitId].Position : military.Place(world.Settlements[target.SettlementId!.Value]).Position;
         return available.Select(t => t.Effect == TacticEffect.TrapSelection ? military.TrapAt(position) : t)
             .OfType<TacticRule>().OrderByDescending(t => t.Power).ThenBy(t => t.Id).FirstOrDefault(t => (t.Effect == TacticEffect.Martial || IntelligenceTactics.IsOffensive(t.Effect)) &&
-            military.SupportsTactic(t, formation, world.Companion) && (target.UnitId is not null || t.AffectsFacilities) &&
+            military.SupportsTacticTarget(t, formation, world.Companion, target.UnitId is null) &&
             t.Category is not null && (military.TacticContactRange(t, formation, world.Companion) is not int range || target.UnitId is not null &&
                 MilitaryCombat.Area(unit, military).IntersectsExpanded(MilitaryCombat.TargetArea(world, target, military), range)));
     }

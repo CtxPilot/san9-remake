@@ -131,7 +131,7 @@ public static class MilitaryFoundationExperiments
         var abilities = OfficerAbilityRules.Empty;
         var people = session.Snapshot.Officers.Where(p => p.OwnerId == 1 && p.SettlementId == 1)
             .Select(p => MilitaryGroupEvaluator.ObserveOwnOfficer(p, force, abilities, [], TreasureRulebook.Empty, rules)).ToArray();
-        var evaluator = new MilitaryGroupEvaluator(rules);
+        var evaluator = new MilitaryGroupEvaluator(rules, new([]), ImmutableDictionary<int, uint>.Empty, CompanionSettings.Default);
         bool emptyFront = evaluator.Search(force, people, [new(10)], 2, 90000, 10000, new(47, 7), MilitaryGroupRole.Field).Best is null;
         var move = new MoveOfficersCommand(SimulationIdentity.Command(session.Snapshot.Simulation.NextSequence, 1), 1,
             session.Snapshot.Simulation.NextSequence, [3], 2);
@@ -235,12 +235,12 @@ public static class MilitaryFoundationExperiments
         var force = world.Forces.Single(f => f.Id == 1);
         var people = world.Officers.Where(p => p.OwnerId == 1 && p.SettlementId == 1).Select(p =>
             MilitaryGroupEvaluator.ObserveOwnOfficer(p, force, OfficerAbilityRules.Empty, [], TreasureRulebook.Empty, rules)).ToArray();
-        var evaluator = new MilitaryGroupEvaluator(rules);
+        var evaluator = new MilitaryGroupEvaluator(rules, new([]), ImmutableDictionary<int, uint>.Empty, CompanionSettings.Default);
         MilitaryGroupEvaluation baseline = null!, search = null!;
         var baselineTime = Measure(() => baseline = evaluator.Search(force, people, [new(10)], 1, 10000, 50000,
-            new(7, 7), MilitaryGroupRole.Field, maximumEvaluations: 8));
+            new(7, 7), MilitaryGroupRole.Field, maximumImprovements: 8));
         var searchTime = Measure(() => search = evaluator.Search(force, people, [new(10), new(20)], 1, 10000, 50000,
-            new(7, 7), MilitaryGroupRole.Field, maximumEvaluations: 8));
+            new(7, 7), MilitaryGroupRole.Field, maximumImprovements: 8));
         if (baseline.Best is null || search.Best is null) throw new InvalidOperationException("No baseline organization in the controlled fixture.");
         bool Prepared(MilitaryGroupOption option)
         {

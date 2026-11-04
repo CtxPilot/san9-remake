@@ -16,6 +16,9 @@ public readonly record struct CombatLoss(uint RemainingSoldiers, uint AddedWound
 /// <summary>Exact integer combat arithmetic shared by field troops and garrisons.</summary>
 public static class CombatMath
 {
+    public static bool IsSettlementDefeated(uint soldiers, int morale, int durability, bool canHostPersons) =>
+        durability == 0 || canHostPersons && (soldiers == 0 || morale == 0);
+
     public static long PolicyStrength(CombatStrength value)
     {
         value.Validate();

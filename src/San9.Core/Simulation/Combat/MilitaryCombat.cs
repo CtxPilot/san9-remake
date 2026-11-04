@@ -382,7 +382,7 @@ internal static class MilitaryCombat
 
     private static bool Defeated(UnitState unit) => unit.Soldiers == 0 || unit.Morale == 0;
     internal static bool Defeated(SettlementState settlement) => !settlement.IsDestroyed && settlement.Facility?.BuilderUnitId is null &&
-        (settlement.Durability == 0 || settlement.CanHostPersons && (settlement.Soldiers == 0 || settlement.Morale == 0));
+        CombatMath.IsSettlementDefeated(settlement.Soldiers, settlement.Morale, settlement.Durability, settlement.CanHostPersons);
     internal static void DamageSettlement(WorldMutation world, SettlementState settlement, uint damage, CombatProfile profile,
         int attacker, List<DomainEvent> events, int walls = 0, bool attackerIsSettlement = false, int? tacticId = null, uint? calculatedSoldierLoss = null, bool isTacticExchange = false, bool continuesSiege = false)
     {

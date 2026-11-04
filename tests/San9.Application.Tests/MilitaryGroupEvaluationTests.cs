@@ -4,7 +4,7 @@ using San9.Core.Domain;
 
 namespace San9.Application.Tests;
 
-public sealed class MilitaryGroupEvaluationTests
+public sealed partial class MilitaryGroupEvaluationTests
 {
     [Fact]
     public void AdaptedPhysicalTacticsAreAConstraintEvenWhenOtherSkillsAreStronger()
@@ -24,12 +24,13 @@ public sealed class MilitaryGroupEvaluationTests
     {
         var (rules, people) = Fixture();
         var low = Evaluate(rules, people, [new(1), new(2)], evaluations: 1);
-        Assert.Equal(1, low.Evaluations);
+        Assert.Equal(1, low.Improvements);
         Assert.NotNull(low.Best);
-        Assert.True(low.Incomplete);
+        Assert.True(low.ImprovementLimited);
         var none = Evaluate(rules, people, [new(1), new(2)], evaluations: 0);
-        Assert.Null(none.Best);
-        Assert.True(none.Incomplete);
+        Assert.NotNull(none.Best);
+        Assert.Equal(0, none.Improvements);
+        Assert.True(none.ImprovementLimited);
         var ordinary = Evaluate(rules, people, [new(1), new(2)]);
         var reordered = Evaluate(rules, people.Reverse().ToArray(), [new(2), new(1)]);
         Assert.Equal(ordinary.Best!.FormationId, reordered.Best!.FormationId);
@@ -52,7 +53,7 @@ public sealed class MilitaryGroupEvaluationTests
         Assert.Equal(1, rich.Best.CommanderId);
         var busy = people.Select(p => p with { Officer = p.Officer with { Acted = true } }).ToArray();
         Assert.Null(Evaluate(rules, busy, [new(1)]).Best);
-        Assert.Null(new MilitaryGroupEvaluator(rules).Search(new(7, 100), people, [new(1)], 10, 90000, 0, new(2, 2), MilitaryGroupRole.Field).Best);
+        Assert.Null(Evaluator(rules).Search(new(7, 100), people, [new(1)], 10, 90000, 0, new(2, 2), MilitaryGroupRole.Field).Best);
     }
 
     [Fact]
@@ -67,16 +68,19 @@ public sealed class MilitaryGroupEvaluationTests
             { Tactics = [infantry, original.Tactics[2], original.Tactics[3], counter, confusion], BasicNavalFormationId = 3 });
         var person = people[0] with { Abilities = new(90, 100, 60, 99), Tactics = [infantry, counter],
             Officer = people[0].Officer with { LearnedTactics = ImmutableSortedSet.Create(1, 4) } };
-        MilitaryGroupOption Choose(MilitaryKnowledge<int?> knowledge) => new MilitaryGroupEvaluator(rules).Search(new(7, 100), [person],
+        MilitaryGroupOption Choose(MilitaryKnowledge<int?> knowledge) => Evaluator(rules).Search(new(7, 100), [person],
             [new(1)], 10, 10000, 1000, new(2, 2), MilitaryGroupRole.Field, [new(999, knowledge)]).Best!;
         Assert.Equal(1, Assert.Single(Choose(MilitaryKnowledge<int?>.Unknown).Members).TacticId);
         Assert.Equal(4, Assert.Single(Choose(MilitaryKnowledge<int?>.Known(5)).Members).TacticId);
     }
 
+    private static MilitaryGroupEvaluator Evaluator(MilitaryRulebook rules) => new(rules, new([]),
+        ImmutableDictionary<int, uint>.Empty, CompanionSettings.Default);
+
     private static MilitaryGroupEvaluation Evaluate(MilitaryRulebook rules, IReadOnlyList<MilitaryOfficerCandidate> people,
         MilitaryFormationPair[] alternatives, int evaluations = 32, WorldPosition? position = null) =>
-        new MilitaryGroupEvaluator(rules).Search(new(7, 100), people, alternatives, 10, 90000, 1000,
-            position ?? new(2, 2), MilitaryGroupRole.Field, maximumEvaluations: evaluations);
+        Evaluator(rules).Search(new(7, 100), people, alternatives, 10, 90000, 1000,
+            position ?? new(2, 2), MilitaryGroupRole.Field, maximumImprovements: evaluations);
 
     private static (MilitaryRulebook, MilitaryOfficerCandidate[]) Fixture()
     {

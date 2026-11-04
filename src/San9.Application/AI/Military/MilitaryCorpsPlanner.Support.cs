@@ -14,32 +14,33 @@ internal sealed partial class MilitaryCorpsPlanner
     private uint Spare(SettlementState source, MilitaryTravelQueries queries, long? except = null) => (uint)Math.Max(0,
         source.Soldiers - queries.PotentialThreats(source.Id, 10).Candidates.Sum(p => (long)p.Soldiers) -
         MilitaryResourceLedger.ReservedSoldiers(batch.State, source.Id, except));
+    private IEnumerable<MilitaryEquipment> RelevantEquipment(MilitaryTravelQueries queries, MilitaryPresence target) =>
+        queries.Observation.Units.Where(u => !target.Object.IsSettlement && u.Id == target.Object.Id ||
+            queries.Observation.Forces.Find(new(u.Id, false)) is { } body &&
+            (u.OwnerId == target.OwnerId || MilitaryDiplomacy.AutomaticEnemy(engine.Snapshot, corps.OwnerId, u.OwnerId)) &&
+            CanRespond(body, target.Area, 10)).SelectMany(u => u.Equipment);
     private DeployUnitCommand? Organize(SettlementState source, MapObjectReference target, uint wanted, MilitaryGroupRole role,
         MilitaryTravelQueries queries, long? campaign = null)
     {
-        if (wanted == 0 || batch.RemainingGroups(corps.OwnerId) == 0) return null;
+        if (wanted == 0) return null;
         var world = engine.Snapshot;
         var force = world.Forces.Single(f => f.Id == corps.OwnerId);
         var busy = world.Simulation.Tasks.Select(t => t.OfficerId).ToHashSet();
         var people = world.Officers.Where(p => p.OwnerId == corps.OwnerId && p.SettlementId == source.Id && !busy.Contains(p.Id) &&
             !MilitaryResourceLedger.OfficerReserved(batch.State, p.Id, campaign)).Select(p => MilitaryGroupEvaluator.ObserveOwnOfficer(p,
                 force, definition.Rules.Abilities, world.Treasures, definition.Rules.Treasures, rules)).ToArray();
-        var position = queries.Observation.Forces.Find(target)?.Area.Position;
-        if (position is null) return null;
-        var alternatives = rules.Formations.Values.Where(f => f.TravelMode == TravelMode.Land && rules.Purpose(f.Id) == UnitPurpose.Combat &&
-                f.Id != rules.UnformedFormationId).OrderBy(f => f.Id).Select(f => new MilitaryFormationPair(f.Id, rules.BasicNavalFormationId));
+        var goal = queries.Observation.Forces.Find(target);
+        if (goal is null) return null;
+        var alternatives = FormationAlternatives(force);
         long money = Math.Max(0, world.Corps.Single(c => c.Id == corps.Id).Treasury.Money - MilitaryResourceLedger.ReservedMoney(batch.State, corps.Id, campaign));
-        var group = new MilitaryGroupEvaluator(rules).Search(force, people, alternatives, source.Id, wanted, money,
-            position.Value, role, queries.Observation.Units.Where(u => u.OwnerId != corps.OwnerId).SelectMany(u => u.Equipment),
-            maximumEvaluations: Math.Min(4, batch.RemainingGroups(corps.OwnerId)));
-        groups += group.Evaluations; batch.SpendGroups(corps.OwnerId, group.Evaluations);
+        var group = GroupEvaluator().Search(force, people, alternatives, source.Id, wanted, money,
+            goal.Area.Position, role, RelevantEquipment(queries, goal),
+            maximumImprovements: Math.Min(4, batch.RemainingImprovements(corps.OwnerId)), objective: Objective(goal, source), morale: source.Morale,
+            sourceCapacity: ids => DepartureAllowance(source, ids, queries).Maximum);
+        RecordGroup(group);
         if (group.Best is not { } best) return null;
-        var leader = world.Officers.Single(p => p.Id == best.CommanderId);
-        uint capacity = CommanderCapacity.Read(leader.Id == force.LeaderId,
-            definition.Content.Information.Ranks.FirstOrDefault(r => r.Id == force.RankId)?.CommandCapacity,
-            definition.Content.Information.Offices.FirstOrDefault(o => o.Id == leader.OfficeId)?.CommandCapacity);
         var members = best.Members.OrderBy(m => m.OfficerId == best.CommanderId ? 0 : 1).ThenBy(m => m.OfficerId).ToArray();
-        uint soldiers = DepartureLimit(source, Math.Min(best.Soldiers, capacity), members.Select(m => m.OfficerId), queries);
+        uint soldiers = best.Soldiers;
         if (soldiers == 0) { reason = MilitaryDecisionReason.SourceExposed; return null; }
         var id = Identity();
         return new(id.Id, force.Id, id.Sequence, source.Id, members.Select(m => m.OfficerId).ToImmutableArray(),

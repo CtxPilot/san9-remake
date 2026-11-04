@@ -33,11 +33,11 @@ public sealed partial class MilitaryRulebook
         ? Math.Min(Formations[unit.FormationId!.Value].SoldierCapacity, Formations[naval].SoldierCapacity)
         : Formations[unit.FormationId!.Value].SoldierCapacity;
 
-    public BattleRank Rank(UnitState unit, int officerId)
+    public BattleRank Rank(UnitState unit, int officerId, WorldPosition? position = null)
     {
-        if (unit.NavalFormationId is null || !Map.IsWater(unit.Position))
-            return unit.MemberPositions.TryGetValue(officerId, out var position) ? position.Rank : BattleRank.Middle;
-        var positions = Formation(unit).Positions;
+        if (unit.NavalFormationId is null || !Map.IsWater(position ?? unit.Position))
+            return unit.MemberPositions.TryGetValue(officerId, out var memberPosition) ? memberPosition.Rank : BattleRank.Middle;
+        var positions = Formation(unit, position).Positions;
         int slot = Array.IndexOf(unit.MemberPositions.OrderBy(p => p.Value.Rank).ThenBy(p => p.Value.Column).ThenBy(p => p.Key).Select(p => p.Key).ToArray(), officerId);
         return slot >= 0 && slot < positions.Length ? positions[slot].Rank : BattleRank.Middle;
     }
