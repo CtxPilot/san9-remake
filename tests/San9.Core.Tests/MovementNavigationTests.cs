@@ -49,7 +49,7 @@ public sealed class MovementNavigationTests
     private static WeakReference CreateDiscardedMap()
     {
         var map = new BattlefieldMap(20, 20, new int[400], [new(0, 10, null)]);
-        map.Navigate(new(12, 12), new(new(80, 10), new(1, 1)), false, new(1, 1), TravelMode.Land, [], 60);
+        map.Navigate(new(12, 12), new(new(80, 10), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 60);
         return new(map);
     }
 
@@ -57,9 +57,9 @@ public sealed class MovementNavigationTests
     public void LocalPrefixUsesMobilityIndependentlyOfTimeBudget()
     {
         var map = new BattlefieldMap(80, 10, new int[800], [new(0, 10, null)]);
-        var step = map.Navigate(new(12, 12), new(new(382, 12), new(1, 1)), false, new(1, 1), TravelMode.Land, [], 1000);
+        var step = map.Navigate(new(12, 12), new(new(382, 12), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 1000);
         Assert.InRange(step.Spent, 1, 999);
-        var fast = map.Navigate(new(12, 12), new(new(382, 12), new(1, 1)), false, new(1, 1), TravelMode.Land, [], 1000, mobility: 200);
+        var fast = map.Navigate(new(12, 12), new(new(382, 12), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 1000, mobility: 200);
         Assert.Equal(1000, fast.Spent);
         Assert.Equal(new WorldPosition(112, 12), fast.Position);
     }
@@ -74,8 +74,8 @@ public sealed class MovementNavigationTests
         using var diagnostics = new PathSearchDiagnostics();
         for (int day = 0; day < 200 && position != target.Position; day++)
         {
-            var result = map.Navigate(position, target, false, new(3, 3), TravelMode.Land, [], 60);
-            var replay = map.Navigate(position, target, false, new(3, 3), TravelMode.Land, [], 60);
+            var result = map.Navigate(position, target, NavigationArrival.Point, new(3, 3), TravelMode.Land, [], 60);
+            var replay = map.Navigate(position, target, NavigationArrival.Point, new(3, 3), TravelMode.Land, [], 60);
             Assert.Equal(result.Position, replay.Position);
             Assert.Equal(result.Spent, replay.Spent);
             Assert.Equal(result.Status, replay.Status);
@@ -101,7 +101,7 @@ public sealed class MovementNavigationTests
         bool wentAround = false;
         for (int day = 0; day < 250 && position != target.Position; day++)
         {
-            var result = map.Navigate(position, target, false, new(3, 3), TravelMode.Land,
+            var result = map.Navigate(position, target, NavigationArrival.Point, new(3, 3), TravelMode.Land,
                 wall, 60);
             Assert.NotEqual(NavigationStatus.Unreachable, result.Status);
             Assert.NotNull(map.PassageCost(result.Position, new(3, 3), TravelMode.Land, wall));
@@ -111,7 +111,7 @@ public sealed class MovementNavigationTests
         Assert.False(wentAround);
         Assert.NotEqual(target.Position, position);
         Assert.True(position.X < 200);
-        var released = map.Navigate(position, target, false, new(3, 3), TravelMode.Land, [], 60);
+        var released = map.Navigate(position, target, NavigationArrival.Point, new(3, 3), TravelMode.Land, [], 60);
         Assert.True(released.Position.X > position.X);
     }
 
@@ -121,11 +121,11 @@ public sealed class MovementNavigationTests
         var map = new BattlefieldMap(10, 10, new int[100], [new(0, 10, null)]);
         var start = new WorldPosition(12, 12);
         var target = new MapOccupancy(new(22, 12), new(1, 1));
-        var waiting = map.Navigate(start, target, false, new(1, 1), TravelMode.Land, [target], 100);
+        var waiting = map.Navigate(start, target, NavigationArrival.Point, new(1, 1), TravelMode.Land, [target], 100);
         Assert.False(waiting.Arrived);
         Assert.NotNull(waiting.Collision);
         Assert.DoesNotContain(target.Position, waiting.Steps);
-        var released = map.Navigate(waiting.Position, target, false, new(1, 1), TravelMode.Land, [], 100);
+        var released = map.Navigate(waiting.Position, target, NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 100);
         Assert.True(released.Arrived);
         Assert.Equal(target.Position, released.Position);
     }
@@ -138,7 +138,7 @@ public sealed class MovementNavigationTests
         Assert.NotNull(map.PassageCost(new(22, 2), new(1, 1), TravelMode.Land, wall));
         Assert.NotNull(map.PassageCost(new(27, 2), new(1, 1), TravelMode.Land, wall));
         Assert.True(map.FindRoute(new(2, 2), new(47, 2), new(1, 1), TravelMode.Land, wall).Reachable);
-        var step = map.Navigate(new(22, 2), new(new(47, 2), new(1, 1)), false, new(1, 1), TravelMode.Land, wall, 100);
+        var step = map.Navigate(new(22, 2), new(new(47, 2), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, wall, 100);
         Assert.False(step.Arrived);
         Assert.NotNull(step.Collision);
         Assert.All(step.Steps, p => Assert.True(p.X < 25));
@@ -169,7 +169,7 @@ public sealed class MovementNavigationTests
         Assert.DoesNotContain(obstacle.Position, route.Steps); // Coarse unit avoidance is applied to its center cell.
         var narrow = new BattlefieldMap(20, 1, new int[20], [new(0, 10, null)]);
         var crowd = obstacle with { Position = new(47, 2), Footprint = new(10, 5) };
-        var move = narrow.Navigate(new(2, 2), new(new(97, 2), new(1, 1)), false, new(1, 1), TravelMode.Land, [crowd], 1000, mobility: 200);
+        var move = narrow.Navigate(new(2, 2), new(new(97, 2), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [crowd], 1000, mobility: 200);
         Assert.True(move.Arrived);
         Assert.Equal(move.Steps.Length * 10, move.Spent);
     }

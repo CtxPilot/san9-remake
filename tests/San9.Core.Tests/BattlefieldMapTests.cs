@@ -29,7 +29,7 @@ public sealed class BattlefieldMapTests
         Assert.True(blocked.Reachable); // A dynamic collision is not proof that the coarse terrain is disconnected.
         Assert.False(blocked.Arrived);
         Assert.True(blocked.Position.X < 5);
-        var resumed = map.Navigate(blocked.Position, new(new(7, 2), new(1, 1)), false, new(1, 1), TravelMode.Land, [], 100);
+        var resumed = map.Navigate(blocked.Position, new(new(7, 2), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 100);
         Assert.True(resumed.Arrived);
         Assert.Equal(resumed.Steps.Sum(p => p.X < 5 ? 1 : 4), resumed.Spent);
         Assert.Equal(new WorldPosition(7, 2), resumed.Position);
@@ -47,7 +47,7 @@ public sealed class BattlefieldMapTests
         var blocked = map.FindRoute(new(2, 2), new(12, 2), new(1, 1), TravelMode.Land,
             [new(new(7, 12), new(5, 5))]);
         Assert.True(blocked.Reachable);
-        var actual = map.Navigate(new(2, 2), new(new(12, 2), new(1, 1)), false, new(1, 1), TravelMode.Land,
+        var actual = map.Navigate(new(2, 2), new(new(12, 2), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land,
             [new(new(7, 12), new(5, 5))], 100, mobility: 20);
         Assert.False(actual.Arrived);
         Assert.NotNull(actual.Collision);
@@ -62,10 +62,10 @@ public sealed class BattlefieldMapTests
         Assert.Equal(20, route.Cost);
         Assert.DoesNotContain(route.Steps, p => p.X is >= 5 and < 10 && p.Y < 5);
         var plain = new BattlefieldMap(1, 1, [0], [new(0, 1, null)]);
-        var local = plain.Navigate(new(2, 2), new(new(3, 1), new(1, 1)), false, new(1, 1), TravelMode.Land, [], 10);
+        var local = plain.Navigate(new(2, 2), new(new(3, 1), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 10);
         Assert.True(local.Arrived);
         Assert.Equal(2, local.Spent);
-        Assert.Equal(local.Steps.ToArray(), plain.Navigate(new(2, 2), new(new(3, 1), new(1, 1)), false,
+        Assert.Equal(local.Steps.ToArray(), plain.Navigate(new(2, 2), new(new(3, 1), new(1, 1)), NavigationArrival.Point,
             new(1, 1), TravelMode.Land, [], 10).Steps.ToArray());
     }
 
@@ -79,7 +79,7 @@ public sealed class BattlefieldMapTests
         Assert.Equal(2, map.PassageCost(new(6, 1), new(2, 2), TravelMode.Water, []));
         Assert.Equal(1, map.PassageCost(new(1, 1), new(2, 2), TravelMode.Land, [new(new(3, 1), new(2, 2))]));
         Assert.Null(map.PassageCost(new(2, 1), new(2, 2), TravelMode.Land, [new(new(3, 1), new(2, 2))]));
-        Assert.False(map.Navigate(new(2, 2), new(new(7, 2), new(1, 1)), false, new(1, 1), TravelMode.Land, [], 100).Arrived);
+        Assert.False(map.Navigate(new(2, 2), new(new(7, 2), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land, [], 100).Arrived);
     }
 
     [Fact]

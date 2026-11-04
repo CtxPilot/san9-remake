@@ -135,7 +135,7 @@ public sealed class MilitaryContentCompilerTests
         foreach (var (id, distance) in new[] { (0, 5), (1, 5), (2, 6), (3, 6) })
         {
             var formation = rules.Formations[id];
-            var movement = rules.Map.Navigate(new(100, 100), new(new(160, 100), new(1, 1)), false, formation.Footprint,
+            var movement = rules.Map.Navigate(new(100, 100), new(new(160, 100), new(1, 1)), NavigationArrival.Point, formation.Footprint,
                 formation.TravelMode, [], formation.MovementBudget, mobility: formation.MovementBudget / 5);
             Assert.Equal(distance, movement.Steps.Length);
             Assert.Equal(distance * 10, movement.Spent);

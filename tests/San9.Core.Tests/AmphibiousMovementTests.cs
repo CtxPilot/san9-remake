@@ -38,13 +38,13 @@ public sealed class AmphibiousMovementTests
         var unit = new UnitState(1, 1, new(8, 7), 1000) { FormationId = 100, NavalFormationId = 200 };
         var travel = rules.Travel(unit);
         Assert.Equal(100, rules.Formation(unit).Id);
-        var step = travel.Map.Navigate(unit.Position, new(new(27, 7), new(1, 1)), false, travel.Shape, travel.Mode, [], travel.DailyBudget);
+        var step = travel.Map.Navigate(unit.Position, new(new(27, 7), new(1, 1)), NavigationArrival.Point, travel.Shape, travel.Mode, [], travel.DailyBudget);
         Assert.Equal(new WorldPosition(11, 7), step.Position);
         unit = unit with { Position = step.Position };
         Assert.Equal(200, rules.Formation(unit).Id);
         Assert.Equal(20, rules.CombatFormation(unit)!.Defense);
         for (int i = 0; i < 10 && !step.Arrived; i++)
-            step = travel.Map.Navigate(step.Position, new(new(27, 7), new(1, 1)), false, travel.Shape, travel.Mode,
+            step = travel.Map.Navigate(step.Position, new(new(27, 7), new(1, 1)), NavigationArrival.Point, travel.Shape, travel.Mode,
                 [], travel.DailyBudget + step.Remainder);
         Assert.True(step.Arrived);
         unit = unit with { Position = step.Position };
@@ -53,7 +53,7 @@ public sealed class AmphibiousMovementTests
         Assert.Equal(200, unit.NavalFormationId);
         var back = travel.Map.FindRoute(unit.Position, new(8, 7), travel.Shape, travel.Mode, []);
         Assert.True(back.Reachable);
-        var returned = travel.Map.Navigate(unit.Position, new(new(8, 7), new(1, 1)), false,
+        var returned = travel.Map.Navigate(unit.Position, new(new(8, 7), new(1, 1)), NavigationArrival.Point,
             travel.Shape, travel.Mode, [], 1000, mobility: 200);
         Assert.True(returned.Arrived);
         Assert.Equal(19 * 6, returned.Spent);
@@ -67,7 +67,7 @@ public sealed class AmphibiousMovementTests
     {
         var rules = Rules(shipSpeed: speed);
         var travel = rules.Travel(100, 200);
-        var step = travel.Map.Navigate(new(15, 7), new(new(22, 7), new(1, 1)), false,
+        var step = travel.Map.Navigate(new(15, 7), new(new(22, 7), new(1, 1)), NavigationArrival.Point,
             travel.Shape, travel.Mode, [], travel.DailyBudget);
         Assert.Equal(new WorldPosition(15 + distance, 7), step.Position);
     }
@@ -81,7 +81,7 @@ public sealed class AmphibiousMovementTests
         Assert.Contains(new WorldPosition(2, 6), travel.Entrances(new(new(2, 7), new(1, 1))));
         Assert.NotNull(travel.Map.PassageCost(new(9, 7), travel.Shape, travel.Mode, [obstacle]));
         Assert.Null(travel.Map.PassageCost(new(10, 7), travel.Shape, travel.Mode, [obstacle]));
-        var step = travel.Map.Navigate(new(9, 7), new(new(20, 7), new(1, 1)), false, travel.Shape, travel.Mode,
+        var step = travel.Map.Navigate(new(9, 7), new(new(20, 7), new(1, 1)), NavigationArrival.Point, travel.Shape, travel.Mode,
             [obstacle], 200);
         Assert.False(step.Arrived);
         Assert.NotNull(step.Collision);
@@ -89,7 +89,7 @@ public sealed class AmphibiousMovementTests
         var route = travel.Map.FindRoute(new(9, 7), new(20, 7), travel.Shape, travel.Mode, [obstacle]);
         Assert.True(route.Reachable);
         Assert.Equal(MapCoordinates.Cell(new(20, 7)), MapCoordinates.Cell(route.Steps[^1]));
-        var changed = travel.Map.Navigate(new(9, 7), new(new(20, 7), new(1, 1)), false,
+        var changed = travel.Map.Navigate(new(9, 7), new(new(20, 7), new(1, 1)), NavigationArrival.Point,
             travel.Shape, travel.Mode, [obstacle], 6);
         Assert.NotEqual(new WorldPosition(10, 7), changed.Position);
         Assert.NotEqual(NavigationStatus.Unreachable, changed.Status);

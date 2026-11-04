@@ -28,7 +28,7 @@ public sealed class MovementContactTests
         var small = new MapOccupancy(new(45, 52), new(10, 100)) { Object = new(1, true) };
         var large = new MapOccupancy(new(equal ? 45 : 50, 52), new(equal ? 10 : 20, 100)) { Object = new(2, true) };
         var target = new MapOccupancy(new(50, 52), new(1, 1));
-        var step = map.Navigate(new(32, 52), target, false, new(1, 1), TravelMode.Land, [small, large], 1000, mobility: 100);
+        var step = map.Navigate(new(32, 52), target, NavigationArrival.Point, new(1, 1), TravelMode.Land, [small, large], 1000, mobility: 100);
         Assert.Equal(equal ? small.Object : large.Object, step.Collision?.Object);
         Assert.DoesNotContain(step.Steps, p => new MapOccupancy(p, new(1, 1)).Overlaps(small));
     }
@@ -48,7 +48,7 @@ public sealed class MovementContactTests
             [new(lowerId, 2, 100, 100, 100, 70, 0, 0, 0, 0, 0), new(upperId, 2, 100, 100, 100, 70, 0, 0, 0, 0, 0)], [], [mover],
             corps: [new(1, 1, null, new(0, 0)) { IsRoot = true }, new(2, 2, null, new(0, 0)) { IsRoot = true }]).BeginMutation();
         var occupancy = world.MovementOccupancy(rules, mover.OwnerId, mover.Policies, mover.Id, null);
-        var step = rules.Map.Navigate(mover.Position, new(mover.Order.Position!.Value, new(1, 1)), false,
+        var step = rules.Map.Navigate(mover.Position, new(mover.Order.Position!.Value, new(1, 1)), NavigationArrival.Point,
             new(4, 4), TravelMode.Land, occupancy, 1000, mobility: 100, randomSeed: 1);
         Assert.Equal(new MapObjectReference(upperId, true), step.Collision?.Object);
         Assert.All(step.Steps, p => Assert.DoesNotContain(occupancy, o => o.Hard && new MapOccupancy(p, new(4, 4)).Overlaps(o)));
@@ -65,7 +65,7 @@ public sealed class MovementContactTests
         var building = unit with { Object = new(2, true) };
         foreach (var objects in new[] { new[] { unit, building }, new[] { building, unit } })
         {
-            var step = map.Navigate(new(32, 52), new(new(50, 52), new(1, 1)), false,
+            var step = map.Navigate(new(32, 52), new(new(50, 52), new(1, 1)), NavigationArrival.Point,
                 new(1, 1), TravelMode.Land, objects, 1000, mobility: 100);
             Assert.Equal(building.Object, step.Collision?.Object);
         }

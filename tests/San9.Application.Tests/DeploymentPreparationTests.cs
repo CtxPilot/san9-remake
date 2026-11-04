@@ -108,7 +108,7 @@ public sealed class DeploymentPreparationTests
         var target = rules.SettlementArea(session.Snapshot.Settlements.Single(s => s.Id == 3));
         var via = new WorldPosition(12, 2);
         var explicitEstimate = NavigationArrivalForecast.Evaluate(new(rules.Travel(70, null), start, target, occupied,
-            PreparationDays: preparation, Waypoint: via), new(100000));
+            Arrival: NavigationArrival.Region, PreparationDays: preparation, Waypoint: via), new(100000));
         var existing = new MilitaryArrivalForecast(session.Snapshot, rules).EstimateDeployment(new(2, 70, null,
             new(MilitaryOrderKind.Transport, null, 3), new(), preparation, via));
         Assert.Equal(existing, explicitEstimate);

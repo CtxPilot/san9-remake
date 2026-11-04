@@ -19,13 +19,13 @@ public sealed class NavigationParityTests
     public void BlockedSourceFootprintCanLeaveButDoesNotOpenOtherTerrain()
     {
         var map = new BattlefieldMap(20, 20, new int[400], [new(0, 10, null)], [new(10, 10)]);
-        var step = map.Navigate(new(52, 52), new(new(82, 52), new(1, 1)), false, new(10, 10), TravelMode.Land, [], 100);
+        var step = map.Navigate(new(52, 52), new(new(82, 52), new(1, 1)), NavigationArrival.Point, new(10, 10), TravelMode.Land, [], 100);
         Assert.NotEqual(new WorldPosition(52, 52), step.Position);
         Assert.Contains(step.Steps, p => p.X >= 55);
         Assert.Null(map.PassageCost(new(52, 52), new(10, 10), TravelMode.Land, []));
         var wall = new BattlefieldMap(20, 20, new int[400], [new(0, 10, null)], Enumerable.Range(0, 20).Select(y => new MapCell(10, y)));
         Assert.Equal(NavigationStatus.Unreachable,
-            wall.Navigate(new(12, 52), new(new(82, 52), new(1, 1)), false, new(4, 4), TravelMode.Land, [], 100).Status);
+            wall.Navigate(new(12, 52), new(new(82, 52), new(1, 1)), NavigationArrival.Point, new(4, 4), TravelMode.Land, [], 100).Status);
     }
 
     [Theory]
@@ -39,7 +39,7 @@ public sealed class NavigationParityTests
         NavigationLookahead? stage = null;
         for (int day = 0; day < 15; day++)
         {
-            var step = map.Navigate(position, target, false, new(4, 4), TravelMode.Land, [target], 100, lookahead: stage);
+            var step = map.Navigate(position, target, NavigationArrival.Point, new(4, 4), TravelMode.Land, [target], 100, lookahead: stage);
             if (hard) Assert.All(step.Steps, p => Assert.False(new MapOccupancy(p, new(4, 4)).Overlaps(target)));
             position = step.Position; stage = step.Lookahead;
         }
@@ -51,9 +51,9 @@ public sealed class NavigationParityTests
     {
         var map = new BattlefieldMap(20, 20, new int[400], [new(0, 10, null)]);
         var target = new MapOccupancy(new(52, 52), new(10, 10)) { Hard = false, Avoidance = NavigationAvoidance.Hostile };
-        var step = map.Navigate(new(42, 52), target, true, new(4, 4), TravelMode.Land, [target], 200, continueApproach: true);
+        var step = map.Navigate(new(42, 52), target, NavigationArrival.Range, new(4, 4), TravelMode.Land, [target], 200, continueApproach: true);
         Assert.Contains(step.Steps, p => new MapOccupancy(p, new(4, 4)).Overlaps(target));
-        var blocked = map.Navigate(new(42, 52), target, true, new(4, 4), TravelMode.Land, [target with { Hard = true }], 200, continueApproach: true);
+        var blocked = map.Navigate(new(42, 52), target, NavigationArrival.Range, new(4, 4), TravelMode.Land, [target with { Hard = true }], 200, continueApproach: true);
         Assert.All(blocked.Steps, p => Assert.False(new MapOccupancy(p, new(4, 4)).Overlaps(target)));
     }
 
@@ -67,8 +67,8 @@ public sealed class NavigationParityTests
         MapOccupancy[] objects = [new(new(70, 65), new(8, 8)) { Hard = false, Avoidance = NavigationAvoidance.Friendly }];
         for (ulong seed = 0; seed < 20; seed++)
         {
-            var a = map.Navigate(new(52, 52), new(new(112, 102), new(1, 1)), false, land.Footprint, TravelMode.Land, objects, 100, randomSeed: seed);
-            var b = combined.Navigate(new(52, 52), new(new(112, 102), new(1, 1)), false, ship.Footprint, TravelMode.Land, objects, 100, randomSeed: seed);
+            var a = map.Navigate(new(52, 52), new(new(112, 102), new(1, 1)), NavigationArrival.Point, land.Footprint, TravelMode.Land, objects, 100, randomSeed: seed);
+            var b = combined.Navigate(new(52, 52), new(new(112, 102), new(1, 1)), NavigationArrival.Point, ship.Footprint, TravelMode.Land, objects, 100, randomSeed: seed);
             Assert.Equal(a.Steps.ToArray(), b.Steps.ToArray());
             Assert.Equal(a.Lookahead, b.Lookahead);
         }
@@ -80,11 +80,11 @@ public sealed class NavigationParityTests
         var map = new BattlefieldMap(25, 25, new int[625], [new(0, 10, null)]);
         var building = new MapOccupancy(new(52, 52), new(15, 15));
         var result = map.EstimateTravelCost(new(12, 52), new(new(92, 52), new(1, 1)), new(4, 4), TravelMode.Land,
-            [], new(10000), intoRange: false, includeCells: true, excluded: building);
+            [], new(10000), arrival: NavigationArrival.Point, includeCells: true, excluded: building);
         Assert.Equal(RouteReachability.Reachable, result.Status);
         Assert.DoesNotContain(result.Cells, c => new MapOccupancy(MapCoordinates.Center(c), new(1, 1)).Overlaps(building));
         var arrival = map.EstimateTravelCost(new(12, 52), building, new(4, 4), TravelMode.Land,
-            [], new(10000), intoRange: false, includeCells: true, excluded: building);
+            [], new(10000), arrival: NavigationArrival.Point, includeCells: true, excluded: building);
         Assert.Equal(RouteReachability.Reachable, arrival.Status);
         Assert.Equal(MapCoordinates.Cell(building.Position), arrival.Cells[^1]);
     }

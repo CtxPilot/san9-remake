@@ -10,6 +10,43 @@ namespace San9.Application.Tests;
 
 public sealed class DeploymentArrivalTests
 {
+    [Fact]
+    public void SortiePreviewAndAiStopCostAtTheSameCityEntryRegion()
+    {
+        var definition = Fixture();
+        definition = definition with
+        {
+            Settlements = definition.Settlements.Select(s => s with
+                { X = s.Id == 1 ? 96 : 89, Y = s.Id == 1 ? 69 : 64, Soldiers = 40000 }).ToArray(),
+            Military = definition.Military! with
+            {
+                Width = 100, Height = 80, TerrainIds = new int[8000].ToImmutableArray(),
+                Terrains = [new(0, 10, null)],
+                Formations = [new(7, 40, 0, 100000, 5, new(8, 8), TravelMode.Land)],
+                BasicNavalFormationId = null, DefaultDeploymentFormationId = 7,
+                Places = [new(1, new(482, 347), new(5, 25)), new(2, new(447, 322), new(25, 25))]
+            }
+        };
+        var session = GameSession.Start(definition, 42);
+        var draft = new DeploymentDraft(session.View, 1);
+        Assert.True(draft.SetMembers([1]));
+        var targets = new DeploymentTargets(draft);
+        Assert.True(targets.Select(new(2, false)));
+        var before = session.Capture();
+        using var diagnostics = new PathSearchDiagnostics();
+        var estimate = targets.EstimateArrival();
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 10), estimate);
+        Assert.Equal(1, diagnostics.Queries);
+        var rules = new MilitaryRulebook(definition.Military);
+        var unit = new UnitState(0, 1, new(482, 347), 30000)
+            { FormationId = 7, Order = new(MilitaryOrderKind.Return, null, 2) };
+        Assert.Equal(estimate.Days, new MilitaryRouteQueryContext(session.Snapshot, rules).Estimate(unit, null).Days);
+        Assert.Equal(2, diagnostics.Queries);
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 19), new MilitaryArrivalForecast(session.Snapshot, rules)
+            .EstimateDeployment(new(1, 7, null, unit.Order, new(), 9, Soldiers: 30000)));
+        StateAssert.Equal(before, session.Capture());
+    }
+
     private static ScenarioInitialState Fixture() => new(ScenarioInitialState.CurrentSchemaVersion, "deployment-arrival", 190, 1, 1, 1,
         [new(1, "force", 1, 100)],
         [new(1, "origin", 1, 0, 1, 1000, 100, 100, 70, []), new(2, "destination", 1, 19, 1, 100, 100, 100, 30, [])], [], [])

@@ -146,19 +146,19 @@ public static class MilitaryRouteQuery
         var cells = ImmutableArray.CreateBuilder<MapCell>();
         long cost = 0;
         WorldPosition start = unit.Position;
-        RouteCostEstimate Segment(MapOccupancy end, bool intoRange, MapOccupancy? excluded = null) => travel.Map.EstimateTravelCost(start, end,
-            travel.Shape, travel.Mode, occupancy, work, intoRange: intoRange, includeCells: true, excluded: excluded);
+        RouteCostEstimate Segment(MapOccupancy end, NavigationArrival arrival, MapOccupancy? excluded = null) => travel.Map.EstimateTravelCost(start, end,
+            travel.Shape, travel.Mode, occupancy, work, arrival: arrival, includeCells: true, excluded: excluded);
         var waypoint = unit.ActiveWaypoint;
         if (waypoint is { } via)
         {
-            var first = Segment(new(via, new(1, 1)), false, order.SettlementId is not null ? target : null);
+            var first = Segment(new(via, new(1, 1)), NavigationArrival.Point, order.SettlementId is not null ? target : null);
             if (first.Status != RouteReachability.Reachable)
                 return first;
             cells.AddRange(first.Cells);
             cost = first.Cost;
             start = via;
         }
-        var last = Segment(target, order.IsAttack || order.SettlementId is not null || order.Construction is not null,
+        var last = Segment(target, MilitaryNavigation.Arrival(order),
             waypoint is not null && order.SettlementId is not null ? target : null);
         if (last.Status != RouteReachability.Reachable)
             return last with { Cells = cells.ToImmutable() };

@@ -92,7 +92,7 @@ public sealed class UnitReformationTests
         engine.EndControl(Player);
         var result = engine.AdvanceXun();
         Assert.Single(result.Events.OfType<UnitAbsorbedEvent>());
-        Assert.Equal(new WorldPosition(24, 2), result.Events.OfType<UnitMovedEvent>().Last().To);
+        Assert.Equal(new WorldPosition(25, 2), result.Events.OfType<UnitMovedEvent>().Last().To);
         Assert.Equal(500u, engine.Snapshot.Settlements.Single(s => s.Id == 2).Soldiers);
     }
 }

@@ -18,7 +18,7 @@ public sealed class NavigationTerrainCenterTests
         NavigationLookahead? stage = null;
         for (int day = 0; day < 30 && position != target.Position; day++)
         {
-            var next = map.Navigate(position, target, false, new(size, size), TravelMode.Land, [], 60, lookahead: stage);
+            var next = map.Navigate(position, target, NavigationArrival.Point, new(size, size), TravelMode.Land, [], 60, lookahead: stage);
             Assert.NotEqual(position, next.Position);
             position = next.Position;
             stage = next.Lookahead;
@@ -46,7 +46,7 @@ public sealed class NavigationTerrainCenterTests
     public void OverhangingBodiesCanMoveAlongEveryMapEdge(int x, int y, int endX, int endY)
     {
         var map = new BattlefieldMap(20, 20, new int[400], [new(0, 10, null)]);
-        var step = map.Navigate(new(x, y), new(new(endX, endY), new(1, 1)), false,
+        var step = map.Navigate(new(x, y), new(new(endX, endY), new(1, 1)), NavigationArrival.Point,
             new(10, 10), TravelMode.Land, [], 100);
         Assert.True(step.Arrived);
         Assert.Equal(new WorldPosition(endX, endY), step.Position);
@@ -61,7 +61,7 @@ public sealed class NavigationTerrainCenterTests
         var map = new BattlefieldMap(10, 10, terrain, [new(0, 10, null), new(1, 12, null)]);
         Assert.Equal(10, map.PassageCost(new(24, 22), new(10, 10), TravelMode.Land, []));
         Assert.Equal(12, map.PassageCost(new(25, 22), new(10, 10), TravelMode.Land, []));
-        var step = map.Navigate(new(24, 22), new(new(25, 22), new(1, 1)), false, new(10, 10), TravelMode.Land, [], 12);
+        var step = map.Navigate(new(24, 22), new(new(25, 22), new(1, 1)), NavigationArrival.Point, new(10, 10), TravelMode.Land, [], 12);
         Assert.True(step.Arrived);
         Assert.Equal(12, step.Spent);
     }

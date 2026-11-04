@@ -325,9 +325,11 @@ internal sealed class BattlefieldPathSearch : IDisposable
 
     internal MovementRoute Search(WorldPosition start, WorldPosition end, TravelMode mode,
         IReadOnlyList<MapOccupancy> objects, NavigationWorkBudget? work = null,
-        bool includeSteps = true, bool includeCells = false, MapOccupancy? endpoint = null, MapOccupancy? excluded = null)
+        bool includeSteps = true, bool includeCells = false, MapOccupancy? endpoint = null, MapOccupancy? excluded = null,
+        MapOccupancy? arrivalRegion = null)
     {
         if (!Coarse(start, end, Endpoint(start, objects), endpoint is { Footprint: not { Width: 1, Height: 1 } } area ? area : Endpoint(end, objects), mode, objects, work, excluded)) return new(false, [], 0);
+        if (arrivalRegion is { } region) return RegionRoute(start, end, region, mode, includeSteps, includeCells);
         var cells = includeCells ? ImmutableArray.CreateBuilder<MapCell>(route.Count) : null;
         var steps = includeSteps ? ImmutableArray.CreateBuilder<WorldPosition>(route.Count) : null;
         RouteTerrainCost components = new(0, 0);
@@ -339,19 +341,53 @@ internal sealed class BattlefieldPathSearch : IDisposable
             if (i > 0 && map.TerrainPassageCost(p, mode) is not null)
                 components += map.PassageComponents(p, mode) * 5;
         }
-        void AddEndpoint(WorldPosition cursor, WorldPosition to)
+        if (route.Count == 1) AccumulateSegment(start, end, mode, ref components);
+        else
         {
-            while (cursor != to)
-            {
-                cursor = cursor.X != to.X ? cursor with { X = cursor.X + Math.Sign(to.X - cursor.X) } : cursor with { Y = cursor.Y + Math.Sign(to.Y - cursor.Y) };
-                if (map.TerrainPassageCost(cursor, mode) is not null)
-                    components += map.PassageComponents(cursor, mode);
-            }
+            AccumulateSegment(start, Center(route[0]), mode, ref components);
+            AccumulateSegment(Center(route[^1]), end, mode, ref components);
         }
-        if (route.Count == 1) AddEndpoint(start, end);
-        else { AddEndpoint(start, Center(route[0])); AddEndpoint(Center(route[^1]), end); }
         return new(true, steps?.MoveToImmutable() ?? [], map.Reweight(components))
             { Cells = cells?.MoveToImmutable() ?? [], TerrainCost = components };
+    }
+
+    // Reuse the single coarse search. Only the source offset and final boundary segment need fine coordinates.
+    private MovementRoute RegionRoute(WorldPosition start, WorldPosition end, MapOccupancy region, TravelMode mode,
+        bool includeSteps, bool includeCells)
+    {
+        var cells = includeCells ? ImmutableArray.CreateBuilder<MapCell>() : null;
+        var steps = includeSteps ? ImmutableArray.CreateBuilder<WorldPosition>() : null;
+        RouteTerrainCost components = new(0, 0);
+        var cursor = start;
+        for (int i = 0; i < route.Count; i++)
+        {
+            var p = Center(route[i]);
+            cells?.Add(MapCoordinates.Cell(p));
+            steps?.Add(p);
+            if (i == 0) continue;
+            if (i == 1 || region.Contains(p)) cursor = AccumulateSegment(cursor, p, mode, ref components, region);
+            else
+            {
+                if (map.TerrainPassageCost(p, mode) is not null) components += map.PassageComponents(p, mode) * 5;
+                cursor = p;
+            }
+            if (region.Contains(cursor)) break;
+        }
+        if (!region.Contains(cursor)) AccumulateSegment(cursor, end, mode, ref components, region);
+        return new(true, steps?.ToImmutable() ?? [], map.Reweight(components))
+            { Cells = cells?.ToImmutable() ?? [], TerrainCost = components };
+    }
+
+    private WorldPosition AccumulateSegment(WorldPosition cursor, WorldPosition to, TravelMode mode,
+        ref RouteTerrainCost components, MapOccupancy? arrivalRegion = null)
+    {
+        while (cursor != to && !(arrivalRegion?.Contains(cursor) ?? false))
+        {
+            cursor = cursor.X != to.X ? cursor with { X = cursor.X + Math.Sign(to.X - cursor.X) }
+                : cursor with { Y = cursor.Y + Math.Sign(to.Y - cursor.Y) };
+            if (map.TerrainPassageCost(cursor, mode) is not null) components += map.PassageComponents(cursor, mode);
+        }
+        return cursor;
     }
 
     internal RouteReachability Reachable(WorldPosition start, TravelMode mode,

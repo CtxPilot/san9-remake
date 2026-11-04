@@ -350,7 +350,7 @@ public sealed class MovementForecastTests
         var unit = new UnitState(0, 1, new(380, 2), 100) { FormationId = 0,
             Order = new(MilitaryOrderKind.Return, null, 1) };
         var world = World(unit); var rules = Rules(100);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 3), new MilitaryArrivalForecast(world.CreateSnapshot(), rules).Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 2), new MilitaryArrivalForecast(world.CreateSnapshot(), rules).Estimate(0));
         Assert.Single(world.CreateSnapshot().Units);
         var mutation = world.BeginMutation();
         Day(mutation, rules);

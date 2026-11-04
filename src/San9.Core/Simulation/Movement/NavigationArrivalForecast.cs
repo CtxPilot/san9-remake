@@ -5,9 +5,9 @@ namespace San9.Core.Simulation;
 
 /// <summary>Explicit public topology and frozen occupancy; no world, command, task or random handles.</summary>
 public sealed record NavigationArrivalInput(UnitTravel Travel, WorldPosition Start, MapOccupancy Target,
-    ImmutableArray<MapOccupancy> Occupancy, bool Adjacent = true, int PreparationDays = 0,
+    ImmutableArray<MapOccupancy> Occupancy, NavigationArrival Arrival = NavigationArrival.Range, int PreparationDays = 0,
     int MovementRemainder = 0, bool RectangularReach = false, int Range = 1,
-    WorldPosition? Waypoint = null, NavigationLookahead? Lookahead = null, bool AllowTargetOverlap = false, MapOccupancy? RelayExcludedArea = null);
+    WorldPosition? Waypoint = null, NavigationLookahead? Lookahead = null, MapOccupancy? RelayExcludedArea = null);
 
 public static class NavigationArrivalForecast
 {
@@ -29,13 +29,11 @@ public static class NavigationArrivalForecast
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumDays);
         ArgumentOutOfRangeException.ThrowIfNegative(input.PreparationDays);
-        if (input.AllowTargetOverlap && input.Waypoint is null && new MapOccupancy(input.Start, input.Travel.Shape).Overlaps(input.Target))
-            return new(ArrivalEstimateStatus.Known, input.PreparationDays);
         var position = input.Start;
         int remainder = input.MovementRemainder;
         NavigationLookahead? lookahead = input.Lookahead;
         WorldPosition? waypoint = input.Waypoint;
-        var initial = Advance(input.Travel, position, input.Target, input.Adjacent, input.Occupancy, 0,
+        var initial = Advance(input.Travel, position, input.Target, input.Arrival, input.Occupancy, 0,
             work, lookahead, input.RectangularReach, input.Range);
         if (initial.Arrived && waypoint is null) return new(ArrivalEstimateStatus.Known, input.PreparationDays);
         for (int day = input.PreparationDays + 1; day <= maximumDays; day++)
@@ -44,15 +42,15 @@ public static class NavigationArrivalForecast
             NavigationStep step;
             if (waypoint is { } via)
             {
-                step = Advance(input.Travel, position, new(via, new(1, 1)), false, input.Occupancy, budget, work, lookahead, excluded: input.RelayExcludedArea);
+                step = Advance(input.Travel, position, new(via, new(1, 1)), NavigationArrival.Point, input.Occupancy, budget, work, lookahead, excluded: input.RelayExcludedArea);
                 if (step.Arrived)
                 {
                     waypoint = null;
-                    step = Advance(input.Travel, step.Position, input.Target, input.Adjacent, input.Occupancy,
+                    step = Advance(input.Travel, step.Position, input.Target, input.Arrival, input.Occupancy,
                         Math.Max(0, budget - step.Spent), work, null, input.RectangularReach, input.Range);
                 }
             }
-            else step = Advance(input.Travel, position, input.Target, input.Adjacent, input.Occupancy,
+            else step = Advance(input.Travel, position, input.Target, input.Arrival, input.Occupancy,
                 budget, work, lookahead, input.RectangularReach, input.Range);
             if (work.Exhausted || step.Status == NavigationStatus.Planning) return new(ArrivalEstimateStatus.Incomplete);
             if (step.Arrived && waypoint is null) return new(ArrivalEstimateStatus.Known, day);
@@ -68,11 +66,11 @@ public static class NavigationArrivalForecast
     }
 
     // Both the full world forecast and authoritative daily movement use this same navigation operation.
-    internal static NavigationStep Advance(UnitTravel travel, WorldPosition position, MapOccupancy target, bool adjacent,
+    internal static NavigationStep Advance(UnitTravel travel, WorldPosition position, MapOccupancy target, NavigationArrival arrival,
         IReadOnlyList<MapOccupancy> occupancy, int budget, NavigationWorkBudget? work, NavigationLookahead? lookahead,
         bool rectangularReach = false, int maximumRange = 1, Func<WorldPosition, int>? range = null, int lookaheadCells = 25,
         ulong randomSeed = 0, bool continueApproach = false, int mobility = 20, MapOccupancy? excluded = null, bool requireTargetClearance = false) =>
-        travel.Map.Navigate(position, target, adjacent, travel.Shape, travel.Mode, occupancy, budget,
+        travel.Map.Navigate(position, target, arrival, travel.Shape, travel.Mode, occupancy, budget,
             range: range ?? (_ => maximumRange), rectangularReach: rectangularReach, maximumRange: maximumRange,
             work: work, lookahead: lookahead, lookaheadCells: lookaheadCells, randomSeed: randomSeed, continueApproach: continueApproach, mobility: mobility, excluded: excluded,
             requireTargetClearance: requireTargetClearance);

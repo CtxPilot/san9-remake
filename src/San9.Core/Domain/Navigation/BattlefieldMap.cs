@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 namespace San9.Core.Domain;
 
 public enum TravelMode { Land, Water }
+public enum NavigationArrival { Point, Range, Region }
 
 public sealed record TerrainPassage(int Id, int? LandCost, int? WaterCost)
 {
@@ -45,6 +46,16 @@ public readonly record struct MapOccupancy(WorldPosition Position, Footprint Foo
         Left < other.Right && other.Left < Right && Top < other.Bottom && other.Top < Bottom;
     public bool Contains(WorldPosition point) =>
         point.X >= Left && point.X < Right && point.Y >= Top && point.Y < Bottom;
+    /// <summary>Outward-quantized map cells occupied by this rectangle, independent of the moving body's size.</summary>
+    public MapOccupancy CoveringCells()
+    {
+        const int scale = MapCoordinates.UnitsPerCell;
+        static long AlignDown(long value) => value - (value % scale + scale) % scale;
+        long left = AlignDown(Left), top = AlignDown(Top);
+        long right = AlignDown(Right + scale - 1), bottom = AlignDown(Bottom + scale - 1);
+        return new(new(checked((int)(left + (right - left) / 2)), checked((int)(top + (bottom - top) / 2))),
+            new(checked((int)(right - left)), checked((int)(bottom - top))));
+    }
     public bool IntersectsExpanded(MapOccupancy other, int range)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(range);
@@ -185,7 +196,7 @@ public sealed class BattlefieldMap
     public int FineWidth { get; }
     public int FineHeight { get; }
     /// <summary>Target geometry defines arrival; only the supplied world occupancy determines object collision.</summary>
-    public NavigationStep Navigate(WorldPosition start, MapOccupancy target, bool intoRange, Footprint footprint,
+    public NavigationStep Navigate(WorldPosition start, MapOccupancy target, NavigationArrival arrival, Footprint footprint,
         TravelMode mode, IReadOnlyList<MapOccupancy> occupancy, int budget,
         int maximumRange = 1, Func<WorldPosition, int>? range = null, bool rectangularReach = false,
         NavigationWorkBudget? work = null, NavigationLookahead? lookahead = null, int lookaheadCells = 25, ulong randomSeed = 0, bool continueApproach = false, int mobility = 20, MapOccupancy? excluded = null, bool requireTargetClearance = false)
@@ -197,14 +208,10 @@ public sealed class BattlefieldMap
         if (start.X < 0 || start.Y < 0 || start.X >= FineWidth || start.Y >= FineHeight ||
             target.Position.X < 0 || target.Position.Y < 0 || target.Position.X >= FineWidth || target.Position.Y >= FineHeight)
             return new(start, 0, NavigationStatus.Unreachable);
-        var goal = intoRange ? RangeGoal(target, footprint, range ?? (_ => maximumRange), rectangularReach, maximumRange,
-            allowOverlap: !requireTargetClearance && !occupancy.Any(o => o.Hard && o.Position == target.Position && o.Footprint == target.Footprint)) :
-            (Arrived: (Func<WorldPosition, bool>)(p => p == target.Position),
-             Distance: (Func<WorldPosition, long>)(p => Math.Abs((long)p.X - target.Position.X) + Math.Abs((long)p.Y - target.Position.Y)),
-             Bounds: (PathGoalBounds?)new(target.Position.X, target.Position.Y, target.Position.X, target.Position.Y));
-        var objects = occupancy;
+        var goal = CreateGoal(target, arrival, footprint, range ?? (_ => maximumRange), rectangularReach, maximumRange,
+            allowOverlap: !requireTargetClearance && !occupancy.Any(o => o.Hard && o.Position == target.Position && o.Footprint == target.Footprint));
         using var search = BattlefieldPathSearch.Rent(this);
-        return search.Daily(start, target, footprint, mode, objects, budget, goal.Arrived, work,
+        return search.Daily(start, target, footprint, mode, occupancy, budget, goal.Arrived, work,
             lookahead, lookaheadCells, randomSeed, continueApproach, mobility,
             continueApproach && range is not null ? p => range(p) > 1 && goal.Arrived(p) : null, excluded, requireTargetClearance);
     }
@@ -264,9 +271,29 @@ public sealed class BattlefieldMap
         return search.Reachable(start, mode, occupied.ToArray(), goal.Arrived, work, target);
     }
 
-    private (Func<WorldPosition, bool> Arrived, Func<WorldPosition, long> Distance, PathGoalBounds? Bounds)
-        RangeGoal(MapOccupancy target, Footprint footprint, Func<WorldPosition, int> range, bool rectangularReach, int? maximumRange, bool allowOverlap = false) =>
-        (p =>
+    private readonly record struct NavigationGoal(Func<WorldPosition, bool> Arrived,
+        Func<WorldPosition, long> Distance, PathGoalBounds? Bounds, MapOccupancy? Region = null);
+
+    private NavigationGoal CreateGoal(MapOccupancy target, NavigationArrival arrival, Footprint footprint,
+        Func<WorldPosition, int> range, bool rectangularReach, int maximumRange, bool allowOverlap) => arrival switch
+    {
+        NavigationArrival.Point => new(p => p == target.Position,
+            p => Math.Abs((long)p.X - target.Position.X) + Math.Abs((long)p.Y - target.Position.Y),
+            new(target.Position.X, target.Position.Y, target.Position.X, target.Position.Y)),
+        NavigationArrival.Range => RangeGoal(target, footprint, range, rectangularReach, maximumRange, allowOverlap),
+        NavigationArrival.Region => RegionGoal(target),
+        _ => throw new ArgumentOutOfRangeException(nameof(arrival))
+    };
+
+    private static NavigationGoal RegionGoal(MapOccupancy target)
+    {
+        var region = target.CoveringCells();
+        return new(region.Contains, p => region.DistanceTo(new(p, new(1, 1))),
+            new((int)region.Left, (int)region.Top, (int)region.Right - 1, (int)region.Bottom - 1), region);
+    }
+
+    private NavigationGoal RangeGoal(MapOccupancy target, Footprint footprint, Func<WorldPosition, int> range, bool rectangularReach, int? maximumRange, bool allowOverlap = false) =>
+        new(p =>
         {
             // Exact range can depend on elevation, weapons and the opponent. Only nearby nodes need it.
             if (maximumRange is int bound && RangeDistance(p, footprint, target, bound) > 0) return false;
@@ -349,33 +376,31 @@ public sealed class BattlefieldMap
     /// Interior cell samples do not guarantee passage for the moving footprint.</summary>
     public RouteCostEstimate EstimateTravelCost(WorldPosition start, MapOccupancy target, Footprint footprint,
         TravelMode mode, IReadOnlyList<MapOccupancy> occupied, NavigationWorkBudget work,
-        bool intoRange = true, int range = 1, bool rectangularReach = false, bool includeCells = false, MapOccupancy? excluded = null) =>
-        EstimateRouteCostCore(start, target, footprint, mode, occupied, work, intoRange, range, rectangularReach, includeCells, excluded);
+        NavigationArrival arrival = NavigationArrival.Range, int range = 1, bool rectangularReach = false, bool includeCells = false, MapOccupancy? excluded = null) =>
+        EstimateRouteCostCore(start, target, footprint, mode, occupied, work, arrival, range, rectangularReach, includeCells, excluded);
 
     /// <summary>One bounded path-cost search for planning, without materializing or replaying daily steps.</summary>
     public RouteCostEstimate EstimateRouteCost(WorldPosition start, MapOccupancy target, Footprint footprint,
         TravelMode mode, IReadOnlyList<MapOccupancy> occupied, NavigationWorkBudget work,
-        bool intoRange = true, int range = 1, bool rectangularReach = false) =>
-        EstimateRouteCostCore(start, target, footprint, mode, occupied, work, intoRange, range, rectangularReach);
+        NavigationArrival arrival = NavigationArrival.Range, int range = 1, bool rectangularReach = false) =>
+        EstimateRouteCostCore(start, target, footprint, mode, occupied, work, arrival, range, rectangularReach);
 
     private RouteCostEstimate EstimateRouteCostCore(WorldPosition start, MapOccupancy target, Footprint footprint,
         TravelMode mode, IReadOnlyList<MapOccupancy> occupied, NavigationWorkBudget work,
-        bool intoRange, int range, bool rectangularReach, bool includeCells = false, MapOccupancy? excluded = null)
+        NavigationArrival arrival, int range, bool rectangularReach, bool includeCells = false, MapOccupancy? excluded = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(range);
         if (work.Exhausted) return new(RouteReachability.Incomplete);
         if (start.X < 0 || start.Y < 0 || start.X >= FineWidth || start.Y >= FineHeight ||
             target.Position.X < 0 || target.Position.Y < 0 || target.Position.X >= FineWidth || target.Position.Y >= FineHeight)
             return new(RouteReachability.Unreachable);
-        var goal = intoRange ? RangeGoal(target, footprint, _ => range, rectangularReach, range,
-            allowOverlap: !occupied.Any(o => o.Hard && o.Position == target.Position && o.Footprint == target.Footprint)) :
-            (Arrived: (Func<WorldPosition, bool>)(p => p == target.Position),
-             Distance: (Func<WorldPosition, long>)(p => Math.Abs((long)p.X - target.Position.X) + Math.Abs((long)p.Y - target.Position.Y)),
-             Bounds: (PathGoalBounds?)new(target.Position.X, target.Position.Y, target.Position.X, target.Position.Y));
+        var goal = CreateGoal(target, arrival, footprint, _ => range, rectangularReach, range,
+            allowOverlap: !occupied.Any(o => o.Hard && o.Position == target.Position && o.Footprint == target.Footprint));
         if (goal.Arrived(start)) return new(RouteReachability.Reachable) { Cells = includeCells ? [MapCoordinates.Cell(start)] : [] };
         using var search = BattlefieldPathSearch.Rent(this);
         var route = search.Search(start, target.Position, mode, occupied, work,
-            includeSteps: false, includeCells: includeCells, endpoint: target, excluded: excluded);
+            includeSteps: false, includeCells: includeCells, endpoint: target, excluded: excluded,
+            arrivalRegion: goal.Region);
         return work.Exhausted ? new(RouteReachability.Incomplete) :
             route.Reachable ? new(RouteReachability.Reachable, route.Cost) { TerrainCost = route.TerrainCost, Cells = route.Cells } : new(RouteReachability.Unreachable);
     }
