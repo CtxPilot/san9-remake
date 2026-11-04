@@ -115,11 +115,15 @@ internal sealed class StrategySnapshotSource
     }
     public SettlementInitialState? Settlement(int id) => _settlements.GetValueOrDefault(id);
     public IReadOnlyList<string> SettlementIcons(int id) => _settlementIcons.GetValueOrDefault(id) ?? [];
-    public StrategySnapshot Project(WorldSnapshot world, CompanionSettings? companion = null) => new(this, world, companion);
+    public StrategySnapshot Project(WorldSnapshot world, CompanionSettings? companion = null,
+        AI.Military.MilitaryIntelligencePublication? intelligence = null) => new(this, world, companion, intelligence);
 }
 
 public sealed class StrategySnapshot
 {
+    private readonly AI.Military.MilitaryIntelligencePublication? militaryIntelligence;
+    public AI.Military.MilitaryObservation? ObserveMilitary(int viewerForceId) => military is null ? null :
+        militaryIntelligence!.Observe(World, military, viewerForceId);
     public CompanionSettings Companion { get; }
     private readonly StrategySnapshotSource _source;
     internal ScenarioRules Rules => _source.Rules;
@@ -181,11 +185,13 @@ public sealed class StrategySnapshot
     {
     }
 
-    internal StrategySnapshot(StrategySnapshotSource source, WorldSnapshot world, CompanionSettings? companion = null)
+    internal StrategySnapshot(StrategySnapshotSource source, WorldSnapshot world, CompanionSettings? companion = null,
+        AI.Military.MilitaryIntelligencePublication? intelligence = null)
     {
         _source = source;
         Companion = companion ?? CompanionSettings.Default;
         military = source.Military;
+        militaryIntelligence = military is null ? null : intelligence ?? AI.Military.MilitaryIntelligencePublication.Publish(world, military);
         arrivalTreasures = source.Treasures;
         Information = source.Information;
         FacilityNameSuffixKeys = source.FacilityNameSuffixKeys;
@@ -294,7 +300,11 @@ public sealed class StrategySnapshot
     public MapCell? PlaceCell(int id) => Settlements.FirstOrDefault(p=>p.Id==id) is { } place ? new(place.X,place.Y) :
         _source.PlacePositions.TryGetValue(id,out var position) ? MapCoordinates.Cell(position) : null;
     /// <summary>Projects a world from the same scenario, reusing definitions and this view when the world is unchanged.</summary>
-    public StrategySnapshot ForWorld(WorldSnapshot world) => ReferenceEquals(World, world) ? this : _source.Project(world, Companion);
+    public StrategySnapshot ForWorld(WorldSnapshot world) => ReferenceEquals(World, world) ? this :
+        _source.Project(world, Companion, militaryIntelligence?.PublishedAt == world.Clock ? militaryIntelligence : null);
+
+    internal StrategySnapshot ForWorld(WorldSnapshot world, AI.Military.MilitaryIntelligencePublication? intelligence) =>
+        ReferenceEquals(World, world) && ReferenceEquals(militaryIntelligence, intelligence) ? this : _source.Project(world, Companion, intelligence);
     public int? EmperorId { get; }
     public int? EmperorCityId { get; }
     public bool ImperialCourtEnded => World.Simulation.ImperialCourtEnded;

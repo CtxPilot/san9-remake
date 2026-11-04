@@ -69,8 +69,29 @@ internal sealed class OfficerCommands(StrategySnapshot view, TextCatalog texts)
 
     public (CatalogCell Order, CatalogCell Target) ReadUnit(UnitState unit, int? viewerForceId)
     {
-        if (unit.OwnerId != viewerForceId && !view.World.Simulation.OtherForceOrdersVisible)
-            return (Hidden(2), Hidden(5));
+        if (unit.OwnerId != viewerForceId)
+        {
+            var observation = view.ObserveMilitary(viewerForceId ?? -1);
+            var published = observation?.Units.FirstOrDefault(u => u.Id == unit.Id)?.Order;
+            if (published is not { IsKnown: true }) return (Hidden(2), Hidden(5));
+            var known = published.Value.Value;
+            CatalogCell publicOrder = known?.Kind switch
+            {
+                MilitaryOrderKind.Move => "进军", MilitaryOrderKind.Return => known.IsRetreat ? "撤退" : "进军",
+                MilitaryOrderKind.Transport => "输送", MilitaryOrderKind.AttackUnit or MilitaryOrderKind.AttackSettlement => "攻击",
+                MilitaryOrderKind.Construct => known.FacilityTypeId is int type && view.FacilityNameSuffixKeys.TryGetValue(type, out string? name)
+                    ? texts.Resolve(name) : "建设", _ => ""
+            };
+            CatalogCell publicTarget = known?.Kind switch
+            {
+                MilitaryOrderKind.AttackUnit => Unit(known.UnitId!.Value),
+                MilitaryOrderKind.Move => known.RegionId is int region ? Region(region) + "周围" :
+                    known.Position is { } position ? Surroundings(position) : CatalogCell.Unavailable,
+                MilitaryOrderKind.Construct => Region(known.RegionId!.Value) + "周围",
+                _ => known?.SettlementId is int place ? Place(place) : CatalogCell.Unavailable
+            };
+            return (publicOrder, publicTarget);
+        }
         var effective = unit.EffectiveOrder;
         CatalogCell order = effective?.Kind switch
         {

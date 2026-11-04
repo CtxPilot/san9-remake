@@ -67,7 +67,7 @@ internal static class NavigationBenchmark
                         move.Reachable ? NavigationStatus.Moving : NavigationStatus.Unreachable)
                     { Remainder = move.Reachable && !move.Arrived ? budget - move.Spent : 0 };
                 }
-                else step = travel.Map.Navigate(unit.Position, target, !returning[i], travel.Shape, travel.Mode,
+                else step = travel.Map.Navigate(unit.Position, target, returning[i] ? NavigationArrival.Point : NavigationArrival.Range, travel.Shape, travel.Mode,
                     places.Concat(units.Where(u => u.Id != unit.Id).Select(u =>
                         new MapOccupancy(u.Position, rules.Formation(u).Footprint))).ToArray(),
                     budget, maximumRange: 10, lookahead: unit.Lookahead);

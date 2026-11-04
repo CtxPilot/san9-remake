@@ -17,6 +17,7 @@
 
 - [整体路线图](roadmap.md)
 - [原版AI新规格](original-ai/README.md)（独立建立行为、实施和验收；研究只引用[唯一权威正文](../research/ai.md)）
+- [军事AI重做计划](military-ai-plan.md)（M0/M1查询基础已完成；M2～M5战役闭环与生产替换待实施）
 - [旧自主AI规格](ai/README.md)（冻结的增强路线与暂停实现记录，不继续追加原版AI规格）
 - [表现层后续接入规划](presentation-implementation-plan.md)（操作、消息、战场与剧情演出及整局收口）
 - [粗格导航设计](navigation-redesign.md)（已采用：粗格导航、细步执行与端点接驳）

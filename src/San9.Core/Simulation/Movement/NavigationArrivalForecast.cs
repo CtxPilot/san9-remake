@@ -22,7 +22,18 @@ public static class NavigationArrivalForecast
         long distance = Math.Max(0, new MapOccupancy(start, travel.Shape).DistanceTo(target) - 2L * maximumRange);
         int remainder = movementRemainder ?? travel.Map.MaximumStepCost(travel.Mode) - 1;
         long cost = Math.Max(0, distance * travel.Map.MinimumStepCost(travel.Mode) - remainder);
+        if (travel.DailyBudget <= 0) return cost == 0 ? preparationDays : int.MaxValue;
         return (int)Math.Min(int.MaxValue, preparationDays + (cost + travel.DailyBudget - 1) / travel.DailyBudget);
+    }
+
+    /// <summary>Conservative spatial coverage, including an unknown carried movement remainder.
+    /// This bounds displacement only; it neither proves passage nor predicts an enemy order.</summary>
+    public static long MaximumDistance(UnitTravel travel, int days)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(days);
+        int minimum = travel.Map.MinimumStepCost(travel.Mode);
+        if (minimum <= 0 || travel.DailyBudget <= 0) return 0;
+        return ((long)days * travel.DailyBudget + travel.Map.MaximumStepCost(travel.Mode) - 1) / minimum;
     }
 
     public static ArrivalEstimate Evaluate(NavigationArrivalInput input, NavigationWorkBudget work, int maximumDays = 4096)

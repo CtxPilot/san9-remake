@@ -39,9 +39,10 @@ public sealed partial class GameSession
             Snapshot.Simulation.Boundary is not (SimulationBoundary.Stable or SimulationBoundary.Terminal))
             throw new InvalidOperationException("Companion settings require an idle stable session.");
         _simulation.ConfigureCompanion(settings);
-        _view = _snapshotSource.Project(Snapshot, Companion);
+        _view = _snapshotSource.Project(Snapshot, Companion, _militaryIntelligence);
     }
     private OriginalAiState _originalAi;
+    private AI.Military.MilitaryIntelligencePublication? _militaryIntelligence;
     public OriginalAiState OriginalAi => _originalAi;
     public ImmutableArray<OriginalAiWorkReport> LastOriginalAiWork { get; private set; } = [];
     private ImmutableDictionary<int, StrategicContextState> _strategicContexts = ImmutableDictionary<int, StrategicContextState>.Empty;
@@ -56,7 +57,10 @@ public sealed partial class GameSession
     public ImmutableList<ChronicleFact> History { get; private set; } = [];
     public WorldSnapshot Snapshot => _simulation.Snapshot;
     public StrategySnapshot InitialView => _initialView;
-    public StrategySnapshot View => _view.World.Revision == Snapshot.Revision ? _view : _view = _snapshotSource.Project(Snapshot, Companion);
+    public StrategySnapshot View => _view.World.Revision == Snapshot.Revision ? _view : _view = _snapshotSource.Project(Snapshot, Companion, _militaryIntelligence);
+
+    public AI.Military.MilitaryObservation ObserveMilitary(int viewerForceId) => View.ObserveMilitary(viewerForceId)
+        ?? throw new InvalidOperationException("This scenario has no military map.");
 
     public SessionRequest Request(SessionOperation operation, string controllerId = "player", Guid? id = null)
     {

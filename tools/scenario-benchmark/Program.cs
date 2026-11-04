@@ -9,6 +9,24 @@ using San9.Content.Scenarios;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
+if (args.FirstOrDefault() is "military-baseline" or "military-foundations")
+{
+    try
+    {
+        if (args is not [_, var configuration])
+            throw new ArgumentException("Usage: military-baseline|military-foundations configuration.json");
+        Environment.ExitCode = args[0] == "military-baseline"
+            ? await San9.Tools.ScenarioBenchmark.MilitaryBaseline.RunAsync(configuration, Console.Out)
+            : await San9.Tools.ScenarioBenchmark.MilitaryFoundationExperiments.RunAsync(configuration, Console.Out);
+    }
+    catch (Exception error) when (error is ArgumentException or IOException or InvalidOperationException or JsonException)
+    {
+        Console.Error.WriteLine(error.Message);
+        Environment.ExitCode = 2;
+    }
+    return;
+}
+
 if (args.Length < 5) throw new ArgumentException("Usage: content-package-directory unit-count xun-count march|combat report-path [verify|navigation|quality|queries|full-route]");
 if (args.Skip(5).Any(option => option is not ("verify" or "navigation" or "quality" or "queries" or "full-route")))
     throw new ArgumentException("Unknown benchmark option.");
@@ -73,9 +91,12 @@ ScenarioInitialState Populate(ScenarioInitialState source, int number, bool batt
 {
     if (source.Units.Length != 0) throw new ArgumentException("Stress construction requires an opening without field units.");
     var rules = new MilitaryRulebook(source.Military ?? throw new ArgumentException("Missing military map."));
-    var formation = rules.Formations.Values.Where(f => f.TravelMode == TravelMode.Land && f.RequiredTacticId is null)
+    var formation = rules.Formations.Values.Where(f => f.TravelMode == TravelMode.Land && f.RequiredTacticId is null && !f.Positions.IsEmpty)
         .OrderBy(f => f.Id).First();
     var cities = source.Settlements.Where(s => !s.IsDormant && s.OwnerId is not null && s.Kind == SettlementKind.City).OrderBy(s => s.Id).ToArray();
+    long formationCenter = (long)formation.Positions.Min(p => p.Column) + formation.Positions.Max(p => p.Column);
+    var memberPosition = formation.Positions.OrderBy(p => Math.Abs(p.Row - (int)BattleRank.Middle))
+        .ThenBy(p => Math.Abs(2L * p.Column - formationCenter)).ThenBy(p => p.Column).First();
     var people = source.Officers.ToArray();
     var candidates = Enumerable.Range(0, people.Length).Where(i => !people[i].State.IsDormant && people[i].State.Status is not (OfficerStatus.Dead or OfficerStatus.Special))
         .OrderBy(i => people[i].State.IsServing ? 0 : 1).ThenBy(i => people[i].State.Id).Take(number).ToArray();
@@ -108,7 +129,7 @@ ScenarioInitialState Populate(ScenarioInitialState source, int number, bool batt
         units.Add(new(id, owner, position.Value, 5000)
         {
             FormationId = formation.Id, NavalFormationId = rules.NavalFormationForDeployment(formation.Id), Morale = 90, CommanderId = person.Id,
-            MemberRanks = System.Collections.Immutable.ImmutableDictionary<int, BattleRank>.Empty.Add(person.Id, formation.CaptureRanks[0]),
+            MemberPositions = System.Collections.Immutable.ImmutableDictionary<int, FormationPosition>.Empty.Add(person.Id, memberPosition),
             ServicePlaceId = home.Id, CorpsId = home.CorpsId, OrderClass = UnitOrderClass.Military,
             Order = new(MilitaryOrderKind.AttackSettlement, null, target.Id)
         });

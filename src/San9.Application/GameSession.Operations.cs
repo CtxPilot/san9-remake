@@ -12,11 +12,12 @@ public sealed partial class GameSession
     internal sealed record OperationInput(SimulationEngine Simulation, ScenarioSessionDefinition Definition,
         StrategySnapshot View, long Sequence, OriginalAiState OriginalAi,
         EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts, ImmutableList<ChronicleFact> History,
-        ImmutableArray<DeploymentPreset> DeploymentPresets);
+        ImmutableArray<DeploymentPreset> DeploymentPresets, AI.Military.MilitaryIntelligencePublication? MilitaryIntelligence);
 
     internal sealed record OperationCommit(SimulationEngine Simulation, OriginalAiState OriginalAi,
         ImmutableArray<OriginalAiWorkReport> AiReports, EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts,
-        ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note, ImmutableArray<DeploymentPreset> DeploymentPresets);
+        ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note, ImmutableArray<DeploymentPreset> DeploymentPresets,
+        AI.Military.MilitaryIntelligencePublication? MilitaryIntelligence);
 
     internal sealed record PreparedOperation(SessionResult Result, StrategySnapshot View,
         OperationCommit? Commit = null)
@@ -25,7 +26,7 @@ public sealed partial class GameSession
     }
 
     private OperationInput CaptureOperationInput() => new(_simulation, _definition, View,
-        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets);
+        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets, _militaryIntelligence);
 
     public SessionResult Apply(SessionRequest request)
     {
@@ -126,7 +127,7 @@ public sealed partial class GameSession
                     break;
                 case PkSettingsOperation pk:
                     if (request.ControllerId != "player") return Rejected(SessionRejection.InvalidRequest);
-                    if (candidate.Snapshot.Simulation.Boundary != SimulationBoundary.Stable)
+                    if (candidate.Snapshot.Simulation.Boundary != SimulationBoundary.Stable || originalAi.Continuation is not null)
                         return Rejected(SessionRejection.NotStable);
                     candidate.SetPkSettings(pk.OtherForceOrdersVisible, pk.OtherForceTacticsVisible, pk.BattleDeathsEnabled);
                     break;
@@ -191,7 +192,15 @@ public sealed partial class GameSession
                 new SessionRecord(e.Clock, e.Command.ForceId, e.Command.SettlementId, e.Command.OfficerIds[0],
                     e.Command.Activity, e.Increment, e.Cost)).ToArray();
             var snapshot = candidate.Snapshot;
-            var view = input.View.ForWorld(snapshot);
+            var intelligence = input.MilitaryIntelligence;
+            if (input.Definition.MilitaryRules is { } military && (intelligence is null ||
+                    snapshot.Simulation.Boundary is SimulationBoundary.Stable or SimulationBoundary.Terminal &&
+                    snapshot.Simulation.DailyAdvanceStarted is null &&
+                    (intelligence.PublishedAt != snapshot.Clock || request.Operation is WorldEditOperation ||
+                        snapshot.Simulation.Boundary == SimulationBoundary.Terminal &&
+                        input.Simulation.Snapshot.Simulation.Boundary != SimulationBoundary.Terminal)))
+                intelligence = AI.Military.MilitaryIntelligencePublication.Publish(snapshot, military);
+            var view = input.View.ForWorld(snapshot, intelligence?.PublishedAt == snapshot.Clock ? intelligence : null);
             var history = ChronicleHistory.Append(input.History, ChronicleHistory.Read(input.View, view, events, input.Definition.Content.Terminal));
             var strategicContexts = input.StrategicContexts.Where(p => snapshot.Simulation.Controls.Any(c =>
                 c.ForceId == p.Key && c.Kind == ControllerKind.Player)).ToImmutableDictionary();
@@ -200,7 +209,7 @@ public sealed partial class GameSession
                     strategicContexts.GetValueOrDefault(force, StrategicContextState.Empty)));
             var publishedEvents = events.ToImmutableArray();
             var commit = new OperationCommit(candidate, originalAi.Reconcile(snapshot), aiReports.ToImmutableArray(),
-                ending, strategicContexts, history, completed, note, deploymentPresets);
+                ending, strategicContexts, history, completed, note, deploymentPresets, intelligence);
             return new(new(SessionDisposition.Accepted, SessionRejection.None, publishedEvents, snapshot, Development: development),
                 view, commit) { Transitions = transitions.ToArray() };
         }
@@ -221,6 +230,7 @@ public sealed partial class GameSession
                 _simulation = commit.Simulation;
                 _view = prepared.View;
                 _originalAi = commit.OriginalAi;
+                _militaryIntelligence = commit.MilitaryIntelligence;
                 LastOriginalAiWork = commit.AiReports;
                 _ending = commit.Ending;
                 _strategicContexts = commit.StrategicContexts;

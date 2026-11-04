@@ -9,7 +9,8 @@ namespace San9.Application;
 
 public sealed partial class GameSession
 {
-    private GameSession(ScenarioSessionDefinition definition, SimulationEngine simulation)
+    private GameSession(ScenarioSessionDefinition definition, SimulationEngine simulation,
+        AI.Military.MilitaryIntelligencePublication? intelligence = null)
     {
         _definition = definition;
         _simulation = simulation;
@@ -17,7 +18,8 @@ public sealed partial class GameSession
         _originalAi = OriginalAiState.Create(definition.Content);
         _initialEvents = simulation.InitialEvents;
         _snapshotSource = new(definition.Content, definition.Rules, definition.Definitions);
-        _view = _snapshotSource.Project(simulation.Snapshot, simulation.Companion);
+        _militaryIntelligence = intelligence ?? (definition.MilitaryRules is { } military ? AI.Military.MilitaryIntelligencePublication.Publish(simulation.Snapshot, military) : null);
+        _view = _snapshotSource.Project(simulation.Snapshot, simulation.Companion, _militaryIntelligence);
         _initialView = _view;
         _strategicContexts = simulation.Snapshot.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player)
             .ToImmutableDictionary(c => c.ForceId, _ => StrategicContextState.Empty with { Clock = simulation.Snapshot.Clock.IsXunBoundary ? simulation.Snapshot.Clock : null });
@@ -94,7 +96,7 @@ public sealed partial class GameSession
         Func<WorldState, SimulationEngine>? factory)
     {
         var simulation = (factory ?? owned.Rules.CreateEngine)(world);
-        var session = new GameSession(owned, simulation);
+        var session = new GameSession(owned, simulation, snapshot.MilitaryIntelligence is { } intelligence ? new(intelligence) : null);
         session._records.AddRange(snapshot.Records);
         session._chronicle.AddRange(snapshot.Chronicle);
         session.History = snapshot.History;
