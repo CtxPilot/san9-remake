@@ -74,14 +74,16 @@ internal sealed class OfficerCommands(StrategySnapshot view, TextCatalog texts)
         var effective = unit.EffectiveOrder;
         CatalogCell order = effective?.Kind switch
         {
-            MilitaryOrderKind.Move => "进军", MilitaryOrderKind.Return => "撤退",
+            MilitaryOrderKind.Move => "进军",
+            MilitaryOrderKind.Return => unit.AutonomousReturn || unit.HasForcedReturn ? "撤退" : "进军",
             MilitaryOrderKind.Transport => "输送",
             MilitaryOrderKind.AttackUnit or MilitaryOrderKind.AttackSettlement => "攻击",
             MilitaryOrderKind.Construct => effective.Construction is { } construction &&
                 view.FacilityNameSuffixKeys.TryGetValue(construction.FacilityTypeId, out string? key) ? texts.Resolve(key) : "建设",
             _ => ""
         };
-        var destination = unit.Order is { Kind: MilitaryOrderKind.Transport } transport ? transport : effective;
+        var destination = !unit.HasForcedReturn && unit.Order is { Kind: MilitaryOrderKind.Transport } transport
+            ? transport : effective;
         CatalogCell target = destination?.Kind switch
         {
             MilitaryOrderKind.AttackUnit => Unit(destination.UnitId!.Value),

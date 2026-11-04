@@ -98,7 +98,7 @@ public static class IndexedImageArchive
             if (transparent) pixels[i * channels + 3] = palette.AsSpan(p, 4).SequenceEqual(palette.AsSpan(0, 4)) ? (byte)0 :
                 paletteAlpha ? (byte)((Math.Min((int)palette[p + 3], 128) * 255 + 64) / 128) : (byte)255;
         }
-        if (transparent) ExtendTransparentColors(pixels, image.Width, image.Height);
+        // Prepare transparent colors only after cropping/compositing, at the atlas boundary.
         return new(image.Width, image.Height, channels, pixels);
     }
 

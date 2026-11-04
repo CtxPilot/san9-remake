@@ -74,7 +74,7 @@ public sealed partial class OriginalAiActionsTests
                 { NameKey = "second-target", State = basis.Officers.Single(p => p.State.Id == 8).State with { Id = 13, UnitId = 11 } }).ToArray(),
             Units = [basis.Units.Single(u => u.Id == 10), basis.Units.Single(u => u.Id == 10) with
                 { Id = 11, Position = new(32, 7), Soldiers = 6000, ServicePlaceId = 4, CommanderId = 13,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(13, BattleRank.Middle) }],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(13, BattleRank.Middle)) }],
             CityConnections = [new(1, 4), new(4, 1), new(4, 2), new(2, 4), new(2, 3), new(3, 2)],
             RegionCityIds = new() { [1] = 1, [2] = 2, [3] = 3, [4] = 4 },
             RegionNameKeys = new() { [1] = "one", [2] = "two", [3] = "three", [4] = "donor" },

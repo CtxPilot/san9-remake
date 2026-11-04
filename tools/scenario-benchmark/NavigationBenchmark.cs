@@ -21,7 +21,7 @@ internal static class NavigationBenchmark
             int days = 0;
             for (; days < 2000 && !arrived; days++)
             {
-                var step = travel.Map.Navigate(position, target, true, travel.Shape, travel.Mode,
+                var step = travel.Map.Navigate(position, target, NavigationArrival.Range, travel.Shape, travel.Mode,
                     objects, checked(travel.DailyBudget + remainder), maximumRange: 10);
                 position = step.Position; remainder = step.Remainder; cost += step.Spent; arrived = step.Arrived;
                 if (step.Status == NavigationStatus.Unreachable) break;

@@ -50,7 +50,11 @@ public sealed class SaveLoadBrowser
         _entries = replacement;
         PendingSlot = null;
     }
-    public void Open(SaveLoadMode mode) { Mode = mode; PendingSlot = null; IsOpen = true; }
+    public void Open(SaveLoadMode mode, int? page = null)
+    {
+        Mode = mode; PendingSlot = null; IsOpen = true;
+        if (page is { } initial) Page = Math.Clamp(initial, 0, PageCount - 1);
+    }
     public void Close() { IsOpen = false; PendingSlot = null; }
     public bool ChangePage(int page)
     {

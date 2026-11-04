@@ -26,10 +26,10 @@ public sealed class UnitReformationTests
     private static readonly CommandContext Player = new("player");
     private static MilitaryRulebook Rules() => new(new(6, 1, [0, 2, 1, 1, 2, 0],
         [new(0, 1, null), new(1, null, 1) { IsWater = true }, new(2, 1, 1)],
-        [new(10, 5, 0, 10000, 2, new(1, 1), TravelMode.Land) { CaptureRanks = [BattleRank.Front, BattleRank.Rear] },
-         new(20, 5, 50, 10000, 2, new(1, 1), TravelMode.Water) { CaptureRanks = [BattleRank.Middle, BattleRank.Middle] },
-         new(70, 5, 0, 10000, 2, new(1, 1), TravelMode.Land) { CaptureRanks = [BattleRank.Front, BattleRank.Rear] },
-         new(71, 5, 50, 10000, 2, new(1, 1), TravelMode.Water) { CaptureRanks = [BattleRank.Middle, BattleRank.Middle] }],
+        [new(10, 5, 0, 10000, 2, new(1, 1), TravelMode.Land) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Rear]) },
+         new(20, 5, 50, 10000, 2, new(1, 1), TravelMode.Water) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle]) },
+         new(70, 5, 0, 10000, 2, new(1, 1), TravelMode.Land) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Rear]) },
+         new(71, 5, 50, 10000, 2, new(1, 1), TravelMode.Water) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle]) }],
         [new(1, new(4, 2), new(1, 1)), new(2, new(25, 2), new(1, 1))]) { TransportFormations = new(70, 71) });
 
     private static WorldState World(int x = 7, bool deployed = true, ControllerKind controller = ControllerKind.Player,
@@ -40,7 +40,7 @@ public sealed class UnitReformationTests
          new(12, 1, deployed ? null : 1, new(70, 70, 70, 70), false) { UnitId = deployed ? 0 : null }],
         units: deployed ? [new(0, 1, new(x, 2), 500) { FormationId = 10, Morale = 70, Wounded = 80, CargoFood = 100,
             CorpsId = automaticCorps ? 1 : null,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front).Add(12, BattleRank.Rear) }] : [],
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front).Add(12, BattleRank.Rear)) }] : [],
         controls: [new("player", 1, controller)], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(1000, 10000)) { IsRoot = true,
                 ControlMode = automaticCorps ? CorpsControlMode.Automatic : CorpsControlMode.Direct }]);
 
@@ -92,7 +92,7 @@ public sealed class UnitReformationTests
         engine.EndControl(Player);
         var result = engine.AdvanceXun();
         Assert.Single(result.Events.OfType<UnitAbsorbedEvent>());
-        Assert.Equal(new WorldPosition(24, 2), result.Events.OfType<UnitMovedEvent>().Last().To);
+        Assert.Equal(new WorldPosition(25, 2), result.Events.OfType<UnitMovedEvent>().Last().To);
         Assert.Equal(500u, engine.Snapshot.Settlements.Single(s => s.Id == 2).Soldiers);
     }
 }

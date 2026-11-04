@@ -15,7 +15,7 @@ public partial class CorpsCommandFlow : CommandWorkflow
     {
         if (HasWindow) return;
         Scope.RequestPrefixes("deployment-", "detail-", "catalog-", "information-", "dialog-", "decision-");
-        _corpsCommand = new() { Draft = new(Session), Session = Session, Texts = Texts, Service = Textures, Textures = Scope, Skin = Skin,
+        _corpsCommand = new() { Draft = new(Session), Preferences = Services.Preferences, Session = Session, Texts = Texts, Service = Textures, Textures = Scope, Skin = Skin,
             Closed = Close, Submit = SubmitCorpsManagement, ChooseMap = Targets.Begin };
         ShowWindow(_corpsCommand, () => { _corpsCommand = null; });
     }

@@ -93,7 +93,7 @@ public sealed partial class SimulationEngine
 public static class WorldEditing
 {
     public static IReadOnlyList<int> OfficerTactics(MilitaryRulebook? rules) => rules?.Tactics.Values
-        .Where(t => t.Category is not null && (t.Selectable || t.Effect is TacticEffect.FormationTechnology or TacticEffect.Construction or TacticEffect.StoneFormation))
+        .Where(t => t.IsOfficerTactic)
         .Select(t => t.Id).Order().ToArray() ?? [];
 
     public static IReadOnlyList<int> CityTactics(MilitaryRulebook? rules, SettlementState city)

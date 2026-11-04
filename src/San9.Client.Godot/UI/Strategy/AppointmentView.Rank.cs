@@ -53,22 +53,10 @@ public partial class AppointmentView
 
     private void SelectRankPeople(OfficeAppointmentPlan edited, CatalogTableState state)
     {
-        (int Page,int Column)[] first = [(0,0),(3,1),(1,5),(1,7),(0,1),(0,2),(0,3),(0,4),(1,4)];
-        var tables = first.Select(c => c.Page).Distinct().ToDictionary(page => page,
-            page => OfficerCatalog.Read(Draft.View,Texts,page,null,null).Rows.ToDictionary(r => r.Key.Id));
-        CatalogRow[] Rows(int page)
-        {
-            var order = edited.OrderedPeople.ToArray();
-            if (page == 0) return order.Select(id => new CatalogRow(id,first.Select(c =>
-                edited.Cell(id,OfficerCatalog.Pages[c.Page].Columns[c.Column].Id,tables[c.Page][id].Cells[c.Column],Texts)).ToArray())).ToArray();
-            var rows = OfficerCatalog.Read(Draft.View,Texts,page-1,null,null).Rows.ToDictionary(r => r.Key.Id);
-            return order.Select(id => new CatalogRow(id,rows[id].Cells.Select((cell,index) =>
-                edited.Cell(id,OfficerCatalog.Pages[page-1].Columns[index].Id,cell,Texts)).ToArray())).ToArray();
-        }
         ReplaceChild(new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), CloseTitle = CommandText.Resolve(Texts, "action.cancel"), Textures = Textures, Service = Service,
             HintText = RankHint("select"), TableState = state, Portrait = id => $"catalog-person-{id}",
-            Pages = [new(CommandText.Resolve(Texts, "title.rank"),first.Select(c => OfficerCatalog.Pages[c.Page].Columns[c.Column]).ToArray()), .. OfficerCatalog.Pages],
-            ReadRows = Rows, Activated = id => SelectRankOffice(edited,id,state), Closed = CloseChild,
+            Pages = AppointmentOfficerCatalog.Pages(Draft, Texts),
+            ReadRows = page => AppointmentOfficerCatalog.Read(Draft, Texts, page, edited), Activated = id => SelectRankOffice(edited,id,state), Closed = CloseChild,
             Confirmed = () => { if (Draft.IsCurrent) Draft.OfficePlan!.Accept(edited); CloseChild(); } });
     }
 

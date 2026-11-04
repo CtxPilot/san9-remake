@@ -24,22 +24,85 @@ public sealed class NewGameInitializationTests
         { SoldierCapacity = 30000, DraftPopulation = 1234 };
 
     [Theory]
-    [InlineData(0u, 8000u, 13000u, 0u)]
-    [InlineData(50000u, 8000u, 18000u, 45000u)]
-    [InlineData(90000u, 8000u, 20000u, 81000u)]
-    [InlineData(50000u, 499000u, 500000u, 45000u)]
-    public void FoundedCityRecruitmentUsesDraftPopulationAndCapacity(uint draftPopulation, uint soldiers, uint expectedSoldiers, uint expectedDraft)
+    [InlineData(0u, 0u, 5000u, 0u, 0, 100, 50)]
+    [InlineData(0u, 8000u, 13000u, 0u, 95, 100, 50)]
+    [InlineData(50000u, 8000u, 18000u, 45000u, 0, 400, 60)]
+    [InlineData(90000u, 8000u, 20000u, 81000u, 95, 100, 50)]
+    [InlineData(50000u, 499000u, 500000u, 45000u, 95, 100, 50)]
+    [InlineData(50000u, 500000u, 500000u, 45000u, 95, 400, 60)]
+    public void FoundedCityRecruitmentUsesDraftPopulationCapacityAndForceMorale(uint draftPopulation, uint soldiers,
+        uint expectedSoldiers, uint expectedDraft, int morale, int trust, int expectedMorale)
     {
         var city = Place(1, 1) with { Kind = SettlementKind.City, SoldierCapacity = 500000,
-            DraftPopulation = draftPopulation, Soldiers = soldiers, CorpsId = 1 };
+            DraftPopulation = draftPopulation, Soldiers = soldiers, Morale = morale, CorpsId = 1 };
         var world = WorldState.Create(new(190, 1, 1), 19,
-            [new(1, 100) { LeaderId = 10 }], [city],
+            [new(1, trust) { LeaderId = 10 }], [city],
             [new(10, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler }],
             corps: [new(1, 1, 10, new(0, 0)) { IsRoot = true }], foundedForceIds: new HashSet<int> { 1 }).CreateSnapshot();
         var actual = Assert.Single(world.Settlements);
         Assert.Equal(expectedSoldiers, actual.Soldiers);
         Assert.Equal(expectedDraft, actual.DraftPopulation);
+        Assert.Equal(expectedMorale, actual.Morale);
         Assert.Equal(soldiers, city.Soldiers);
+    }
+
+    [Theory]
+    [InlineData(0, 95)]
+    [InlineData(1, 95)]
+    [InlineData(20, 85)]
+    [InlineData(49, 71)]
+    [InlineData(50, 70)]
+    [InlineData(51, 70)]
+    [InlineData(75, 70)]
+    [InlineData(149, 95)]
+    public void CreatedServingLoyaltyUsesCircularAffinityAndFivePointVariation(int affinity, int minimum)
+    {
+        var values = new HashSet<int>();
+        for (ulong seed = 0; seed < 32; seed++)
+        foreach (var mode in Enum.GetValues<GameMode>())
+        {
+            var world = WorldState.Create(new(190, 1, 1), seed,
+                [new(1, 100) { LeaderId = 9001 }], [Place(1, 1)],
+                [new(9001, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler },
+                    new(2, 1, 1, new(50, 50, 50, 50), false) { Affinity = affinity }],
+                corps: [new(1, 1, 9001, new(0, 0)) { IsRoot = true }],
+                newGame: new() { Mode = mode },
+                createdOfficerIds: new HashSet<int> { 2 }).CreateSnapshot();
+            int loyalty = world.Officers.Single(p => p.Id == 2).Loyalty;
+            Assert.InRange(loyalty, minimum, minimum + 4);
+            values.Add(loyalty);
+        }
+        Assert.Equal(Enumerable.Range(minimum, 5), values.Order());
+    }
+
+    [Fact]
+    public void FictionalSetupExcludesCreatedPeopleRegardlessOfStatusOrIdentityOrder()
+    {
+        OfficerState[] people =
+        [
+            new(1, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler, Affinity = 20 },
+            new(2, 1, 1, new(50, 50, 50, 50), false) { Affinity = 40 },
+            new(3, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Free },
+            new(4, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.NotAppeared },
+            new(5, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Undiscovered },
+            new(6, null, null, new(50, 50, 50, 50), false) { Status = OfficerStatus.Undiscovered, IsDormant = true },
+            new(9001, 2, 2, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler }
+        ];
+        var createdIds = Enumerable.Range(1, 6).ToHashSet();
+        WorldSnapshot Start(GameMode mode) => WorldState.Create(new(190, 1, 1), 19,
+            [new(1, 100) { LeaderId = 1 }, new(2, 100) { LeaderId = 9001 }], [Place(1, 1), Place(2, 2)], people,
+            corps: [new(1, 1, 1, new(0, 0)) { IsRoot = true }, new(2, 2, 9001, new(0, 0)) { IsRoot = true }],
+            newGame: new() { Mode = mode }, officerStartingPlaces: [1, 2], createdOfficerIds: createdIds).CreateSnapshot();
+        var historical = Start(GameMode.Historical);
+        var fictional = Start(GameMode.Fictional);
+        foreach (var expected in historical.Officers.Where(p => createdIds.Contains(p.Id)))
+        {
+            var actual = fictional.Officers.Single(p => p.Id == expected.Id);
+            Assert.Equal(expected with { ForceLoyalties = actual.ForceLoyalties }, actual);
+            Assert.Equal(expected.ForceLoyalties.OrderBy(p => p.Key), actual.ForceLoyalties.OrderBy(p => p.Key));
+        }
+        Assert.NotEqual(historical.Officers.Single(p => p.Id == 9001), fictional.Officers.Single(p => p.Id == 9001));
+        Assert.InRange(fictional.Officers.Single(p => p.Id == 2).Loyalty, 85, 89);
     }
 
     [Theory]

@@ -93,14 +93,15 @@ internal static class AlienateStrategies
         return CommandRejection.None;
     }
 
-    internal static void Resolve(WorldMutation world, PersistentTask task, PersonnelRulebook places,
+    internal static void Resolve(WorldMutation world, PersistentTask task, SimulationRules rules,
         List<DomainEvent> events)
     {
         var actor = world.Officers[task.OfficerId];
         var target = world.Officers[task.Journey!.TargetOfficerId!.Value];
+        task = PersonnelLocations.AtPerson(world, task, target, rules);
         var audience = StrategyAudience.Capture(world, task.ForceId, target);
         int threshold = Threshold(world, actor.Id, target.Id);
-        int roll = task.Journey.SuccessRoll!.Value;
+        int roll = task.Journey!.SuccessRoll!.Value;
         int contactForce = world.Forces.Values
             .Where(force => !force.IsEliminated && !force.IsBarbarian && force.Id != task.ForceId && force.Id != target.OwnerId)
             .OrderByDescending(force => ForceRelations.Get(world, force.Id, target.OwnerId!.Value).Value)
@@ -125,7 +126,7 @@ internal static class AlienateStrategies
         OfficerTacticGrowth.Increase(world, actor.Id, 8, 2, events);
         events.Add(new AlienateResolvedEvent(world.Clock, actor.Id, target.Id, threshold, roll, success, loyaltyLoss,
             relationForce) { Audience = audience });
-        PersonnelReturns.Start(world, task, places, events, true);
+        PersonnelReturns.Start(world, task, rules.Personnel, events, true, arrived: true);
     }
 }
 
@@ -146,5 +147,5 @@ internal sealed class AlienateRule(SimulationRules rules) : TaskRule
         AlienateStrategies.EligibleTarget(world, task.ForceId, task.Journey!.TargetOfficerId!.Value, rules);
 
     internal override void Complete(WorldMutation world, PersistentTask task, List<DomainEvent> events) =>
-        AlienateStrategies.Resolve(world, task, rules.Personnel, events);
+        AlienateStrategies.Resolve(world, task, rules, events);
 }

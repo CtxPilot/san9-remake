@@ -72,7 +72,7 @@ internal sealed class StrategySnapshotSource
             new Dictionary<int, int>(definition.RegionCityIds));
         var people = definition.Officers.ToDictionary(o => o.State.Id, o => new OfficerDisplayDefinition(o.NameKey, o.CourtesyNameKey, o.BiographyKey, o.FlagGlyph));
         foreach (var person in (additions ?? SessionDefinitions.Empty).Officers)
-            people[person.Id] = new(person.NameKey, person.CourtesyNameKey, person.BiographyKey, -1);
+            people[person.Id] = new(person.NameKey, person.CourtesyNameKey, person.BiographyKey, person.FlagGlyph);
         _officers = people;
         _sessionForces = (additions ?? SessionDefinitions.Empty).Forces.ToDictionary(f => f.Id);
         _forces = definition.Forces.ToDictionary(force => force.Id);
@@ -103,15 +103,15 @@ internal sealed class StrategySnapshotSource
         string? rulerName = !force.IsBarbarian && force.LeaderId is int ruler && _officers.TryGetValue(ruler, out var person)
             ? person.NameKey : null;
         int? titleGlyph = force.CountryTitleId is int title ? Information.CountryTitles.Single(t => t.Id == title).FlagGlyph : null;
-        if (force.Origin is { } origin)
+        int? founderId = force.Origin?.FounderId ?? _sessionForces.GetValueOrDefault(force.Id)?.FounderId;
+        if (founderId is int founder)
         {
             int glyph = force.LeaderId is int leader ? _officers[leader].FlagGlyph : -1;
-            return (rulerName ?? _officers[origin.FounderId].NameKey, force.ColorCode, titleGlyph ?? glyph);
+            return (rulerName ?? _officers[founder].NameKey, force.ColorCode, titleGlyph ?? glyph);
         }
-        if (_sessionForces.TryGetValue(force.Id, out var added))
-            return (rulerName ?? _officers[added.FounderId].NameKey, force.ColorCode, titleGlyph ?? -1);
         var initial = _forces[force.Id];
-        return (rulerName ?? initial.NameKey, force.ColorCode, titleGlyph ?? initial.FlagGlyph);
+        int rulerGlyph = force.LeaderId is int current ? _officers[current].FlagGlyph : initial.FlagGlyph;
+        return (rulerName ?? initial.NameKey, force.ColorCode, titleGlyph ?? rulerGlyph);
     }
     public SettlementInitialState? Settlement(int id) => _settlements.GetValueOrDefault(id);
     public IReadOnlyList<string> SettlementIcons(int id) => _settlementIcons.GetValueOrDefault(id) ?? [];
@@ -162,8 +162,8 @@ public sealed class StrategySnapshot
     }
     public IReadOnlyList<MapCell> FacilityRockfallPath(int id, WorldPosition target) => military is not null &&
         World.Settlements.FirstOrDefault(s => s.Id == id) is {} source ? military.RockfallPath(source, target, World.Settlements) : [];
-    public BattleRank? FormationRank(UnitState unit, int officerId) => unit.FormationId is null || !unit.MemberRanks.TryGetValue(officerId, out var rank)
-        ? null : unit.NavalFormationId is null ? rank : military!.Rank(unit, officerId);
+    public BattleRank? FormationRank(UnitState unit, int officerId) => unit.FormationId is null || !unit.MemberPositions.TryGetValue(officerId, out var position)
+        ? null : unit.NavalFormationId is null ? position.Rank : military!.Rank(unit, officerId);
     private MilitaryArrivalForecast? arrivalForecast;
     private readonly TreasureRulebook arrivalTreasures;
     private readonly Dictionary<int, ArrivalEstimate> arrivals = [];
@@ -351,6 +351,7 @@ public sealed class StrategySnapshot
 
 public sealed class InformationCatalog(InformationDefinitions definitions)
 {
+    public bool ShowOfficerAges { get; } = definitions.ShowOfficerAges;
     public IReadOnlySet<int> MapContextExcludedFacilityIds { get; } = definitions.MapContextExcludedFacilityIds.ToImmutableHashSet();
     public IReadOnlyList<CountryTitleDefinition> CountryTitles { get; } = Array.AsReadOnly(definitions.CountryTitles.ToArray());
     public IReadOnlyList<MilitaryCatalogDefinition> Tactics { get; } = Array.AsReadOnly(definitions.Tactics.ToArray());

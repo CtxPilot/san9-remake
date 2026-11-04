@@ -6,7 +6,7 @@ namespace San9.Application.Presentation;
 /// <summary>Personnel selection pages project shared catalog facts over the draft's fixed candidate set.</summary>
 public static class PersonnelCatalog
 {
-    private static CatalogColumn OfficerColumn(string field) => OfficerCatalog.Pages.SelectMany(p => p.Columns).First(c => c.Id == field);
+    private static CatalogColumn OfficerColumn(string field) => OfficerCatalog.CorePages.SelectMany(p => p.Columns).First(c => c.Id == field);
     private static CatalogColumn RegionColumn(string field) => AdministrativeCatalog.Pages(InformationCategory.Regions).SelectMany(p => p.Columns).First(c => c.Id == field);
     private static CatalogColumn Arrival(TextCatalog texts) => new("estimate", CommandText.Resolve(texts, "label.arrival"), 3, CatalogAlignment.Right);
     private static IEnumerable<int> OrderedOfficers(PersonnelDraft draft, bool targets)
@@ -47,7 +47,7 @@ public static class PersonnelCatalog
             };
         CatalogColumn[] prefix = !targets && draft.Kind == "search"
             ? [new("advice", CommandText.Resolve(texts, "label.advice"), 8, CatalogAlignment.Center), OfficerColumn("name")] : [OfficerColumn("name")];
-        return [new(CommandText.Resolve(texts, "title." + draft.Kind), [.. prefix, .. fields.Select(f => f == "estimate" ? Arrival(texts) : OfficerColumn(f))]), .. OfficerCatalog.Pages];
+        return [new(CommandText.Resolve(texts, "title." + draft.Kind), [.. prefix, .. fields.Select(f => f == "estimate" ? Arrival(texts) : OfficerColumn(f))]), .. OfficerCatalog.Pages(draft.View, texts)];
     }
     public static CatalogRow[] Officers(PersonnelDraft draft, TextCatalog texts, int page, bool targets = false)
     {
@@ -59,7 +59,7 @@ public static class PersonnelCatalog
         }
         var columns = OfficerPages(draft, texts, targets)[0].Columns;
         var fields = columns.Where(c => c.Id is not ("estimate" or "advice")).ToDictionary(c => c.Id,
-            c => OfficerCatalog.Pages.Select((catalog, index) => (Page: index, Column: Array.FindIndex(catalog.Columns, field => field.Id == c.Id)))
+            c => OfficerCatalog.CorePages.Select((catalog, index) => (Page: index, Column: Array.FindIndex(catalog.Columns, field => field.Id == c.Id)))
                 .First(location => location.Column >= 0));
         var facts = fields.Values.Select(location => location.Page).Distinct().ToDictionary(pageIndex => pageIndex,
             pageIndex => OfficerCatalog.Read(draft.View, texts, pageIndex, null, null).Rows.ToDictionary(r => r.Key.Id));

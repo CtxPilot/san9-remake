@@ -15,11 +15,11 @@ public sealed class AttackRangeTests
         var rules = new MilitaryRulebook(new(7, 1, [0, 0, 0, 0, 0, 1, 1],
             [new(0, 1, 1), new(1, 1, 1) { IsWater = waterTarget }],
             [new(7000, movementBudget, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = combat, CaptureRanks = [BattleRank.Front],
+                { Combat = combat, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]),
                     Attack = new(1, false) { ElevationBonusPerLevel = restricted ? 0 : 5, MaximumElevationBonus = restricted ? 0 : 10,
                         RequiresWaterContact = restricted }, Tactics = new(100, 2, [0], []) },
                 new(7001, 1, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(1, false), CaptureRanks = [BattleRank.Front] }],
+                { Combat = combat, Attack = new(1, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(2, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat },
                 new(2, new(32, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat }])
         {
@@ -33,9 +33,9 @@ public sealed class AttackRangeTests
             [new(11, 1, null, new(80, 80, 80, 80), false) { UnitId = 0, LearnedTactics = [9000], EquippedTacticId = 9000 },
                 new(21, 2, null, new(80, 80, 80, 80), false) { UnitId = 1 }, new(22, 2, 2, new(80, 80, 80, 80), false)],
             units: [new(0, 1, new(7, 2), 100000) { FormationId = 7000, Morale = 100, ServicePlaceId = 1,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) },
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) },
                 new(1, 2, new(27, 2), 100000) { FormationId = 7001, Morale = 100, ServicePlaceId = 2,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front) }],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)) }],
             controls: [new("player", 1, ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(10000, 1000000)) { IsRoot = true }]);
         captureRules?.Invoke(rules);
         return new(state, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: rules);

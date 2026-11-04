@@ -14,6 +14,7 @@ public sealed record CreatedOfficer(Guid Id, string Name)
     [JsonRequired] public string CourtesyName { get; init; } = "";
     [JsonRequired] public string Biography { get; init; } = "";
     [JsonRequired] public string? PortraitKey { get; init; }
+    [JsonRequired] public int FlagGlyph { get; init; } = -1;
     [JsonRequired] public OfficerAbilities Abilities { get; init; } = new(50, 50, 50, 50);
     [JsonRequired] public bool IsFemale { get; init; }
     [JsonRequired] public int BirthYear { get; init; } = 170;
@@ -32,7 +33,7 @@ public sealed record CreatedOfficer(Guid Id, string Name)
     public void Validate()
     {
         if (Id == Guid.Empty || string.IsNullOrWhiteSpace(Name) || Surname is null || CourtesyName is null || Biography is null ||
-            BirthYear < 1 || AppearanceYear < BirthYear || LifespanTier is < 0 or > 7 ||
+            FlagGlyph < -1 || BirthYear < 1 || AppearanceYear < BirthYear || LifespanTier is < 0 or > 7 ||
             Abilities.War < 1 || Abilities.Intelligence < 1 || Abilities.Politics < 1 || Abilities.Leadership < 1 ||
             Personality is < 0 or > 3 || Righteousness is < 0 or > 15 || Ambition is < 0 or > 15 || Affinity is < 0 or > 149 ||
             ParentId == Guid.Empty || ParentId == Id ||
@@ -48,7 +49,7 @@ public sealed record CreatedOfficer(Guid Id, string Name)
 
 public sealed record CreatedOfficerLibrary(int SchemaVersion, ImmutableArray<CreatedOfficer> Officers)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 3;
     public static CreatedOfficerLibrary Empty { get; } = new(CurrentSchemaVersion, []);
     public void Validate()
     {

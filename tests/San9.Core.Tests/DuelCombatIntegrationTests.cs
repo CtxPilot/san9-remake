@@ -20,7 +20,7 @@ public sealed class DuelCombatIntegrationTests
         var combat = normalPower ? new CombatProfile(10, 10, 0, 10, 50) : new CombatProfile(0, 0, 0, 1000, 50);
         var military = new MilitaryRulebook(new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
             [new(1, 5, 0, 100000, 3, new(1, 1), TravelMode.Land)
-                { CaptureRanks = [BattleRank.Front, BattleRank.Front, BattleRank.Rear], Combat = combat, Attack = new(1, false), Tactics = new(opportunity, 2, [], []) }],
+                { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Front, BattleRank.Rear]), Combat = combat, Attack = new(1, false), Tactics = new(opportunity, 2, [], []) }],
             [new(1, new(2, 2), new(1, 1)) { Combat = combat }, new(2, new(17, 2), new(1, 1)) { Combat = combat }])
         {
             DefensiveTacticChance = defensiveChance, BattleDeathsAllowed = true, DuelCapturesAllowed = false,
@@ -39,8 +39,8 @@ public sealed class DuelCombatIntegrationTests
         change.Replace(change.Forces[1] with { LeaderId = 11 }); change.Replace(ResourceAccounts.Root(change, 1) with { LeaderId = 11 });
         change.Replace(change.Forces[2] with { LeaderId = 22 }); change.Replace(ResourceAccounts.Root(change, 2) with { LeaderId = 22 });
         change.Replace(change.Units[1] with { Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 2 } });
-        change.Replace(change.Units[2] with { MemberRanks = ImmutableDictionary<int, BattleRank>.Empty
-            .Add(21, BattleRank.Rear).Add(22, BattleRank.Front).Add(23, BattleRank.Rear) });
+        change.Replace(change.Units[2] with { MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty
+            .Add(21, BattleRank.Rear).Add(22, BattleRank.Front).Add(23, BattleRank.Rear)) });
         change.SetSimulation(change.Simulation with { BattleDeathsEnabled = deaths, Controls = [new("player", 2, ControllerKind.Player)] });
         world.Commit(change);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: military);
@@ -48,10 +48,10 @@ public sealed class DuelCombatIntegrationTests
         {
             var snapshot = engine.Snapshot;
             var laterAttacker = snapshot.Units.Single(u => u.Id == 1) with { Id = 3, Position = new(11, 2),
-                CommanderId = 31, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(31, BattleRank.Rear),
+                CommanderId = 31, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(31, BattleRank.Rear)),
                 Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 4 } };
             var laterDefender = laterAttacker with { Id = 4, OwnerId = 2, Position = new(12, 2), CommanderId = 41,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(41, BattleRank.Rear), Order = null };
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(41, BattleRank.Rear)), Order = null };
             engine = new SimulationEngine(WorldState.Restore(snapshot with
             {
                 Simulation = snapshot.Simulation with { NextUnitId = 5 },

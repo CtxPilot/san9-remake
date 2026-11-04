@@ -22,7 +22,7 @@ public sealed class PoliticalEventSessionTests
         AnnualAppearancesEnabled = false, NaturalDeathsEnabled = false, OfficeRequestsEnabled = false,
         FreeOfficerMigrationEnabled = false, ForceEmergenceEnabled = false, CityIndependenceEnabled = false,
         ForceConsolidationEnabled = false,
-        Officers = [new("ruler.1", new(1, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler }),
+        Officers = [new("ruler.1", new(1, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler }) { FlagGlyph = 10 },
             new("ruler.2", new(2, 2, 2, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler }),
             new("emperor", new(31, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Free })],
         ImperialCourt = new([31], []), ImperialCourtEnded = ended,

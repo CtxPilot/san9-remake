@@ -7,7 +7,7 @@ namespace San9.Core.Tests;
 public sealed class NavigationQueryConsistencyTests
 {
     [Fact]
-    public void ForecastContinuesPastIdleDaysWhenDailyRandomnessCanChangeTheRoute()
+    public void RouteEstimateDoesNotSimulateIdleDaysOrConsumeDailyRandomness()
     {
         var rules = new MilitaryRulebook(new(20, 20, new int[400].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)], []));
@@ -22,9 +22,8 @@ public sealed class NavigationQueryConsistencyTests
             corps: [new(1, 1, null, new(0, 0)) { IsRoot = true }, new(2, 2, null, new(0, 0)) { IsRoot = true }]);
         var snapshot = state.CreateSnapshot();
         var forecast = new MilitaryArrivalForecast(snapshot, rules);
-        Assert.Equal(new(ArrivalEstimateStatus.Incomplete), forecast.Estimate(0, maximumDays: 4));
         Assert.Equal(new(ArrivalEstimateStatus.Incomplete), forecast.Estimate(0, maximumExpanded: 1));
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 11), forecast.Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 2), forecast.Estimate(0));
 
         var world = state.BeginMutation();
         for (int day = 1; day <= 11; day++)
@@ -36,16 +35,16 @@ public sealed class NavigationQueryConsistencyTests
             world.SetClock(world.Clock.NextDay());
         }
         Assert.All(obstacles, obstacle => Assert.Equal(obstacle.Position, world.Units[obstacle.Id].Position));
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 11), forecast.Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 2), forecast.Estimate(0));
         Assert.Equal(mover.Position, snapshot.Units.Single(u => u.Id == 0).Position);
     }
 
     [Fact]
-    public void DeploymentForecastPredictsFacilityEngagementLikeAnExistingUnit()
+    public void DeploymentAndExistingUnitEstimateTheSameRouteWithoutFutureFacilityEngagement()
     {
         var rules = new MilitaryRulebook(new(40, 30, new int[1200].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(22, 52), new(4, 4)), new(2, new(62, 58), new(40, 4))
                 { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true) }]));
         var state = WorldState.Create(new(190, 1, 1), 42, [new(1, 100), new(2, 100)],
@@ -60,21 +59,23 @@ public sealed class NavigationQueryConsistencyTests
             { FormationId = 0, Order = request.Order, Policies = request.Policies, ServicePlaceId = 1, Morale = 80 });
         Assert.Equal(ArrivalEstimateStatus.Known, estimate.Status);
         Assert.Equal(estimate, new MilitaryArrivalForecast(world.CapturePresentation(), rules).Estimate(0));
-        Assert.True(estimate.Days > 10); // Unopposed travel takes ten days on this terrain.
+        Assert.Equal(10, estimate.Days);
         bool slowed = false;
-        for (int day = 1; day <= estimate.Days; day++)
+        int actualDays = 0;
+        for (int day = 1; day <= 30; day++)
         {
             world.SetClock(world.Clock.NextDay());
             var unit = world.Units[0];
             slowed |= unit.PassiveEngagement;
             var step = MilitaryNavigation.Advance(world, unit, unit.Id, rules, MilitaryNavigation.Budget(unit, rules));
             world.AdvanceNavigation(unit.Id, step);
-            Assert.Equal(day == estimate.Days, step.Arrived);
+            if (step.Arrived) { actualDays = day; break; }
             MilitaryEngagements.ClearExpired(world, rules);
             if (MilitaryEngagements.FacilityTarget(world, world.Settlements[2], rules) is { } victim)
                 MilitaryEngagements.Open(world, new(2, true), new(victim.Id, false), rules);
         }
         Assert.True(slowed);
+        Assert.True(actualDays > estimate.Days);
         Assert.Equal(estimate, forecast.EstimateDeployment(request));
         Assert.Empty(snapshot.Units);
         Assert.Equal(0, snapshot.Simulation.NextUnitId);
@@ -89,7 +90,7 @@ public sealed class NavigationQueryConsistencyTests
     {
         var rules = new MilitaryRulebook(new(40, 30, new int[1200].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(172, 52), new(4, 4))]));
         var unit = new UnitState(0, 1, new(22, 52), 1000)
         {
@@ -126,7 +127,7 @@ public sealed class NavigationQueryConsistencyTests
     [Theory]
     [InlineData(false, 12)]
     [InlineData(true, 12)]
-    public void ForecastExpiresEngagementDuringDaysWithoutMovement(bool departure, int expectedDays)
+    public void RouteEstimateIncludesDepartureDelayButDoesNotSimulateConfusionOrEngagement(bool departure, int expectedDays)
     {
         var rules = new MilitaryRulebook(new(50, 30, new int[1500].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)], []));
@@ -139,7 +140,7 @@ public sealed class NavigationQueryConsistencyTests
         };
         var state = World(unit);
         var snapshot = state.CreateSnapshot();
-        Assert.Equal(new(ArrivalEstimateStatus.Known, expectedDays), new MilitaryArrivalForecast(snapshot, rules).Estimate(0));
+        Assert.Equal(new(ArrivalEstimateStatus.Known, departure ? 12 : 10), new MilitaryArrivalForecast(snapshot, rules).Estimate(0));
         var world = state.BeginMutation();
         for (int day = 1; day <= expectedDays; day++)
         {
@@ -153,11 +154,11 @@ public sealed class NavigationQueryConsistencyTests
     }
 
     [Fact]
-    public void ForecastOpensEngagementBeforeDepartureDelayExpires()
+    public void RouteEstimateDoesNotOpenFutureEngagementDuringDepartureDelay()
     {
         var rules = new MilitaryRulebook(new(50, 30, new int[1500].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true), CaptureRanks = [BattleRank.Front] }], []));
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(10, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []));
         var unit = new UnitState(0, 1, new(22, 22), 1000)
         {
             FormationId = 0, Morale = 90, DepartureDaysRemaining = 2,
@@ -170,10 +171,11 @@ public sealed class NavigationQueryConsistencyTests
         var state = WorldState.Create(new(190, 1, 1), 42, [new(1, 100), new(2, 100)], [], [], [unit, enemy],
             corps: [new(1, 1, null, new(0, 0)) { IsRoot = true }, new(2, 2, null, new(0, 0)) { IsRoot = true }]);
         var estimate = new MilitaryArrivalForecast(state.CreateSnapshot(), rules).Estimate(0);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 16), estimate);
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 13), estimate);
         var world = state.BeginMutation();
-        // Freeze external positions and damage, matching the forecast's external-world contract.
-        for (int day = 1; day <= estimate.Days; day++)
+        // Actual execution still opens engagements and can arrive later than the route estimate.
+        int? arrivalDay = null;
+        for (int day = 1; day <= 32; day++)
         {
             world.SetClock(world.Clock.NextDay());
             var current = world.Units[0];
@@ -184,8 +186,14 @@ public sealed class NavigationQueryConsistencyTests
                 MilitaryEngagements.Open(world, new(1, false), new(0, false), rules);
             MilitaryMovement.TickDepartureDelays(world);
             if (day == 2) Assert.True(world.Units[0].PassiveEngagement);
-            Assert.Equal(day == estimate.Days, world.Units[0].Position == unit.Order.Position);
+            if (world.Units[0].Position == unit.Order.Position)
+            {
+                arrivalDay = day;
+                break;
+            }
         }
+        Assert.NotNull(arrivalDay);
+        Assert.True(arrivalDay > estimate.Days);
         Assert.Equal(enemy.Position, world.Units[1].Position);
     }
 
@@ -196,7 +204,7 @@ public sealed class NavigationQueryConsistencyTests
     [InlineData(0, 0)]
     [InlineData(9, 0)]
     [InlineData(0, 3)]
-    public void ForecastUsesTheFormalMovementDateIncludingWaitingDays(int departure, int confusion)
+    public void RouteEstimateIsIndependentOfFutureMovementDatesAndConfusion(int departure, int confusion)
     {
         var rules = Rules();
         var unit = new UnitState(0, 1, new(22, 22), 1000)
@@ -208,15 +216,10 @@ public sealed class NavigationQueryConsistencyTests
         var state = World(unit);
         var forecast = new MilitaryArrivalForecast(state.CreateSnapshot(), rules).Estimate(0);
         Assert.Equal(ArrivalEstimateStatus.Known, forecast.Status);
-        var world = state.BeginMutation();
-        for (int day = 1; day <= forecast.Days; day++)
-        {
-            MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
-            MilitaryConditions.Tick(world, []);
-            MilitaryMovement.TickDepartureDelays(world);
-            world.SetClock(world.Clock.NextDay());
-            Assert.Equal(day == forecast.Days, world.Units[0].Position == unit.Order.Position);
-        }
+        var normal = unit with { DepartureDaysRemaining = 0, Condition = UnitCondition.Normal, ConditionDaysRemaining = 0 };
+        var baseline = new MilitaryArrivalForecast(World(normal).CreateSnapshot(), rules).Estimate(0);
+        Assert.Equal(baseline.Days + departure, forecast.Days);
+        Assert.Equal(forecast, new MilitaryArrivalForecast(state.CreateSnapshot() with { Clock = new(191, 2, 3) }, rules).Estimate(0));
     }
 
     [Fact]
@@ -242,7 +245,7 @@ public sealed class NavigationQueryConsistencyTests
     [Theory]
     [InlineData(UnitCondition.HighSpirits)]
     [InlineData(UnitCondition.NoFormation)]
-    public void ConditionExpiryClearsOldLookaheadInForecastAndFormalMovement(UnitCondition condition)
+    public void RouteEstimateIgnoresOldLookaheadWhileFormalMovementClearsItOnConditionExpiry(UnitCondition condition)
     {
         var rules = new MilitaryRulebook(new(50, 30, new int[1500].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)], []));
@@ -254,14 +257,14 @@ public sealed class NavigationQueryConsistencyTests
         var state = World(unit);
         var snapshot = state.CreateSnapshot();
         var estimate = new MilitaryArrivalForecast(snapshot, rules).Estimate(0);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 12), estimate);
+        Assert.Equal(new(ArrivalEstimateStatus.Known, 10), estimate);
         var world = state.BeginMutation();
-        for (int day = 1; day <= estimate.Days; day++)
+        for (int day = 1; day <= 12; day++)
         {
             MilitaryMovement.ResolveArrivals(world, MilitaryMovement.AdvanceDay(world, rules, []), rules, new([]), PersonnelRulebook.Empty, []);
             MilitaryConditions.Tick(world, []);
             if (day == 1) Assert.Null(world.Units[0].Lookahead);
-            Assert.Equal(day == estimate.Days, world.Units[0].Position == unit.Order.Position);
+            Assert.Equal(day == 12, world.Units[0].Position == unit.Order.Position);
         }
         Assert.Equal(unit, snapshot.Units.Single());
     }
@@ -271,7 +274,7 @@ public sealed class NavigationQueryConsistencyTests
     {
         var rules = new MilitaryRulebook(new(50, 30, new int[1500].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }], []));
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []));
         var unit = new UnitState(0, 1, new(22, 22), 1000)
         {
             FormationId = 0, Morale = 80, Order = new(MilitaryOrderKind.Move, new(122, 22), null),
@@ -280,7 +283,7 @@ public sealed class NavigationQueryConsistencyTests
         var state = WorldState.Create(new(190, 1, 1), 42, [new(1, 100), new(2, 100)], [], [],
             [unit, new(1, 2, new(72, 22), 1000) { FormationId = 0, Morale = 80 }],
             corps: [new(1, 1, null, new(0, 0)) { IsRoot = true }, new(2, 2, null, new(0, 0)) { IsRoot = true }]);
-        Assert.Equal(new(ArrivalEstimateStatus.Incomplete), new MilitaryArrivalForecast(state.CreateSnapshot(), rules).Estimate(0));
+        Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(state.CreateSnapshot(), rules).Estimate(0).Status);
         var world = state.BeginMutation();
         MilitaryConditions.Tick(world, []);
         Assert.Equal(unit.ContactTarget, world.Units[0].ContactTarget);

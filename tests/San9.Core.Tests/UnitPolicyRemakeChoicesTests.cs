@@ -63,7 +63,7 @@ public sealed partial class UnitPolicyTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void EndingTemporaryPursuitCannotBeUndoneByTheNextApproachPass(bool pursue)
+    public void EndingTemporaryPursuitAllowsANewApproachDecision(bool pursue)
     {
         var world = World(1, new(AttackApproachingEnemies: true, Pursue: pursue)).BeginMutation();
         world.Replace(world.Units[1] with { EngagementTargetId = 2 });
@@ -71,22 +71,25 @@ public sealed partial class UnitPolicyTests
             AutonomousReturn = true, PursuitResponsePending = true });
         List<DomainEvent> events = [];
         MilitaryPolicies.ResolvePursuit(world, Rules(), events);
-        MilitaryPolicies.FinishPursuitResponses(world);
-        for (int day = 0; day < 3; day++) MilitaryPolicies.ApproachDay(world, Rules(), events);
         Assert.Null(world.Units[1].EngagementTargetId);
         Assert.Equal(Mission, world.Units[1].Order);
         Assert.Single(events.OfType<UnitPolicyRespondedEvent>(), e => e.Unit.Id == 1 && e.Response == UnitPolicyResponse.ResumeOrders);
-        Assert.DoesNotContain(events.OfType<UnitEngagementChangedEvent>(), e => e.UnitId == 1 && e.TargetId == 2);
-        // Once this is an advancing enemy again, ordinary interception is available without a cooldown.
-        world.Replace(world.Units[2] with { Order = Attack(1), AutonomousReturn = false });
+        MilitaryPolicies.FinishPursuitResponses(world);
         MilitaryPolicies.ApproachDay(world, Rules(), events);
         Assert.Equal(2, world.Units[1].EngagementTargetId);
+        Assert.Equal(Mission, world.Units[1].Order);
+        Assert.True(world.Units[2].AutonomousReturn);
+        Assert.Single(events.OfType<UnitPolicyRespondedEvent>(), e => e.Unit.Id == 1 && e.Response == UnitPolicyResponse.AttackOrdered);
+        int count = events.Count;
+        MilitaryPolicies.ResolvePursuit(world, Rules(), events);
+        MilitaryPolicies.ApproachDay(world, Rules(), events);
+        Assert.Equal(count, events.Count);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void PublicDailyAdvanceResumesTheMissionInsteadOfReacquiringTheRetreatingEnemy(bool pursue)
+    public void PublicDailyAdvanceCanReacquireTheRetreatingEnemy(bool pursue)
     {
         var snapshot = World(1, new(AttackApproachingEnemies: true, Pursue: pursue)).CreateSnapshot();
         snapshot = snapshot with
@@ -97,17 +100,18 @@ public sealed partial class UnitPolicyTests
         };
         var engine = new SimulationEngine(WorldState.Restore(snapshot), EconomyRulebook.Empty,
             PersonnelRulebook.Empty, TreasureRulebook.Empty, military: Rules());
-        for (int day = 0; day < 3; day++)
-        {
-            var result = engine.AdvanceDay();
-            Assert.Equal(Mission, result.Snapshot.Units.Single(u => u.Id == 1).EffectiveOrder);
-            Assert.DoesNotContain(result.Events.OfType<UnitPolicyRespondedEvent>(), e => e.Unit.Id == 1 &&
-                e.Response is UnitPolicyResponse.AttackOrdered or UnitPolicyResponse.AttackDespiteOrders);
-        }
+        var result = engine.AdvanceDay();
+        var unit = result.Snapshot.Units.Single(u => u.Id == 1);
+        Assert.Equal(Mission, unit.Order);
+        Assert.Equal(Attack(2), unit.EffectiveOrder);
+        Assert.Contains(result.Events.OfType<UnitPolicyRespondedEvent>(), e => e.Unit.Id == 1 &&
+            e.Response == UnitPolicyResponse.ResumeOrders);
+        Assert.Contains(result.Events.OfType<UnitPolicyRespondedEvent>(), e => e.Unit.Id == 1 &&
+            e.Response == UnitPolicyResponse.AttackOrdered);
     }
 
     [Fact]
-    public void PostActionCannotStartAPursuitThatInterceptionWouldRefuse()
+    public void PostActionCanSelectARetreatingEnemyWithoutPursuitPermission()
     {
         var world = World(1, new(AttackApproachingEnemies: true, AttackAfterAction: true)).BeginMutation();
         world.Replace(world.Units[1] with { Order = null, AwaitingPostAction = true });
@@ -115,8 +119,24 @@ public sealed partial class UnitPolicyTests
             AutonomousReturn = true });
         List<DomainEvent> events = [];
         MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events);
-        Assert.Equal(UnitPolicyResponse.PostActionNoTarget, Assert.Single(events.OfType<UnitPolicyRespondedEvent>()).Response);
-        Assert.Equal(MilitaryOrderKind.Return, world.Units[1].Order!.Kind);
+        Assert.Equal(UnitPolicyResponse.PostActionAttackOrdered, Assert.Single(events.OfType<UnitPolicyRespondedEvent>()).Response);
+        Assert.Equal(Attack(2), world.Units[1].Order);
+    }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    public void InitialApproachToARetreatingEnemyUsesOwnReturnIdentity(bool pursue, bool autonomous, bool engages)
+    {
+        var world = World(1, new(AttackApproachingEnemies: true, Pursue: pursue),
+            new(MilitaryOrderKind.Return, null, 1)).BeginMutation();
+        world.Replace(world.Units[1] with { AutonomousReturn = autonomous });
+        world.Replace(world.Units[2] with { Order = new(MilitaryOrderKind.Return, null, 2), AutonomousReturn = true });
+        MilitaryPolicies.ApproachDay(world, Rules(), []);
+        Assert.Equal(engages ? 2 : (int?)null, world.Units[1].EngagementTargetId);
+        Assert.Equal(new(MilitaryOrderKind.Return, null, 1), world.Units[1].Order);
     }
 
     [Fact]

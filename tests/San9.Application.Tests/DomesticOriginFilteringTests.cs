@@ -13,7 +13,7 @@ public sealed class DomesticOriginFilteringTests
         var combat = new CombatProfile(10, 10, 10, 10, 50);
         var content = basis with { Military = basis.Military! with
         {
-            Formations = [basis.Military.Formations[0] with { Combat = combat, Attack = new(10, true), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Middle, basis.Military.Formations[0].OfficerCapacity)] }],
+            Formations = [basis.Military.Formations[0] with { Combat = combat, Attack = new(10, true), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Middle, basis.Military.Formations[0].OfficerCapacity)]) }],
             Places = [.. basis.Military.Places.Select(p => p with { Combat = combat })]
         } };
         var world = GameSession.Start(basis, 1).Snapshot;
@@ -24,8 +24,8 @@ public sealed class DomesticOriginFilteringTests
             Officers = world.Officers.Select(p => p.OwnerId == 1 ? p with { BaseAbilities = new(100, 100, 100, 100) } : p).ToArray(),
             Corps = world.Corps.Select(c => c.Id == 1 ? c with { Treasury = new(100000, 1000000) } : c).ToArray(),
             Units = [.. world.Units.Select(u => u.Id == 20 ? u with
-                { MemberRanks = u.MemberRanks.SetItem(23, BattleRank.Middle), Position = state == 2 ? new(4, 7) : new(42, 7), Order = new(MilitaryOrderKind.AttackSettlement, null, 1) }
-                : u with { MemberRanks = u.MemberRanks.SetItem(3, BattleRank.Middle), Position = new(102, 7), Order = null })]
+                { MemberPositions = u.MemberPositions.SetItem(23, new(0, BattleRank.Middle)), Position = state == 2 ? new(4, 7) : new(42, 7), Order = new(MilitaryOrderKind.AttackSettlement, null, 1) }
+                : u with { MemberPositions = u.MemberPositions.SetItem(3, new(0, BattleRank.Middle)), Position = new(102, 7), Order = null })]
         };
         var engine = GameSession.EngineFactory(content)(WorldState.Restore(world));
         var military = new MilitaryRulebook(content.Military!);

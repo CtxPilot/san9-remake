@@ -55,7 +55,9 @@ public partial class WorkflowLifecycleVerification
                 ConfigureTacticsOnFormationSelection: true, BattleDeathProtectionThreshold: 125,
                 AllowCommanderBattleDeaths: true, DuelDeathCoefficient: 0, InfiniteLifespan: true } &&
                 saved.Rules.ComputerStrategyPermissions is { Alienate: false, Burn: false, FalseReport: true } &&
-                saved.Rules.PlayerDelegatedStrategyPermissions == saved.Rules.ComputerStrategyPermissions,
+                saved.Rules.PlayerDelegatedStrategyPermissions == saved.Rules.ComputerStrategyPermissions &&
+                saved.Rules.ComputerDiplomacyPermissions is { Gift: false, RequestAttack: false, ReturnPrisoner: true, Surrender: false } &&
+                saved.Rules.PlayerDelegatedDiplomacyPermissions == saved.Rules.ComputerDiplomacyPermissions,
                 $"The companion preset discarded a retained numeric draft or applied incorrect policies: {saved}.");
             Check(saved?.FormationAppearanceEnabled == true, "The companion preset did not enable formation appearance.");
 
@@ -68,6 +70,14 @@ public partial class WorkflowLifecycleVerification
             view.Back();
             Check(writes == 3 && closes == 5 && saved == new CompanionConfiguration(CompanionSettings.Default, true),
                 "A visual-only draft must save without changing simulation settings.");
+            var computerGift = buttons.Single(b => b.TooltipText.StartsWith("电脑势力：自动向其他势力赠送", StringComparison.Ordinal));
+            var delegatedReturn = buttons.Single(b => b.TooltipText.StartsWith("玩家委任军团：自动派遣使者请求交还", StringComparison.Ordinal));
+            computerGift.ButtonPressed = false;
+            delegatedReturn.ButtonPressed = false;
+            view.Back();
+            Check(saved?.Rules.ComputerDiplomacyPermissions is { Gift: false, RequestAttack: true, ReturnPrisoner: true, Surrender: true } &&
+                saved.Rules.PlayerDelegatedDiplomacyPermissions is { Gift: true, RequestAttack: true, ReturnPrisoner: false, Surrender: true },
+                "Diplomacy editors changed the wrong command or control scope.");
             GD.Print("COMPANION_DRAFT_OK pending-input,preset,reset,save-failure");
         }
         finally { view.Free(); }

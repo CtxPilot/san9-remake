@@ -16,6 +16,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     public Func<string, int[], San9.Core.Domain.NewGameSettings, int, NewGameSetup, Task> BeginGame { get; init; } = null!;
     public TextureService Service { get; init; } = null!;
     public Persistence.ClientDataPaths DataPaths { get; init; } = null!;
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public string ContentRoot { get; init; } = "";
     private CreatedOfficerEditor? _officerEditor;
     private TextureScope _textures = null!;
@@ -83,7 +84,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     {
         if (_officerEditor is not null) return;
         _controls.Hide();
-        _officerEditor = new CreatedOfficerEditor { Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Closed = () =>
+        _officerEditor = new CreatedOfficerEditor { Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Preferences = Preferences, Closed = () =>
         {
             _officerEditor!.QueueFree(); _officerEditor = null; _controls.Show();
             _controls.GetNode<StartMenuButton>("create-officer").GrabFocus();

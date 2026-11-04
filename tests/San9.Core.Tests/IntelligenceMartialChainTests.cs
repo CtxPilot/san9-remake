@@ -17,10 +17,10 @@ public sealed class IntelligenceMartialChainTests
         // Contact boundary cases keep positions fixed throughout the xun despite continued approach.
         var rules = new MilitaryRulebook(new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, contact ? 100 : 1, contact ? 100 : 1)],
             [new(100, 5, 0, 200000, 3, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(10, false), CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Rear],
+                { Combat = combat, Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle, BattleRank.Rear]),
                     Tactics = new(100, 4, [0], []) },
              new(200, 5, 0, 200000, 1, new(1, 1), TravelMode.Land)
-                { Combat = combat, CaptureRanks = [BattleRank.Middle] }],
+                { Combat = combat, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
             [new(1, new(2, 2), new(1, 1)) { Combat = combat }, new(2, new(17, 2), new(1, 1)) { Combat = combat }])
         {
             Tactics = [new(9000, 7, effect, effect == TacticEffect.Taunt ? 0 : 10, 30, 0, true, true, [100]),
@@ -40,12 +40,12 @@ public sealed class IntelligenceMartialChainTests
             new(21, 2, settlement ? 2 : null, new(70, 0, 70, 70), false) { UnitId = settlement ? null : 1 }
         };
         List<UnitState> units = [new(0, 1, new(6, 2), 100000) { FormationId = 100, Morale = 100, ServicePlaceId = 1,
-            MemberRanks = new Dictionary<int, BattleRank> { [11] = BattleRank.Front, [12] = BattleRank.Middle,
-                [13] = BattleRank.Rear }.ToImmutableDictionary() }];
+            MemberPositions = San9.Tests.FormationTestData.Members(new Dictionary<int, BattleRank> { [11] = BattleRank.Front, [12] = BattleRank.Middle,
+                [13] = BattleRank.Rear }.ToImmutableDictionary()) }];
         if (!settlement) units.Add(new(1, 2, new(targetX, 2), targetSoldiers)
             { FormationId = 200, Morale = 100, ServicePlaceId = 2, Condition = condition,
                 ConditionDaysRemaining = condition == UnitCondition.Normal ? 0 : 30,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle) });
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)) });
         var state = WorldState.Create(new(190, 1, 1), seed,
             [new(1, 100) { LeaderId = 11 }, new(2, 100) { LeaderId = 21 }],
             [new(1, 1, 1000, 100, 100, 100, 0, 0, 100, 0, 100),

@@ -13,9 +13,9 @@ public sealed class FacilityConstructionTests
     private static readonly MilitaryRulebook Military = CreateMilitary();
     private static MilitaryRulebook CreateMilitary(bool hostsPeople = true, bool needsTechnology = false, bool attacksWalls = false, int members = 1) => new(new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, 1, null)],
         [new(1, 5, 50, 100000, members, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 1000, 10, 50), Attack = new(1, attacksWalls), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Front, members)] },
+            { Combat = new(10, 10, 1000, 10, 50), Attack = new(1, attacksWalls), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Front, members)]) },
          new(2, 5, 50, 100000, members, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 1000, 10, 50), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Front, members)] }],
+            { Combat = new(10, 10, 1000, 10, 50), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Front, members)]) }],
         [new(1, new(2, 2), new(1, 1)) { FacilityTypeId = 0 },
          new(2, new(27, 2), new(1, 1)) { FacilityTypeId = 0 }])
     {
@@ -141,9 +141,9 @@ public sealed class FacilityConstructionTests
     }
 
     [Theory]
-    [InlineData(24)]
-    [InlineData(25)]
-    public void ConstructionFindsClearArrivalAfterShoreFootprintExpansion(int startX)
+    [InlineData(24, 2)]
+    [InlineData(25, 0)]
+    public void ConstructionFindsClearArrivalAfterShoreFootprintExpansion(int startX, int routeDays)
     {
         var rules = new MilitaryRulebook(new(10, 10,
             Enumerable.Range(0, 100).Select(i => i % 10 < 5 && i / 10 >= 5 ? 1 : 0).ToImmutableArray(),
@@ -174,14 +174,15 @@ public sealed class FacilityConstructionTests
         var site = new MapOccupancy(new(27, 22), new(4, 4));
         Assert.Equal(startX == 25, MilitaryCombat.Area(builder, rules).Overlaps(site));
         var estimate = new MilitaryArrivalForecast(snapshot, rules, geography.RegionCities, TreasureRulebook.Empty).Estimate(0);
-        Assert.Equal(new(ArrivalEstimateStatus.Known, 1), estimate);
+        // Coarse route time does not predict the final footprint adjustment across the shore.
+        Assert.Equal(new(ArrivalEstimateStatus.Known, routeDays), estimate);
         var world = state.BeginMutation();
         List<DomainEvent> events = [];
         FacilityConstruction.AdvanceDay(world, simulation, events);
         Assert.False(MilitaryCombat.Area(world.Units[0], rules).Overlaps(site));
         Assert.Equal(NavigationStatus.Arrived, Assert.Single(events.OfType<UnitMovedEvent>()).Status);
         var started = Assert.Single(events.OfType<FacilityConstructionChangedEvent>(), e => e.Phase == "started");
-        Assert.Equal(Math.Max(1L, estimate.Days!.Value), started.Clock.DayNumber - snapshot.Clock.DayNumber + 1);
+        Assert.Equal(1L, started.Clock.DayNumber - snapshot.Clock.DayNumber + 1);
         Assert.True(world.Settlements.ContainsKey(8000));
         Assert.Equal(builder, snapshot.Units.Single());
     }
@@ -655,7 +656,7 @@ public sealed class FacilityConstructionTests
                 { UnitId = 1, Status = OfficerStatus.Ruler }),
             Units = saved.Units.Select(u => u with { Condition = UnitCondition.Confused, ConditionDaysRemaining = 100 }).ToImmutableArray()
                 .Add(new(1, 2, new(19, 2), 10000) { FormationId = 1, Morale = 100,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front),
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)),
                     Order = new(MilitaryOrderKind.AttackSettlement, null, 8000) }),
             Simulation = saved.Simulation with { NextUnitId = 2 }
         }), rules);
@@ -703,7 +704,7 @@ public sealed class FacilityConstructionTests
             Officers = saved.Officers.ToImmutableArray().Add(new(21, 2, null, new(100, 100, 100, 100), false)
                 { UnitId = 1, Status = OfficerStatus.Ruler }),
             Units = [new(1, 2, new(19, 2), 10000) { FormationId = 1, Morale = 50,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front),
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)),
                 Order = new(MilitaryOrderKind.AttackSettlement, null, 8000) }],
             Simulation = saved.Simulation with { NextUnitId = 2 }
         }), rules);
@@ -741,7 +742,7 @@ public sealed class FacilityConstructionTests
                 { UnitId = 1, Status = OfficerStatus.Ruler }),
             Units = saved.Units.Select(u => u with { Soldiers = 1, Condition = UnitCondition.Confused, ConditionDaysRemaining = 100 }).ToImmutableArray()
                 .Add(new(1, 2, new(12, 2), 10000) { FormationId = 1, Morale = 100,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front),
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)),
                     Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 0 } }),
             Simulation = saved.Simulation with { NextUnitId = 2 }
         }));

@@ -23,7 +23,7 @@ public sealed class MilitaryRoutePreviewTests
                 [new(8, 95, 0, 10000, 5, new(3, 3), TravelMode.Land)
                 {
                     Combat = new(10, 10, 10, 10, 50),
-                    CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear],
+                    Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear]),
                     Attack = new(10, true) { RangedSiege = catapult, ElevationBonusPerLevel = 5, MaximumElevationBonus = 10 }
                 }],
                 [new(1, new(12, 52), new(3, 3)) { Combat = new(10, 10, 10, 10, 50), Attack = new(10, false) },

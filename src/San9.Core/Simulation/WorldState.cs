@@ -19,6 +19,8 @@ public sealed class WorldState
     /// <summary>Every commander follows from the current selection inputs (set by a full reselection, kept by the partial
     /// ones; not saved: a loaded world reselects everything once, as before).</summary>
     internal bool LeadershipConsistent { get; private set; }
+    internal bool GovernanceConsistent { get; private set; }
+    internal EngagementView? EngagementCache { get; private set; }
     private ActiveWorldRecords _activeRecords = new(
         ImmutableDictionary<int, ForceState>.Empty, ImmutableDictionary<int, SettlementState>.Empty,
         ImmutableDictionary<int, OfficerState>.Empty);
@@ -51,7 +53,7 @@ public sealed class WorldState
     public static WorldState Create(GameClock clock, ulong seed) => Create(clock, seed, [], [], []);
 
     public static WorldState Create(GameClock clock, ulong seed, IEnumerable<ForceState> forces,
-        IEnumerable<SettlementState> settlements, IEnumerable<OfficerState> officers, IEnumerable<UnitState>? units = null, IEnumerable<CorpsState>? corps = null, IEnumerable<TreasureState>? treasures = null, IEnumerable<ForceRelation>? relations = null, IEnumerable<ControlSeat>? controls = null, int computerDamageBonusPercent = 0, AllianceState? alliance = null, IEnumerable<AttackRequestState>? attackRequests = null, bool annualAppearancesEnabled = true, bool naturalDeathsEnabled = true, bool freeOfficerMigrationEnabled = true, bool battleDeathsEnabled = false, bool officeRequestsEnabled = true, IEnumerable<PersistentEventKey>? consumedEventKeys = null, bool forceConsolidationEnabled = true, bool forceEmergenceEnabled = true, bool cityIndependenceEnabled = true, bool imperialCourtEnded = false, GameClock? threeVisitsStarted = null, int foodExchangeRate = 1, bool settlementDefectionsEnabled = true, bool unitDefectionsEnabled = true, NewGameSettings? newGame = null, IReadOnlyList<int>? officerStartingPlaces = null, IReadOnlySet<int>? initialPlayerForces = null, IReadOnlySet<int>? foundedForceIds = null)
+        IEnumerable<SettlementState> settlements, IEnumerable<OfficerState> officers, IEnumerable<UnitState>? units = null, IEnumerable<CorpsState>? corps = null, IEnumerable<TreasureState>? treasures = null, IEnumerable<ForceRelation>? relations = null, IEnumerable<ControlSeat>? controls = null, int computerDamageBonusPercent = 0, AllianceState? alliance = null, IEnumerable<AttackRequestState>? attackRequests = null, bool annualAppearancesEnabled = true, bool naturalDeathsEnabled = true, bool freeOfficerMigrationEnabled = true, bool battleDeathsEnabled = false, bool officeRequestsEnabled = true, IEnumerable<PersistentEventKey>? consumedEventKeys = null, bool forceConsolidationEnabled = true, bool forceEmergenceEnabled = true, bool cityIndependenceEnabled = true, bool imperialCourtEnded = false, GameClock? threeVisitsStarted = null, int foodExchangeRate = 1, bool settlementDefectionsEnabled = true, bool unitDefectionsEnabled = true, NewGameSettings? newGame = null, IReadOnlyList<int>? officerStartingPlaces = null, IReadOnlySet<int>? initialPlayerForces = null, IReadOnlySet<int>? foundedForceIds = null, IReadOnlySet<int>? createdOfficerIds = null)
     {
         var world = new WorldState(clock, seed);
         world._forces = IndexUnique(forces, value => value.Id);
@@ -73,13 +75,15 @@ public sealed class WorldState
             AttackRequests = (attackRequests ?? []).OrderBy(r => r.RequestedForceId).ToImmutableArray(),
             NextUnitId = world._units.Count == 0 ? 0 : (long)world._units.Keys.Max() + 1 };
         world._activeRecords = ActiveWorldRecords.Create(world._forces, world._settlements, world._officers);
-        if (newGame is not null || foundedForceIds is { Count: > 0 })
+        if (newGame is not null || foundedForceIds is { Count: > 0 } || createdOfficerIds is { Count: > 0 })
         {
             var initialization = world.BeginMutation();
+            if (createdOfficerIds is { Count: > 0 }) NewGameInitialization.PrepareCreatedOfficers(initialization, createdOfficerIds);
             if (foundedForceIds is { Count: > 0 }) NewGameInitialization.PrepareFoundedForces(initialization, foundedForceIds);
             if (newGame is not null)
                 NewGameInitialization.Apply(initialization, newGame, officerStartingPlaces ?? [],
-                    initialPlayerForces ?? world.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player).Select(c => c.ForceId).ToHashSet());
+                    initialPlayerForces ?? world.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player).Select(c => c.ForceId).ToHashSet(),
+                    createdOfficerIds ?? ImmutableHashSet<int>.Empty);
             world.Commit(initialization);
         }
         WorldInvariants.Validate(world.BeginMutation());
@@ -121,6 +125,8 @@ public sealed class WorldState
             _corps = _corps, _treasures = _treasures, _relations = _relations,
             _activeRecords = _activeRecords,
             Simulation = Simulation, Revision = Revision, _snapshot = _snapshot, LeadershipConsistent = LeadershipConsistent,
+            GovernanceConsistent = GovernanceConsistent,
+            EngagementCache = EngagementCache,
             _publishedForces = _publishedForces,
             _publishedSettlements = _publishedSettlements,
             _publishedOfficers = _publishedOfficers,
@@ -183,6 +189,8 @@ public sealed class WorldState
         _relations = mutation.AllRelations;
         _activeRecords = mutation.ActiveRecords;
         LeadershipConsistent = mutation.LeadershipConsistentAtCommit;
+        GovernanceConsistent = mutation.GovernanceConsistent;
+        EngagementCache = mutation.EngagementCache;
         Clock = mutation.Clock;
         Simulation = mutation.Simulation;
         Revision++;

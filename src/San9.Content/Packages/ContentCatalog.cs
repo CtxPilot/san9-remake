@@ -8,7 +8,8 @@ public sealed record ScenarioCatalogEntry(string Id, string Package);
 public sealed record ContentCatalog(int SchemaVersion, string Textures, string Opening,
     ScenarioCatalogEntry[] Scenarios)
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
+    [System.Text.Json.Serialization.JsonRequired] public string OfficerFlags { get; init; } = null!;
     public ScenarioCatalogEntry RequireScenario(string id) => Scenarios.SingleOrDefault(s => s.Id == id)
         ?? throw new InvalidDataException($"Unknown scenario: {id}.");
 }
@@ -40,8 +41,15 @@ public static class ContentCatalogFiles
             throw new InvalidDataException("Invalid content catalog.");
         _ = PackageFiles.Resolve(root, catalog.Textures);
         _ = PackageFiles.Resolve(root, catalog.Opening);
+        _ = PackageFiles.Resolve(root, catalog.OfficerFlags);
         foreach (var scenario in catalog.Scenarios) _ = PackageFiles.Resolve(root, scenario.Package);
         return catalog;
+    }
+
+    public static async Task<Authoring.OfficerFlagCatalog> LoadOfficerFlagsAsync(string root, ContentCatalog catalog, CancellationToken token = default)
+    {
+        var flags = await PackageFiles.ReadAsync<Authoring.OfficerFlagCatalog>(PackageFiles.Resolve(root, catalog.OfficerFlags), token);
+        flags.Validate(); return flags;
     }
 
     public static async Task<ScenarioPreviewEntry[]> LoadPreviewsAsync(string root, ContentCatalog catalog, CancellationToken token = default)

@@ -44,19 +44,10 @@ public partial class AppointmentView
 
     private void SelectRosterAppointmentOfficers()
     {
-        (int Page, int Column)[] columns = Draft.Kind == "reward"
-            ? [(0,0),(1,7),(3,1),(3,2),(0,1),(0,2),(0,3),(0,4),(0,5),(1,4)]
-            : [(0,0),(1,5),(1,1),(1,7),(0,1),(0,2),(0,3),(0,4),(0,7),(1,4)];
-        var tables = new[] { 0,1,3 }.ToDictionary(page => page,
-            page => OfficerCatalog.Read(Draft.View,Texts,page,null,null).Rows.ToDictionary(r => r.Key.Id));
-        CatalogRow[] Rows(int page) => page == 0
-            ? Draft.Candidates.Select(id => new CatalogRow(id,columns.Select(c => tables[c.Page][id].Cells[c.Column]).ToArray())).ToArray()
-            : OfficerCatalog.Read(Draft.View,Texts,page-1,null,null).Rows.Where(r => Draft.Candidates.Contains(r.Key.Id))
-                .OrderBy(r => Draft.Candidates.IndexOf(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id,r.Cells.ToArray())).ToArray();
         ReplaceChild(new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), Textures = Textures, Service = Service,
             HintText = Texts.Resolve(AppointmentText.Key(Draft.Kind, "select")),
-            Pages = [new(CommandText.Resolve(Texts, "title." + Draft.Kind),columns.Select(c => OfficerCatalog.Pages[c.Page].Columns[c.Column]).ToArray()), .. OfficerCatalog.Pages],
-            ReadRows = Rows, Portrait = id => $"catalog-person-{id}", Selection = new(Draft.Candidates,Draft.Members,Draft.SelectionLimit),
+            Pages = AppointmentOfficerCatalog.Pages(Draft, Texts),
+            ReadRows = page => AppointmentOfficerCatalog.Read(Draft, Texts, page), Portrait = id => $"catalog-person-{id}", Selection = new(Draft.Candidates,Draft.Members,Draft.SelectionLimit),
             ConfirmSelection = ids => { if (Draft.SetMembers(ids)) CloseChild(); }, Closed = CloseChild });
     }
 }

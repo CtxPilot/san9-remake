@@ -24,7 +24,7 @@ public sealed class UnitMapInteractionTests
         {
             Units = [new(77, 2, new(12, 12), 1000) { CommanderId = 4, ServicePlaceId = 2,
                 FormationId = 100, Morale = 70, CorpsId = 2, Order = order,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(4, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(4, BattleRank.Front)) }],
             Simulation = original.Simulation with { NextUnitId = 78 },
             Officers = original.Officers.Select(o => o.Id == 4 ? o with
                 { SettlementId = null, UnitId = 77, IsCommander = false } : o).ToImmutableArray()

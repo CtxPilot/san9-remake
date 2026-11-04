@@ -26,7 +26,7 @@ public sealed class SettlementDefectionTests
             { Construction = new(99, 1, new(352, 2), 1) };
         world.Replace(world.Officers[1] with { SettlementId = null, UnitId = 200, IsCommander = false });
         world.AddUnit(new(200, 1, new(302, 2), 1000) { FormationId = 1, CorpsId = 10, ServicePlaceId = 10,
-            CommanderId = 1, Order = order, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(1, BattleRank.Front) });
+            CommanderId = 1, Order = order, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(1, BattleRank.Front)) });
         var events = Apply(world);
         Assert.Equal(2, world.Settlements[10].OwnerId);
         Assert.Equal(3, world.Units[200].ServicePlaceId);
@@ -85,7 +85,7 @@ public sealed class SettlementDefectionTests
         world.Replace(world.Officers[12] with { Status = OfficerStatus.Captive, SettlementId = 2, StatusStartYear = 180 });
         world.Replace(world.Officers[30] with { OwnerId = 2, Status = OfficerStatus.Captive, SettlementId = null, UnitId = 200 });
         world.AddUnit(new(200, 1, new(302, 2), 10000) { FormationId = 1, CorpsId = 10, ServicePlaceId = 10,
-            CommanderId = 1, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(1, BattleRank.Front).Add(11, BattleRank.Middle) });
+            CommanderId = 1, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(1, BattleRank.Front).Add(11, BattleRank.Middle)) });
         var baseline = Rules();
         var rules = new SimulationRules { Military = baseline.Military,
             Personnel = new(baseline.Personnel.Places.Values, new Dictionary<int, int> { [3] = 10, [2] = 2 },
@@ -142,7 +142,7 @@ public sealed class SettlementDefectionTests
         Personnel = new([new(2, new(102, 2)), new(3, new(302, 2)), new(10, new(52, 2))],
             new Dictionary<int, int> { [2] = 2, [3] = 3, [10] = 2 }, friendlyNeighbor ? [new(2, 3)] : []),
         Military = new(new(80, 1, Enumerable.Repeat(0, 80).ToImmutableArray(), [new(0, 1, null)],
-            [new(1, 1, 0, 1000000, 5, new(1, 1), TravelMode.Land) { CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle], Attack = new(10, true), Combat = new(10, 10, 10, 10, 50) }],
+            [new(1, 1, 0, 1000000, 5, new(1, 1), TravelMode.Land) { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]), Attack = new(10, true), Combat = new(10, 10, 10, 10, 50) }],
             [new(2, new(102, 2), new(1, 1)), new(3, new(302, 2), new(1, 1)),
              new(10, new(52, 2), new(1, 1)) { Combat = new(10, 10, 10, 10, 50) }])
             { RegionIds = Enumerable.Range(0, 80).Select(i => (int?)(i < 40 ? 2 : 3)).ToImmutableArray() })
@@ -381,7 +381,7 @@ public sealed class SettlementDefectionTests
         world.Replace(world.Settlements[3] with { Kind = SettlementKind.Facility });
         world.Replace(world.Officers[1] with { SettlementId = null, UnitId = 200, IsCommander = false });
         world.AddUnit(new(200, 1, new(302, 2), 10000) { FormationId = 1, CorpsId = 10, ServicePlaceId = 3,
-            CommanderId = 1, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(1, BattleRank.Front) });
+            CommanderId = 1, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(1, BattleRank.Front)) });
         world.AddSettlement(Place(11, 2, 200000) with { Kind = SettlementKind.Facility });
         var baseline = Rules();
         var rules = new SimulationRules { Military = baseline.Military, Personnel = new(baseline.Personnel.Places.Values.Append(new(11, new(62, 2))),

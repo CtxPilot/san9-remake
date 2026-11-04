@@ -4,7 +4,7 @@ namespace San9.Application.Presentation;
 
 public static class EndingOfficeCatalog
 {
-    private static readonly Dictionary<string, (CatalogColumn Definition, int Page, int Column)> SourceColumns = OfficerCatalog.Pages
+    private static Dictionary<string, (CatalogColumn Definition, int Page, int Column)> SourceColumns(StrategySnapshot view, TextCatalog texts) => OfficerCatalog.Pages(view, texts)
         .SelectMany((page, p) => page.Columns.Select((column, c) => (Definition: column, Page: p, Column: c)))
         .DistinctBy(c => c.Definition.Id).ToDictionary(c => c.Definition.Id);
     private static readonly Dictionary<string, string[]> Columns = new()
@@ -14,13 +14,15 @@ public static class EndingOfficeCatalog
         ["protector"] = ["leadership", "war", "proficiency.4", "proficiency.6", "learned", "intelligence", "politics", "office", "service"],
         ["successor"] = ["politics", "leadership", "war", "intelligence", "learned", "office", "loyalty", "service"]
     };
-    public static IReadOnlyList<CatalogPage> Pages(string office)
+    public static IReadOnlyList<CatalogPage> Pages(StrategySnapshot view, TextCatalog texts, string office)
     {
-        return [new("能力", new[] { "name" }.Concat(Columns[office]).Select(id => SourceColumns[id].Definition).ToArray())];
+        var source = SourceColumns(view, texts);
+        return [new("能力", new[] { "name" }.Concat(Columns[office]).Select(id => source[id].Definition).ToArray())];
     }
     public static CatalogRow[] Read(EndingDraft draft, TextCatalog texts)
     {
-        var columns = new[] { "name" }.Concat(Columns[draft.CurrentOffice]).Select(id => SourceColumns[id]).ToArray();
+        var source = SourceColumns(draft.View, texts);
+        var columns = new[] { "name" }.Concat(Columns[draft.CurrentOffice]).Select(id => source[id]).ToArray();
         var tables = columns.Select(c => c.Page).Distinct().ToDictionary(page => page,
             page => OfficerCatalog.Read(draft.View, texts, page, null, null).Rows.ToDictionary(r => r.Key.Id));
         var candidates = draft.Candidates.ToHashSet();

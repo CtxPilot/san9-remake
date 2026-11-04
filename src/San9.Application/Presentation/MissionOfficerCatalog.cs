@@ -9,7 +9,7 @@ public static class MissionOfficerCatalog
     {
         "estimate" => new(id,CommandText.Resolve(texts, "label.arrival"),2,CatalogAlignment.Right),
         "inspiration" => new(id,CommandText.Resolve(texts, "label.inspiration"),2,CatalogAlignment.Center),
-        _ => OfficerCatalog.Pages.SelectMany(p => p.Columns).First(c => c.Id == id)
+        _ => OfficerCatalog.CorePages.SelectMany(p => p.Columns).First(c => c.Id == id)
     };
 
     public static IReadOnlyList<CatalogPage> Pages(MissionDraft draft, TextCatalog texts, bool targets = false)
@@ -25,7 +25,7 @@ public static class MissionOfficerCatalog
                 _ => draft.Kind == "inspire" ? ["intelligence","inspiration","status","leadership","war","politics","learned"]
                     : ["intelligence","status","leadership","war","politics","learned"]
             };
-        return [new(CommandText.Resolve(texts, "title." + draft.Kind),[Column("name",texts), .. fields.Select(f => Column(f,texts))]), .. OfficerCatalog.Pages];
+        return [new(CommandText.Resolve(texts, "title." + draft.Kind),[Column("name",texts), .. fields.Select(f => Column(f,texts))]), .. OfficerCatalog.Pages(draft.View, texts)];
     }
 
     public static CatalogRow[] Read(MissionDraft draft, TextCatalog texts, int page, bool targets = false)
@@ -41,7 +41,7 @@ public static class MissionOfficerCatalog
         }
         var columns = pages[0].Columns;
         var fields = columns.Where(c => c.Id is not ("estimate" or "inspiration")).ToDictionary(c => c.Id,
-            c => OfficerCatalog.Pages.Select((p,index) => (Page:index,Column:Array.FindIndex(p.Columns,f => f.Id == c.Id))).First(f => f.Column >= 0));
+            c => OfficerCatalog.CorePages.Select((p,index) => (Page:index,Column:Array.FindIndex(p.Columns,f => f.Id == c.Id))).First(f => f.Column >= 0));
         var facts = fields.Values.Select(f => f.Page).Distinct().ToDictionary(p => p,
             p => OfficerCatalog.Read(draft.View,texts,p,null,null).Rows.ToDictionary(r => r.Key.Id));
         CatalogCell Cell(int id, string field)

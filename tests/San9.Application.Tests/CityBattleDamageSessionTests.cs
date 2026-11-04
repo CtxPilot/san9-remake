@@ -23,7 +23,7 @@ public sealed class CityBattleDamageSessionTests
                 new("second", new(21, 2, 2, new(100, 100, 100, 100), false) { Status = OfficerStatus.Ruler })],
             Military = new(4, 1, [0, 0, 0, 0], [new(0, 1, null)],
                 [new(700, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                    { Combat = combat, Attack = new(1, false), CaptureRanks = [BattleRank.Middle] }],
+                    { Combat = combat, Attack = new(1, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
                 [new(1, new(2, 2), new(1, 1)) { Combat = combat }, new(2, new(12, 2), new(1, 1)) { Combat = combat }]),
             Information = new([], [], [], [new(1, 1, 11, new(10000, 100000)) { IsRoot = true },
                 new(2, 2, 21, new(10000, 100000)) { IsRoot = true }], []),

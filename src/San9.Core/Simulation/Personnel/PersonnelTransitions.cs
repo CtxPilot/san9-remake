@@ -131,16 +131,16 @@ internal static class PersonnelTransitions
         var person = world.Officers[personId];
         var destination = world.Settlements[destinationId];
         if (destination.OwnerId != person.OwnerId || !destination.CanHostPersons) throw new InvalidOperationException("Invalid move destination.");
-        CancelMissions(world, personId, "person-location-changed", events, places, afterDailyCommands);
+        CancelMissions(world, personId, "person-location-changed", events, places, afterDailyCommands, preservePersonTargets: true);
         world.Replace(person with { SettlementId = destinationId, RegionId = null, Acted = true, IsCommander = false });
         events.Add(new OfficerMovedEvent(world.Clock, personId, person.SettlementId!.Value, destinationId,
             new(task.ForceId, world.Forces[task.ForceId].LeaderId, task.Sequence, true, PersonnelLocations.Corps(world, person))));
     }
 
     internal static void CancelMissions(WorldMutation world, int personId, string reason, List<DomainEvent> events, PersonnelRulebook places, bool afterDailyCommands,
-        bool preserveReinforcements = false)
+        bool preserveReinforcements = false, bool preservePersonTargets = false)
     {
-        foreach (var task in world.Simulation.Tasks.Where(t => t.OfficerId == personId || t.Journey?.TargetOfficerId == personId ||
+        foreach (var task in world.Simulation.Tasks.Where(t => t.OfficerId == personId || (!preservePersonTargets && t.Journey?.TargetOfficerId == personId) ||
             t.PrisonerReturn?.PrisonerId == personId || t.PrisonerReturn?.Offer?.PrisonerId == personId || t.AttackRequest?.Offer?.PrisonerId == personId)
             .OrderBy(t => t.Sequence).ThenBy(t => t.OriginSettlementId).ThenBy(t => t.OfficerId).ThenBy(t => t.Id).ToArray())
         {

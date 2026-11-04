@@ -93,7 +93,7 @@ internal sealed partial class OriginalAiMilitary
             int f = categories.Count(c => c == 0), h = categories.Count(c => c == 1), b = categories.Count(c => c == 2), c = categories.Count(c => c == 3);
             if (f + h + b + c == 0) selected = Role(OriginalAiFormationRole.Defense);
             else if (h >= f && h >= h + b && h >= b + c && (target is null ||
-                !World.Officers.Any(p => p.UnitId == target.Id && target.MemberRanks.GetValueOrDefault(p.Id) == BattleRank.Front) ||
+                !World.Officers.Any(p => p.UnitId == target.Id && target.MemberPositions.TryGetValue(p.Id, out var position) && position.Rank == BattleRank.Front) ||
                 World.Officers.Where(p => p.UnitId == target.Id).Max(p => Ability(p).War) < people.Max(p => Ability(p).War))) selected = Role(OriginalAiFormationRole.Cavalry);
             if (selected is null && b + c >= f && b + c >= h && b + c >= h + b) selected = Role(OriginalAiFormationRole.MixedRanged);
             if (selected is null && h + b >= f && h + b >= h && h + b >= b + c) selected = Role(OriginalAiFormationRole.Mobile);
@@ -162,13 +162,22 @@ internal sealed partial class OriginalAiMilitary
         var ordered = people.OrderByDescending(p => Ability(p).War).ToArray();
         int start = Force.IsBarbarian ? 0 : Math.Clamp(Math.Max(0, 85 - Ability(ordered[0]).War) / 20, 0, 5 - ordered.Length);
         var formation = rules.Formations[pair.Land];
-        var ranks = ordered.Select((p, i) => (p.Id, Rank: fallback ? formation.CaptureRanks.Length >= 5 ? formation.CaptureRanks[4] : BattleRank.Middle : formation.CaptureRanks.IsEmpty
-            ? (BattleRank)Math.Min(2, (start + i) / 2) : formation.CaptureRanks[Math.Min(start + i, formation.CaptureRanks.Length - 1)]))
-            .ToImmutableDictionary(p => p.Id, p => p.Rank);
+        var positions = ordered.Select((p, i) => (p.Id, Position: fallback ? SupportPosition(formation) : formation.Positions.IsEmpty
+            ? new FormationPosition(i, (BattleRank)Math.Min(2, (start + i) / 2))
+            : formation.Positions[Math.Min(start + i, formation.Positions.Length - 1)]))
+            .ToImmutableDictionary(p => p.Id, p => p.Position);
         var command = (DeployUnitCommand)Command((id, owner, sequence) => new DeployUnitCommand(id, owner, sequence, source.Id,
             people.Select(p => p.Id).ToImmutableArray(), soldiers, pair.Land, order)
-            { NavalFormationId = pair.Naval, Tactics = tactics.ToImmutableDictionary(), Ranks = ranks,
+            { NavalFormationId = pair.Naval, Tactics = tactics.ToImmutableDictionary(), Positions = positions,
                 DepartureDelayDays = Math.Clamp(delay, 0, 9), Policies = Policies(fallback), ConfirmAttack = order.IsAttack });
         return command;
+    }
+
+    private static FormationPosition SupportPosition(FormationRule formation)
+    {
+        if (formation.Positions.IsEmpty) return new(0, BattleRank.Middle);
+        long center = (long)formation.Positions.Min(p => p.Column) + formation.Positions.Max(p => p.Column);
+        return formation.Positions.OrderBy(p => Math.Abs(p.Row - (int)BattleRank.Middle))
+            .ThenBy(p => Math.Abs(2L * p.Column - center)).ThenBy(p => p.Column).First();
     }
 }

@@ -24,11 +24,11 @@ public sealed class GiftPeaceSessionTests
                 new(4, 1, 2, new(0, 0)) { Delegation = new DefeatForceDelegation(2) }] },
             Military = basis.Military with { Formations =
                 [formation with { Combat = new(10, 10, 0, 10, 50), Attack = new(1, false),
-                    CaptureRanks = [.. Enumerable.Repeat(BattleRank.Middle, formation.OfficerCapacity)] }] },
+                    Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Middle, formation.OfficerCapacity)]) }] },
             Units = basis.Units.Select(u => u with
             {
                 ServicePlaceId = u.OwnerId, Condition = UnitCondition.Confused, ConditionDaysRemaining = 30,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(u.CommanderId!.Value, BattleRank.Middle),
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(u.CommanderId!.Value, BattleRank.Middle)),
                 Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = u.Id == 10 ? 20 : 10 }
             }).ToArray()
         };

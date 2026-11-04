@@ -16,12 +16,12 @@ public sealed class NavalTacticOpportunityTests
         return new(6, 1, Enumerable.Repeat(water ? 1 : 0, 6).ToImmutableArray(),
             [new(0, 1, 1), new(1, 1, 1) { IsWater = true }],
             [new(100, 5, 0, 200000, 2, new(1, 1), TravelMode.Water)
-                { Combat = combat, Attack = new(10, false), CaptureRanks = [BattleRank.Middle, BattleRank.Middle],
+                { Combat = combat, Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle]),
                     Tactics = new(15, 2, [], [5000]) { AutomaticOpportunityChance = 10 } },
              new(200, 5, 0, 200000, 1, new(1, 1), TravelMode.Water)
-                { Combat = combat, CaptureRanks = [BattleRank.Middle] },
+                { Combat = combat, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) },
              new(300, 5, 0, 200000, 2, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(10, false), CaptureRanks = [BattleRank.Front, BattleRank.Middle],
+                { Combat = combat, Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle]),
                     Tactics = new(15, 2, [], []) }],
             [new(1, new(2, 2), new(1, 1)) { Combat = combat }, new(2, new(11, 2), new(1, 1)) { Combat = combat }])
         {
@@ -41,12 +41,12 @@ public sealed class NavalTacticOpportunityTests
          .. secondMember ? new OfficerState[] { new(12, 1, null, new(70, 70, 70, 70), false) { UnitId = 1 } } : [],
          new(21, 2, settlement ? 2 : null, new(70, 0, 70, 70), false) { UnitId = settlement ? null : 2 }],
         units: [new(1, 1, new(6, 2), 100000) { FormationId = 300, NavalFormationId = 100, Morale = 100, ServicePlaceId = 1,
-            CommanderId = 11, MemberRanks = secondMember
+            CommanderId = 11, MemberPositions = San9.Tests.FormationTestData.Members(secondMember
                 ? new Dictionary<int, BattleRank> { [11] = BattleRank.Front, [12] = BattleRank.Middle }.ToImmutableDictionary()
-                : ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) },
+                : ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) },
             .. settlement ? Array.Empty<UnitState>() : [new(2, 2, new(11, 2), 100000)
                 { FormationId = 200, Morale = 100, ServicePlaceId = 2,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle) }]],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)) }]],
         controls: [new("player", 1, ControllerKind.Player)],
         corps: [new(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new(2, 2, 21, new(10000, 1000000)) { IsRoot = true }]);
 

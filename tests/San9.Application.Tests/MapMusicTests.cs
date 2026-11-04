@@ -77,7 +77,7 @@ public sealed class MapMusicTests
         var combat = new CombatProfile(10, 10, 10, 10, 50);
         var definition = basis with { Military = basis.Military! with
         {
-            Formations = [basis.Military.Formations[0] with { Combat = combat, Attack = new(5, false), CaptureRanks = [.. Enumerable.Repeat(BattleRank.Middle, basis.Military.Formations[0].OfficerCapacity)] }],
+            Formations = [basis.Military.Formations[0] with { Combat = combat, Attack = new(5, false), Positions = San9.Tests.FormationTestData.Layout([.. Enumerable.Repeat(BattleRank.Middle, basis.Military.Formations[0].OfficerCapacity)]) }],
             Places = [.. basis.Military.Places.Select(p => p with { Combat = combat })]
         } };
         var session = GameSession.Start(basis, 1);

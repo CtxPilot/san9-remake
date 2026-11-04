@@ -16,6 +16,12 @@ public partial class WorkflowLifecycleVerification : Node
     {
         try
         {
+            if (System.Environment.GetEnvironmentVariable("SAN9_UI_PREFERENCES_CONTENT") is { Length: > 0 } preferencesRoot)
+            {
+                await CheckUiPreferences(preferencesRoot);
+                GetTree().Quit();
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SAN9_OPENING_CONTENT") is { Length: > 0 } openingRoot)
             {
                 await CheckOpeningControls(openingRoot);

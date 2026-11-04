@@ -15,6 +15,7 @@ public partial class StartMenuPreview : Node
     public Func<string, int[], San9.Core.Domain.NewGameSettings, int, NewGameSetup, Task> BeginGame { get; init; } = null!;
     public Func<SlotSaveDocument, Task> LoadGame { get; init; } = null!;
     public ClientDataPaths? DataPaths { get; init; }
+    public UiPreferencesSession Preferences { get; init; } = new();
     public bool InitiallyVisible { get; init; } = true;
     private StartMenuView _view = null!;
     private SceneMusicPlayer _music = null!;
@@ -63,7 +64,7 @@ public partial class StartMenuPreview : Node
                 }
             }
             var view = new StartMenuView { Definition = opening.Menu, SelectionDefinition = opening.Selection, Service = service, Visible = InitiallyVisible,
-                DataPaths = paths, ContentRoot = root, Store = new SlotSaveStore(paths.SaveSlots), LoadGame = document => EnterGame(() => LoadGame(document)),
+                DataPaths = paths, Preferences = Preferences, ContentRoot = root, Store = new SlotSaveStore(paths.SaveSlots), LoadGame = document => EnterGame(() => LoadGame(document)),
                 BeginGame = (id, players, settings, damage, setup) => EnterGame(() => BeginGame(id, players, settings, damage, setup)),
                 LoadScenario = (id, cancellation) => Task.Run(async () =>
                 {

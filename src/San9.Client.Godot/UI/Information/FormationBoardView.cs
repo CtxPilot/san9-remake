@@ -22,41 +22,29 @@ public partial class FormationBoardView : Control
         if (Data.Presentation?.AvailableRole is { } available) Textures.Request([available]);
         MouseFilter = OfficerMoved is null ? MouseFilterEnum.Ignore : MouseFilterEnum.Stop;
         int columns = Data.Presentation?.Columns ?? 3, rows = Data.Presentation?.Rows ?? 3;
-        var slots = Data.Presentation?.Slots.ToArray() ?? [];
-        var assigned = new List<(FormationMemberView Member, int Column, int Row)>();
-        foreach (var member in Data.Members)
-        {
-            if (member.Position is { } position)
-            { assigned.Add((member, position.Column, position.Row)); continue; }
-            int row = Math.Min(rows - 1, (int)member.Rank);
-            var candidates = slots.Where(s => s.Row == row).Select(s => s.Column).ToArray();
-            if (candidates.Length == 0) candidates = Enumerable.Range(0, columns).ToArray();
-            int count = assigned.Count(p => p.Row == row);
-            assigned.Add((member, candidates[count % candidates.Length], row));
-        }
-        foreach (var group in assigned.GroupBy(p => (p.Column, p.Row)))
+        foreach (var group in Data.Members.Where(m => m.Position is not null).GroupBy(m => m.Position!.Value))
         {
             int index = 0;
-            foreach (var item in group)
+            foreach (var member in group)
             {
                 float cellWidth = Size.X / columns, cellHeight = Size.Y / rows;
                 float height = Math.Min(80, cellHeight / group.Count());
-                var rect = new Rect2(item.Column * cellWidth + (cellWidth - Math.Min(120, cellWidth)) / 2,
-                    item.Row * cellHeight + index++ * height + 4, Math.Min(120, cellWidth), height);
+                var rect = new Rect2(group.Key.Column * cellWidth + (cellWidth - Math.Min(120, cellWidth)) / 2,
+                    group.Key.Row * cellHeight + index++ * height + 4, Math.Min(120, cellWidth), height);
                 var button = new FormationMemberButton
                 {
                     Position = rect.Position,
                     Size = rect.Size,
-                    Member = item.Member,
+                    Member = member,
                     Textures = Textures
                 };
-                if (OfficerMoved is null) button.Pressed += () => OfficerActivated?.Invoke(item.Member.OfficerId);
+                if (OfficerMoved is null) button.Pressed += () => OfficerActivated?.Invoke(member.OfficerId);
                 else button.GuiInput += input =>
                 {
                     if (input is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } mouse)
                     {
                         button.AcceptEvent();
-                        if (mouse.DoubleClick) { OfficerActivated?.Invoke(item.Member.OfficerId); return; }
+                        if (mouse.DoubleClick) { OfficerActivated?.Invoke(member.OfficerId); return; }
                         _held = button; _grab = mouse.Position; _start = button.Position;
                     }
                 };

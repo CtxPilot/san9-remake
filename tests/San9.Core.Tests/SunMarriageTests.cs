@@ -114,7 +114,7 @@ public sealed class SunMarriageTests
         var state = World(); var world = state.BeginMutation(Rules().Abilities);
         world.SetSimulation(world.Simulation with { NextUnitId = 51 });
         world.AddUnit(new(50, 2, new(17, 2), 1000) { FormationId = 1, ServicePlaceId = 4, CommanderId = 22,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) });
         world.Replace(world.Officers[22] with { SettlementId = null, UnitId = 50 });
         if (otherMember) world.Replace(world.Officers[23] with { SettlementId = null, UnitId = 50 });
         List<DomainEvent> events = []; SunMarriage.Apply(world, Rules(), events);

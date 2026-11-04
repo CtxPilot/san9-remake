@@ -11,8 +11,8 @@ public static class UnitCatalog
     public static IReadOnlyList<CatalogPage> Pages { get; } = [
         new("所属", [Name, Text("势力"), Text("军团"), Text("所属", 10), Number("在任"), Number("俘虏")]),
         new("战力", [Name, Number("士兵"), Number("伤兵"), Number("士气"), Text("状态", 6), Text("阵形", 6), Text("船", 4)]),
-        new("陆上", [Name, Number("对部队", 8), Number("对守卫", 8), Number("对城墙", 8), Number("守备力", 8), Number("机动力", 8)]),
-        new("水上", [Name, Number("对部队", 8), Number("对守卫", 8), Number("对城墙", 8), Number("守备力", 8), Number("机动力", 8)]),
+        new("陆上", [Name, Number("对部队", 8), Number("对守兵", 8), Number("对城壁", 8), Number("守备力", 8), Number("机动力", 8)]),
+        new("水上", [Name, Number("对部队", 8), Number("对守兵", 8), Number("对城壁", 8), Number("守备力", 8), Number("机动力", 8)]),
         new("命令", [Name, Text("命令", 6), Text("目标", 10), Text("敌接近时", 10), Text("自主撤退", 10), Text("追击", 6), Text("事后命令", 10), Text("命令变更", 10)])
     ];
 
@@ -50,7 +50,7 @@ public static class UnitCatalog
                 var command = commands.ReadUnit(unit, view.PlayerForceId);
                 CatalogCell Policy(string value) => unit.OwnerId == view.PlayerForceId ? new(value) : new("＊＊＊", IsUnavailable: true);
                 cells = [name, command.Order, command.Target,
-                    Policy(unit.Policies.AttackApproachingEnemies ? "迎击" : "无视"),
+                    Policy(unit.Policies.AttackApproachingEnemies ? "攻击" : "无视"),
                     Policy(unit.Policies.AutonomousRetreat ? "许可" : "不许可"), Policy(unit.Policies.Pursue ? "许可" : "不许可"),
                     Policy(unit.Policies.AttackAfterAction ? "攻击" : "撤退"), Policy(unit.CommandedThisXun ? "完" : "未")];
             }

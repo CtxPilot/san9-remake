@@ -22,9 +22,9 @@ public sealed class NavigationResourceTests
         Assert.NotSame(first.Map, rules.Travel(2, 5).Map);
         Assert.NotSame(first.Map, rules.Travel(1, 4).Map);
         using var diagnostics = new PathSearchDiagnostics();
-        var slow = first.Map.Navigate(new(12, 12), new(new(82, 12), new(1, 1)), false,
+        var slow = first.Map.Navigate(new(12, 12), new(new(82, 12), new(1, 1)), NavigationArrival.Point,
             first.Shape, first.Mode, [], first.DailyBudget);
-        var fast = faster.Map.Navigate(new(12, 12), new(new(82, 12), new(1, 1)), false,
+        var fast = faster.Map.Navigate(new(12, 12), new(new(82, 12), new(1, 1)), NavigationArrival.Point,
             faster.Shape, faster.Mode, [], faster.DailyBudget);
         Assert.InRange(diagnostics.WorkspaceNodes, 0, 40000);
         Assert.Equal(19, slow.Position.X);
@@ -37,7 +37,7 @@ public sealed class NavigationResourceTests
         NavigationStep Query(int scale)
         {
             var map = new BattlefieldMap(140, 140, new int[19600], [new(0, 10 * scale, null)]);
-            return map.Navigate(new(350, 350), new(new(600, 350), new(1, 1)), false, new(1, 1), TravelMode.Land,
+            return map.Navigate(new(350, 350), new(new(600, 350), new(1, 1)), NavigationArrival.Point, new(1, 1), TravelMode.Land,
                 [], 75 * scale);
         }
         var first = Query(1);
@@ -69,10 +69,10 @@ public sealed class NavigationResourceTests
     {
         var map = new BattlefieldMap(10, 10, new int[100], [new(0, null, 10) { IsWater = true }]);
         using var diagnostics = new PathSearchDiagnostics();
-        Assert.Equal(NavigationStatus.Waiting, map.Navigate(new(12, 12), new(new(20, 20), new(1, 1)), false,
+        Assert.Equal(NavigationStatus.Waiting, map.Navigate(new(12, 12), new(new(20, 20), new(1, 1)), NavigationArrival.Point,
             new(1, 1), TravelMode.Land, [], 0).Status);
         Assert.Equal(0, diagnostics.Queries);
-        Assert.Equal(NavigationStatus.Unreachable, map.Navigate(new(12, 12), new(new(20, 20), new(1, 1)), false,
+        Assert.Equal(NavigationStatus.Unreachable, map.Navigate(new(12, 12), new(new(20, 20), new(1, 1)), NavigationArrival.Point,
             new(1, 1), TravelMode.Land, [], 60).Status);
     }
 
@@ -83,13 +83,13 @@ public sealed class NavigationResourceTests
         MapOccupancy[] wall = [new(new(50, 50), new(1, 100))];
         var start = new WorldPosition(49, 50);
         var target = new MapOccupancy(new(70, 50), new(1, 1));
-        var blocked = map.Navigate(start, target, true, new(1, 1), TravelMode.Land, wall, 60);
+        var blocked = map.Navigate(start, target, NavigationArrival.Range, new(1, 1), TravelMode.Land, wall, 60);
         Assert.False(blocked.Arrived);
         start = blocked.Position;
         using var diagnostics = new PathSearchDiagnostics();
         for (int day = 0; day < 10; day++)
         {
-            var step = map.Navigate(start, target, true, new(1, 1), TravelMode.Land, wall, 60);
+            var step = map.Navigate(start, target, NavigationArrival.Range, new(1, 1), TravelMode.Land, wall, 60);
             Assert.False(step.Arrived);
             Assert.True(step.Position.X < wall[0].Left);
             Assert.All(step.Steps, p => Assert.False(new MapOccupancy(p, new(1, 1)).Overlaps(wall[0])));
@@ -97,9 +97,9 @@ public sealed class NavigationResourceTests
         }
         Assert.True(diagnostics.Queries > 0);
         // Same target center with a changed footprint now offers an approach on this side of the wall.
-        var resized = map.Navigate(start, target with { Footprint = new(60, 100) }, true, new(1, 1), TravelMode.Land, wall, 60);
+        var resized = map.Navigate(start, target with { Footprint = new(60, 100) }, NavigationArrival.Range, new(1, 1), TravelMode.Land, wall, 60);
         Assert.True(resized.Arrived);
-        var released = map.Navigate(start, target, true, new(1, 1), TravelMode.Land, [], 1000, mobility: 200);
+        var released = map.Navigate(start, target, NavigationArrival.Range, new(1, 1), TravelMode.Land, [], 1000, mobility: 200);
         Assert.True(released.Arrived);
     }
 

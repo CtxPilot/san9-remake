@@ -27,15 +27,33 @@ public sealed class RecruitmentRuleTests
         Assert.Equal(expected, RecruitmentRules.Threshold(state, 10, 20, new()));
     }
 
-    [Fact]
-    public void NamedPoliticsBonusUsesBasePoliticsAndSignedDivisionTruncatesTowardZero()
+    [Theory]
+    [InlineData(51, -2)]
+    [InlineData(50, -3)]
+    [InlineData(149, -2)]
+    [InlineData(150, -1)]
+    public void NamedPoliticsBonusUsesBasePoliticsAndTrustDifferenceTruncatesTowardZero(int trust, int expected)
     {
         var state = World().BeginMutation();
         state.Replace(state.Officers[10] with { BaseAbilities = new(50, 50, 60, 50), Injury = 5, HasRecruitmentPoliticsBonus = true });
-        state.Replace(state.Forces[1] with { BaseTrust = 96 });
-        Assert.Equal(-2, RecruitmentRules.Threshold(state, 10, 20, new()));
-        state.Replace(state.Forces[1] with { BaseTrust = 95 });
-        Assert.Equal(-3, RecruitmentRules.Threshold(state, 10, 20, new()));
+        state.Replace(state.Forces[1] with { BaseTrust = trust });
+        Assert.Equal(expected, RecruitmentRules.Threshold(state, 10, 20, new()));
+    }
+
+    [Theory]
+    [InlineData(111, 1, 102, 83, 17)]
+    [InlineData(27, 5, 99, 101, 51)]
+    public void CaptiveRecruitmentUsesOriginalPrestigeScale(int affinity, int righteousness, int loyalty, int politics, int expected)
+    {
+        var state = World().BeginMutation();
+        state.Replace(state.Forces[1] with { BaseTrust = 237 });
+        state.Replace(state.Forces[2] with { BaseTrust = 131 });
+        state.Replace(state.Officers[1] with { Affinity = 25 });
+        state.Replace(state.Officers[2] with { Affinity = 101 });
+        state.Replace(state.Officers[10] with { BaseAbilities = new(50, 50, politics, 50) });
+        state.Replace(state.Officers[20].WithLoyalty(2, loyalty) with
+            { Status = OfficerStatus.Captive, SettlementId = 1, Affinity = affinity, Righteousness = righteousness });
+        Assert.Equal(expected, RecruitmentRules.Threshold(state, 10, 20, new()));
     }
 
     [Fact]

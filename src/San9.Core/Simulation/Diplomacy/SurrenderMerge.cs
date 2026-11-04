@@ -93,7 +93,7 @@ internal static class SurrenderMerge
             {
                 world.Replace(unit with { OwnerId = recipient, CorpsId = root,
                     CommanderId = unit.FormationId is null ? null : LeadershipMaintenance.SelectUnitCommander(world, members, rules.Governance),
-                    MemberRanks = unit.MemberRanks.Where(p => joined.Contains(p.Key)).ToImmutableDictionary(),
+                    MemberPositions = unit.MemberPositions.Where(p => joined.Contains(p.Key)).ToImmutableDictionary(),
                     EngagementTargetId = null, ContactTarget = null, Lookahead = null });
                 events.Add(new UnitTransferredEvent(world.Clock, unit.Id, force, recipient));
             }

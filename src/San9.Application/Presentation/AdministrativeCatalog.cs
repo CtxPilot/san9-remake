@@ -85,10 +85,10 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
     private string Person(int? id) => id is int key && _people.TryGetValue(key, out var o) ? texts.Resolve(o.NameKey) : "—";
     private string Force(int? id) => id is int key && _forces.TryGetValue(key, out var f) ? texts.Resolve(f.NameKey) : "—";
     private string Place(int id) => _places.TryGetValue(id, out var p) ? p.ResolveName(texts) : view.RegionNameKeys.TryGetValue(id, out var name) ? texts.Resolve(name) : "—";
-    private string Tactics(IEnumerable<int> ids) => string.Join("‧", ids.Select(id => OfficerCatalog.Pages.Skip(4).SelectMany(p => p.Columns).FirstOrDefault(c => c.Id == $"tactic.{id}")?.Title ?? $"兵法{id}"));
+    private string Tactics(IEnumerable<int> ids) => string.Join("‧", ids.Select(id => texts.Resolve(view.Information.Tactics.Single(t => t.Id == id).NameKey)));
     private string RankHolders(int rankId)
     {
-        var names = view.Forces.Where(f => f.RankId == rankId).Select(f => texts.Resolve(f.NameKey)).ToArray();
+        var names = view.Forces.Where(f => !f.IsEliminated && f.RankId == rankId).Select(f => texts.Resolve(f.NameKey)).ToArray();
         return names.Length <= 3 ? string.Join("‧", names)
             : $"{string.Join("‧", names.Take(2))}及其他{names.Length - 2}势力";
     }
@@ -100,7 +100,7 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
         IEnumerable<int> ids = category switch
         {
             InformationCategory.Ranks => view.Information.Ranks.Where(r => !r.IsUnranked).OrderByDescending(r => r.Precedence).Select(r => r.Id),
-            InformationCategory.Forces => view.Forces.Where(f => force is null || f.Id == force).Select(f => f.Id),
+            InformationCategory.Forces => view.Forces.Where(f => !f.IsEliminated && (force is null || f.Id == force)).Select(f => f.Id),
             InformationCategory.Corps => view.World.Corps.Where(c => _forces.ContainsKey(c.OwnerId) && (force is null || c.OwnerId == force) && (corps is null || c.Id == corps)).Select(c => c.Id),
             InformationCategory.Cities => view.Settlements.Where(s => s.Kind == SettlementKind.City && (force is null || s.OwnerId == force) && (corps is null || s.CorpsId == corps) && (settlement is null || s.Id == settlement)).Select(s => s.Id),
             InformationCategory.Regions => view.RegionNameKeys.Keys.Where(id => (region is null || id == region) &&
@@ -184,7 +184,7 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
             case "target":
                 if (corps is null || corps.IsRoot) return CatalogCell.Unavailable;
                 if (owner != view.PlayerForceId) return Hidden;
-                if (field == "policy") return corps.Delegation switch { GeneralDelegation => "全权", DomesticDelegation => "内政", DefeatForceDelegation => "势力攻略", CaptureSettlementDelegation => "都市攻略", _ => throw new InvalidOperationException("Unknown delegation.") };
+                if (field == "policy") return corps.Delegation switch { GeneralDelegation => "一般委任", DomesticDelegation => "重视内政", DefeatForceDelegation => "打倒敌势", CaptureSettlementDelegation => "攻略设施", _ => throw new InvalidOperationException("Unknown delegation.") };
                 return corps.Delegation switch { DefeatForceDelegation d => Force(d.ForceId), CaptureSettlementDelegation c => Place(c.SettlementId), _ => CatalogCell.Unavailable };
             case "relation":
                 return relation is null || owner == view.PlayerForceId ? CatalogCell.Unavailable : new CatalogCell(
@@ -249,7 +249,7 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
             "population" => (long)state.Population + state.DraftPopulation, "draft" => (long)state.DraftPopulation,
             "soldiers" => (long)state.Soldiers, "wounded" => (long)state.Wounded,
             "morale" => state.Soldiers == 0 ? CatalogCell.Unavailable : state.Morale,
-            "state" => state.ConfusionDaysRemaining > 0 ? "混乱" : "正常",
+            "state" => SettlementCondition(id),
             "durability" => state.Durability, "max-durability" => state.MaxDurability,
             "public-order" => state.PublicOrder, "commerce" => state.Commerce, "max-commerce" => state.MaxCommerce,
             "cultivation" => state.Cultivation, "max-cultivation" => state.MaxCultivation,
@@ -259,10 +259,13 @@ public sealed class AdministrativeCatalog(StrategySnapshot view, TextCatalog tex
             "tactics" => place.ConfiguredTacticId is int tactic ? Tactics([tactic]) : CatalogCell.Unavailable,
             "facility" => place.Kind == SettlementKind.City ? "都市" : place.NameSuffixKey is { } suffix ? texts.Resolve(suffix) : place.ResolveName(texts),
             "draft-growth" => (_population ??= new(view.World)).DraftGrowth(id),
-            "feature" => view.TacticCourses.FirstOrDefault(c => c.CityId == id) is { } course && view.TacticCategory(course.TacticId) is int group ? OfficerCatalog.Pages[group + 4].Title : CatalogCell.Unavailable,
+            "feature" => view.TacticCourses.FirstOrDefault(c => c.CityId == id) is { } course && view.TacticCategory(course.TacticId) is int group ? OfficerCatalog.TacticCategories[group] : CatalogCell.Unavailable,
             "trait" => string.Join("‧", (place.UsesRockfallPower ? new[] { "落石" } : []).Concat(place.HasRangeBonus ? new[] { "射台" } : [])),
             "recovery" => place.WoundedRecovery is int recovery ? recovery : CatalogCell.Unavailable,
             _ => throw new ArgumentOutOfRangeException(nameof(field), field, "Unknown place field.")
         };
     }
+
+    internal string SettlementCondition(int id) => _states[id].ConfusionDaysRemaining > 0 ? "混乱"
+        : view.IsSettlementEngaged(id) ? "交战" : "一般";
 }

@@ -75,7 +75,7 @@ public sealed class ForceEliminationTests
         world.Replace(world.Settlements[3] with { DraftPopulation = 500000 });
         world.Replace(world.Officers[11] with { SettlementId = null, UnitId = 200 });
         world.AddUnit(new(200, 1, new(302, 2), 10001) { Wounded = 100, FormationId = 1, CorpsId = 10, ServicePlaceId = 10,
-            CommanderId = 11, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) });
+            CommanderId = 11, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) });
         world.SetSimulation(world.Simulation with { NextUnitId = 201 });
         var basis = Rules();
         var military = noCity ? new MilitaryRulebook(new(80, 1, Enumerable.Repeat(0, 80).ToImmutableArray(),
@@ -149,7 +149,7 @@ public sealed class ForceEliminationTests
         world.AddUnit(new(200, 2, new(102, 2), 2000) { FormationId = 1, CorpsId = 20, CommanderId = 2,
             ServicePlaceId = 2, Order = new(MilitaryOrderKind.AttackSettlement, null, 10),
             Waypoint = new(92, 2), MovementRemainder = 1,
-            ContactTarget = new(10, true), MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Front) });
+            ContactTarget = new(10, true), MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Front)) });
         world.SetSimulation(world.Simulation with { NextUnitId = 201 });
         Eliminate(world);
         Assert.Null(world.Units[200].Order);
@@ -194,7 +194,7 @@ public sealed class ForceEliminationTests
             associatedCity ? new Dictionary<int, int> { [2] = 2, [3] = 3, [10] = 2 } : new Dictionary<int, int> { [2] = 2, [3] = 3 }, neighbors ? [new(2, 3)] : []),
         Military = new(new(80, 1, Enumerable.Repeat(0, 80).ToImmutableArray(), [new(0, 1, null)],
             [new(1, 1, 0, 1000000, 5, new(1, 1), TravelMode.Land)
-                { CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle] }],
+                { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]) }],
             [new(2, new(102, 2), new(1, 1)), new(3, new(302, 2), new(1, 1)), new(10, new(52, 2), new(1, 1))])
             { RegionIds = Enumerable.Range(0, 80).Select(i => (int?)(i < 40 ? 2 : 3)).ToImmutableArray() })
     };

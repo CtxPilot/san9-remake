@@ -17,7 +17,7 @@ public sealed class TacticSnipingTests
         var military = new MilitaryRulebook(new(100, 3, [.. Enumerable.Repeat(0, 300)], [new(0, 1, 1)],
             [new(100, 5, 0, 100000, 2, new(1, 1), TravelMode.Land)
                 { Combat = combat, Attack = new(10, false), SnipingChanceBonus = bonus, MeleeDeathUsesRanks = meleeRanks,
-                    CaptureRanks = [BattleRank.Front, BattleRank.Middle], Tactics = new(100, 2, [3], []) }],
+                    Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle]), Tactics = new(100, 2, [3], []) }],
             [new(1, new(2, 7), new(1, 1)) { Combat = combat, FacilityTypeId = 8000, Attack = new(10, false) },
                 new(2, new(107, 7), new(1, 1)) { Combat = combat, FacilityTypeId = 8000 }, new(3, new(497, 7), new(1, 1)) { Combat = combat, FacilityTypeId = 8000 }])
             { DefensiveTacticChance = defensiveChance, BattleDeathsAllowed = deathsAllowed, Tactics = [tactic], Geography = new(5, []),
@@ -34,10 +34,10 @@ public sealed class TacticSnipingTests
                 new(22, 2, settlement ? 2 : null, new(70, 70, 70, 70), false) { UnitId = settlement ? null : 2 }],
             units: [new(1, 1, new(102, 7), 100000) { FormationId = 100, Morale = 100, ServicePlaceId = 1,
                     CommanderId = 11, Order = settlement ? PlaceTarget : UnitTarget,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) },
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) },
                 ..(settlement ? Array.Empty<UnitState>() : [new(2, 2, new(106, 7), 100000) { FormationId = 100,
                     CommanderId = 21, Morale = 100, ServicePlaceId = 3,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Rear).Add(22, BattleRank.Middle) }])],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Rear).Add(22, BattleRank.Middle)) }])],
             controls: [new("player", 1, ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 10000)) { IsRoot = true }]);
         return (world, new() { Military = military }, tactic);
     }
@@ -63,7 +63,7 @@ public sealed class TacticSnipingTests
         var (world, rules, tactic) = Create(settlement);
         var m = world.BeginMutation();
         if (gate == "proficiency") m.Replace(m.Officers[11] with { TacticProficiencies = [0, 0, 0, 300, 0, 0, 0, 0, 0] });
-        if (gate == "rear") m.Replace(m.Units[2] with { MemberRanks = m.Units[2].MemberRanks.SetItem(22, BattleRank.Rear) });
+        if (gate == "rear") m.Replace(m.Units[2] with { MemberPositions = m.Units[2].MemberPositions.SetItem(22, new(0, BattleRank.Rear)) });
         if (gate == "injured") m.Replace(m.Officers[22] with { Injury = 1 });
         if (settlement) m.Replace(m.Officers[22] with { Acted = true });
         Assert.Null(TacticSniping.Select(m, new(1, false), tactic with { SnipingProficiencyCategory = gate == "unsupported" ? null : 3 },
@@ -200,8 +200,8 @@ public sealed class TacticSnipingTests
         m.Replace(m.Officers[21] with { OwnerId = 1, UnitId = 1, Status = OfficerStatus.Serving, Injury = 0,
             LearnedTactics = [9000], EquippedTacticId = 9000, TacticLinkBonus = 100,
             TacticProficiencies = [0, 0, 0, 1000, 0, 0, 0, 0, 0] });
-        m.Replace(m.Units[1] with { MemberRanks = m.Units[1].MemberRanks.Add(21, BattleRank.Middle) });
-        m.Replace(m.Units[2] with { CommanderId = 22, MemberRanks = m.Units[2].MemberRanks.Remove(21) });
+        m.Replace(m.Units[1] with { MemberPositions = m.Units[1].MemberPositions.Add(21, new(0, BattleRank.Middle)) });
+        m.Replace(m.Units[2] with { CommanderId = 22, MemberPositions = m.Units[2].MemberPositions.Remove(21) });
         TacticCombat.TryUnit(m, 1, UnitTarget, rules, events);
         Assert.Equal(new[] { 11, 21 }, Assert.Single(events.OfType<TacticActivatedEvent>()).Participants.Select(p => p.OfficerId));
         Assert.Equal(21, Assert.Single(events.OfType<TacticSnipingResolvedEvent>()).ActorId);

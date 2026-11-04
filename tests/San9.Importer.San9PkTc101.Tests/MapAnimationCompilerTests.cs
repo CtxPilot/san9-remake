@@ -24,6 +24,7 @@ public sealed class MapAnimationCompilerTests
         new byte[] { 0, 248, 0, 0, 255, 0, 0, 128, 0, 0, 255, 128 }.CopyTo(palette, 0);
         var frame = IndexedImageArchive.Frame(sheet, 2, 1, 1, 0);
         var decoded = IndexedImageArchive.Decode(frame, palette, true, true);
+        IndexedImageArchive.ExtendTransparentColors(decoded.Pixels, decoded.Width, decoded.Height);
         Assert.Equal(new byte[] { 0, 0, 255, 0 }, decoded.Pixels.AsSpan(4, 4).ToArray());
         Assert.Equal(new byte[] { 2, 0, 0, 0 }, frame.Pixels);
         Assert.Throws<InvalidDataException>(() => IndexedImageArchive.Frame(sheet, 3, 1, 0, 0));

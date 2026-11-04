@@ -78,11 +78,12 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
             _stopAtBoundary = true;
     }
 
-    public bool Request()
+    public bool Request(bool requireConfirmation = true)
     {
         if (!CanAdvance) return false;
-        Screen = TurnScreen.Confirmation;
         Error = null;
+        if (requireConfirmation) Screen = TurnScreen.Confirmation;
+        else BeginAdvance();
         return true;
     }
 

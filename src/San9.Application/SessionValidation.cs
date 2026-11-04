@@ -71,6 +71,8 @@ internal static class SessionValidation
                 context.Prompts.Any(p => p.ForceId != forceId || !San9.Content.Interface.ProgressPresentationDefinition.ContextRoles.Contains(p.Role) ||
                     !snapshot.World.Officers.Any(o => o.Id == p.ActorId) || !snapshot.World.Officers.Any(o => o.Id == p.RulerId) ||
                     !snapshot.World.Forces.Any(f => f.Id == p.ForceId) ||
+                    p.Role is ("enemy-city" or "enemy-place" or "reinforce-from" or "reinforce-to") &&
+                        (p.EnemyForceId is null || p.EnemyForceId == forceId) ||
                     !ContextPlace(p.PlaceId) || !ContextPlace(p.CityId) || !ContextPlace(p.OtherPlaceId) ||
                     p.EnemyForceId is int enemy && !snapshot.World.Forces.Any(f => f.Id == enemy) ||
                     p.OtherOfficerId is int other && !snapshot.World.Officers.Any(o => o.Id == other) ||

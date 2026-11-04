@@ -75,7 +75,7 @@ public sealed class GuanduSessionTests
     }
 
     [Fact]
-    public void EnemyDispatchOfTheTargetCancelsRecruitmentBeforeHistoricalEffects()
+    public void EnemyMovePreservesRecruitmentButRevalidatesHistoricalEligibility()
     {
         var basis = Definition();
         var definition = basis with { Officers = basis.Officers.Select(o => o.State.Id == 23
@@ -88,7 +88,8 @@ public sealed class GuanduSessionTests
             session.Snapshot.Simulation.NextSequence, [23], 4)).Submission.Accepted);
         var result = session.AdvanceXun();
         Assert.Contains(result.Events.OfType<OfficerMovedEvent>(), e => e.OfficerId == 23);
-        Assert.Contains(result.Events.OfType<TaskCancelledEvent>(), e => e.TaskId == command.CommandId);
+        Assert.DoesNotContain(result.Events.OfType<TaskCancelledEvent>(), e => e.TaskId == command.CommandId);
+        Assert.False(Assert.Single(result.Events.OfType<RecruitmentResolvedEvent>()).Success);
         Assert.Empty(result.Events.OfType<GuanduEvent>());
         Assert.DoesNotContain(new PersistentEventKey("guandu"), session.Snapshot.Simulation.ConsumedEventKeys);
         Assert.Equal(30000u, session.Snapshot.Settlements.Single(s => s.Id == 4).Soldiers);

@@ -106,7 +106,7 @@ public sealed class AlienateStrategyTests
     }
 
     [Fact]
-    public void LiveAbilityIsRevalidatedButMovingToAnotherValidPlaceDoesNotCancel()
+    public void LiveAbilityIsRevalidatedAtResolution()
     {
         var rules = Rules();
         var world = World();
@@ -116,15 +116,6 @@ public sealed class AlienateStrategyTests
         var resolved = Assert.Single(Day(state, rules).OfType<AlienateResolvedEvent>());
         Assert.Equal(16, resolved.Threshold);
         Assert.False(resolved.Success);
-
-        world = World();
-        Submit(world, rules, 0);
-        state = world.BeginMutation(rules.Abilities);
-        state.Replace(state.Officers[21] with { SettlementId = 3 });
-        var moved = Assert.Single(Day(state, rules).OfType<AlienateResolvedEvent>());
-        Assert.True(moved.Success);
-        Assert.True(state.Officers[21].Loyalty < 80);
-        Assert.Equal(3, moved.RelationForceId);
     }
 
     [Fact]
@@ -146,19 +137,33 @@ public sealed class AlienateStrategyTests
         Assert.Equal(80, state.Relations[(2, 3)].Value);
     }
 
-    [Fact]
-    public void FieldUnitOfficerUsesTheSubmissionPositionWithoutBecomingLocationLocked()
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 99)]
+    [InlineData(true, 0)]
+    [InlineData(true, 99)]
+    public void CompletedAlienationReturnsFromCurrentTargetWithoutReschedulingArrival(bool field, int roll)
     {
         var rules = Rules();
-        var world = World(fieldTarget: true);
-
-        var task = Submit(world, rules, 0);
-
-        Assert.Equal(2, task.Journey!.DestinationPlaceId);
-        Assert.Equal(new WorldPosition(32, 2), task.Journey.Route.Destination);
+        var world = World(fieldTarget: field);
+        var task = Submit(world, rules, roll);
+        Assert.Equal(new WorldPosition(32, 2), task.Journey!.Route.Destination);
         var state = world.BeginMutation(rules.Abilities);
-        state.Replace(state.Units[5] with { Position = new(62, 2) });
-        Assert.Single(Day(state, rules).OfType<AlienateResolvedEvent>());
+        if (field) state.Replace(state.Units[5] with { Position = new(62, 2) });
+        else state.Replace(state.Officers[21] with { SettlementId = 3 });
+        var events = Day(state, rules);
+        var resolved = Assert.Single(events.OfType<AlienateResolvedEvent>());
+        Assert.Equal(roll == 0, resolved.Success);
+        Assert.Equal(roll == 0 ? 3 : 1, resolved.RelationForceId);
+        Assert.Equal(task.Due, resolved.Clock);
+        var returning = Assert.Single(events.OfType<TaskStartedEvent>(), e => e.Task.Kind == PersonnelReturns.Kind).Task;
+        Assert.Equal(new WorldPosition(62, 2), returning.Journey!.Route.Origin);
+        Assert.Equal(field ? 2 : 3, returning.Journey.ReturnLeg!.OriginPlaceId);
+        Assert.Equal(2, returning.Journey.ReturnLeg.CountdownDays);
+        Assert.Equal(field, returning.Journey.ReturnLeg.FieldTravel);
+        Assert.Equal(resolved.Clock.NextDay().NextDay(), returning.Due);
+        Assert.Equal(field ? null : 3, state.Officers[21].SettlementId);
+        Assert.Equal(2, state.Officers[21].OwnerId);
     }
 
     private static WorldState WithRulers(ulong seed = 42)

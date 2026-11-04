@@ -26,54 +26,41 @@ public partial class CompanionSettingsView : ModalView
         AddChild(backdrop); backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var panel = new PanelContainer
         {
-            AnchorLeft = 0, AnchorRight = 1, AnchorTop = .5f, AnchorBottom = .5f,
-            OffsetLeft = 120, OffsetRight = -120, OffsetTop = -330, OffsetBottom = 330,
+            AnchorLeft = 0, AnchorRight = 1, AnchorTop = 0, AnchorBottom = 1,
+            OffsetLeft = 64, OffsetRight = -64, OffsetTop = 20, OffsetBottom = -20,
         };
         AddChild(panel);
         var margin = new MarginContainer();
         foreach (string side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride($"margin_{side}", 24);
+            margin.AddThemeConstantOverride($"margin_{side}", 16);
         panel.AddChild(margin);
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 14); margin.AddChild(column);
-        var heading = new VBoxContainer(); heading.AddThemeConstantOverride("separation", 4); column.AddChild(heading);
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 8); margin.AddChild(column);
         var title = new Label { Text = "优化伴侣" };
-        title.AddThemeFontSizeOverride("font_size", 24); heading.AddChild(title);
-        heading.AddChild(Note("关闭面板时保存配置并生效，新游戏自动读取。"));
+        title.AddThemeFontSizeOverride("font_size", 24); column.AddChild(title);
         var tabs = new TabContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; column.AddChild(tabs);
         foreach (var page in Pages)
         {
             var scroll = new ScrollContainer { Name = page.Title, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
             var list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            list.AddThemeConstantOverride("separation", 12); scroll.AddChild(list); tabs.AddChild(scroll);
+            list.AddThemeConstantOverride("separation", 20); scroll.AddChild(list); tabs.AddChild(scroll);
             foreach (var section in page.Sections) AddSection(list, section);
-            if (page.HasStrategyPermissions) StrategyPermissions(list);
         }
-        var appearance = new VBoxContainer { Name = "外观" };
-        tabs.AddChild(appearance);
-        _formationAppearance = new Button { Name = "FormationAppearance", ToggleMode = true, CustomMinimumSize = new(96, 36) };
-        CompanionPanelStyle.Toggle(_formationAppearance);
-        SetFormationAppearance(Initial.FormationAppearanceEnabled);
-        _formationAppearance.Toggled += value =>
-        {
-            _formationAppearance.Text = value ? "开启" : "关闭";
-            _failure.Hide();
-        };
-        OptionRow(appearance, "阵型差异外观", "普通八阵的中央兵群使用不同兵模，锥行、锋矢中央复用原版骑兵数量与站位，外围保留普通士兵。关闭面板后生效。").AddChild(_formationAppearance);
         _failure = Note(""); _failure.Visible = false;
         _failure.AddThemeColorOverride("font_color", new("ffb4ab")); column.AddChild(_failure);
         var divider = new ColorRect { Color = new("343e4b"), CustomMinimumSize = new(0, 1), MouseFilter = MouseFilterEnum.Ignore };
         column.AddChild(divider);
         var actions = new HBoxContainer();
         actions.AddThemeConstantOverride("separation", 12); column.AddChild(actions);
-        var shortcut = Note("Esc 保存并关闭"); shortcut.SizeFlagsVertical = SizeFlags.ShrinkCenter; actions.AddChild(shortcut);
-        actions.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-        var preset = new Button { Text = "预设配置", CustomMinimumSize = new(104, 38),
-            TooltipText = "开启普通功能开关（含无限寿命）；允许伪报、扰乱、激励、救援，禁止离间、流言、烧夷、夺取。\n资金与兵粮倍率200%，能力上限与免阵亡能力门槛125，无退路俘获加成0%，其余数值保留当前输入。\n战斗阵亡仍须在PK设定中开启。" };
+        var hint = Note("关闭时保存并生效 · Esc 关闭");
+        hint.VerticalAlignment = VerticalAlignment.Center;
+        actions.AddChild(hint);
+        var preset = new Button { Text = "预设配置", CustomMinimumSize = new(104, 34),
+            TooltipText = "开启普通功能开关（含无限寿命）；允许伪报、扰乱、激励、救援、交还，禁止离间、流言、烧夷、夺取、赠与、请求、劝降。\n资金与兵粮倍率200%，能力上限与免阵亡能力门槛125，无退路俘获加成0%，其余数值保留当前输入。\n战斗阵亡仍须在PK设定中开启。" };
         preset.Pressed += ApplyPreset; actions.AddChild(preset);
-        var reset = new Button { Text = "原版配置", CustomMinimumSize = new(104, 38),
+        var reset = new Button { Text = "原版配置", CustomMinimumSize = new(104, 34),
             TooltipText = "恢复原版对应配置。" };
         reset.Pressed += () => { RefreshEditors(CompanionSettings.Default); SetFormationAppearance(false); }; actions.AddChild(reset);
-        var close = new Button { Text = "关闭", CustomMinimumSize = new(96, 38) };
+        var close = new Button { Text = "关闭", CustomMinimumSize = new(96, 34) };
         CompanionPanelStyle.Primary(close);
         close.Pressed += Back; actions.AddChild(close);
         close.GrabFocus();
@@ -82,17 +69,17 @@ public partial class CompanionSettingsView : ModalView
     private void AddSection(VBoxContainer list, SectionDefinition section)
     {
         var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        body.AddThemeConstantOverride("separation", 12); list.AddChild(body);
-        if (section.Title is { } title)
-        {
-            var heading = new Label { Text = title };
-            heading.AddThemeFontSizeOverride("font_size", 16);
-            heading.AddThemeColorOverride("font_color", new("aab6c5")); body.AddChild(heading);
-        }
+        body.AddThemeConstantOverride("separation", 8); list.AddChild(body);
+        body.AddChild(CompanionPanelStyle.SectionHeading(section.Title));
         foreach (var option in section.Options)
         {
             switch (option)
             {
+                case FormationAppearanceOption appearance:
+                    _formationAppearance = CreateToggle(Initial.FormationAppearanceEnabled, 96, "开启", "关闭", _ => _failure.Hide());
+                    _formationAppearance.Name = "FormationAppearance";
+                    OptionRow(body, appearance.Title, appearance.Note).AddChild(_formationAppearance);
+                    break;
                 case ToggleOption toggleOption:
                 {
                     var row = OptionRow(body, toggleOption.Title, toggleOption.Note);
@@ -113,39 +100,33 @@ public partial class CompanionSettingsView : ModalView
                     break;
             }
         }
+        if (section.Permissions is { } permissions) AutomaticPermissions(body, permissions);
     }
 
-    private void StrategyPermissions(VBoxContainer list)
+    private void AutomaticPermissions(VBoxContainer list, Func<bool, IEnumerable<ToggleOption>> options)
     {
         var card = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ShrinkCenter };
         card.AddThemeStyleboxOverride("panel", CompanionPanelStyle.Card()); list.AddChild(card);
         var table = new GridContainer { Columns = 3, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
         table.AddThemeConstantOverride("h_separation", 16);
         table.AddThemeConstantOverride("v_separation", 6); card.AddChild(table);
-        table.AddChild(new Label { Text = "计略", CustomMinimumSize = new(64, 0) });
+        table.AddChild(new Label { Text = "命令", CustomMinimumSize = new(64, 0) });
         foreach (string scope in new[] { "电脑势力", "玩家委任军团" })
         {
             var label = new Label { Text = scope, CustomMinimumSize = new(112, 0),
                 HorizontalAlignment = HorizontalAlignment.Center };
             label.AddThemeFontSizeOverride("font_size", 14); table.AddChild(label);
         }
-        foreach (var option in StrategyOptions)
+        foreach (var pair in options(false).Zip(options(true)))
         {
+            var option = pair.First;
             table.AddChild(new Label { Text = option.Title, TooltipText = option.Note,
                 CustomMinimumSize = new(64, 0), VerticalAlignment = VerticalAlignment.Center,
                 MouseFilter = MouseFilterEnum.Pass });
-            foreach (bool delegated in new[] { false, true })
+            foreach (var (scope, optionToggle) in new[] { ("电脑势力", pair.First), ("玩家委任军团", pair.Second) })
             {
-                var optionToggle = new ToggleOption(option.Title, option.Note,
-                    settings => (delegated ? settings.PlayerDelegatedStrategyPermissions : settings.ComputerStrategyPermissions).Allows(option.Kind),
-                    (settings, allowed) => delegated
-                        ? settings with { PlayerDelegatedStrategyPermissions = settings.PlayerDelegatedStrategyPermissions.WithAllowed(option.Kind, allowed) }
-                        : settings with { ComputerStrategyPermissions = settings.ComputerStrategyPermissions.WithAllowed(option.Kind, allowed) },
-                    EnabledText: "允许", DisabledText: "禁止",
-                    PresetValue: option.Kind is not (AutomaticStrategyKind.Alienate or AutomaticStrategyKind.Gossip or
-                        AutomaticStrategyKind.Burn or AutomaticStrategyKind.Seize));
                 var toggle = ToggleEditor(optionToggle, 112);
-                toggle.TooltipText = $"{(delegated ? "玩家委任军团" : "电脑势力")}：{option.Note}";
+                toggle.TooltipText = $"{scope}：{option.Note}";
                 table.AddChild(toggle);
             }
         }
@@ -153,16 +134,22 @@ public partial class CompanionSettingsView : ModalView
 
     private Button ToggleEditor(ToggleOption option, int width = 96)
     {
-        bool enabled = option.Read(_settings);
-        var toggle = new Button { Text = enabled ? option.EnabledText : option.DisabledText, ToggleMode = true,
-            ButtonPressed = enabled, CustomMinimumSize = new(width, 36) };
+        var toggle = CreateToggle(option.Read(_settings), width, option.EnabledText, option.DisabledText,
+            value => Edit(option.Write(_settings, value)));
+        _toggleEditors.Add((option, toggle));
+        return toggle;
+    }
+
+    private static Button CreateToggle(bool enabled, int width, string enabledText, string disabledText, Action<bool> edit)
+    {
+        var toggle = new Button { Text = enabled ? enabledText : disabledText, ToggleMode = true,
+            ButtonPressed = enabled, CustomMinimumSize = new(width, 32) };
         CompanionPanelStyle.Toggle(toggle);
         toggle.Toggled += value =>
         {
-            Edit(option.Write(_settings, value));
-            toggle.Text = value ? option.EnabledText : option.DisabledText;
+            edit(value);
+            toggle.Text = value ? enabledText : disabledText;
         };
-        _toggleEditors.Add((option, toggle));
         return toggle;
     }
 
@@ -185,7 +172,7 @@ public partial class CompanionSettingsView : ModalView
     private SpinBox NumberEditor(NumericOption option, int width = 112)
     {
         var number = new SpinBox { MinValue = option.Minimum, MaxValue = option.Maximum, Step = 1,
-            Value = option.Read(_settings), CustomMinimumSize = new(width, 36), Suffix = option.Suffix,
+            Value = option.Read(_settings), CustomMinimumSize = new(width, 32), Suffix = option.Suffix,
             TooltipText = option.Note };
         number.GetLineEdit().TooltipText = option.Note;
         number.ValueChanged += value => Edit(option.Write(_settings, (int)value));
@@ -197,7 +184,7 @@ public partial class CompanionSettingsView : ModalView
     {
         var card = new PanelContainer();
         card.AddThemeStyleboxOverride("panel", CompanionPanelStyle.Card()); list.AddChild(card);
-        var body = new VBoxContainer(); body.AddThemeConstantOverride("separation", 10); card.AddChild(body);
+        var body = new VBoxContainer(); body.AddThemeConstantOverride("separation", 4); card.AddChild(body);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 16); body.AddChild(row);
         var label = new Label { Text = title, SizeFlagsHorizontal = SizeFlags.ExpandFill,
             VerticalAlignment = VerticalAlignment.Center };

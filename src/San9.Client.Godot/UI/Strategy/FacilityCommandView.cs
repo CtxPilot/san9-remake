@@ -90,13 +90,13 @@ public partial class FacilityCommandView : FixedPage
     }
     private void SelectOfficers()
     {
-        int primary = Array.FindIndex(OfficerCatalog.Pages[0].Columns, c => c.Id == Draft.ActorPriorityField);
+        int primary = Array.FindIndex(OfficerCatalog.CorePages[0].Columns, c => c.Id == Draft.ActorPriorityField);
         int[] columns = [0,primary,8,.. new[] { 1,2,3,4,5 }.Where(c => c != primary)];
         CatalogRow[] Rows(int page) => OfficerCatalog.Read(Draft.View,Texts,page == 0 ? 0 : page-1,null,Draft.Home.Id).Rows
             .Where(r => Draft.Candidates.Contains(r.Key.Id)).OrderBy(r => Draft.Candidates.IndexOf(r.Key.Id))
             .Select(r => new CatalogRow(r.Key.Id,page == 0 ? columns.Select(c => r.Cells[c]).ToArray() : r.Cells.ToArray())).ToArray();
         _child = new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), HintText = Texts.Resolve(CommandMenuSkin.OfficerSelectionHintKey), Service = Service, Textures = Textures,
-            Pages = [new(CommandText.Resolve(Texts, "title." + Draft.Kind),columns.Select(c => OfficerCatalog.Pages[0].Columns[c]).ToArray()),.. OfficerCatalog.Pages],
+            Pages = [new(CommandText.Resolve(Texts, "title." + Draft.Kind),columns.Select(c => OfficerCatalog.CorePages[0].Columns[c]).ToArray()),.. OfficerCatalog.Pages(Draft.View, Texts)],
             ReadRows = Rows, Portrait = id => $"catalog-person-{id}", Selection = new(Draft.Candidates,Draft.Members,Draft.SelectionLimit),
             CanConfirmSelection = ids => Draft.CanSelect(ids), ConfirmSelection = ids => { if (Draft.SetMembers(ids)) CloseChild(); }, Closed = CloseChild };
         AddChild(_child);

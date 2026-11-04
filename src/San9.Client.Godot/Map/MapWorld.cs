@@ -213,7 +213,7 @@ public partial class MapWorld : Node2D
         if (Scene is { HasExpiredRetirements: true }) { Scene = Scene.PruneRetirements(); RequestDisplay(); }
         _terrain?.Pump(() => Textures.CanUpload);
         if (_display?.Error is not null) _awaitingSeason = false;
-        UpdateEdgeScrolling(delta);
+        if (!UpdateKeyboardScrolling(delta)) UpdateEdgeScrolling(delta);
         LastProcessMilliseconds = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
     }
     private void OnCommitted()

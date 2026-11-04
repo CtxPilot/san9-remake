@@ -15,12 +15,12 @@ public partial class StrategyHud
 
     private void BuildTargetControls()
     {
-        _flow = new() { World = World, Session = Session, Texts = Texts, Service = Textures, Textures = _textures };
+        _flow = new() { World = World, Preferences = Preferences, Session = Session, Texts = Texts, Service = Textures, Textures = _textures };
         _flow.Changed += RefreshMilitaryCommand;
         _flow.Notice += message => { _notice.SetNotice(message); _notice.Show(); };
         _flow.Submitted += PresentMilitaryCommand;
         OverlayHost.AddChild(_flow);
-        _personnelFlow = new() { World = World, Session = Session, Texts = Texts, Service = Textures,
+        _personnelFlow = new() { World = World, Preferences = Preferences, Session = Session, Texts = Texts, Service = Textures,
             Textures = _textures, OverlayHost = OverlayHost, Definition = CommandPresentation.Personnel };
         _personnelFlow.Changed += RefreshMilitaryCommand;
         _personnelFlow.Notice += message => { _notice.SetNotice(message); _notice.Show(); };

@@ -5,6 +5,22 @@ namespace San9.Core.Simulation;
 
 internal static class NewGameInitialization
 {
+    internal static void PrepareCreatedOfficers(WorldMutation world, IReadOnlySet<int> officerIds)
+    {
+        // Resolve service loyalty before fictional mode changes a historical ruler's affinity.
+        foreach (int id in officerIds.Order())
+        {
+            var person = world.AllOfficers[id];
+            if (person.IsDormant || person.Status != OfficerStatus.Serving) continue;
+            if (person.OwnerId is not int owner || !world.Forces.TryGetValue(owner, out var force) ||
+                force.LeaderId is not int leader || !world.Officers.TryGetValue(leader, out var ruler))
+                throw new ArgumentException("A serving created officer requires a force ruler.");
+            int loyalty = 95 - PersonnelRulebook.AffinityDistance(person, ruler) / 2 +
+                (int)(world.NextRandom("new-game-created-officer-loyalty") % 5);
+            world.Replace(person.WithLoyalty(owner, loyalty));
+        }
+    }
+
     internal static void PrepareFoundedForces(WorldMutation world, IReadOnlySet<int> forceIds)
     {
         foreach (int id in forceIds.Order())
@@ -16,12 +32,14 @@ internal static class NewGameInitialization
                 throw new ArgumentException("A founded force requires a ruler in its city.");
             uint transfer = city.DraftPopulation / 10;
             uint increase = Math.Min(12000u, transfer + 5000);
+            uint soldiers = (uint)Math.Min(city.SoldierCapacity, (long)city.Soldiers + increase);
             world.Replace(city with { DraftPopulation = city.DraftPopulation - transfer,
-                Soldiers = (uint)Math.Min(city.SoldierCapacity, (long)city.Soldiers + increase) });
+                Soldiers = soldiers, Morale = soldiers > 0 ? EconomyMath.RecruitMorale(force.Trust) : 0 });
         }
     }
 
-    internal static void Apply(WorldMutation world, NewGameSettings settings, IReadOnlyList<int> officerPlaces, IReadOnlySet<int> players)
+    internal static void Apply(WorldMutation world, NewGameSettings settings, IReadOnlyList<int> officerPlaces,
+        IReadOnlySet<int> players, IReadOnlySet<int> createdOfficerIds)
     {
         settings.Validate();
         world.SetSimulation(world.Simulation with { NewGame = settings });
@@ -58,7 +76,7 @@ internal static class NewGameInitialization
         var loyalties = world.AllForces.Keys.ToImmutableDictionary(id => id, _ => 50);
         foreach (var person in world.AllOfficers.Values.OrderBy(p => p.Id).ToArray())
         {
-            if (person.Status == OfficerStatus.Dead) continue;
+            if (person.Status == OfficerStatus.Dead || createdOfficerIds.Contains(person.Id)) continue;
             var updated = person with
             {
                 Righteousness = Pick(16), Ambition = Pick(16), Personality = Pick(4), LifespanTier = Pick(8),

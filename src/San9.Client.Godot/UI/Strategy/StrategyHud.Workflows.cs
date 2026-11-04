@@ -16,14 +16,14 @@ public partial class StrategyHud
     private CorpsCommandFlow _corpsFlow = null!;
     private void BuildCommandFlows()
     {
-        _commandTargets = new() { World = World, Session = Session };
+        _commandTargets = new() { World = World, Session = Session, Preferences = Preferences };
         _commandTargets.Changed += RefreshMilitaryCommand;
         AddChild(_commandTargets);
         var services = new CommandWorkflowServices(Session, World, Texts, Textures, _textures, Skin,
             CommandPresentation, OverlayHost, _commandTargets,
             message => { _notice.SetNotice(message); _notice.Show(); },
             (messages, view, completed) => _presentation.OpenNarration(messages, view, completed),
-            PresentMapRecord, ClearCommandSelection);
+            PresentMapRecord, ClearCommandSelection) { Preferences = Preferences };
         _patrolFlow = new() { Services = services }; AddChild(_patrolFlow);
         _appointmentFlow = new() { Services = services }; AddChild(_appointmentFlow);
         _facilityFlow = new() { Services = services }; AddChild(_facilityFlow);

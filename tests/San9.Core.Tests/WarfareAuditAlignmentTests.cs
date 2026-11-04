@@ -226,7 +226,7 @@ public sealed class WarfareAuditAlignmentTests
         [.. Enumerable.Repeat(0, 60)], [new(0, 1, 1)],
         [new(101, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
             { Combat = new(10, 10, 100, 10, 50), Attack = new(15, true) { RangedSiege = ranged },
-                CaptureRanks = [BattleRank.Middle] }],
+                Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
         [new(1, new(2, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) },
          new(2, new(32, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50), DestroyedAtZeroDurability = destroyed },
          new(99, new(92, 7), new(1, 1)) { Combat = new(10, 10, 0, 10, 50) }])
@@ -241,9 +241,9 @@ public sealed class WarfareAuditAlignmentTests
         [new(11, 1, null, new(80, 80, 80, 80), false) { UnitId = 1 },
          new(21, 2, null, new(80, 80, 80, 80), false) { UnitId = 2 }],
         units: [new(1, 1, new(22, 7), 10000) { FormationId = 101, Morale = 100,
-                    CommanderId = 11, OrderClass = UnitOrderClass.Military, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle) },
+                    CommanderId = 11, OrderClass = UnitOrderClass.Military, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle)) },
                 new(2, 2, new(52, 7), 10000) { FormationId = 101, Morale = 100,
-                    CommanderId = 21, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle) }], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(100000, 100000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(100000, 100000)) { IsRoot = true }]);
+                    CommanderId = 21, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)) }], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(100000, 100000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(100000, 100000)) { IsRoot = true }]);
 
     [Theory]
     [InlineData(100, 1, UnitOrderClass.Military, true, 70)]

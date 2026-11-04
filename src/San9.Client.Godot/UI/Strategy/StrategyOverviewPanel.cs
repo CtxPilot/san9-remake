@@ -11,6 +11,7 @@ public partial class StrategyOverviewPanel : FixedPage
 {
     protected override Color PageBackground => Colors.Black;
     public StrategyOverview State { get; init; } = null!;
+    public Action LayersChanged { get; init; } = () => { };
     public MapWorld World { get; init; } = null!;
     public GameSession Session { get; init; } = null!;
     public InterfaceSkin Skin { get; init; } = null!;
@@ -61,7 +62,7 @@ public partial class StrategyOverviewPanel : FixedPage
                 Frames = Enumerable.Range(0,4).Select(f => (Texture2D)Textures.Get($"button-overview-{role}" + (f == 0 ? "" : $"-{f}"), this)).ToArray()
             };
             // The four rectangular frames contain a diamond-shaped button.
-            button.Pressed += () => State.Toggle(layer);
+            button.Pressed += () => { State.Toggle(layer); LayersChanged(); };
             AddChild(button); _buttons.Add(layer, button);
         }
     }

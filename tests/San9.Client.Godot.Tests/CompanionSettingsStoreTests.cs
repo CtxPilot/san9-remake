@@ -22,6 +22,7 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         {
             PlayerAutoDomesticEnabled = true, OfficerAbilityCap = 125,
             DisableComputerForceConsolidation = true,
+            DisableComputerRewardTimingRestrictions = true,
             DisableComputerPrisonerExecution = true,
             DisablePlayerPrisonerExecution = true,
             InfiniteLifespan = true,
@@ -38,6 +39,8 @@ public sealed class CompanionSettingsStoreTests : IDisposable
             DuelDeathCoefficient = 5,
             ComputerStrategyPermissions = new() { Alienate = false, Burn = false },
             PlayerDelegatedStrategyPermissions = new() { Seize = false, Gossip = false },
+            ComputerDiplomacyPermissions = new() { Gift = false, Surrender = false },
+            PlayerDelegatedDiplomacyPermissions = new() { RequestAttack = false, ReturnPrisoner = false },
         };
         store.Save(new(settings, true));
         Assert.Equal(new CompanionConfiguration(settings, true), new CompanionSettingsStore(FilePath).Load());
@@ -50,7 +53,8 @@ public sealed class CompanionSettingsStoreTests : IDisposable
             settings with { DuelDeathCoefficient = -1 }, settings with { DuelDeathCoefficient = 11 } })
             Assert.Throws<ArgumentOutOfRangeException>(() => store.Save(new(invalid, false)));
         foreach (var invalid in new[] {
-            settings with { ComputerStrategyPermissions = null! }, settings with { PlayerDelegatedStrategyPermissions = null! } })
+            settings with { ComputerStrategyPermissions = null! }, settings with { PlayerDelegatedStrategyPermissions = null! },
+            settings with { ComputerDiplomacyPermissions = null! }, settings with { PlayerDelegatedDiplomacyPermissions = null! } })
             Assert.Throws<ArgumentNullException>(() => store.Save(new(invalid, false)));
         Assert.Equal(saved, File.ReadAllBytes(FilePath));
 
@@ -70,6 +74,26 @@ public sealed class CompanionSettingsStoreTests : IDisposable
         document["settings"]!["computerStrategyPermissions"]!.AsObject().Remove("burn");
         File.WriteAllText(FilePath, document.ToJsonString(), Encoding.UTF8);
         Assert.Throws<JsonException>(() => store.Load());
+    }
+
+    [Theory]
+    [InlineData("computerDiplomacyPermissions", null)]
+    [InlineData("playerDelegatedDiplomacyPermissions", null)]
+    [InlineData("computerDiplomacyPermissions", "gift")]
+    [InlineData("playerDelegatedDiplomacyPermissions", "requestAttack")]
+    [InlineData("computerDiplomacyPermissions", "returnPrisoner")]
+    [InlineData("playerDelegatedDiplomacyPermissions", "surrender")]
+    public void IncompleteDiplomacyPermissionsAreRejectedWithoutChangingTheFile(string scope, string? field)
+    {
+        var store = new CompanionSettingsStore(FilePath);
+        store.Save(CompanionConfiguration.Default);
+        var document = JsonNode.Parse(File.ReadAllText(FilePath, Encoding.UTF8))!;
+        if (field is null) document["settings"]!.AsObject().Remove(scope);
+        else document["settings"]![scope]!.AsObject().Remove(field);
+        string incomplete = document.ToJsonString();
+        File.WriteAllText(FilePath, incomplete, Encoding.UTF8);
+        Assert.Throws<JsonException>(() => store.Load());
+        Assert.Equal(incomplete, File.ReadAllText(FilePath, Encoding.UTF8));
     }
 
     public void Dispose()

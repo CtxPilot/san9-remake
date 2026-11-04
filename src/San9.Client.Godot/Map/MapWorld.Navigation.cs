@@ -9,6 +9,7 @@ public partial class MapWorld
     private readonly EdgeScrollCursor _edgeCursor = new();
     private Vector2 _pointer = new(-1, -1);
     public event Action<EdgeScrollMode>? EdgeScrollModeChanged;
+    public void SetEdgeScrollMode(EdgeScrollMode mode) => _edgeScroll.SetMode(mode);
     public Func<Vector2, bool>? IsNavigationBlocked { get; set; }
     public Func<bool>? CanNavigate { get; set; }
 
@@ -63,6 +64,25 @@ public partial class MapWorld
         var movement = EdgeScrollController.Displacement(direction, delta, RequestedZoom, IsVisibleReady);
         if (movement != default)
             MoveWorld(movement.X, movement.Y);
+    }
+
+    private bool UpdateKeyboardScrolling(double delta)
+    {
+        if (!NavigationAvailable || _mapDrag.IsHeld || Input.IsMouseButtonPressed(MouseButton.Middle) ||
+            GetViewport().GuiGetFocusOwner() is LineEdit or TextEdit ||
+            Input.IsKeyPressed(Key.Ctrl) || Input.IsKeyPressed(Key.Alt) ||
+            Input.IsKeyPressed(Key.Meta) || Input.IsKeyPressed(Key.Shift)) return false;
+
+        var direction = new EdgeScrollDirection(
+            (Input.IsPhysicalKeyPressed(Key.D) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) ? 1 : 0),
+            (Input.IsPhysicalKeyPressed(Key.S) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) ? 1 : 0));
+        if (direction.IsNone) return false;
+
+        _edgeScroll.CancelGesture();
+        _edgeCursor.Show(default, false);
+        var movement = EdgeScrollController.Displacement(direction, delta, RequestedZoom, IsVisibleReady);
+        if (movement != default) MoveWorld(movement.X, movement.Y);
+        return true;
     }
 
     private bool HandleNavigationKey(InputEvent input)

@@ -167,18 +167,20 @@ internal sealed class BattlefieldPathSearch : IDisposable
         return new(MapCoordinates.Center(MapCoordinates.Cell(position)), new(5, 5));
     }
 
-    // Ring boundary coverage is deliberately asymmetric; do not replace with rectangle-depth distance.
+    // Cover the half-open footprint completely, with equal costs at equal inward depths.
     internal static void RasterizeGradient(MapOccupancy area, int initial, int increment, Action<int, int, int> paint)
+        => RasterizeGradient(area, area, initial, increment, paint);
+
+    private static void RasterizeGradient(MapOccupancy area, MapOccupancy window, int initial, int increment,
+        Action<int, int, int> paint)
     {
-        for (int y = (int)area.Top; y <= area.Bottom; y++)
-        for (int x = (int)area.Left; x <= area.Right; x++)
+        // The window limits writes; inward depth always uses the complete object's boundaries.
+        for (int y = (int)Math.Max(area.Top, window.Top); y < Math.Min(area.Bottom, window.Bottom); y++)
+        for (int x = (int)Math.Max(area.Left, window.Left); x < Math.Min(area.Right, window.Right); x++)
         {
-            int layer = (int)Math.Min(Math.Min(x - area.Left, area.Right - x), Math.Min(y - area.Top, area.Bottom - y));
-            long l = area.Left + layer, r = area.Right - layer, t = area.Top + layer, b = area.Bottom - layer;
-            if (l >= r || t >= b) continue;
-            bool horizontalEdge = x >= l && x < r && (y == t || y == b);
-            bool verticalEdge = y > t && y < b - 1 && (x == l || x == r);
-            if (horizontalEdge || verticalEdge) paint(x, y, Math.Min(250, initial + layer * increment));
+            int layer = (int)Math.Min(Math.Min(x - area.Left, area.Right - 1 - x),
+                Math.Min(y - area.Top, area.Bottom - 1 - y));
+            paint(x, y, Math.Min(250, initial + layer * increment));
         }
     }
 
@@ -189,12 +191,10 @@ internal sealed class BattlefieldPathSearch : IDisposable
         Action<int, int, int> paint)
     {
         if ((!obstacle.Hard && obstacle.Avoidance == NavigationAvoidance.None) || !obstacle.Overlaps(window)) return;
-        int left = (int)Math.Max(obstacle.Left, window.Left), top = (int)Math.Max(obstacle.Top, window.Top);
-        int width = (int)(Math.Min(obstacle.Right, window.Right) - left);
-        int height = (int)(Math.Min(obstacle.Bottom, window.Bottom) - top);
         int padding = obstacle.Hard ? 0 : shape.Width / 2 + 1;
-        var field = new MapOccupancy(new(left + width / 2, top + height / 2), new(width + 2 * padding, height + 2 * padding));
-        RasterizeGradient(field, obstacle.Hard ? mobility + 75 : 25, obstacle.Hard ? 5 : 10, paint);
+        var field = new MapOccupancy(obstacle.Position,
+            new(obstacle.Footprint.Width + 2 * padding, obstacle.Footprint.Height + 2 * padding));
+        RasterizeGradient(field, window, obstacle.Hard ? mobility + 75 : 25, obstacle.Hard ? 5 : 10, paint);
     }
 
     internal NavigationStep Daily(WorldPosition start, MapOccupancy target, Footprint shape, TravelMode mode,
@@ -325,9 +325,11 @@ internal sealed class BattlefieldPathSearch : IDisposable
 
     internal MovementRoute Search(WorldPosition start, WorldPosition end, TravelMode mode,
         IReadOnlyList<MapOccupancy> objects, NavigationWorkBudget? work = null,
-        bool includeSteps = true, bool includeCells = false, MapOccupancy? endpoint = null, MapOccupancy? excluded = null)
+        bool includeSteps = true, bool includeCells = false, MapOccupancy? endpoint = null, MapOccupancy? excluded = null,
+        MapOccupancy? arrivalRegion = null)
     {
         if (!Coarse(start, end, Endpoint(start, objects), endpoint is { Footprint: not { Width: 1, Height: 1 } } area ? area : Endpoint(end, objects), mode, objects, work, excluded)) return new(false, [], 0);
+        if (arrivalRegion is { } region) return RegionRoute(start, end, region, mode, includeSteps, includeCells);
         var cells = includeCells ? ImmutableArray.CreateBuilder<MapCell>(route.Count) : null;
         var steps = includeSteps ? ImmutableArray.CreateBuilder<WorldPosition>(route.Count) : null;
         RouteTerrainCost components = new(0, 0);
@@ -339,19 +341,53 @@ internal sealed class BattlefieldPathSearch : IDisposable
             if (i > 0 && map.TerrainPassageCost(p, mode) is not null)
                 components += map.PassageComponents(p, mode) * 5;
         }
-        void AddEndpoint(WorldPosition cursor, WorldPosition to)
+        if (route.Count == 1) AccumulateSegment(start, end, mode, ref components);
+        else
         {
-            while (cursor != to)
-            {
-                cursor = cursor.X != to.X ? cursor with { X = cursor.X + Math.Sign(to.X - cursor.X) } : cursor with { Y = cursor.Y + Math.Sign(to.Y - cursor.Y) };
-                if (map.TerrainPassageCost(cursor, mode) is not null)
-                    components += map.PassageComponents(cursor, mode);
-            }
+            AccumulateSegment(start, Center(route[0]), mode, ref components);
+            AccumulateSegment(Center(route[^1]), end, mode, ref components);
         }
-        if (route.Count == 1) AddEndpoint(start, end);
-        else { AddEndpoint(start, Center(route[0])); AddEndpoint(Center(route[^1]), end); }
         return new(true, steps?.MoveToImmutable() ?? [], map.Reweight(components))
             { Cells = cells?.MoveToImmutable() ?? [], TerrainCost = components };
+    }
+
+    // Reuse the single coarse search. Only the source offset and final boundary segment need fine coordinates.
+    private MovementRoute RegionRoute(WorldPosition start, WorldPosition end, MapOccupancy region, TravelMode mode,
+        bool includeSteps, bool includeCells)
+    {
+        var cells = includeCells ? ImmutableArray.CreateBuilder<MapCell>() : null;
+        var steps = includeSteps ? ImmutableArray.CreateBuilder<WorldPosition>() : null;
+        RouteTerrainCost components = new(0, 0);
+        var cursor = start;
+        for (int i = 0; i < route.Count; i++)
+        {
+            var p = Center(route[i]);
+            cells?.Add(MapCoordinates.Cell(p));
+            steps?.Add(p);
+            if (i == 0) continue;
+            if (i == 1 || region.Contains(p)) cursor = AccumulateSegment(cursor, p, mode, ref components, region);
+            else
+            {
+                if (map.TerrainPassageCost(p, mode) is not null) components += map.PassageComponents(p, mode) * 5;
+                cursor = p;
+            }
+            if (region.Contains(cursor)) break;
+        }
+        if (!region.Contains(cursor)) AccumulateSegment(cursor, end, mode, ref components, region);
+        return new(true, steps?.ToImmutable() ?? [], map.Reweight(components))
+            { Cells = cells?.ToImmutable() ?? [], TerrainCost = components };
+    }
+
+    private WorldPosition AccumulateSegment(WorldPosition cursor, WorldPosition to, TravelMode mode,
+        ref RouteTerrainCost components, MapOccupancy? arrivalRegion = null)
+    {
+        while (cursor != to && !(arrivalRegion?.Contains(cursor) ?? false))
+        {
+            cursor = cursor.X != to.X ? cursor with { X = cursor.X + Math.Sign(to.X - cursor.X) }
+                : cursor with { Y = cursor.Y + Math.Sign(to.Y - cursor.Y) };
+            if (map.TerrainPassageCost(cursor, mode) is not null) components += map.PassageComponents(cursor, mode);
+        }
+        return cursor;
     }
 
     internal RouteReachability Reachable(WorldPosition start, TravelMode mode,

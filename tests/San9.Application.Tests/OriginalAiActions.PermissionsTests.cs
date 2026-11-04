@@ -26,6 +26,19 @@ public sealed partial class OriginalAiActionsTests
         FalseReport = false, Disorder = false, Inspire = false, Reinforce = false,
         Alienate = false, Burn = false, Seize = false, Gossip = false,
     };
+    private static readonly (OriginalAiWork Work, AutomaticDiplomacyKind Kind)[] DiplomacyPermissionKinds =
+    [
+        (OriginalAiWork.Gift, AutomaticDiplomacyKind.Gift),
+        (OriginalAiWork.RequestAttack, AutomaticDiplomacyKind.RequestAttack),
+        (OriginalAiWork.ReturnPrisoner, AutomaticDiplomacyKind.ReturnPrisoner),
+        (OriginalAiWork.Surrender, AutomaticDiplomacyKind.Surrender),
+    ];
+    private static readonly AutomaticDiplomacyPermissions NoDiplomacy = new()
+    {
+        Gift = false, RequestAttack = false, ReturnPrisoner = false, Surrender = false,
+    };
+    private static readonly OriginalAiWork[] PermissionWorks =
+        [.. PermissionKinds.Select(p => p.Work), .. DiplomacyPermissionKinds.Select(p => p.Work)];
 
     public static IEnumerable<object[]> StrategyPermissionCases() =>
         from pair in PermissionKinds
@@ -38,6 +51,31 @@ public sealed partial class OriginalAiActionsTests
     public void StrategyPermissionsApplyOnlyToTheSelectedScopeBeforePlanning(OriginalAiWork work,
         AutomaticStrategyKind kind, bool player, bool restrictPlayer)
     {
+        var restricted = AutomaticStrategyPermissions.All.WithAllowed(kind, false);
+        CheckAutomaticPermission(work, player, restrictPlayer, restrictPlayer
+            ? new() { PlayerDelegatedStrategyPermissions = restricted }
+            : new() { ComputerStrategyPermissions = restricted });
+    }
+
+    public static IEnumerable<object[]> DiplomacyPermissionCases() =>
+        from pair in DiplomacyPermissionKinds
+        from player in new[] { false, true }
+        from restrictPlayer in new[] { false, true }
+        select new object[] { pair.Work, pair.Kind, player, restrictPlayer };
+
+    [Theory]
+    [MemberData(nameof(DiplomacyPermissionCases))]
+    public void DiplomacyPermissionsApplyOnlyToTheSelectedScopeBeforePlanning(OriginalAiWork work,
+        AutomaticDiplomacyKind kind, bool player, bool restrictPlayer)
+    {
+        var restricted = AutomaticDiplomacyPermissions.All.WithAllowed(kind, false);
+        CheckAutomaticPermission(work, player, restrictPlayer, restrictPlayer
+            ? new() { PlayerDelegatedDiplomacyPermissions = restricted }
+            : new() { ComputerDiplomacyPermissions = restricted });
+    }
+
+    private static void CheckAutomaticPermission(OriginalAiWork work, bool player, bool restrictPlayer, CompanionSettings settings)
+    {
         bool blocked = player == restrictPlayer;
         int draws = 0;
         var h = new Harness(change: w => w with
@@ -46,12 +84,16 @@ public sealed partial class OriginalAiActionsTests
                 ? c with { Kind = player ? ControllerKind.Player : ControllerKind.Automatic }
                 : c.ForceId == 2 ? c with { Kind = ControllerKind.Player } : c)] },
             Units = w.Units.Select(u => work == OriginalAiWork.Confuse && u.Id == 10
-                ? u with { Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 20 } } : u).ToArray()
-        }, draw: maximum => { draws++; Assert.False(blocked, "A prohibited strategy consumed a planning draw."); return maximum - 1; });
-        var restricted = AutomaticStrategyPermissions.All.WithAllowed(kind, false);
-        h.Engine.ConfigureCompanion(restrictPlayer
-            ? new() { PlayerDelegatedStrategyPermissions = restricted }
-            : new() { ComputerStrategyPermissions = restricted });
+                ? u with { Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 20 } } : u).ToArray(),
+            Officers = w.Officers.Select(p => work == OriginalAiWork.ReturnPrisoner && p.Id == 12
+                ? p with { Status = OfficerStatus.Captive, SettlementId = 2 } : p).ToArray(),
+            Settlements = w.Settlements.Select(s => work == OriginalAiWork.Gift && s.Id == 1
+                ? s with { Soldiers = 1000 } : s).ToArray(),
+            Relations = w.Relations.Select(r => work == OriginalAiWork.Gift && r.FirstId == 1 && r.SecondId == 2
+                ? r with { Value = 40 } : r).ToArray(),
+        }, draw: maximum => { draws++; Assert.False(blocked, "A prohibited action consumed a planning draw."); return maximum - 1; });
+        if (work == OriginalAiWork.Surrender) h.State = h.State with { DiplomaticOrder = [1, 2, 3] };
+        h.Engine.ConfigureCompanion(settings);
         var before = h.Engine.Snapshot;
         var report = h.Run(work);
         if (!blocked)
@@ -77,9 +119,9 @@ public sealed partial class OriginalAiActionsTests
             OriginalAi = content.OriginalAi with
             {
                 WorkRules = content.OriginalAi.WorkRules.ToImmutableDictionary(p => p.Key, p => p.Value with
-                    { OpeningWaitDays = PermissionKinds.Any(k => k.Work == p.Key) ? 0 : 10000, PeriodDays = 0 }),
+                    { OpeningWaitDays = PermissionWorks.Contains(p.Key) ? 0 : 10000, PeriodDays = 0 }),
                 SecondaryBatches = content.OriginalAi.SecondaryBatches.ToImmutableDictionary(p => p.Key,
-                    _ => PermissionKinds.Select(k => k.Work).ToImmutableArray()),
+                    _ => PermissionWorks.Where(w => !OriginalAiTurnRunner.RootFirst.Contains(w)).ToImmutableArray()),
             }
         };
     }
@@ -87,14 +129,14 @@ public sealed partial class OriginalAiActionsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ProductionSchedulerReportsProhibitedStrategiesWithoutPlanning(bool player)
+    public void ProductionSchedulerReportsProhibitedActionsWithoutPlanning(bool player)
     {
         var session = GameSession.Start(PermissionContent(), 42, playerForceController: player ? ControllerKind.Player : ControllerKind.Automatic,
-            companionSettings: player ? new() { PlayerDelegatedStrategyPermissions = NoStrategies }
-                : new() { ComputerStrategyPermissions = NoStrategies });
+            companionSettings: player ? new() { PlayerDelegatedStrategyPermissions = NoStrategies, PlayerDelegatedDiplomacyPermissions = NoDiplomacy }
+                : new() { ComputerStrategyPermissions = NoStrategies, ComputerDiplomacyPermissions = NoDiplomacy });
         if (player) session.EndControl(new("player")); else session.AdvanceXun();
-        var reports = session.LastOriginalAiWork.Where(r => r.CorpsId == 1 && PermissionKinds.Any(k => k.Work == r.Work)).ToArray();
-        Assert.Equal(8, reports.Length);
+        var reports = session.LastOriginalAiWork.Where(r => r.CorpsId == 1 && PermissionWorks.Contains(r.Work)).ToArray();
+        Assert.Equal(PermissionWorks.Length, reports.Length);
         Assert.All(reports, r =>
         {
             Assert.Equal(OriginalAiWorkEnd.Permission, r.End);
@@ -104,22 +146,43 @@ public sealed partial class OriginalAiActionsTests
         });
     }
 
-    [Fact]
-    public void PermissionsDoNotRestrictManualCommandsOrRecallExistingMissions()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PermissionsDoNotRestrictManualCommandsOrRecallExistingMissions(bool diplomacy)
     {
+        var settings = new CompanionSettings
+        {
+            ComputerStrategyPermissions = NoStrategies, PlayerDelegatedStrategyPermissions = NoStrategies,
+            ComputerDiplomacyPermissions = NoDiplomacy, PlayerDelegatedDiplomacyPermissions = NoDiplomacy,
+        };
         var h = new Harness();
-        h.Engine.ConfigureCompanion(new() { ComputerStrategyPermissions = NoStrategies, PlayerDelegatedStrategyPermissions = NoStrategies });
-        var command = new BurnCommand(Guid.NewGuid(), 1, h.Engine.Snapshot.Simulation.NextSequence, 11, 2);
+        h.Engine.ConfigureCompanion(settings);
+        long sequence = h.Engine.Snapshot.Simulation.NextSequence;
+        GameCommand command = diplomacy ? new RequestAttackCommand(Guid.NewGuid(), 1, sequence, 11, 3, 2)
+            : new BurnCommand(Guid.NewGuid(), 1, sequence, 11, 2);
         Assert.True(h.Engine.Execute(new("player"), command).Submission.Accepted);
 
         var basis = PermissionContent();
-        var content = basis with { OriginalAi = basis.OriginalAi with
-            { SecondaryBatches = basis.OriginalAi.SecondaryBatches.ToImmutableDictionary(p => p.Key,
-                _ => ImmutableArray.Create(OriginalAiWork.Encourage)) } };
+        var work = diplomacy ? OriginalAiWork.RequestAttack : OriginalAiWork.Encourage;
+        var content = basis with
+        {
+            Information = basis.Information with { Corps = [.. basis.Information.Corps.Select(c => diplomacy && c.Id == 1
+                ? c with { ControlMode = CorpsControlMode.Direct } : c)] },
+            OriginalAi = basis.OriginalAi with
+            {
+                WorkRules = basis.OriginalAi.WorkRules.ToImmutableDictionary(p => p.Key, p => p.Value with
+                    { OpeningWaitDays = p.Key == work ? 0 : 10000 }),
+                SecondaryBatches = basis.OriginalAi.SecondaryBatches.ToImmutableDictionary(p => p.Key,
+                    _ => diplomacy ? ImmutableArray<OriginalAiWork>.Empty : [work]),
+            },
+        };
         var session = GameSession.Start(content, 42);
-        var started = session.EndControl(new("player"));
-        var mission = Assert.Single(started.Events.OfType<TaskStartedEvent>()).Task;
-        var settings = new CompanionSettings { ComputerStrategyPermissions = NoStrategies, PlayerDelegatedStrategyPermissions = NoStrategies };
+        var started = diplomacy
+            ? session.Execute(new("player"), new RequestAttackCommand(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence, 11, 3, 2)).Events
+            : session.EndControl(new("player")).Events;
+        var mission = Assert.Single(started.OfType<TaskStartedEvent>()).Task;
+        if (diplomacy) session.EndControl(new("player"));
         session.ConfigureCompanion(settings);
         var restored = SaveService.Decode(SaveService.Encode(session), content);
         restored.ConfigureCompanion(settings);

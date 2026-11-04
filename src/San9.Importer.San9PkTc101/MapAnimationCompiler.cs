@@ -88,7 +88,6 @@ public static class MapAnimationCompiler
         {
             var result = new PngImage(68,52,4,new byte[68*52*4]);
             if (layer is not null) Overlay(result,layer,x,y);
-            IndexedImageArchive.ExtendTransparentColors(result.Pixels,result.Width,result.Height);
             return result;
         }
         var pole = IndexedImageArchive.Decode(flagArchive.Images[0], flagArchive.Palettes[palettes[491]-285],true,false);

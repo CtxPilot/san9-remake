@@ -5,8 +5,11 @@ namespace San9.Application.Authoring;
 /// <summary>Owns an editor visit. Changes stay in memory until the host successfully saves the library.</summary>
 public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
 {
+    private readonly Dictionary<Guid, string> _surnameEdits = [];
     public CreatedOfficerLibrary Library { get; private set; } = library;
     public bool HasChanges { get; private set; }
+    public OfficerFlagCatalog? FlagCatalog { get; private set; }
+    public void UseFlagCatalog(OfficerFlagCatalog catalog) { catalog.Validate(); FlagCatalog = catalog; }
     public void Saved() => HasChanges = false;
     public CreatedOfficer Add()
     {
@@ -24,14 +27,41 @@ public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
         for (int i = 0; i < Library.Officers.Length; i++)
             if (Library.Officers[i].Id == person.Id) { index = i; break; }
         if (index >= 0 && Library.Officers[index] == person) return;
+        if (index >= 0 && Library.Officers[index].Surname != person.Surname)
+            _surnameEdits.TryAdd(person.Id, Library.Officers[index].Surname);
         Library = Library with { Officers = index < 0 ? Library.Officers.Add(person) : Library.Officers.SetItem(index, person) };
         HasChanges = true;
+    }
+    public bool AssignFlagFromSurname(Guid id)
+    {
+        var person = Library.Officers.SingleOrDefault(p => p.Id == id);
+        if (person is null) return false;
+        var catalog = FlagCatalog ?? throw new InvalidOperationException("旗字目录尚未载入。");
+        int glyph = catalog.Resolve(person.Surname);
+        Set(person with { FlagGlyph = glyph });
+        _surnameEdits.Remove(id);
+        return glyph != person.FlagGlyph;
+    }
+    public bool FinishSurnameEdit(Guid id, bool automatic)
+    {
+        if (!_surnameEdits.TryGetValue(id, out string? original)) return false;
+        if (automatic && Library.Officers.Any(p => p.Id == id && p.Surname != original))
+            return AssignFlagFromSurname(id);
+        _surnameEdits.Remove(id);
+        return false;
+    }
+    public bool FinishSurnameEdits(bool automatic)
+    {
+        bool changed = false;
+        foreach (var id in _surnameEdits.Keys.ToArray()) changed |= FinishSurnameEdit(id, automatic);
+        return changed;
     }
     public void Delete(Guid id)
     {
         if (Library.Officers.Any(o => o.ParentId == id)) throw new InvalidDataException("请先解除其他人物指向此人的亲代关系。");
         if (!Library.Officers.Any(o => o.Id == id)) return;
         Library = Library with { Officers = Library.Officers.RemoveAll(o => o.Id == id) };
+        _surnameEdits.Remove(id);
         HasChanges = true;
     }
     public void Import(CreatedOfficerLibrary imported, bool createCopies)
@@ -47,6 +77,8 @@ public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
             else { positions.Add(value.Id, people.Count); people.Add(value); }
         }
         var candidate = Library with { Officers = people.ToImmutable() };
-        candidate.Validate(); Library = candidate; HasChanges = true;
+        candidate.Validate(); Library = candidate;
+        foreach (var id in ids.Values) _surnameEdits.Remove(id);
+        HasChanges = true;
     }
 }

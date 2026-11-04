@@ -53,7 +53,7 @@ public sealed class BattleRoutingTests
         var second = snapshot.Units.Single(u => u.Id == 0) with
         {
             Id = 2, Position = new(37, 7), CommanderId = null,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty,
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty),
             Order = attacksSubject ? new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 } : null
         };
         var state = world.BeginMutation();
@@ -68,7 +68,7 @@ public sealed class BattleRoutingTests
         var (world, military) = Fixture(39, false, 40000);
         var state = world.BeginMutation();
         state.AddUnit(state.Units[0] with { Id = 2, CommanderId = null,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty) });
         state.RemoveUnit(0);
         List<DomainEvent> events = [];
         BattleRouting.CompleteExchange(state, new(0, false), new(1, false), new() { Military = military }, events);
@@ -83,7 +83,7 @@ public sealed class BattleRoutingTests
         var (world, military) = Fixture(29, false, 1);
         var setup = world.BeginMutation();
         setup.Replace(setup.Officers[11] with { UnitId = null, SettlementId = 1 });
-        setup.Replace(setup.Units[0] with { CommanderId = null, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty });
+        setup.Replace(setup.Units[0] with { CommanderId = null, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty) });
         setup.AddUnit(setup.Units[0] with { Id = 2, Soldiers = 80000, Position = new(37, 7) });
         world.Commit(setup);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: military);
@@ -168,7 +168,7 @@ public sealed class BattleRoutingTests
         var snapshot = System.Text.Json.JsonSerializer.Deserialize<WorldSnapshot>(
             CanonicalJson.Text(first.Snapshot), CanonicalJson.Options)!;
         var second = new SimulationEngine(WorldState.Restore(snapshot), rules);
-        Assert.Equal(new(ArrivalEstimateStatus.Incomplete), new MilitaryArrivalForecast(snapshot, rules.Military!).Estimate(5));
+        Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(snapshot, rules.Military!).Estimate(5).Status);
         first.EndControl(new("player"));
         second.EndControl(new("player"));
         EventAssert.Equal(first.AdvanceXun().Events, second.AdvanceXun().Events);
@@ -181,7 +181,7 @@ public sealed class BattleRoutingTests
         var profile = new CombatProfile(10, 10, 10, 10, 50);
         var military = new MilitaryRulebook(new(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(), [new(0, 1, null)],
             [new(7, 10, 0, 100000, 5, new(1, 1), TravelMode.Land)
-                { Combat = profile, Attack = new(1, true), CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear] }],
+                { Combat = profile, Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear]) }],
             [new(1, facility ? new(35, 7) : new(2, 7), new(1, 1)) { Combat = profile, Attack = facility ? new(1, true) : null },
              new(2, new(37, 2), new(1, 1)) { Combat = profile }])
         { Tactics = [new(9000, 7, TacticEffect.CounterConfusion, 0, 0, 0, true, false, [])] });
@@ -193,10 +193,10 @@ public sealed class BattleRoutingTests
              new(22, 2, null, new(70, 70, 70, 70), false) { UnitId = 1, Status = OfficerStatus.Ruler,
                  LearnedTactics = protection ? [9000] : [], EquippedTacticId = protection ? 9000 : null }],
             [new(0, 1, facility ? new(2, 7) : new(35, 7), attackingSoldiers) { FormationId = 7, Morale = 90, ServicePlaceId = 1,
-                CommanderId = 11, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front),
+                CommanderId = 11, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)),
                 Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 1 } },
              new(1, 2, new(36, 7), 5000) { FormationId = 7, Morale = morale, ServicePlaceId = 2,
-                CommanderId = 22, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) }],
+                CommanderId = 22, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) }],
             corps: [new(1, 1, 11, new(100000, 100000)) { IsRoot = true }, new(2, 2, 22, new(100000, 100000)) { IsRoot = true }]);
         return (world, military);
     }

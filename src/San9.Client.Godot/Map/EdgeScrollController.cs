@@ -13,6 +13,12 @@ public sealed class EdgeScrollController
     public const double EdgeWidth = 32;
     public const double Speed = 1200;
     public EdgeScrollMode Mode { get; private set; } = EdgeScrollMode.Hover;
+    public void SetMode(EdgeScrollMode mode)
+    {
+        if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+        Mode = mode;
+        CancelGesture();
+    }
     public bool OwnsLeftButton { get; private set; }
     private bool _armed;
 

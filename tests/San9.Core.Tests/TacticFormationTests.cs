@@ -57,9 +57,9 @@ public sealed class TacticFormationTests
         return new(100, 3, Enumerable.Repeat(water ? 1 : 0, 300).ToImmutableArray(),
             [new(0, 1, null), new(1, 1, 1) { IsWater = true }],
             [new(100, 5, 0, 100000, 2, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(10, false), CaptureRanks = [BattleRank.Front, BattleRank.Middle], Tactics = new(100, 2, [], []) },
+                { Combat = combat, Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle]), Tactics = new(100, 2, [], []) },
              new(200, 5, 0, 100000, 2, new(1, 1), TravelMode.Water)
-                { Combat = combat, Attack = new(10, false), CaptureRanks = [BattleRank.Middle, BattleRank.Middle], Tactics = new(100, 2, [], []) }], [])
+                { Combat = combat, Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle]), Tactics = new(100, 2, [], []) }], [])
         {
             Tactics = [new(9000, 8, TacticEffect.Inspire, 10, 9, 0, true, false,
                 compatible ? [100, 200] : [100])]

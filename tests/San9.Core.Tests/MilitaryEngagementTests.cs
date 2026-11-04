@@ -12,7 +12,7 @@ public sealed class MilitaryEngagementTests
         var combat = new CombatProfile(10, 10, 10, 10, 50);
         var military = new MilitaryRulebook(new(20, 3, [.. Enumerable.Repeat(0, 60)], [new(0, 1, null)],
             [new(1, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = combat, Attack = new(10, true), CaptureRanks = [BattleRank.Middle] }],
+                { Combat = combat, Attack = new(10, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
             [new(1, new(2, 7), new(1, 1)) { Combat = combat, WoundedRecovery = 1 },
              new(2, new(40, 7), new(buildingWidth, 1)) { Combat = combat, Attack = new(10, false), WoundedRecovery = 1 },
              new(3, new(60, 7), new(1, 1)) { Combat = combat, Attack = new(10, false) }]) { Geography = new(scale, []) });
@@ -122,6 +122,36 @@ public sealed class MilitaryEngagementTests
         Assert.Same(relations, m.Engagements(military));
         Assert.Same(m.Units[1], MilitaryEngagements.FacilityTarget(m, m.Settlements[2], military));
         Assert.Equal(9000u, MilitaryEngagements.FacilityTarget(m, m.Settlements[2], military)!.Soldiers);
+        world.Commit(m);
+        var next = world.BeginMutation();
+        Assert.Same(relations, next.Engagements(military));
+        Assert.Equal(9000u, MilitaryEngagements.FacilityTarget(next, next.Settlements[2], military)!.Soldiers);
+    }
+
+    [Fact]
+    public void CommittedRelationsSurviveForksAndDiscardedPreviewsWithoutLeakingChanges()
+    {
+        var (world, military) = Create();
+        var m = world.BeginMutation();
+        var relations = m.Engagements(military);
+        // Merely querying a preview does not publish its cache to the owner.
+        Assert.Null(world.EngagementCache);
+        world.Commit(m);
+        var branch = world.Fork();
+        Assert.Same(relations, branch.BeginMutation().Engagements(military));
+        var preview = world.BeginMutation();
+        preview.Replace(preview.Units[2] with { Order = null });
+        Assert.Null(preview.Engagements(military).Target(new(2, false)));
+        Assert.Same(relations, world.BeginMutation().Engagements(military));
+        var changed = branch.BeginMutation();
+        changed.Replace(changed.Units[2] with { Position = new(70, 7) });
+        branch.Commit(changed); // Invalidated caches also propagate when not queried before commit.
+        Assert.Null(branch.BeginMutation().Engagements(military).Target(new(2, false)));
+        Assert.Same(relations, world.BeginMutation().Engagements(military));
+        Assert.Equal(new BattleSource(1, false), relations.Target(new(2, false)));
+        var (_, otherRules) = Create();
+        Assert.NotSame(relations, world.BeginMutation().Engagements(otherRules));
+        Assert.Same(relations, world.BeginMutation().Engagements(military));
     }
 
     [Theory]
@@ -132,10 +162,12 @@ public sealed class MilitaryEngagementTests
     [InlineData("morale")]
     [InlineData("owner")]
     [InlineData("elimination")]
-    public void AttackEligibilityChangesAreVisibleBeforeTheNextQuery(string change)
+    public void AttackEligibilityChangesInvalidateRelationsAcrossCommands(string change)
     {
         var (world, military) = Create(); var m = world.BeginMutation();
         Assert.Equal(new BattleSource(1, false), m.Engagements(military).Target(new(2, false)));
+        world.Commit(m);
+        m = world.BeginMutation();
         var unit = m.Units[2];
         if (change == "elimination") m.Replace(m.Forces[2] with { IsEliminated = true });
         else m.Replace(change switch
@@ -148,7 +180,8 @@ public sealed class MilitaryEngagementTests
             "owner" => unit with { OwnerId = 1 },
             _ => throw new InvalidOperationException()
         });
-        Assert.Null(m.Engagements(military).Target(new(2, false)));
+        world.Commit(m);
+        Assert.Null(world.BeginMutation().Engagements(military).Target(new(2, false)));
     }
 
     [Fact]

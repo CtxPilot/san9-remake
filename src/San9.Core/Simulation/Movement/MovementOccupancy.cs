@@ -43,10 +43,9 @@ internal sealed class MovementOccupancy
     internal static IReadOnlyList<MapOccupancy> Snapshot(WorldSnapshot world, MilitaryRulebook rules, int owner, UnitPolicies policies, bool includeUnits,
         int? movingUnit = null)
     {
-        var units = world.Units.ToDictionary(u => u.Id);
-        var places = world.Settlements.Where(s => !s.IsDormant).ToDictionary(s => s.Id);
-        return new MovementOccupancy(places.Values, includeUnits ? world.Units : [], rules)
-            .Query(units, places, policies, other => MilitaryDiplomacy.AutomaticEnemy(world, owner, other), owner, movingUnit);
+        var query = new WorldQuery(world);
+        return new MovementOccupancy(query.Settlements.Values, includeUnits ? world.Units : [], rules)
+            .Query(query, owner, policies, movingUnit);
     }
 
     internal void Set(UnitState unit) => Set((true, unit.Id), unit.FormationId is int id
@@ -74,11 +73,14 @@ internal sealed class MovementOccupancy
             }
     }
 
-    internal IReadOnlyList<MapOccupancy> Query(IWorldQuery world, int owner, UnitPolicies policies, int? movingUnit = null, int? entry = null)
-        => Query(world.Units, world.Settlements, policies, other => MilitaryDiplomacy.AutomaticEnemy(world, owner, other), owner, movingUnit, entry);
+    internal IReadOnlyList<MapOccupancy> Query(IWorldQuery world, int owner, UnitPolicies policies, int? movingUnit = null, int? entry = null, UnitState? mover = null)
+        => Query(world.Units, world.Settlements, policies, other => MilitaryDiplomacy.AutomaticEnemy(world, owner, other),
+            other => (mover ?? (movingUnit is int id ? world.Units.GetValueOrDefault(id) : null)) is { } source
+                ? MilitaryDiplomacy.ApproachEnemy(world, source, other) : MilitaryDiplomacy.AutomaticEnemy(world, owner, other),
+            owner, movingUnit, entry);
 
     private IReadOnlyList<MapOccupancy> Query(IReadOnlyDictionary<int, UnitState> units, IReadOnlyDictionary<int, SettlementState> places,
-        UnitPolicies policies, Func<int?, bool> enemyOf, int owner, int? movingUnit = null, int? entry = null)
+        UnitPolicies policies, Func<int?, bool> enemyOf, Func<int, bool> unitEnemyOf, int owner, int? movingUnit = null, int? entry = null)
     {
         var result = new List<MapOccupancy>();
         foreach (var (key, area) in areas)
@@ -89,7 +91,7 @@ internal sealed class MovementOccupancy
                 var unit = units[key.Id];
                 if (unit.IsEmbedded || unit.IsPersonnel) continue;
                 bool enemy = unit.OwnerId != owner;
-                result.Add(area with { Hard = enemy && policies.AttackApproachingEnemies,
+                result.Add(area with { Hard = unitEnemyOf(unit.OwnerId) && policies.AttackApproachingEnemies,
                     Avoidance = enemy ? NavigationAvoidance.Hostile : NavigationAvoidance.Friendly });
             }
             else
@@ -122,35 +124,49 @@ public static class MilitaryRouteQuery
     internal static MilitaryRoutePlan Plan(IWorldQuery world, MilitaryRulebook rules, UnitState unit, int? movingUnit,
         int maximumDays, int maximumExpanded)
     {
-        var work = new NavigationWorkBudget(maximumExpanded);
+        var route = Estimate(world, rules, unit, movingUnit, new(maximumExpanded));
+        return new(route.Status switch
+        {
+            RouteReachability.Reachable => NavigationStatus.Arrived,
+            RouteReachability.Incomplete => NavigationStatus.Planning,
+            _ => NavigationStatus.Unreachable
+        }, route.Cells.Select(MapCoordinates.Center).ToImmutableArray());
+    }
+
+    /// <summary>One search per active route segment; avoidance affects routing, never adds elapsed days.</summary>
+    internal static RouteCostEstimate Estimate(IWorldQuery world, MilitaryRulebook rules, UnitState unit, int? movingUnit,
+        NavigationWorkBudget work)
+    {
         var travel = rules.Travel(unit);
         var order = unit.EffectiveOrder!;
         var target = order.IsAttack ? MilitaryCombat.TargetArea(world, order, rules) :
             order.Construction is { } site ? rules.FacilityArea(site.Position, site.FacilityTypeId) :
             order.SettlementId is int home ? rules.SettlementArea(world.Settlements[home]) : new MapOccupancy(order.Position!.Value, new(1, 1));
-        var occupancy = world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId);
-        var steps = ImmutableArray.CreateBuilder<WorldPosition>();
+        var occupancy = world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit);
+        var cells = ImmutableArray.CreateBuilder<MapCell>();
+        long cost = 0;
         WorldPosition start = unit.Position;
-        RouteCostEstimate Segment(WorldPosition end, MapOccupancy? excluded = null) => travel.Map.EstimateTravelCost(start, new(end, new(1, 1)),
-            travel.Shape, travel.Mode, occupancy, work, intoRange: false, includeCells: true, excluded: excluded);
+        RouteCostEstimate Segment(MapOccupancy end, NavigationArrival arrival, MapOccupancy? excluded = null) => travel.Map.EstimateTravelCost(start, end,
+            travel.Shape, travel.Mode, occupancy, work, arrival: arrival, includeCells: true, excluded: excluded);
         var waypoint = unit.ActiveWaypoint;
         if (waypoint is { } via)
         {
-            var first = Segment(via, order.SettlementId is not null ? target : null);
+            var first = Segment(new(via, new(1, 1)), NavigationArrival.Point, order.SettlementId is not null ? target : null);
             if (first.Status != RouteReachability.Reachable)
-                return new(first.Status == RouteReachability.Incomplete ? NavigationStatus.Planning : NavigationStatus.Unreachable, []);
-            steps.AddRange(first.Cells.Select(MapCoordinates.Center));
+                return first;
+            cells.AddRange(first.Cells);
+            cost = first.Cost;
             start = via;
         }
-        var last = Segment(target.Position, waypoint is not null && order.SettlementId is not null ? target : null);
+        var last = Segment(target, MilitaryNavigation.Arrival(order),
+            waypoint is not null && order.SettlementId is not null ? target : null);
         if (last.Status != RouteReachability.Reachable)
-            return new(last.Status == RouteReachability.Incomplete ? NavigationStatus.Planning : NavigationStatus.Unreachable, steps.ToImmutable());
+            return last with { Cells = cells.ToImmutable() };
         foreach (var cell in last.Cells)
         {
-            var position = MapCoordinates.Center(cell);
-            if (steps.Count == 0 || steps[^1] != position) steps.Add(position);
+            if (cells.Count == 0 || cells[^1] != cell) cells.Add(cell);
         }
-        return new(NavigationStatus.Arrived, steps.ToImmutable());
+        return new(RouteReachability.Reachable, cost + last.Cost) { Cells = cells.ToImmutable() };
     }
 
     public static IReadOnlyList<MapOccupancy> Occupancy(WorldSnapshot snapshot, MilitaryRulebook rules, int owner, UnitPolicies policies,

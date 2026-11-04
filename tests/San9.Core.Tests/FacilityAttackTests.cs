@@ -28,7 +28,7 @@ public sealed class FacilityAttackTests
     {
         var combat = new CombatProfile(10, 10, 0, 10, 50);
         return new(new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, 1, null)],
-            [new(7000, 1, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, CaptureRanks = [BattleRank.Front] }],
+            [new(7000, 1, 0, 100000, 1, new(1, 1), TravelMode.Land) { Combat = combat, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(9000, new(7, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat, Attack = new(1, false), EnabledTacticIds = enabled ? [9500, 9501] : [] },
                 new(9001, new(27, 2), new(1, 1)) { FacilityTypeId = 8000, Combat = combat }])
         {
@@ -73,7 +73,7 @@ public sealed class FacilityAttackTests
                 new(21, 2, null, new(80, 80, 80, 80), false) { UnitId = 7001 },
                 new(22, 2, 9001, new(80, 80, 80, 80), false) { Status = OfficerStatus.Ruler }],
             units: [new(7001, 2, new(7 + distance, 2), 100000) { FormationId = 7000, Morale = 100, ServicePlaceId = 9001,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Front)) }],
             controls: [new("first", 1, sourcePlayer ? ControllerKind.Player : ControllerKind.Automatic),
                 new("second", 2, targetPlayer ? ControllerKind.Player : ControllerKind.Automatic)], computerDamageBonusPercent: bonus, corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 22, new(10000, 1000000)) { IsRoot = true }]);
         var engine = new SimulationEngine(state, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: rules);

@@ -31,10 +31,10 @@ public sealed partial class OriginalAiActionsTests
                 Opponent(9, null) with { State = Opponent(9, null).State with { UnitId = 20 } }],
             Units = [new UnitState(10, 1, new(17, 7), 5000) { FormationId = 400, ServicePlaceId = 1, CommanderId = 8,
                 Morale = 60, Order = new(MilitaryOrderKind.Move, new(32, 7), null),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(8, BattleRank.Middle) },
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(8, BattleRank.Middle)) },
                 new UnitState(20, 2, new(27, 7), 5000) { FormationId = 400, ServicePlaceId = 2, CommanderId = 9,
                 Morale = 100, Order = new(MilitaryOrderKind.AttackSettlement, null, 1),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(9, BattleRank.Middle) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(9, BattleRank.Middle)) }],
             Information = basis.Information with { Corps = [new(1, 1, 1, new(100000, 100000)) { IsRoot = true },
                 new(2, 2, 2, new(100000, 100000)) { IsRoot = true }, new(3, 3, 3, new(100000, 100000)) { IsRoot = true }],
                 Relations = [new(1, 2, 0), new(1, 3, 80), new(2, 3, 20)] },
@@ -43,7 +43,7 @@ public sealed partial class OriginalAiActionsTests
             RegionNameKeys = new() { [1] = "one", [2] = "two", [3] = "three" },
             Military = new(20, 3, Enumerable.Repeat(0, 60).ToImmutableArray(), [new(0, 1, null)],
                 [new(400, 10, 0, 30000, 5, new(1, 1), TravelMode.Land)
-                    { CaptureRanks = Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray() }],
+                    { Positions = San9.Tests.FormationTestData.Layout(Enumerable.Repeat(BattleRank.Middle, 5).ToImmutableArray()) }],
                 [new(1, new(7, 7), new(1, 1)), new(2, new(37, 7), new(1, 1)), new(3, new(67, 7), new(1, 1))])
                 { RegionIds = Enumerable.Range(0, 60).Select(i => (int?)(i % 20 < 6 ? 1 : i % 20 < 12 ? 2 : 3)).ToImmutableArray(),
                     TerritoryExits = Enumerable.Repeat(TerritoryExits.All, 60).ToImmutableArray() },
@@ -425,7 +425,7 @@ public sealed partial class OriginalAiActionsTests
             return nearby ? world with
             {
                 Units = [.. world.Units, w.Units.Single(u => u.Id == 20) with { Id = 21, CommanderId = 19,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(19, BattleRank.Middle) }],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(19, BattleRank.Middle)) }],
                 Officers = [.. world.Officers, w.Officers.Single(p => p.Id == 9) with { Id = 19, UnitId = 21 }],
                 Simulation = world.Simulation with { NextUnitId = 22 }
             } : world;
@@ -459,7 +459,7 @@ public sealed partial class OriginalAiActionsTests
         var h = new Harness(content, change: w => secondTarget ? w with
         {
             Units = [.. w.Units, w.Units.Single(u => u.Id == 10) with { Id = 11, Soldiers = 6000,
-                Position = new(22, 7), CommanderId = 18, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(18, BattleRank.Middle) }],
+                Position = new(22, 7), CommanderId = 18, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(18, BattleRank.Middle)) }],
             Officers = [.. w.Officers, w.Officers.Single(p => p.Id == 8) with { Id = 18, UnitId = 11 }]
         } : w);
         var report = h.Run(OriginalAiWork.Reinforce);

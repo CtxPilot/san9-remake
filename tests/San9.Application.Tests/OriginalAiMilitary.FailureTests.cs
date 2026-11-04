@@ -33,7 +33,7 @@ public sealed partial class OriginalAiMilitaryTests
                 {
                     Id = 901, CommanderId = 101, Position = new(47, 7),
                     Order = new(MilitaryOrderKind.AttackSettlement, null, 3),
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(101, BattleRank.Middle)
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(101, BattleRank.Middle))
                 }],
                 Officers = world.Officers.Select(p => p.Id == 101 ? p with { SettlementId = null, UnitId = 901 } : p).ToArray(),
                 Simulation = world.Simulation with { NextUnitId = 902 }

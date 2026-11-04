@@ -83,7 +83,8 @@ internal sealed class ScenarioSessionDefinition
                 _playerForces.Contains(f.Id) ? playerForceController : ControllerKind.Automatic)), computerDamageBonusPercent, Content.Alliance,
         Content.AttackRequests.Select(r => new AttackRequestState(r.RequestedForceId, r.RequesterForceId, r.TargetSettlementId,
             Content.Settlements.Single(s => s.Id == r.TargetSettlementId).OwnerId!.Value, r.RemainingXun)), Content.AnnualAppearancesEnabled, Content.NaturalDeathsEnabled, Content.FreeOfficerMigrationEnabled, battleDeathsEnabled, Content.OfficeRequestsEnabled, Content.ConsumedEventKeys, Content.ForceConsolidationEnabled, Content.ForceEmergenceEnabled, Content.CityIndependenceEnabled, Content.ImperialCourtEnded, Content.ThreeVisitsStarted, Content.FoodExchangeRate, Content.SettlementDefectionsEnabled, Content.UnitDefectionsEnabled,
-        settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces, Definitions.Forces.Select(f => f.Id).ToHashSet());
+        settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces,
+        Definitions.Forces.Select(f => f.Id).ToHashSet(), Definitions.Officers.Select(p => p.Id).ToHashSet());
 
     private IEnumerable<ForceState> Forces() => Content.Forces.Select(f => new ForceState(f.Id, f.Trust)
     {

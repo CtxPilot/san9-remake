@@ -14,6 +14,7 @@ public partial class CreatedOfficerEditor : ModalView
     public CreatedOfficerStore Store { get; init; } = null!;
     public string ContentRoot { get; init; } = "";
     public TextureService? Service { get; init; }
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public Action Closed { get; init; } = null!;
     private CreatedOfficerWorkspace? _workspace;
     private CreatedOfficerWorkspace Workspace => _workspace ?? throw new InvalidOperationException("人物库尚未载入。");
@@ -56,6 +57,19 @@ public partial class CreatedOfficerEditor : ModalView
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); column.AddChild(header);
         _title = new Label { Text = "新武将编辑器", Name = "EditorTitle", SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _title.AddThemeFontSizeOverride("font_size", 20); header.AddChild(_title);
+        var options = new MenuButton { Text = "编辑选项", Name = "EditorOptions" };
+        var optionsPopup = options.GetPopup();
+        optionsPopup.AddCheckItem("自动旗字", 0);
+        optionsPopup.SetItemChecked(0, Preferences.Current.AutoAssignOfficerFlag);
+        optionsPopup.IdPressed += id =>
+        {
+            if (id != 0) return;
+            FinishSurnameEdit();
+            Preferences.Update(p => p with { AutoAssignOfficerFlag = !p.AutoAssignOfficerFlag });
+            optionsPopup.SetItemChecked(0, Preferences.Current.AutoAssignOfficerFlag);
+            if (_workspace is not null) ShowCurrent();
+        };
+        header.AddChild(options);
         _reference = new MenuButton { Text = "参考剧本", Name = "ReferenceScenario", Disabled = true };
         _reference.GetPopup().IdPressed += id => { _referenceScenarioIndex = (int)id; LoadScenario(); }; header.AddChild(_reference);
         var save = AddButton(header, "保存人物库", () => Save(), "SaveOfficers");
@@ -70,8 +84,8 @@ public partial class CreatedOfficerEditor : ModalView
         _count = new Label { SizeFlagsHorizontal = SizeFlags.ExpandFill, HorizontalAlignment = HorizontalAlignment.Right };
         _count.AddThemeColorOverride("font_color", CreatedOfficerEditorStyle.Muted); listHeading.AddChild(_count);
         var actions = new HBoxContainer(); actions.AddThemeConstantOverride("separation", 6); sidebar.AddChild(actions);
-        AddButton(actions, "新建", () => { _current = Workspace.Add().Id; Changed(true); }, "NewOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        AddButton(actions, "复制", () => { if (_current is Guid id) { _current = Workspace.Duplicate(id).Id; Changed(true); } }, "CopyOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        AddButton(actions, "新建", () => { FinishSurnameEdit(); _current = Workspace.Add().Id; Changed(true); }, "NewOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        AddButton(actions, "复制", () => { FinishSurnameEdit(); if (_current is Guid id) { _current = Workspace.Duplicate(id).Id; Changed(true); } }, "CopyOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
         AddButton(actions, "删除", DeleteCurrent, "DeleteOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _search = new LineEdit { PlaceholderText = "搜索姓名、字", Name = "OfficerSearch" }; sidebar.AddChild(_search);
         _search.TextChanged += _ => RefreshList();
@@ -114,6 +128,15 @@ public partial class CreatedOfficerEditor : ModalView
                 var service = new TextureService(); service.Initialize(textures, textureRoot); AddChild(service);
                 _portraitService = service; ShowCurrent();
             }
+            try
+            {
+                var flags = await ContentCatalogFiles.LoadOfficerFlagsAsync(ContentRoot, catalog, token);
+                token.ThrowIfCancellationRequested();
+                flags.ValidateReferences(_portraitService.AnimationClips.Keys.ToHashSet());
+                Workspace.UseFlagCatalog(flags); ShowCurrent();
+            }
+            catch (Exception error) when (IsFileError(error))
+            { Status("旗字目录读取失败，选旗和自动关联不可用：" + error.Message, true); }
             var previews = await ContentCatalogFiles.LoadPreviewsAsync(ContentRoot, catalog, token);
             token.ThrowIfCancellationRequested(); _scenarios = catalog.Scenarios;
             for (int i = 0; i < _scenarios.Length; i++)
@@ -149,7 +172,7 @@ public partial class CreatedOfficerEditor : ModalView
             _reference.Text = $"参考：{content.Scenario.Year}年";
             _reference.TooltipText = content.Text.Resolve("scenario.title") + "\n点击更换参考剧本";
             for (int i = 0; i < _scenarios.Length; i++) _reference.GetPopup().SetItemChecked(i, i == _referenceScenarioIndex);
-            Status("");
+            if (Workspace.FlagCatalog is not null) Status("");
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception error) when (IsFileError(error)) { Status("剧本读取失败：" + error.Message, true); }
@@ -172,7 +195,7 @@ public partial class CreatedOfficerEditor : ModalView
         _title.Text = "新武将编辑器" + (HasChanges ? " · 未保存" : "");
         _refreshing = false;
     }
-    private void Changed(bool rebuild = false) { RefreshList(); if (rebuild) ShowCurrent(); }
+    private void Changed(bool rebuild = false) { RefreshList(); if (rebuild) ShowCurrent(); else RefreshFlagValue(); }
     private void Change(Guid officerId, Func<CreatedOfficer, CreatedOfficer> edit, bool rebuild = false)
     {
         var person = Library.Officers.SingleOrDefault(p => p.Id == officerId);
@@ -181,6 +204,7 @@ public partial class CreatedOfficerEditor : ModalView
     }
     private void ShowCurrent()
     {
+        FinishSurnameEdit();
         int page = _tabs.CurrentTab;
         foreach (var child in _tabs.GetChildren()) { _tabs.RemoveChild(child); child.QueueFree(); }
         if (Current is not { } person)
@@ -193,6 +217,7 @@ public partial class CreatedOfficerEditor : ModalView
         if (_workspace is null) return false;
         try
         {
+            FinishSurnameEdit();
             Store.Save(Library); _workspace.Saved(); RefreshList(); Status("人物库已保存。"); return true;
         }
         catch (Exception error) when (IsFileError(error)) { Status("未保存：" + error.Message, true); return false; }
@@ -225,7 +250,7 @@ public partial class CreatedOfficerEditor : ModalView
         Popup(dialog);
     });
     private void Export() => ChooseLibraryFile(true, path =>
-    { CreatedOfficerStore.Export(path, Library); Status("已导出人物资料与头像引用。导出不替代保存本地人物库。"); });
+    { FinishSurnameEdit(); CreatedOfficerStore.Export(path, Library); Status("已导出人物资料与头像引用。导出不替代保存本地人物库。"); });
     private void ChooseLibraryFile(bool save, Action<string> selected)
     {
         var dialog = new FileDialog { Access = FileDialog.AccessEnum.Filesystem,

@@ -10,6 +10,7 @@ public interface IInformationPage { void RefreshData(); }
 public partial class InformationPanel : ModalView
 {
     public InformationBrowser State { get; } = new();
+    public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public GameSession Session { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
     public Control MenuAnchor { get; init; } = null!;
@@ -34,10 +35,18 @@ public partial class InformationPanel : ModalView
     }
     private void OnChanged() => _dirty = true;
     public void OpenMenu() { State.OpenMenu(); Rebuild(); }
-    public void Open(InformationCategory category) { State.Close(); State.Open(category); Rebuild(); }
+    public void Open(InformationCategory category) { State.Close(); State.Open(category); RestorePreferredMode(); Rebuild(); }
+    private void RestorePreferredMode()
+    {
+        if (!State.IsDetail && State.Category is InformationCategory.Forces or InformationCategory.Cities)
+            State.ShowMap(Preferences.IsMap(State.Category));
+    }
+    private void Navigate(InformationLink link) { State.Navigate(link); RestorePreferredMode(); }
+    private void ChangeMapMode(bool map) { State.ShowMap(map); Rebuild(); }
     public void OpenContext(MapContextEntry entry)
     {
         State.OpenContext(entry);
+        RestorePreferredMode();
         if (entry.DetailId is int id)
         {
             State.DetailSelection.SetVisibleRows(AdministrativeDetailView.VisibleRows(entry.Target.Category));
@@ -83,6 +92,8 @@ public partial class InformationPanel : ModalView
         _textures?.Dispose(); _textures = null;
         Visible = State.IsOpen;
         if (!Visible) return;
+        if (!State.IsMenu && !State.IsDetail && State.Category is InformationCategory.Forces or InformationCategory.Cities)
+            Preferences.SetMap(State.Category, State.IsMap);
         _textures = Service.CreateScope();
         if (State.IsMenu) _textures.RequestPrefixes("information-menu-");
         else if (State.Category is InformationCategory.Records or InformationCategory.Chronicle) _textures.RequestPrefixes("progress-record-", "detail-", "catalog-scroll-", "message-", "text-icon-");
@@ -91,8 +102,8 @@ public partial class InformationPanel : ModalView
         else _textures.RequestPrefixes("information-", "catalog-", "roster-", "scroll-", "button-scroll-", "message-", "text-icon-");
         _page = State.IsMenu
             ? new InformationMenuView { AnchorControl = MenuAnchor, Query = _query, Texts = Texts, Textures = _textures,
-                Open = category => { State.Open(category); Rebuild(); }, Back = Back }
-            : new InformationPageFactory { State = State, Session = Session, Texts = Texts,
+                Open = Open, Back = Back }
+            : new InformationPageFactory { State = State, Navigate = Navigate, ChangeMapMode = ChangeMapMode, Session = Session, Texts = Texts,
                 Service = Service, Textures = _textures, World = World, Skin = Skin, Query = _query,
                 RecordsLog = RecordsLog, ChangeReportMode = ChangeReportMode, Rebuild = Rebuild, Back = Back }.Create();
         AddChild(_page);

@@ -75,7 +75,7 @@ public sealed class WaterCombatContactTests
         var rules = new MilitaryRulebook(new(10, 3, Enumerable.Range(0, 30).Select(i => i % 10 < 5 ? 1 : 0).ToImmutableArray(),
             [new(0, 1, null), new(1, null, 1) { IsWater = true }],
             [new(200, 100, 0, 100000, 1, new(1, 1), TravelMode.Water)
-                { Combat = combat, Attack = Melee, CaptureRanks = [BattleRank.Front] }],
+                { Combat = combat, Attack = Melee, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(1, new(2, 7), new(1, 1)) { FacilityTypeId = 8000, Combat = combat },
                 new(2, new(27, 7), new(5, 5)) { FacilityTypeId = 8000, Combat = combat },
                 new(3, new(blockerX, 7), new(5, 15)) { FacilityTypeId = 8000, Combat = combat, DestroyedAtZeroDurability = true }])
@@ -87,7 +87,7 @@ public sealed class WaterCombatContactTests
             [new(11, 1, null, new(80, 80, 80, 80), false) { UnitId = 0 },
                 new(22, 2, 2, new(80, 80, 80, 80), false)],
             units: [new(0, 1, new(7, 7), 10000) { FormationId = 200, Morale = 100, ServicePlaceId = 1,
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) }],
             controls: [new("player", 1, ControllerKind.Player)],
             corps: [new(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new(2, 2, 22, new(10000, 1000000)) { IsRoot = true }]);
         return (world, rules);
@@ -101,7 +101,7 @@ public sealed class WaterCombatContactTests
         var player = new CommandContext("player");
         var order = new MilitaryOrder(MilitaryOrderKind.AttackSettlement, null, 2);
         Assert.True(engine.Execute(player, new OrderUnitCommand(Guid.NewGuid(), 1, 0, 0, order)).Submission.Accepted);
-        var estimate = new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0, maximumDays: 5);
+        var estimate = new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0);
         Assert.Equal(ArrivalEstimateStatus.Known, estimate.Status);
         engine.EndControl(player);
         var events = engine.AdvanceXun().Events;
@@ -111,17 +111,17 @@ public sealed class WaterCombatContactTests
         Assert.True(rules.Map.IsWater(position));
         Assert.False(Area(position.X, position.Y).Overlaps(rules.BuildingArea(rules.Places[2])));
         Assert.All(approach.SelectMany(e => e.Steps), p => Assert.True(rules.Map.IsWater(p)));
-        Assert.Equal(estimate.Days, events.OfType<BattleDamageEvent>().First(e => e.AttackerId == 0).Clock.Day);
+        Assert.Equal(1, events.OfType<BattleDamageEvent>().First(e => e.AttackerId == 0).Clock.Day);
     }
 
     [Fact]
-    public void ABlockedChannelIsNotReportedAsArrivalAtTheTarget()
+    public void RouteEstimateDoesNotPredictDailyWaterContactBlocking()
     {
         var (world, rules) = Scenario(blocker: true);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, PersonnelRulebook.Empty, TreasureRulebook.Empty, military: rules);
         var order = new MilitaryOrder(MilitaryOrderKind.AttackSettlement, null, 2);
         Assert.True(engine.Execute(new("player"), new OrderUnitCommand(Guid.NewGuid(), 1, 0, 0, order)).Submission.Accepted);
-        Assert.NotEqual(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0, maximumDays: 5).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, new MilitaryArrivalForecast(engine.Snapshot, rules).Estimate(0).Status);
     }
 
     [Fact]
@@ -158,21 +158,19 @@ public sealed class WaterCombatContactTests
     }
 
     [Fact]
-    public void ForecastAndCombatBothExpirePassiveContactAcrossABlockedWaterCorner()
+    public void CombatExpiresPassiveContactAcrossABlockedWaterCorner()
     {
         var (world, _) = Scenario();
         var rules = new MilitaryRulebook(new(3, 3, [1, 0, 0, 0, 1, 0, 0, 0, 1],
             [new(0, 1, null), new(1, null, 1) { IsWater = true }],
             [new(200, 100, 0, 100000, 1, new(1, 1), TravelMode.Water)
-                { Combat = new(10, 10, 10, 10, 50), Attack = Melee, CaptureRanks = [BattleRank.Front] }], []));
+                { Combat = new(10, 10, 10, 10, 50), Attack = Melee, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }], []));
         var mutation = world.BeginMutation();
         mutation.Replace(mutation.Units[0] with { Position = new(4, 4), ActiveEngagement = true, ContactTarget = new(1, false) });
         var defender = mutation.Units[0] with { Id = 1, OwnerId = 2, Position = new(7, 7),
-            ActiveEngagement = false, PassiveEngagement = true, ContactTarget = null, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty };
+            ActiveEngagement = false, PassiveEngagement = true, ContactTarget = null, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty) };
         mutation.AddUnit(defender);
-        var predicted = MilitaryEngagements.ForecastNextCombat(mutation, defender, rules);
         MilitaryEngagements.ClearExpired(mutation, rules);
-        Assert.False(predicted.PassiveEngagement);
-        Assert.Equal(mutation.Units[1].PassiveEngagement, predicted.PassiveEngagement);
+        Assert.False(mutation.Units[1].PassiveEngagement);
     }
 }

@@ -36,7 +36,7 @@ public sealed record MapCommandSummary(string Kind, string Name, string Status, 
         Row("在任", $"{staffing.Available,3}/{staffing.Assigned,3}");
         Row("俘虏", staffing.AssignedPeople.Count(o => o.Status == OfficerStatus.Captive).ToString());
         Row("在野", people.Count(o => o.Status == OfficerStatus.Free).ToString());
-        return new(city ? "city" : "facility", visible.ResolveName(texts), place.ConfusionDaysRemaining > 0 ? "混乱" : "一般", rows) {
+        return new(city ? "city" : "facility", visible.ResolveName(texts), catalog.SettlementCondition(id), rows) {
             Icon = city ? place.MerchantPresent ? "merchant" : visible.Icons.Contains("training") ? "training" : null : null
         };
     }

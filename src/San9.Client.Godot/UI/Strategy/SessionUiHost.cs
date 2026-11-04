@@ -21,6 +21,7 @@ public partial class SessionUiHost : Node
     public ClientContentPackage Content { get; init; } = null!;
     public ScenarioInitialState Definition { get; init; } = null!;
     public ClientDataPaths DataPaths { get; init; } = null!;
+    public UiPreferencesSession Preferences { get; init; } = new();
     public SlotSaveStore SaveStore { get; init; } = null!;
     public SceneMusicPlayer Music { get; init; } = null!;
     public GameSession InitialSession { get; init; } = null!;
@@ -64,8 +65,12 @@ public partial class SessionUiHost : Node
         Music.SetEnabled(_settings.Current.MusicEnabled);
         _windowDisplay = new(GetWindow());
         _windowDisplay.Apply(_settings.Current.FullscreenEnabled, _settings.Current.MouseConfined);
+        World.SetEdgeScrollMode(Preferences.Current.EdgeScrollMode);
+        World.EdgeScrollModeChanged += RememberEdgeScrollMode;
         Activate(InitialSession, InitialSessionKind);
     }
+    private void RememberEdgeScrollMode(EdgeScrollMode mode)
+        => Preferences.Update(p => p with { EdgeScrollMode = mode });
 
     public void Activate(GameSession next, SessionReplacementKind kind)
     {
@@ -155,6 +160,7 @@ public partial class SessionUiHost : Node
             StartNewGame = OpenNewGame,
             Music = Music, OverlayHost = overlayHost,
             ReadSettings = () => _settings.Current,
+            Preferences = Preferences,
             ReadFormationAppearance = () => _companionSettings.FormationAppearanceEnabled,
             ApplyCompanionSettings = draft =>
             {
@@ -258,6 +264,7 @@ public partial class SessionUiHost : Node
     {
         _lifetime.Cancel(); _lifetime.Dispose();
         _windowDisplay.Dispose();
+        World.EdgeScrollModeChanged -= RememberEdgeScrollMode;
         _pending = null;
         World.IsInputBlocked = null;
         World.IsNavigationBlocked = null;

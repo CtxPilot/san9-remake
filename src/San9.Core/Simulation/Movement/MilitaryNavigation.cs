@@ -22,8 +22,8 @@ internal static class MilitaryNavigation
         if (unit.ActiveWaypoint is not { } via)
             return new(AdvanceDestination(world, unit, movingUnit, rules, budget, work, seed));
         var travel = rules.Travel(unit);
-        var first = travel.Map.Navigate(unit.Position, new(via, new(1, 1)), false,
-            travel.Shape, travel.Mode, world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null),
+        var first = travel.Map.Navigate(unit.Position, new(via, new(1, 1)), NavigationArrival.Point,
+            travel.Shape, travel.Mode, world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null, unit),
             budget, work: work, lookahead: unit.Lookahead, randomSeed: seed, mobility: rules.Formation(unit).MovementBudget / 5,
             excluded: unit.EffectiveOrder?.SettlementId is int destination ? rules.SettlementArea(world.Settlements[destination]) : null);
         if (!first.Arrived) return new(first);
@@ -42,8 +42,8 @@ internal static class MilitaryNavigation
             ? Math.Max(1, checked(attack.Range + attack.MaximumElevationBonus)) : 1;
         var travel = rules.Travel(unit);
         if (order.IsAttack)
-            return NavigationArrivalForecast.Advance(travel, unit.Position, MilitaryCombat.TargetArea(world, order, rules), true,
-                world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null), budget, work, unit.Lookahead,
+            return NavigationArrivalForecast.Advance(travel, unit.Position, MilitaryCombat.TargetArea(world, order, rules), NavigationArrival.Range,
+                world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, null, unit), budget, work, unit.Lookahead,
                 range: position => MilitaryCombat.ApproachRange(world, unit, order, rules, position), rectangularReach: true,
                 maximumRange: Math.Max(Range(formation), Range(naval)),
                 lookaheadCells: order.UnitId is null ? 25 : 6, randomSeed: seed, continueApproach: true, mobility: rules.Formation(unit).MovementBudget / 5,
@@ -53,13 +53,13 @@ internal static class MilitaryNavigation
             : order.SettlementId is int destination
                 ? rules.SettlementArea(world.Settlements[destination])
                 : new MapOccupancy(order.Position!.Value, new(1, 1));
-        if (order.Construction is null && order.SettlementId is int home && world.Settlements[home].OwnerId == unit.OwnerId &&
-            new MapOccupancy(unit.Position, rules.UnitFootprint(unit)).Overlaps(target))
-            return new(unit.Position, 0, NavigationStatus.Arrived);
-        return NavigationArrivalForecast.Advance(travel, unit.Position, target, order.Construction is not null || order.SettlementId is not null,
-            world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId), budget, work, unit.Lookahead, randomSeed: seed, mobility: rules.Formation(unit).MovementBudget / 5,
+        return NavigationArrivalForecast.Advance(travel, unit.Position, target, Arrival(order),
+            world.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit), budget, work, unit.Lookahead, randomSeed: seed, mobility: rules.Formation(unit).MovementBudget / 5,
             requireTargetClearance: order.Construction is not null);
     }
+
+    internal static NavigationArrival Arrival(MilitaryOrder order) => order.IsAttack || order.Construction is not null
+        ? NavigationArrival.Range : order.SettlementId is not null ? NavigationArrival.Region : NavigationArrival.Point;
 
     internal static int Budget(UnitState unit, MilitaryRulebook rules)
     {

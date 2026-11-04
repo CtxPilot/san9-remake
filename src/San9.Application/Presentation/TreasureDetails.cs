@@ -13,9 +13,7 @@ public static class TreasureDetails
         var cells = row.Cells;
         string ability = cells[2].Text.Length == 0 ? "" : $"{cells[2].Text}+{cells[3].Text}";
         int? tacticId = view.Information.Treasures.Single(t => t.Id == id).TacticId;
-        int? group = tacticId is null ? null : OfficerCatalog.Pages.Skip(4)
-            .Select((page, index) => (page, index))
-            .Single(p => p.page.Columns.Any(c => c.Id == $"tactic.{tacticId}")).index;
+        int? group = tacticId is int tactic ? view.TacticCategory(tactic) : null;
         return new(cells[0].Text, $"information-treasure-{id}", cells[6].Text,
             texts.ResolveRich(TreasureText.DescriptionKey(id)), cells[1].Text,
             cells[5].IsUnavailable ? "" : cells[5].Text, ability, cells[4].Text, group);

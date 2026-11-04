@@ -122,7 +122,7 @@ public partial class MilitaryPolicyView : FixedPage
             ArrivalEstimateStatus.Known => $"{estimate.Days,3}日　",
             ArrivalEstimateStatus.Waiting => "受阻",
             ArrivalEstimateStatus.Unreachable => "不可达",
-            ArrivalEstimateStatus.Incomplete => "待定",
+            ArrivalEstimateStatus.Incomplete => "未能估算",
             _ => "—"
         };
         _arrival.Text = $"到达预定　{value}";

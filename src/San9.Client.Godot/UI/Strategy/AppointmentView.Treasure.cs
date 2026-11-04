@@ -66,8 +66,7 @@ public partial class AppointmentView
         body.AddChild(message);
     }
 
-    private void SelectTreasureRecipient() => SelectSingleAppointmentOfficer(
-        [(0,0),(1,7),(0,1),(0,2),(0,3),(0,4),(0,5),(3,2),(0,7),(1,4)]);
+    private void SelectTreasureRecipient() => SelectSingleAppointmentOfficer();
 
 }
 

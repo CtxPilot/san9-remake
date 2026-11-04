@@ -202,6 +202,56 @@ public sealed class ProgressPresentationTests
         Assert.Empty(state.ReportedEnemyUnits);
     }
 
+    [Theory]
+    [InlineData(3000, 30000, "reinforce-from")]
+    [InlineData(30000, 5000, "reinforce-to")]
+    public void QuarterMilitaryAdviceComparesEnemyGarrisonWithItsFriendlyNeighbor(int ownSoldiers, int enemySoldiers, string role)
+    {
+        var (definition, world) = QuarterMilitaryEntry(ownSoldiers, enemySoldiers);
+        var view = new StrategySnapshot(definition, world);
+        var state = StrategicContext.Prepare(view, StrategicContextState.Empty, _ => 0);
+        var prompt = Assert.Single(state.Prompts);
+
+        Assert.Equal(role, prompt.Role);
+        Assert.Equal(1, prompt.ForceId);
+        Assert.Equal(2, prompt.EnemyForceId);
+        Assert.Equal(2, prompt.PlaceId);
+        Assert.Equal(1, prompt.OtherPlaceId);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(null)]
+    [InlineData(2)]
+    public void QuarterMilitaryAdviceDoesNotDescribeOwnNeutralOrFriendlyGarrisonsAsEnemies(int? owner)
+    {
+        var (definition, world) = QuarterMilitaryEntry(3000, 30000);
+        world = world with
+        {
+            Settlements = world.Settlements.Select(s => s.Id == 2 ? s with { OwnerId = owner } : s).ToImmutableArray(),
+            Relations = [new(1, 2, 100)]
+        };
+        var state = StrategicContext.Prepare(new(definition, world), StrategicContextState.Empty, _ => 0);
+        Assert.DoesNotContain(state.Prompts, p => p.Role is "reinforce-from" or "reinforce-to");
+    }
+
+    private static (San9.Content.Scenarios.ScenarioInitialState Definition, WorldSnapshot World) QuarterMilitaryEntry(int ownSoldiers, int enemySoldiers)
+    {
+        var definition = Scenario();
+        definition = definition with { Military = definition.Military! with
+        {
+            RegionIds = Enumerable.Range(0, 90).Select(i => (int?)(i % 30 < 10 ? 1 : 2)).ToImmutableArray(),
+            TerritoryExits = Enumerable.Repeat(TerritoryExits.All, 90).ToImmutableArray()
+        } };
+        var world = GameSession.Start(definition, 42).Snapshot;
+        return (definition, world with
+        {
+            Clock = new(190, 4, 1),
+            Settlements = world.Settlements.Select(s => s.Id == 1 ? s with { Soldiers = (uint)ownSoldiers } :
+                s.Id == 2 ? s with { Soldiers = (uint)enemySoldiers } : s).ToImmutableArray()
+        });
+    }
+
     [Fact]
     public void SameForceAtOnePlaceReportsOnceButDifferentEnemyForcesRemainIndependent()
     {
@@ -376,16 +426,26 @@ public sealed class ProgressPresentationTests
         Assert.Same(loaded.StrategicContext,StrategicContext.Prepare(loaded.View,loaded.StrategicContext,_ => throw new Exception("Rerolled save")));
     }
 
-    [Fact]
-    public void SaveRejectsContextWithAnUnknownDisclosedPlace()
+    [Theory]
+    [InlineData("enemy-city", 9999, 2)]
+    [InlineData("enemy-city", 2, null)]
+    [InlineData("enemy-place", 2, 1)]
+    [InlineData("reinforce-from", 2, null)]
+    [InlineData("reinforce-to", 2, 1)]
+    public void SaveRejectsInvalidMilitaryAdvice(string role, int place, int? enemy)
     {
         var definition = Scenario();
-        var session = GameSession.Start(definition,42);
+        var session = GameSession.Start(definition, 42);
         var envelope = SaveService.Capture(session);
-        var context = session.StrategicContext with { Prompts = [new("enemy-city",2,1,1,PlaceId:9999,CityId:1,EnemyForceId:2)] };
+        var context = session.StrategicContext with
+        {
+            Prompts = [new(role, 2, 1, 1, PlaceId: place, CityId: 2, EnemyForceId: enemy, OtherPlaceId: 1)]
+        };
         var error = Assert.Throws<SaveException>(() => SaveService.Load(envelope with
-            { Session = envelope.Session with { StrategicContexts = envelope.Session.StrategicContexts.SetItem(1, context) } },definition));
-        Assert.Equal(SaveFailure.InvalidState,error.Failure);
+        {
+            Session = envelope.Session with { StrategicContexts = envelope.Session.StrategicContexts.SetItem(1, context) }
+        }, definition));
+        Assert.Equal(SaveFailure.InvalidState, error.Failure);
     }
 
     [Fact]

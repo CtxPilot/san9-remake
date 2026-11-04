@@ -71,12 +71,12 @@ public partial class PatrolView : FixedPage
     private void SelectOfficers()
     {
         var selection = new CatalogSelection(Draft.Candidates, Draft.Members, Draft.SelectionLimit);
-        var ability = OfficerCatalog.Pages[0];
+        var ability = OfficerCatalog.CorePages[0];
         int[] columns = [0,3,8,1,2,4,5];
         CatalogRow[] Rows(int page) => OfficerCatalog.Read(Draft.View, Texts, page == 0 ? 0 : page-1, null, Draft.Home.Id).Rows
             .Where(r => Draft.Candidates.Contains(r.Key.Id)).OrderBy(r => Draft.Candidates.IndexOf(r.Key.Id))
             .Select(r => new CatalogRow(r.Key.Id, page == 0 ? columns.Select(c => r.Cells[c]).ToArray() : r.Cells.ToArray())).ToArray();
-        var view = new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), HintText = Texts.Resolve(CommandMenuSkin.OfficerSelectionHintKey), Pages = [new(CommandText.Resolve(Texts, "title.patrol"), columns.Select(c => ability.Columns[c]).ToArray()), .. OfficerCatalog.Pages],
+        var view = new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), HintText = Texts.Resolve(CommandMenuSkin.OfficerSelectionHintKey), Pages = [new(CommandText.Resolve(Texts, "title.patrol"), columns.Select(c => ability.Columns[c]).ToArray()), .. OfficerCatalog.Pages(Draft.View, Texts)],
             ReadRows = Rows, Service = Service, Textures = Textures, Portrait = id => $"catalog-person-{id}", Selection = selection,
             CanConfirmSelection = ids => ids.Count * 50 <= Draft.Money,
             ConfirmSelection = ids => { if (Draft.SetMembers(ids)) CloseChild(); }, Closed = CloseChild };

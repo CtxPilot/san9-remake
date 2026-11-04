@@ -98,7 +98,7 @@ internal sealed partial class OriginalAiActions(SimulationEngine engine, Scenari
         OriginalAiWorkReport Report(OriginalAiWorkEnd end) => new(corpsId, work, end, used, accepted)
             { Rejected = rejected, EmptyPlans = empty, PathQueries = pathQueries, PathSearches = diagnostics.Queries,
                 PathExpanded = diagnostics.Expanded, PathEndpointExpanded = diagnostics.EndpointExpanded };
-        if (!OriginalAiStrategyPermissions.Allows(World, engine.Companion, Owner, work))
+        if (!OriginalAiActionPermissions.Allows(World, engine.Companion, Owner, work))
             return Report(OriginalAiWorkEnd.Permission);
         bool reduced = state.Forces.Single(f => f.ForceId == Owner).Group == OriginalAiGroup.ReducedActivity;
         bool schemes = work is >= OriginalAiWork.FalseReport and <= OriginalAiWork.Gossip;

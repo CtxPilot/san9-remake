@@ -103,12 +103,15 @@ internal static class OriginalAiTurnRunner
                     continue;
                 }
                 if (force.IsBarbarian && !rule.AllowsBarbarians || !corps.IsRoot && !rule.AllowsChildCorps ||
-                    !OriginalAiStrategyPermissions.Allows(engine.Snapshot, engine.Companion, seat.ForceId, work))
+                    !OriginalAiActionPermissions.Allows(engine.Snapshot, engine.Companion, seat.ForceId, work))
                 {
                     Report(new(corps.Id, work, OriginalAiWorkEnd.Permission, 0, 0));
                     continue;
                 }
-                if (!OriginalAiWorkGate.Calendar(engine.Snapshot.Clock, engine.Snapshot.Simulation.Started, forceState.SchedulingKey, rule, advanced))
+                bool unrestrictedRewardTiming = seat.Kind == ControllerKind.Automatic && work == OriginalAiWork.Reward &&
+                    engine.Companion.DisableComputerRewardTimingRestrictions;
+                if (!unrestrictedRewardTiming &&
+                    !OriginalAiWorkGate.Calendar(engine.Snapshot.Clock, engine.Snapshot.Simulation.Started, forceState.SchedulingKey, rule, advanced))
                 {
                     Report(new(corps.Id, work, OriginalAiWorkEnd.Calendar, 0, 0));
                     continue;

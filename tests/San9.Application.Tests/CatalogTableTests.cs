@@ -7,8 +7,8 @@ public sealed class CatalogTableTests
     [Fact]
     public void AbilityColumnsFollowMeasuredDescriptorWidths()
     {
-        Assert.Equal(13, OfficerCatalog.Pages.Count);
-        var ability = OfficerCatalog.Pages[0];
+        Assert.Equal(4, OfficerCatalog.CorePages.Count);
+        var ability = OfficerCatalog.CorePages[0];
         Assert.Equal(["武将", "统率", "武力", "智力", "政治", "学得", "健康", "宝物", "身分"], ability.Columns.Select(c => c.Title));
         Assert.Equal(520, ability.Columns.Sum(c => c.Width));
         Assert.Equal(72, ability.Columns[0].Width);

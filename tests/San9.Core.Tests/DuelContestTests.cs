@@ -16,7 +16,7 @@ public sealed class DuelContestTests
         {
             FormationId = 1, Morale = 100,
             CommanderId = people.First(p => p.UnitId == id).Id,
-            MemberRanks = people.Where(p => p.UnitId == id).ToImmutableDictionary(p => p.Id, _ => BattleRank.Front)
+            MemberPositions = San9.Tests.FormationTestData.Members(people.Where(p => p.UnitId == id).ToImmutableDictionary(p => p.Id, _ => BattleRank.Front))
         });
         return WorldState.Create(new(190, 1, 1), seed,
             [new(1, 100), new(2, 100)],
@@ -116,7 +116,7 @@ public sealed class DuelContestTests
         var world = World([Person(11, 1, 100), Person(12, 1) with { Injury = 1 },
             Person(13, 1) with { TacticCooldown = 1 }, Person(14, 1) with { Acted = true }, Person(15, 1),
             Person(21, 2, 100)], SeedForTrigger(0)).BeginMutation();
-        world.Replace(world.Units[1] with { MemberRanks = world.Units[1].MemberRanks.SetItem(15, BattleRank.Rear) });
+        world.Replace(world.Units[1] with { MemberPositions = world.Units[1].MemberPositions.SetItem(15, new(0, BattleRank.Rear)) });
         var roster = DuelParticipants.Select(world, world.Units[1], world.Units[2], Rules())!;
         Assert.Equal(new[] { 11 }, roster.Attackers);
         Assert.DoesNotContain(world.Simulation.RandomStreams, s => s.Name == "duel-support");

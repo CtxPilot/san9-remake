@@ -80,7 +80,8 @@ internal static class BattlePersonnel
         int? corps = PersonnelLocations.Corps(world, person);
         if (!world.Settlements.TryGetValue(destination, out var home) || home.OwnerId != person.OwnerId ||
             home.IsDestroyed || !home.CanHostPersons || home.Durability == 0) throw new ArgumentException("Invalid escape destination.");
-        PersonnelTransitions.CancelMissions(world, officerId, "person-escaped-battle", events, places, world.CurrentDateCountdownConsumed);
+        PersonnelTransitions.CancelMissions(world, officerId, "person-escaped-battle", events, places,
+            world.CurrentDateCountdownConsumed, preservePersonTargets: true);
         world.Replace(world.Officers[officerId] with { UnitId = null, SettlementId = destination, RegionId = null,
             Status = person.Status == OfficerStatus.Captive
                 ? world.Forces[person.OwnerId!.Value].LeaderId == person.Id ? OfficerStatus.Ruler : OfficerStatus.Serving

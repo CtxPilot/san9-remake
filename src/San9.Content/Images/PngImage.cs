@@ -9,10 +9,16 @@ public sealed record PngImage(int Width, int Height, int Channels, byte[] Pixels
 {
     private static readonly byte[] Signature = [137, 80, 78, 71, 13, 10, 26, 10];
     private static readonly uint[] CrcTable = CreateCrcTable();
-    public byte[] Encode()
+    public byte[] Encode(CompressionLevel compressionLevel = CompressionLevel.SmallestSize)
+    {
+        using var output = new MemoryStream();
+        Encode(output, compressionLevel);
+        return output.ToArray();
+    }
+
+    public void Encode(Stream output, CompressionLevel compressionLevel = CompressionLevel.SmallestSize)
     {
         Validate();
-        using var output = new MemoryStream();
         output.Write(Signature);
         byte[] header = new byte[13];
         BinaryPrimitives.WriteInt32BigEndian(header, Width);
@@ -20,11 +26,10 @@ public sealed record PngImage(int Width, int Height, int Channels, byte[] Pixels
         header[8] = 8; header[9] = Channels switch { 1 => 0, 3 => 2, 4 => 6, _ => throw new InvalidDataException() };
         Chunk(output, "IHDR", header);
         using var compressed = new MemoryStream();
-        using (var z = new ZLibStream(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
+        using (var z = new ZLibStream(compressed, compressionLevel, leaveOpen: true))
             for (int y = 0; y < Height; y++) { z.WriteByte(0); z.Write(Pixels, y * Width * Channels, Width * Channels); }
-        Chunk(output, "IDAT", compressed.ToArray());
+        Chunk(output, "IDAT", compressed.GetBuffer().AsSpan(0, checked((int)compressed.Length)));
         Chunk(output, "IEND", []);
-        return output.ToArray();
     }
 
     public static PngImage Decode(byte[] data)
@@ -84,18 +89,23 @@ public sealed record PngImage(int Width, int Height, int Channels, byte[] Pixels
             (long)width * height * channels > 400_000_000)
             throw new InvalidDataException("Invalid package image dimensions.");
     }
-    private static void Chunk(Stream stream, string type, byte[] payload)
+    private static void Chunk(Stream stream, string type, ReadOnlySpan<byte> payload)
     {
         Span<byte> word = stackalloc byte[4];
         BinaryPrimitives.WriteInt32BigEndian(word, payload.Length); stream.Write(word);
-        byte[] body = new byte[payload.Length + 4]; Encoding.ASCII.GetBytes(type).CopyTo(body, 0); payload.CopyTo(body, 4);
-        stream.Write(body); BinaryPrimitives.WriteUInt32BigEndian(word, Crc(body)); stream.Write(word);
+        Span<byte> typeBytes = stackalloc byte[4]; Encoding.ASCII.GetBytes(type, typeBytes);
+        stream.Write(typeBytes); stream.Write(payload);
+        uint crc = UpdateCrc(uint.MaxValue, typeBytes);
+        BinaryPrimitives.WriteUInt32BigEndian(word, ~UpdateCrc(crc, payload)); stream.Write(word);
     }
     private static uint Crc(ReadOnlySpan<byte> bytes)
     {
-        uint crc = uint.MaxValue;
+        return ~UpdateCrc(uint.MaxValue, bytes);
+    }
+    private static uint UpdateCrc(uint crc, ReadOnlySpan<byte> bytes)
+    {
         foreach (byte b in bytes) crc = (crc >> 8) ^ CrcTable[(crc ^ b) & 255];
-        return ~crc;
+        return crc;
     }
     private static uint[] CreateCrcTable()
     {

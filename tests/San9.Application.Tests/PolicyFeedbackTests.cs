@@ -93,9 +93,9 @@ public sealed partial class ProgressFeedbackTests
         var definition = MissionScenario.Create();
         definition = definition with { Military = definition.Military! with { Formations = definition.Military.Formations
             .Select(f => f with { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true),
-                CaptureRanks = Enumerable.Repeat(BattleRank.Front, f.OfficerCapacity).ToImmutableArray() }).ToImmutableArray() } };
+                Positions = San9.Tests.FormationTestData.Layout(Enumerable.Repeat(BattleRank.Front, f.OfficerCapacity).ToImmutableArray()) }).ToImmutableArray() } };
         definition = definition with { Units = definition.Units.Select(u => u with
-            { MemberRanks = definition.Officers.Where(p => p.State.UnitId == u.Id).ToImmutableDictionary(p => p.State.Id, _ => BattleRank.Front) }).ToArray() };
+            { MemberPositions = San9.Tests.FormationTestData.Members(definition.Officers.Where(p => p.State.UnitId == u.Id).ToImmutableDictionary(p => p.State.Id, _ => BattleRank.Front)) }).ToArray() };
         var session = GameSession.Start(definition, 42);
         var world = session.View.World with
         {

@@ -32,7 +32,7 @@ public sealed partial class UnitPolicyTests
     private static readonly MilitaryOrder Mission = new(MilitaryOrderKind.Move, new(90, 10), null);
     private static MilitaryRulebook Rules() => new(new(20, 5, Enumerable.Repeat(0, 100).ToImmutableArray(),
         [new(0, 1, null)], [new(1, 1, 0, 100000, 1, new(1, 1), TravelMode.Land)
-        { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Vision = new(10, 360), CaptureRanks = [BattleRank.Front] }],
+        { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Vision = new(10, 360), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
         [new(1, new(2, 2), new(1, 1)) { Combat = new(10, 10, 10, 10, 50) },
          new(2, new(95, 2), new(1, 1)) { Combat = new(10, 10, 10, 10, 50) }]) { PolicyRadius = 10 });
 
@@ -42,9 +42,9 @@ public sealed partial class UnitPolicyTests
             [new(11, 1, null, new(80, 80, 80, 80), false) { UnitId = 1, Personality = personality },
              new(22, 2, null, new(80, 80, 80, 80), false) { UnitId = 2, Personality = 3 }],
             [new(1, 1, new(20, 10), 5000) { FormationId = 1, CommanderId = 11, ServicePlaceId = 1, Morale = 80,
-                Policies = policies ?? new(), Order = order ?? Mission, MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front) },
+                Policies = policies ?? new(), Order = order ?? Mission, MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)) },
              new(2, 2, new(25, 10), 5000) { FormationId = 1, CommanderId = 22, ServicePlaceId = 2, Morale = 80, Order = new(MilitaryOrderKind.Move, new(90, 10), null),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) }],
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) }],
             controls: [new("player", 1, ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(10000, 10000)) { IsRoot = true }]);
 
     [Theory]
@@ -107,8 +107,12 @@ public sealed partial class UnitPolicyTests
         mutation.Replace(mutation.Units[2] with { Position = new(22, 10) });
         var events = new List<DomainEvent>(); var rules = Rules();
         MilitaryPolicies.ApproachDay(mutation, rules, events);
-        MilitaryMovement.ResolveArrivals(mutation, MilitaryMovement.AdvanceDay(mutation, rules, events), rules, new([]), PersonnelRulebook.Empty, events);
+        // Advance the interceptor alone so the target's own route does not decide combat eligibility.
+        var interceptor = mutation.Units[1];
+        MilitaryNavigation.Commit(mutation, interceptor,
+            MilitaryNavigation.Advance(mutation, interceptor, interceptor.Id, rules, MilitaryNavigation.Budget(interceptor, rules)), rules, events);
         Assert.Equal(new WorldPosition(21, 10), mutation.Units[1].Position);
+        Assert.Equal(new WorldPosition(22, 10), mutation.Units[2].Position);
         MilitaryCombat.AdvanceDay(mutation, new() { Military = rules }, events);
         Assert.Contains(events.OfType<BattleDamageEvent>(), e => e.AttackerId == 1 && e.TargetUnitId == 2 && e.SoldierLoss > 0);
         Assert.Equal(Mission, mutation.Units[1].Order);

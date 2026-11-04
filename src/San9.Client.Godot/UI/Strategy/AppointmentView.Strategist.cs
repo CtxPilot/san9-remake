@@ -35,8 +35,7 @@ public partial class AppointmentView
         body.AddChild(message);
     }
 
-    private void SelectStrategist() => SelectSingleAppointmentOfficer(
-        [(0,0),(0,3),(1,7),(0,1),(0,2),(0,4),(0,5),(0,7),(1,4)]);
+    private void SelectStrategist() => SelectSingleAppointmentOfficer();
 
 }
 

@@ -87,8 +87,8 @@ internal static class ExecutionPresentationCompiler
         Dialogue("enemy-place", 7436, ("force.0", "enemy-force"), ("building.0", "place"), ("building.1", "city"));
         Dialogue("food-shortage", 7498);
         Dialogue("money-shortage", 7502);
-        Dialogue("reinforce-from", 7490, ("building.0","other-place"), ("building.1","place"), ("force.0","force"));
-        Dialogue("reinforce-to", 7494, ("building.0","other-place"), ("building.1","place"), ("force.0","force"));
+        Dialogue("reinforce-from", 7490, ("building.0","other-place"), ("building.1","place"), ("force.0","enemy-force"));
+        Dialogue("reinforce-to", 7494, ("building.0","other-place"), ("building.1","place"), ("force.0","enemy-force"));
         foreach (var (role, source) in new[] { ("desperate",7450), ("rockfall",7455), ("siege",7474),
                      ("city",7463), ("place",7470), ("counterattack",7482) })
             Dialogue("defense-" + role, source, ("building.0", "place"));

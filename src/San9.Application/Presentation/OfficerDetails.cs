@@ -61,7 +61,7 @@ public static class OfficerDetails
     [
         ["force", "corps", "home", "location", "service", "status"],
         ["office", "capacity", "salary", "loyalty"],
-        ["gender", "personality", "parent", "age", "health"],
+        ["gender", "personality", "affinity", "parent", "age", "health"],
         ["order", "target-person", "target-place", "arrival", "formation", "equipped-tactic"]
     ];
     public static OfficerDetailData Read(StrategySnapshot view, TextCatalog texts, int id)
@@ -70,9 +70,10 @@ public static class OfficerDetails
         var person = view.World.Officers.Single(o => o.Id == id);
         var values = new Dictionary<string, InformationField>();
         var tactics = new List<OfficerTacticGroup>();
-        for (int page = 0; page < OfficerCatalog.Pages.Count; page++)
+        var pages = OfficerCatalog.Pages(view, texts);
+        for (int page = 0; page < pages.Count; page++)
         {
-            var definition = OfficerCatalog.Pages[page];
+            var definition = pages[page];
             var row = OfficerCatalog.Read(view, texts, page, null, null, id).Rows.Single(r => r.Key.Id == id);
             for (int c = 0; c < definition.Columns.Length; c++)
                 values[definition.Columns[c].Id] = new(definition.Columns[c].Title, row.Cells[c].Text);

@@ -50,7 +50,7 @@ public sealed partial class MilitaryCommandLifecycleTests
         world.Replace(world.Officers[22] with { OwnerId = 3, SettlementId = null, UnitId = 3 });
         world.AddUnit(new(3, 3, new(45, 2), 5000) { CorpsId = 3, ServicePlaceId = 4, FormationId = 1,
             Morale = 80, CommanderId = 22, Order = order,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) });
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) });
         world.Replace(world.Settlements[3] with { Soldiers = 0, Durability = 0 });
         BattleAftermath.ResolveSettlementDefeat(world, 3, new(3, false), new() { Military = Rules() }, []);
         MilitaryOrders.ResolveOrders(world, Rules(), []);
@@ -165,9 +165,9 @@ public sealed partial class MilitaryCommandLifecycleTests
         Enumerable.Range(0, 160).Select(i => i / 20 == 3 ? 1 : 0).ToImmutableArray(),
         [new(0, 1, null), new(1, null, 1) { IsWater = true }],
         [new(1, 10, 0, 100000, 1, new(1, 1), TravelMode.Land)
-            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] },
+            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) },
          new(2, 10, 0, 100000, 1, new(1, 1), TravelMode.Water)
-            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, false) { RequiresWaterContact = true }, CaptureRanks = [BattleRank.Front] },
+            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, false) { RequiresWaterContact = true }, Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) },
          new(3, 10, 0, 100000, 1, new(1, 1), TravelMode.Land)],
         [new(1, new(2, 2), new(1, 1)) { Combat = new(10, 10, 10, 10, 50) },
          new(2, new(92, 2), new(1, 1)) { Combat = new(10, 10, 10, 10, 50) },
@@ -184,7 +184,7 @@ public sealed partial class MilitaryCommandLifecycleTests
         {
             FormationId = order.Kind == MilitaryOrderKind.Transport ? 3 : 1, NavalFormationId = naval ? 2 : null,
             CommanderId = 11, CorpsId = 1, ServicePlaceId = 2, Morale = 80, Order = order,
-            MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)
+            MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front))
         };
         return WorldState.Create(new(190, 1, 1), 42,
             [new(1, 100) { LeaderId = 101 }, new(2, 100) { LeaderId = 201 }, new(3, 100) { LeaderId = 301 }],
@@ -195,7 +195,7 @@ public sealed partial class MilitaryCommandLifecycleTests
              Person(22, 2, enemyUnit ? null : 3) with { UnitId = enemyUnit ? 2 : null }],
             enemyUnit ? [unit, new(2, 2, new(37, 7), 5000)
                 { FormationId = 1, CommanderId = 22, CorpsId = 2, ServicePlaceId = 3, Morale = 80,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front) }] : [unit],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Front)) }] : [unit],
             relations: [new(1, 2, 0), new(1, 3, 0), new(2, 3, 0)], controls: [new("player", 1, ControllerKind.Player)],
             corps: [new CorpsState(1, 1, 101, new(10000, 10000)) { IsRoot = true },
                 new CorpsState(2, 2, 201, new(10000, 10000)) { IsRoot = true },

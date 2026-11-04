@@ -8,6 +8,8 @@ namespace San9.Client.Godot;
 internal sealed class InformationPageFactory
 {
     public required InformationBrowser State { get; init; }
+    public required Action<InformationLink> Navigate { get; init; }
+    public required Action<bool> ChangeMapMode { get; init; }
     public required GameSession Session { get; init; }
     public required TextCatalog Texts { get; init; }
     public required TextureService Service { get; init; }
@@ -29,10 +31,10 @@ internal sealed class InformationPageFactory
                 Read = id => Query.UnitDetail(id),
                 ReadName = id => Query.UnitDetail(id).Name,
                 CurrentChanged = State.Select, Closed = Back,
-                OpenOfficers = id => { State.Navigate(new("武将", InformationCategory.Officers, UnitId: id)); Rebuild(); },
+                OpenOfficers = id => { Navigate(new("武将", InformationCategory.Officers, UnitId: id)); Rebuild(); },
                 OpenOfficer = id =>
                 {
-                    State.Navigate(new("武将", InformationCategory.Officers, OfficerId: id));
+                    Navigate(new("武将", InformationCategory.Officers, OfficerId: id));
                     State.OfficerDetail.Open([id],id); State.ShowDetail(id); Rebuild();
                 }
             };
@@ -81,7 +83,7 @@ internal sealed class InformationPageFactory
                     Read = id => AdministrativeDetails.Read(Session.View, Texts, new(category, id)),
                     ReadName = id => new AdministrativeCatalog(Session.View, Texts).Cell(category, id, "name").Text,
                     Available = link => Query.Read(link.Category, 0, link.ForceId, link.SettlementId, link.CorpsId, link.RegionId, link.OfficerId).Rows.Length > 0,
-                    Navigate = link => { State.Navigate(link); Rebuild(); }, CurrentChanged = State.Select, Closed = Back,
+                    Navigate = link => { Navigate(link); Rebuild(); }, CurrentChanged = State.Select, Closed = Back,
                     Preview = id => World.CreateInformationPreview(id, Texts)
                 };
                 return administrativeDetail;
@@ -93,7 +95,7 @@ internal sealed class InformationPageFactory
                 var informationMap = new InformationMapView {
                     ReadView = () => Session.View, Texts = Texts, Skin = Skin, Service = Service, Textures = Textures, Category = category,
                     ReadCandidates = () => Query.Read(State).Rows.Select(r => r.Key.Id).ToArray(), Closed = Back,
-                    ShowList = () => { State.ShowMap(false); Rebuild(); },
+                    ShowList = () => ChangeMapMode(false),
                     Activated = id => OpenAdministrativeDetail(category,id)
                 };
                 return informationMap;
@@ -104,7 +106,7 @@ internal sealed class InformationPageFactory
                 Service = Service, Textures = Textures, TableState = State.Catalog, Title = InformationQuery.MenuTitle(category)[1..] + "一览", Pages = pages,
                 HintText = category == InformationCategory.Ranks ? "查看官爵的指挥、信望、说明与就任势力。" : "请选择欲观看其情报的项目。",
                 ReadRows = page => Query.Read(category, page, State.ForceFilter, State.SettlementFilter, State.CorpsFilter, State.RegionFilter).Rows.Select(r => new CatalogRow(r.Key.Id,r.Cells)).ToArray(),
-                Closed = Back, ShowMap = category is InformationCategory.Forces or InformationCategory.Cities ? () => { State.ShowMap(true); Rebuild(); } : null,
+                Closed = Back, ShowMap = category is InformationCategory.Forces or InformationCategory.Cities ? () => ChangeMapMode(true) : null,
                 Activated = category == InformationCategory.Ranks ? null : id => OpenAdministrativeDetail(category,id),
             };
             return catalog;
@@ -114,7 +116,7 @@ internal sealed class InformationPageFactory
             var catalog = new CatalogView
             {
                 Service = Service,
-                TableState = State.Catalog, Title = "武将一览", HintText = Texts.ResolveRich(StrategyHintText.Key("catalog-officers")), Pages = OfficerCatalog.Pages, Textures = Textures,
+                TableState = State.Catalog, Title = "武将一览", HintText = Texts.ResolveRich(StrategyHintText.Key("catalog-officers")), Pages = OfficerCatalog.Pages(Session.View, Texts), Textures = Textures,
                 ReadRows = page => Query.Read(State.Category, page, State.ForceFilter, State.SettlementFilter, State.CorpsFilter, State.RegionFilter, State.OfficerFilter, State.UnitFilter).Rows
                     .Select(row => new CatalogRow(row.Key.Id, row.Cells)).ToArray(),
                 Portrait = id => $"catalog-person-{id}",
@@ -135,7 +137,7 @@ internal sealed class InformationPageFactory
                 State = State.OfficerDetail, Textures = Textures, Texts = Texts,
                 Read = id => OfficerDetails.Read(Session.View, Texts, id),
                 ReadName = id => Texts.Resolve(Session.View.Officers.Single(o => o.Id == id).NameKey),
-                OpenTreasures = id => { State.Navigate(new("宝物", InformationCategory.Treasures, HolderId: id)); Rebuild(); },
+                OpenTreasures = id => { Navigate(new("宝物", InformationCategory.Treasures, HolderId: id)); Rebuild(); },
                 CurrentChanged = State.Select, Closed = Back
             };
             return officerDetail;

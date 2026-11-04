@@ -35,10 +35,11 @@ public sealed partial class MilitaryRulebook
 
     public BattleRank Rank(UnitState unit, int officerId)
     {
-        if (unit.NavalFormationId is null || !Map.IsWater(unit.Position)) return unit.MemberRanks.GetValueOrDefault(officerId, BattleRank.Middle);
-        var ranks = Formation(unit).CaptureRanks;
-        int slot = Array.IndexOf(unit.MemberRanks.OrderBy(p => p.Value).ThenBy(p => p.Key).Select(p => p.Key).ToArray(), officerId);
-        return slot >= 0 && slot < ranks.Length ? ranks[slot] : BattleRank.Middle;
+        if (unit.NavalFormationId is null || !Map.IsWater(unit.Position))
+            return unit.MemberPositions.TryGetValue(officerId, out var position) ? position.Rank : BattleRank.Middle;
+        var positions = Formation(unit).Positions;
+        int slot = Array.IndexOf(unit.MemberPositions.OrderBy(p => p.Value.Rank).ThenBy(p => p.Value.Column).ThenBy(p => p.Key).Select(p => p.Key).ToArray(), officerId);
+        return slot >= 0 && slot < positions.Length ? positions[slot].Rank : BattleRank.Middle;
     }
 
     public Footprint UnitFootprint(UnitState unit, WorldPosition? position = null) => Formation(unit, position).FootprintFor(unit.Soldiers);

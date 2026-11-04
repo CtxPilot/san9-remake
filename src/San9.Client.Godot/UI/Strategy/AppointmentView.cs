@@ -51,18 +51,12 @@ public partial class AppointmentView : FixedPage
         if (Draft.Kind is "reward" or "exile") { SelectRosterAppointmentOfficers(); return; }
         SelectRankPeople(Draft.OfficePlan!.Fork(), new());
     }
-    private void SelectSingleAppointmentOfficer((int Page,int Column)[] columns)
+    private void SelectSingleAppointmentOfficer()
     {
-        var tables = columns.Select(c => c.Page).Distinct().ToDictionary(page => page,
-            page => OfficerCatalog.Read(Draft.View,Texts,page,null,null).Rows.ToDictionary(r => r.Key.Id));
-        CatalogRow[] Rows(int page) => page == 0
-            ? Draft.Candidates.Select(id => new CatalogRow(id,columns.Select(c => tables[c.Page][id].Cells[c.Column]).ToArray())).ToArray()
-            : OfficerCatalog.Read(Draft.View,Texts,page-1,null,null).Rows.Where(r => Draft.Candidates.Contains(r.Key.Id))
-                .OrderBy(r => Draft.Candidates.IndexOf(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id,r.Cells.ToArray())).ToArray();
         ReplaceChild(new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), CloseTitle = CommandText.Resolve(Texts, "action.cancel"), Textures = Textures, Service = Service,
             HintText = Texts.Resolve(AppointmentText.Key(Draft.Kind,"select")),
-            Pages = [new(CommandText.Resolve(Texts, "title." + Draft.Kind),columns.Select(c => OfficerCatalog.Pages[c.Page].Columns[c.Column]).ToArray()), .. OfficerCatalog.Pages],
-            ReadRows = Rows, Portrait = id => $"catalog-person-{id}", InitialCurrentId = Draft.Members.IsEmpty ? null : Draft.Members[0],
+            Pages = AppointmentOfficerCatalog.Pages(Draft, Texts),
+            ReadRows = page => AppointmentOfficerCatalog.Read(Draft, Texts, page), Portrait = id => $"catalog-person-{id}", InitialCurrentId = Draft.Members.IsEmpty ? null : Draft.Members[0],
             Activated = id => { if (Draft.SetMembers([id])) CloseChild(); }, Closed = CloseChild });
     }
     private void SelectTreasure()

@@ -10,9 +10,9 @@ public sealed class PlanningRouteCostTests
         var map = new BattlefieldMap(9, 1, Enumerable.Repeat(0, 9), [new(0, 2, null)]);
         var start = new WorldPosition(1, 2);
         var target = new MapOccupancy(new(43, 2), new(1, 1));
-        var cost = map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land, [], new(10000), intoRange: false);
+        var cost = map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land, [], new(10000), arrival: NavigationArrival.Point);
         using var diagnostics = new PathSearchDiagnostics();
-        var route = map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land, [], new(10000), intoRange: false, includeCells: true);
+        var route = map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land, [], new(10000), arrival: NavigationArrival.Point, includeCells: true);
         Assert.Equal(RouteReachability.Reachable, route.Status);
         Assert.Equal(cost.Cost, route.Cost);
         Assert.Empty(cost.Cells);
@@ -33,9 +33,9 @@ public sealed class PlanningRouteCostTests
         var start = new WorldPosition(3, 7);
         var target = new MapOccupancy(new(4, 7), new(1, 1));
         var shared = travel.PlanningMap().EstimateTravelCost(start, target, land.Footprint,
-            TravelMode.Land, [], new(65536), intoRange: false);
+            TravelMode.Land, [], new(65536), arrival: NavigationArrival.Point);
         var actual = travel.EstimateTravelCost(start, target, land.Footprint,
-            TravelMode.Land, [], new(65536), intoRange: false);
+            TravelMode.Land, [], new(65536), arrival: NavigationArrival.Point);
         Assert.Equal(RouteReachability.Reachable, shared.Status);
         Assert.Equal(20 / landSpeed, actual.Cost);
         Assert.Equal(actual.Cost, travel.Reweight(shared.TerrainCost));
@@ -51,7 +51,7 @@ public sealed class PlanningRouteCostTests
         var travel = map.ForTravel(land, ship, 20);
         var shared = travel.PlanningMap();
         var cost = shared.EstimateTravelCost(new(2, 7), new(new(52, 7), new(1, 1)),
-            new(1, 1), TravelMode.Land, [], new(65536), intoRange: false);
+            new(1, 1), TravelMode.Land, [], new(65536), arrival: NavigationArrival.Point);
         Assert.Equal(RouteReachability.Reachable, cost.Status);
         Assert.Equal(cost.Cost, cost.TerrainCost.Land + cost.TerrainCost.Water);
         Assert.True(cost.TerrainCost.Water > 0);
@@ -69,13 +69,13 @@ public sealed class PlanningRouteCostTests
         var start = new WorldPosition(1, 1);
         var target = new MapOccupancy(new(3, 3), new(1, 1));
         RouteCostEstimate Estimate(BattlefieldMap field, TravelMode mode, params MapOccupancy[] objects) =>
-            field.EstimateTravelCost(start, target, new(1, 1), mode, objects, new(10000), intoRange: false);
+            field.EstimateTravelCost(start, target, new(1, 1), mode, objects, new(10000), arrival: NavigationArrival.Point);
 
         Assert.Equal(8, Estimate(map, TravelMode.Land).Cost);
         Assert.Equal(12, Estimate(map, TravelMode.Water).Cost);
         Assert.Equal(28, Estimate(other, TravelMode.Land).Cost);
         Assert.Equal(RouteReachability.Reachable, Estimate(map, TravelMode.Land, target).Status);
-        Assert.False(map.Navigate(start, target, false, new(1, 1), TravelMode.Land, [target], 100).Arrived);
+        Assert.False(map.Navigate(start, target, NavigationArrival.Point, new(1, 1), TravelMode.Land, [target], 100).Arrived);
         var restored = Estimate(map, TravelMode.Land);
         Assert.Equal(RouteReachability.Reachable, restored.Status);
         Assert.Equal(8, restored.Cost);
@@ -88,10 +88,10 @@ public sealed class PlanningRouteCostTests
         var start = new WorldPosition(2, 2);
         var target = new MapOccupancy(new(42, 2), new(1, 1));
         MapOccupancy[] objects = [new(new(22, 2), new(5, 5)) { Hard = false, Avoidance = NavigationAvoidance.Facility }];
-        var estimate = map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land, objects, new(10000), intoRange: false);
+        var estimate = map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land, objects, new(10000), arrival: NavigationArrival.Point);
         Assert.Equal(RouteReachability.Reachable, estimate.Status);
         Assert.Equal(80, estimate.Cost);
-        Assert.Equal(estimate.Cost, map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Land, objects, new(10000), intoRange: false).Cost);
+        Assert.Equal(estimate.Cost, map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Land, objects, new(10000), arrival: NavigationArrival.Point).Cost);
         Assert.Equal(80, map.FindRoute(start, target.Position, new(1, 1), TravelMode.Land, []).Cost);
     }
 
@@ -103,14 +103,14 @@ public sealed class PlanningRouteCostTests
         var target = new MapOccupancy(new(42, 7), new(1, 1));
         MapOccupancy[] wall = [new(new(20, 7), new(1, 15))];
         Assert.Equal(RouteReachability.Reachable, map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land,
-            wall, new(10000), intoRange: false).Status);
+            wall, new(10000), arrival: NavigationArrival.Point).Status);
         var terrainWall = new BattlefieldMap(9, 3, new int[27], [new(0, 1, null)], Enumerable.Range(0, 3).Select(y => new MapCell(4, y)));
         Assert.Equal(RouteReachability.Unreachable, terrainWall.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land,
-            [], new(10000), intoRange: false).Status);
+            [], new(10000), arrival: NavigationArrival.Point).Status);
         Assert.Equal(RouteReachability.Incomplete, map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Land,
-            [], new(1), intoRange: false).Status);
+            [], new(1), arrival: NavigationArrival.Point).Status);
         Assert.Equal(RouteReachability.Unreachable, map.EstimateTravelCost(start, target, new(1, 1), TravelMode.Water,
-            [], new(10000), intoRange: false).Status);
+            [], new(10000), arrival: NavigationArrival.Point).Status);
     }
 
     [Theory]
@@ -128,8 +128,8 @@ public sealed class PlanningRouteCostTests
         var start = new WorldPosition(7, 12);
         var target = new MapOccupancy(new(57, 12), new(1, 1));
         Assert.Equal(RouteReachability.Reachable, map.EstimateTravelCost(start, target, new(7, 7), TravelMode.Land,
-            [], new(10000), intoRange: false).Status);
-        var actual = map.Navigate(start, target, false, new(7, 7), TravelMode.Land, [], 1000, mobility: 200);
+            [], new(10000), arrival: NavigationArrival.Point).Status);
+        var actual = map.Navigate(start, target, NavigationArrival.Point, new(7, 7), TravelMode.Land, [], 1000, mobility: 200);
         Assert.True(actual.Arrived);
         Assert.All(actual.Steps, p => Assert.NotNull(map.PassageCost(p, new(7, 7), TravelMode.Land, [])));
     }
@@ -143,13 +143,13 @@ public sealed class PlanningRouteCostTests
         var target = new MapOccupancy(new(12, 2), new(1, 1));
         var route = map.FindRoute(start, target.Position, new(1, 1), TravelMode.Land, []);
         var estimate = map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Land, [], new(100000),
-            intoRange: false);
+            arrival: NavigationArrival.Point);
         Assert.Equal(RouteReachability.Reachable, estimate.Status);
         Assert.Equal(30, estimate.Cost);
         Assert.Equal(RouteReachability.Reachable, map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Land,
-            [new(new(7, 12), new(5, 5))], new(100000), intoRange: false).Status);
+            [new(new(7, 12), new(5, 5))], new(100000), arrival: NavigationArrival.Point).Status);
         Assert.Equal(RouteReachability.Incomplete, map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Land,
-            [], new(1), intoRange: false).Status);
+            [], new(1), arrival: NavigationArrival.Point).Status);
         var after = map.FindRoute(start, target.Position, new(1, 1), TravelMode.Land, []);
         Assert.Equal(route.Cost, after.Cost);
         Assert.Equal(route.Steps.ToArray(), after.Steps.ToArray());
@@ -163,13 +163,13 @@ public sealed class PlanningRouteCostTests
         var start = new WorldPosition(2, 7);
         var target = new MapOccupancy(new(22, 7), new(1, 1));
         Assert.Equal(RouteReachability.Reachable, map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Land,
-            walls, new(100000), intoRange: false).Status);
+            walls, new(100000), arrival: NavigationArrival.Point).Status);
         Assert.Equal(RouteReachability.Reachable, map.EstimateRouteCost(start, target, new(3, 3), TravelMode.Land,
-            walls, new(100000), intoRange: false).Status);
-        var movement = map.Navigate(start, target, false, new(3, 3), TravelMode.Land, walls, 1000, mobility: 200);
+            walls, new(100000), arrival: NavigationArrival.Point).Status);
+        var movement = map.Navigate(start, target, NavigationArrival.Point, new(3, 3), TravelMode.Land, walls, 1000, mobility: 200);
         Assert.False(movement.Arrived);
         Assert.All(movement.Steps, p => Assert.NotNull(map.PassageCost(p, new(3, 3), TravelMode.Land, walls)));
         Assert.Equal(RouteReachability.Unreachable, map.EstimateRouteCost(start, target, new(1, 1), TravelMode.Water,
-            [], new(100000), intoRange: false).Status);
+            [], new(100000), arrival: NavigationArrival.Point).Status);
     }
 }

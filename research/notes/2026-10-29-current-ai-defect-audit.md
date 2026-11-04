@@ -133,4 +133,4 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 | `dotnet test tests/San9.Headless.Tests/San9.Headless.Tests.csproj --no-restore` | 41项通过 | 同目录`headless-tests.log` |
 | 工作内查询复用及输送需求计算优化后的Application测试 | 2058项通过 | 同目录`performance-fixes-application.log` |
 
-上述为规则`san9-core-g10-v200`试验版本的阶段记录，包含已撤回策略，不作为当前主线的实现、覆盖或性能承诺。保存130／命令日志137结构未变，无需内容转换。验证使用有效合成局面与正式命令，没有改写或运行玩家旧格式存档，没有完整战役长期演进或原作全图动态对照；最后一项未做耗时基准，不声称具体提速比例。历史产品运行成本另见[性能记录](../../docs/ai-performance-records.md#ai-mobilization-trial-20261029)。
+上述为规则`san9-core-g10-v200`试验版本的阶段记录，包含已撤回策略，不作为当前主线的实现、覆盖或性能承诺。保存130／命令日志137结构未变，无需内容转换。验证使用有效合成局面与正式命令，没有改写或运行玩家旧格式存档，没有完整战役长期演进或原作全图动态对照；最后一项未做耗时基准，不声称具体提速比例。已撤回试验及证据入口另见[记录整理](../../docs/ai-performance-records.md#已撤回试验)。

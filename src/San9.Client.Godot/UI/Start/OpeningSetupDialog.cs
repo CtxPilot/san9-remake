@@ -64,8 +64,8 @@ public partial class OpeningSetupDialog : ModalView
             first ??= ruler;
             Button(layout.City, "都市", () => ChooseCity(slot), hint: "选择新势力的所在都市。");
             var erase = Button(layout.Erase, "消去", () => { _rulers[slot] = null; _cities[slot] = null; RefreshForces(); }, hint: "消去这个新势力。");
-            var name = Label("", Point(layout.RulerName), new(96, 24));
-            var city = Label("", Point(layout.CityName), new(96, 24));
+            var name = Label("", Point(layout.RulerName), new(96, 24), 24, new("f0f0f0"));
+            var city = Label("", Point(layout.CityName), new(96, 24), 24, new("f0f0f0"));
             var face = new AsyncPortrait { Service = Service, View = San9.Content.Images.PortraitView.Face,
                 Position = Point(layout.Portrait), Size = new(64, 80), MouseFilter = MouseFilterEnum.Ignore };
             AddChild(face); _slots.Add((name, city, face, erase));
@@ -136,11 +136,12 @@ public partial class OpeningSetupDialog : ModalView
         Action<IReadOnlySet<int>> confirmed, Action closed)
     {
         bool single = CreateForces;
+        var pages = OpeningOfficerCatalog.Pages(Draft.Source, Draft.Text);
         _list = new CatalogView { Title = title, HintText = single ? "选择担任新势力君主的武将。" : "请选择武将后决定。",
             Service = Service, Textures = _skin, CloseTitle = "中止", TitleWidth = 208, TabStripFollowsPage = true, MinimumBodyWidth = 588,
             WindowPainter = (canvas, body) => OpeningWindowPainter.Draw(canvas, _skin, body, pairedActions: !single),
-            Pages = OpeningOfficerCatalog.Pages, ReadRows = page => people.Select(p => new CatalogRow(_ids[p.Id],
-                OpeningOfficerCatalog.Pages[page].Columns.Select(c => OpeningOfficerCatalog.Cell(p, c.Id)).ToArray())).ToArray(),
+            Pages = pages, ReadRows = page => people.Select(p => new CatalogRow(_ids[p.Id],
+                pages[page].Columns.Select(c => OpeningOfficerCatalog.Cell(p, c.Id)).ToArray())).ToArray(),
             Portrait = id => _officers[id].PortraitKey, InitialCurrentId = selected.Cast<int?>().FirstOrDefault(),
             Selection = single ? null : new(people.Select(p => _ids[p.Id]), selected, limit), ConfirmSelection = confirmed,
             Activated = single ? id => confirmed(new HashSet<int> { id }) : null, Closed = closed };

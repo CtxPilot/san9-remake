@@ -19,9 +19,9 @@ public partial class InformationActionButton : BaseButton
     public override void _Ready()
     {
         FocusMode = FocusModeEnum.All;
-        _label = new Label { Text = Title, Size = Size, HorizontalAlignment = HorizontalAlignment.Center,
+        _label = new Label { Text = Title, HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center, MouseFilter = MouseFilterEnum.Ignore };
-        AddChild(_label); RefreshAppearance();
+        AddChild(_label); Resized += RefreshAppearance; RefreshAppearance();
     }
     private (bool Disabled, bool Pressed, bool Hovered, bool Focused, DrawMode Mode)? _visual;
     public override void _Process(double delta)
@@ -37,7 +37,11 @@ public partial class InformationActionButton : BaseButton
         Modulate = Disabled ? new Color("888888") : Colors.White;
         _text.Apply(_label, GameTextStyles.Button(TextRole, highlighted, ButtonPressed || pressed, Disabled)
             with { FontSize = FontSize ?? (MapToggle ? 16 : 24) });
-        _label.Position = ButtonPressed || pressed ? new(2, 2) : Vector2.Zero;
+        // The 48-pixel action artwork has a visible face at y=2..42; its bottom padding is asymmetric.
+        var bounds = MapToggle ? new Rect2(Vector2.Zero, Size)
+            : new Rect2(new Vector2(0,2*Size.Y/48),new Vector2(Size.X,40*Size.Y/48));
+        _label.Size = bounds.Size;
+        _label.Position = bounds.Position + (ButtonPressed || pressed ? new Vector2(2, 2) : Vector2.Zero);
     }
     public override void _Draw()
     {

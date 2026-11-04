@@ -9,7 +9,7 @@ public sealed class MovementContactTests
 {
     private static MilitaryRulebook Rules() => new(new(100, 30, new int[3000].ToImmutableArray(), [new(0, 10, null)],
         [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+            { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
         [new(1, new(42, 52), new(10, 10)) { Combat = new(10, 10, 10, 10, 50) }]));
 
     private static UnitState Unit(int id, WorldPosition position) => new(id, id + 1, position, 1000)
@@ -28,7 +28,7 @@ public sealed class MovementContactTests
         var small = new MapOccupancy(new(45, 52), new(10, 100)) { Object = new(1, true) };
         var large = new MapOccupancy(new(equal ? 45 : 50, 52), new(equal ? 10 : 20, 100)) { Object = new(2, true) };
         var target = new MapOccupancy(new(50, 52), new(1, 1));
-        var step = map.Navigate(new(32, 52), target, false, new(1, 1), TravelMode.Land, [small, large], 1000, mobility: 100);
+        var step = map.Navigate(new(32, 52), target, NavigationArrival.Point, new(1, 1), TravelMode.Land, [small, large], 1000, mobility: 100);
         Assert.Equal(equal ? small.Object : large.Object, step.Collision?.Object);
         Assert.DoesNotContain(step.Steps, p => new MapOccupancy(p, new(1, 1)).Overlaps(small));
     }
@@ -40,7 +40,7 @@ public sealed class MovementContactTests
     {
         var rules = new MilitaryRulebook(new(30, 30, new int[900].ToImmutableArray(), [new(0, 10, null)],
             [new(0, 100, 0, 100000, 1, new(4, 4), TravelMode.Land)
-                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), CaptureRanks = [BattleRank.Front] }],
+                { Combat = new(10, 10, 10, 10, 50), Attack = new(1, true), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front]) }],
             [new(lowerId, new(42, 57), new(10, 10)) { Combat = new(10, 10, 10, 10, 50) },
              new(upperId, new(42, 47), new(10, 10)) { Combat = new(10, 10, 10, 10, 50) }]));
         var mover = Unit(0, new(32, 52)) with { Order = new(MilitaryOrderKind.Move, new(42, 52), null) };
@@ -48,7 +48,7 @@ public sealed class MovementContactTests
             [new(lowerId, 2, 100, 100, 100, 70, 0, 0, 0, 0, 0), new(upperId, 2, 100, 100, 100, 70, 0, 0, 0, 0, 0)], [], [mover],
             corps: [new(1, 1, null, new(0, 0)) { IsRoot = true }, new(2, 2, null, new(0, 0)) { IsRoot = true }]).BeginMutation();
         var occupancy = world.MovementOccupancy(rules, mover.OwnerId, mover.Policies, mover.Id, null);
-        var step = rules.Map.Navigate(mover.Position, new(mover.Order.Position!.Value, new(1, 1)), false,
+        var step = rules.Map.Navigate(mover.Position, new(mover.Order.Position!.Value, new(1, 1)), NavigationArrival.Point,
             new(4, 4), TravelMode.Land, occupancy, 1000, mobility: 100, randomSeed: 1);
         Assert.Equal(new MapObjectReference(upperId, true), step.Collision?.Object);
         Assert.All(step.Steps, p => Assert.DoesNotContain(occupancy, o => o.Hard && new MapOccupancy(p, new(4, 4)).Overlaps(o)));
@@ -65,7 +65,7 @@ public sealed class MovementContactTests
         var building = unit with { Object = new(2, true) };
         foreach (var objects in new[] { new[] { unit, building }, new[] { building, unit } })
         {
-            var step = map.Navigate(new(32, 52), new(new(50, 52), new(1, 1)), false,
+            var step = map.Navigate(new(32, 52), new(new(50, 52), new(1, 1)), NavigationArrival.Point,
                 new(1, 1), TravelMode.Land, objects, 1000, mobility: 100);
             Assert.Equal(building.Object, step.Collision?.Object);
         }

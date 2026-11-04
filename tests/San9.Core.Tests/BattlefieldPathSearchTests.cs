@@ -14,7 +14,7 @@ public sealed class BattlefieldPathSearchTests
         var route = map.FindRoute(start, end, new(3, 3), TravelMode.Land, wall);
         Assert.True(route.Reachable);
         Assert.Equal(MapCoordinates.Cell(end), MapCoordinates.Cell(route.Steps[^1]));
-        var step = map.Navigate(start, new(end, new(1, 1)), false, new(3, 3), TravelMode.Land, wall, 100000, mobility: 20000);
+        var step = map.Navigate(start, new(end, new(1, 1)), NavigationArrival.Point, new(3, 3), TravelMode.Land, wall, 100000, mobility: 20000);
         Assert.False(step.Arrived);
         Assert.NotNull(step.Collision);
         Assert.All(step.Steps, p => Assert.NotNull(map.PassageCost(p, new(3, 3), TravelMode.Land, wall)));
@@ -70,7 +70,7 @@ public sealed class BattlefieldPathSearchTests
             }
         }
         var wall = new MapOccupancy(new(100, 20), new(3, 40));
-        var blocked = map.Navigate(start, new(end, new(1, 1)), false, new(3, 3), TravelMode.Land, [wall], 100000, mobility: 20000);
+        var blocked = map.Navigate(start, new(end, new(1, 1)), NavigationArrival.Point, new(3, 3), TravelMode.Land, [wall], 100000, mobility: 20000);
         Assert.False(blocked.Arrived);
         Assert.All(blocked.Steps, p => Assert.False(new MapOccupancy(p, new(3, 3)).Overlaps(wall)));
         var target = new MapOccupancy(end, new(3, 3));
@@ -96,7 +96,7 @@ public sealed class BattlefieldPathSearchTests
         var start = new WorldPosition(2, 2);
         var end = new WorldPosition(12, 2);
         var shape = new Footprint(1, 1);
-        var route = map.Navigate(start, new(end, new(1, 1)), false, shape, TravelMode.Land, [], 1000, mobility: 200);
+        var route = map.Navigate(start, new(end, new(1, 1)), NavigationArrival.Point, shape, TravelMode.Land, [], 1000, mobility: 200);
         Assert.True(route.Arrived);
         for (int budget = 0; budget <= 200; budget++)
         {
@@ -109,7 +109,7 @@ public sealed class BattlefieldPathSearchTests
                 spent += cost;
                 expected = step;
             }
-            var actual = map.Navigate(start, new(end, new(1, 1)), false, shape, TravelMode.Land, [], budget, mobility: 200);
+            var actual = map.Navigate(start, new(end, new(1, 1)), NavigationArrival.Point, shape, TravelMode.Land, [], budget, mobility: 200);
             Assert.Equal(expected, actual.Position);
             Assert.Equal(spent, actual.Spent);
         }
@@ -130,7 +130,7 @@ public sealed class BattlefieldPathSearchTests
             MapOccupancy[] occupied = [new(new(15 + trial % 10, 20), new(3, 7))];
             long? expected = ReferenceCost(map, start, end, shape, mode, occupied);
             if (!expected.HasValue) continue; // Endpoint relaxation has a separate contract and dedicated coverage.
-            var actual = map.Navigate(start, new(end, new(1, 1)), false, shape, mode, occupied, 100000, mobility: 20000);
+            var actual = map.Navigate(start, new(end, new(1, 1)), NavigationArrival.Point, shape, mode, occupied, 100000, mobility: 20000);
             long total = 0; var previous = start;
             foreach (var step in actual.Steps)
             {
@@ -150,7 +150,7 @@ public sealed class BattlefieldPathSearchTests
         var map = new BattlefieldMap(10, 10, new int[100], [new(0, 10, null)]);
         var start = new WorldPosition(5, 5); var end = new WorldPosition(45, 45);
         MapOccupancy[] wall = [new(new(25, 25), new(3, 50))];
-        Assert.False(map.Navigate(start, new(end, new(1, 1)), false, new(3, 3), TravelMode.Land, wall, 1000, mobility: 200).Arrived);
+        Assert.False(map.Navigate(start, new(end, new(1, 1)), NavigationArrival.Point, new(3, 3), TravelMode.Land, wall, 1000, mobility: 200).Arrived);
         var expected = map.FindRoute(start, end, new(3, 3), TravelMode.Land, []);
         Assert.True(expected.Reachable);
         Parallel.For(0, 8, _ => Assert.Equal(expected.Steps.ToArray(),

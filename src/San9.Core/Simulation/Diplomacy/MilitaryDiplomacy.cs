@@ -26,6 +26,10 @@ public static class MilitaryDiplomacy
             world.Simulation.Alliance?.Protects(attacker, defender.Value) != true && !AttackRequests.Protects(world, attacker, defender.Value) &&
             IsHostileRelation(Relation(world, attacker, defender.Value)));
 
+    internal static bool ApproachEnemy(IWorldQuery world, UnitState unit, int otherOwner) =>
+        otherOwner != unit.OwnerId && (AutomaticEnemy(world, unit.OwnerId, otherOwner) ||
+            TargetOwner(world, unit.Order) == otherOwner || TargetOwner(world, unit.EffectiveOrder) == otherOwner);
+
     public static bool AutomaticEnemy(WorldSnapshot world, int attacker, int? defender)
     {
         bool Alive(int id) => world.Forces.Any(f => f.Id == id && !f.IsEliminated);
@@ -40,7 +44,7 @@ public static class MilitaryDiplomacy
     internal static bool Work(IWorldQuery world, int settlementId, MilitaryRulebook rules) =>
         rules.Place(world.Settlements[settlementId]).FacilityTypeId is int type && rules.Facilities[type].IsWork;
 
-    internal static int? TargetOwner(WorldMutation world, MilitaryOrder? order) => order?.Kind switch
+    internal static int? TargetOwner(IWorldQuery world, MilitaryOrder? order) => order?.Kind switch
     {
         MilitaryOrderKind.AttackUnit when order.UnitId is int id && world.Units.TryGetValue(id, out var unit) => unit.OwnerId,
         MilitaryOrderKind.AttackSettlement when order.SettlementId is int id && world.Settlements.TryGetValue(id, out var place) => place.OwnerId,

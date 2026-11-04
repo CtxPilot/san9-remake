@@ -134,7 +134,7 @@ public partial class PersonnelCommandView : FixedPage
             Activated = id => { if (Draft.SetTarget(id)) { CloseChild(); SelectionChanged(); } }, Closed = CloseChild };
         AddChild(_child);
     }
-    public void ShowTargetList(Action cancelled, Action<int> selected)
+    public void ShowTargetList(Action showMap, Action cancelled, Action<int> selected)
     {
         if (_child is not null) return;
         Show(); _body!.Hide();
@@ -142,7 +142,7 @@ public partial class PersonnelCommandView : FixedPage
             CloseTitle = CommandText.Resolve(Texts, "action.cancel"), HintText = Draft.Kind == "search" ? CommandText.Resolve(Texts, "hint.search-region") : CommandText.Resolve(Texts, "hint.target-facility"),
             Pages = PersonnelCatalog.TargetPages(Draft,Texts), ReadRows = page => PersonnelCatalog.Targets(Draft,Texts,page),
             InitialCurrentId = Draft.TargetId, Activated = id => { CloseChild(); selected(id); }, Closed = () => { CloseChild(); cancelled(); },
-            ShowMap = () => { CloseChild(); cancelled(); } };
+            ShowMap = () => { CloseChild(); showMap(); } };
         AddChild(_child);
     }
     public override void _GuiInput(InputEvent input)

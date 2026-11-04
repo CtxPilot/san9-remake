@@ -19,7 +19,7 @@ public partial class MissionCommandFlow : CommandWorkflow
         { Notice(CommandText.Resolve(Texts, "content.missions")); return; }
         Scope.RequestPrefixes("deployment-", "detail-", "catalog-", "information-", "narration-", "dialog-");
         _missionAdviceSelection = null;
-        _mission = new() { Draft = new(Session,id,kind), Session = Session, Texts = Texts, Service = Textures, Textures = Scope, Skin = Skin,
+        _mission = new() { Draft = new(Session,id,kind), Preferences = Services.Preferences, Session = Session, Texts = Texts, Service = Textures, Textures = Scope, Skin = Skin,
             World = World, Closed = Close, Submit = SubmitMission, SelectionChanged = ShowMissionAdvice, ChooseMap = Targets.Begin };
         ShowWindow(_mission, () => { _mission = null; });
         ShowMissionAdvice();

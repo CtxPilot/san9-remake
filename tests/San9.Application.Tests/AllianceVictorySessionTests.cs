@@ -27,7 +27,7 @@ public sealed class AllianceVictorySessionTests
                 new("ally", new(31, 3, 3, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler })],
             Military = new(6, 1, [0, 0, 0, 0, 0, 0], [new(0, 1, null)],
                 [new(1, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                    { Combat = combat, Attack = new(5, false), CaptureRanks = [BattleRank.Middle] }],
+                    { Combat = combat, Attack = new(5, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
                 [new(1, new(2, 2), new(1, 1)) { Combat = combat },
                     new(2, new(12, 2), new(1, 1)) { Combat = combat },
                     new(3, new(27, 2), new(1, 1)) { Combat = combat }])

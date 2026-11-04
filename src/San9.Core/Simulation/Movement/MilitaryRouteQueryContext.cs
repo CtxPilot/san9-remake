@@ -16,7 +16,7 @@ public sealed class MilitaryRouteQueryContext(WorldSnapshot snapshot, MilitaryRu
     // land/water footprints and passage rules while normalizing their relative speeds.
     private readonly record struct ReachabilityQuery(BattlefieldMap Map, WorldPosition Start, MapOccupancy Target,
         Footprint Shape, TravelMode Mode, int Owner, UnitPolicies Policies, int? MovingUnit,
-        int? ConstructionRegion, bool IntoRange);
+        int? ConstructionRegion, NavigationArrival Arrival);
 
     public MilitaryRoutePlan Plan(UnitState unit, int? movingUnit, int maximumDays = 4096, int maximumExpanded = 100000) =>
         MilitaryRouteQuery.Plan(world ??= new(snapshot), rules, unit, movingUnit, maximumDays, maximumExpanded);
@@ -46,18 +46,13 @@ public sealed class MilitaryRouteQueryContext(WorldSnapshot snapshot, MilitaryRu
         var target = order.IsAttack ? MilitaryCombat.TargetArea(query, order, rules) :
             order.Construction is { } construction ? rules.FacilityArea(construction.Position, construction.FacilityTypeId) :
             order.SettlementId is int home ? rules.SettlementArea(query.Settlements[home]) : new MapOccupancy(order.Position!.Value, new(1, 1));
-        bool intoRange = order.IsAttack || order.SettlementId is not null || order.Construction is not null;
+        var arrival = MilitaryNavigation.Arrival(order);
         var key = new ReachabilityQuery(travel.Map.PlanningMap(), unit.Position, target, travel.Shape, travel.Mode,
-            unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, intoRange);
+            unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, arrival);
         if (connectivityOnly && reachability.TryGetValue(key, out var cached)) return new(cached);
-        RouteCostEstimate route;
-        if (order.SettlementId is int destination && query.Settlements[destination].OwnerId == unit.OwnerId &&
-            new MapOccupancy(unit.Position, rules.UnitFootprint(unit)).Overlaps(target))
-            route = new(RouteReachability.Reachable) { Cells = connectivityOnly ? [] : [MapCoordinates.Cell(unit.Position)] };
-        else
-            route = travel.Map.EstimateTravelCost(unit.Position, target, travel.Shape, travel.Mode,
-                query.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId),
-                new NavigationWorkBudget(maximumExpanded), intoRange: intoRange, includeCells: !connectivityOnly);
+        var route = travel.Map.EstimateTravelCost(unit.Position, target, travel.Shape, travel.Mode,
+            query.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit),
+            new NavigationWorkBudget(maximumExpanded), arrival: arrival, includeCells: !connectivityOnly);
         if (route.Status != RouteReachability.Incomplete) reachability[key] = route.Status;
         return route;
     }

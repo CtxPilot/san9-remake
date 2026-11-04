@@ -40,17 +40,17 @@ public sealed class SnipingSessionTests
                 new("heir", new(23, 2, 3, new(50, 50, 50, 50), false))],
             Units = [..(facility ? Array.Empty<UnitState>() : [new(1, 1, new(102, 7), 100000)
                 { FormationId = 100, Morale = 100, ServicePlaceId = 1, CommanderId = 11,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front),
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Front)),
                     Order = assault ? new(MilitaryOrderKind.AttackSettlement, null, 2) :
                         new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 2 } }]),
                 ..(assault ? Array.Empty<UnitState>() : [new(2, 2, new(facility ? 6 : 106, 7), 100000)
                 { FormationId = 100, CommanderId = 21, Morale = 100, ServicePlaceId = 3,
                     Order = path == "facility-counter" ? new(MilitaryOrderKind.AttackSettlement, null, 1) : null,
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Rear).Add(22, BattleRank.Middle) }])],
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Rear).Add(22, BattleRank.Middle)) }])],
             Military = new(100, 3, [.. Enumerable.Repeat(0, 300)], [new(0, 1, 1)],
                 [new(100, 5, 0, 100000, 2, new(1, 1), TravelMode.Land)
                     { Combat = combat, Attack = new(10, false), SnipingChanceBonus = 100,
-                        CaptureRanks = [BattleRank.Front, BattleRank.Middle], Tactics = new(100, 2, [3], []) }],
+                        Positions = San9.Tests.FormationTestData.Layout([BattleRank.Front, BattleRank.Middle]), Tactics = new(100, 2, [3], []) }],
                 [new(1, new(2, 7), new(1, 1)) { Combat = combat, FacilityTypeId = 8000, Attack = new(10, false) },
                     new(2, new(107, 7), new(1, 1)) { Combat = combat, FacilityTypeId = 8000, Attack = new(10, false) },
                     new(3, new(497, 7), new(1, 1)) { Combat = combat, FacilityTypeId = 8000 }])

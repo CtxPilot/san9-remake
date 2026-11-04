@@ -19,9 +19,9 @@ public sealed class UnitDefectionSessionTests
         {
             Information = basis.Information with { Relations = [new(1, 2, 0)] },
             Military = basis.Military! with { Formations = basis.Military.Formations.Select(f => f with
-            { CaptureRanks = [BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle],
+            { Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle, BattleRank.Middle]),
                 Attack = new(10, true), Combat = new(1, 1000, 1, 1000, 50) }).ToImmutableArray() },
-            Units = [basis.Units[0] with { Condition = UnitCondition.Confused, ConditionDaysRemaining = 60, MemberRanks = new Dictionary<int, BattleRank> { [20] = BattleRank.Front, [21] = BattleRank.Middle, [22] = BattleRank.Rear }.ToImmutableDictionary() }]
+            Units = [basis.Units[0] with { Condition = UnitCondition.Confused, ConditionDaysRemaining = 60, MemberPositions = San9.Tests.FormationTestData.Members(new Dictionary<int, BattleRank> { [20] = BattleRank.Front, [21] = BattleRank.Middle, [22] = BattleRank.Rear }.ToImmutableDictionary()) }]
         };
         var session = GameSession.Start(content, 17);
         for (int i = 0; i < 2; i++) Assert.Empty(session.AdvanceXun().Events.OfType<UnitDefectedEvent>());
@@ -34,7 +34,7 @@ public sealed class UnitDefectionSessionTests
             Units = [capture.World.Units.Single(u => u.Id == 100),
                 .. new[] { 101, 102 }.Select(id => new UnitState(id, 1, new(id == 101 ? 327 : 337, 2), 5000)
                 { FormationId = 1, CorpsId = 1, ServicePlaceId = 1, CommanderId = id == 101 ? 11 : 1, Morale = 100,
-                    MemberRanks = new Dictionary<int, BattleRank> { [id == 101 ? 11 : 1] = BattleRank.Middle }.ToImmutableDictionary(),
+                    MemberPositions = San9.Tests.FormationTestData.Members(new Dictionary<int, BattleRank> { [id == 101 ? 11 : 1] = BattleRank.Middle }.ToImmutableDictionary()),
                     Order = new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = 100 } })]
         } });
         var restored = SaveService.Decode(SaveService.Encode(session), content);

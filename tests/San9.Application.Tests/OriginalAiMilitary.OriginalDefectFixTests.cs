@@ -40,7 +40,7 @@ public sealed partial class OriginalAiMilitaryTests
             {
                 FormationId = 500, CommanderId = 2, ServicePlaceId = 3, CorpsId = 1,
                 Order = new(MilitaryOrderKind.Transport, null, 1),
-                MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle)
+                MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(2, BattleRank.Middle))
             }],
             Simulation = w.Simulation with { NextUnitId = 901 }
         });

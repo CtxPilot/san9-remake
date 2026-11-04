@@ -12,7 +12,7 @@ public sealed class CombatRuleCompletionTests
     {
         var military = new MilitaryRulebook(new(100, 3, [.. Enumerable.Repeat(0, 300)], [new(0, 1, 1)],
             [new(1, 5, 0, 100000, 1, new(1, 1), TravelMode.Land)
-                { Combat = new(10, 10, 0, 10, 50), Attack = new(10, false), CaptureRanks = [BattleRank.Middle] }],
+                { Combat = new(10, 10, 0, 10, 50), Attack = new(10, false), Positions = San9.Tests.FormationTestData.Layout([BattleRank.Middle]) }],
             [new(1, new(2, 7), new(1, 1)), new(2, new(497, 7), new(1, 1)), new(3, new(402, 7), new(1, 1))])
             { CityInfluence = influence ? new(8, 10) : null, Geography = new(5, []) });
         var world = WorldState.Create(new(190, 1, 1), 42,
@@ -24,11 +24,11 @@ public sealed class CombatRuleCompletionTests
                 new(21, 2, null, new(70, 70, 70, 70), false) { UnitId = 2 },
                 new(22, 2, null, new(70, 70, 70, 70), false) { UnitId = 3 }],
             units: [new(1, 1, new(102, 7), 10000) { FormationId = 1, Morale = 100, ServicePlaceId = 1, Order = Attack(2),
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle) },
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(11, BattleRank.Middle)) },
                 new(2, 2, new(106, 7), 10000) { FormationId = 1, Morale = 100, ServicePlaceId = 2, Order = Attack(1),
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle) },
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(21, BattleRank.Middle)) },
                 new(3, 2, new(107, 7), 10000) { FormationId = 1, Morale = 100, ServicePlaceId = 2, Order = Attack(1),
-                    MemberRanks = ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Middle) }], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 1000000)) { IsRoot = true }]);
+                    MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty.Add(22, BattleRank.Middle)) }], corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 1000000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 1000000)) { IsRoot = true }]);
         return (world, new() { Military = military });
     }
 

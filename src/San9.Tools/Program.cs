@@ -30,6 +30,8 @@ try
         string root = Required("--content-root");
         var catalog = await ContentCatalogFiles.LoadAsync(root);
         var textures = await TexturePackageFiles.LoadAsync(PackageFiles.Resolve(root, catalog.Textures));
+        var flags = await ContentCatalogFiles.LoadOfficerFlagsAsync(root, catalog);
+        flags.ValidateReferences(textures.Map.Clips.Select(c => c.Id).ToHashSet());
         var opening = await ContentCatalogFiles.LoadOpeningAsync(root, catalog);
         opening.Menu.Validate(textures.Assets); opening.Selection.Validate(textures.Assets);
         foreach (var entry in catalog.Scenarios)

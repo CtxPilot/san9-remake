@@ -66,8 +66,8 @@ internal static class LeadershipMaintenance
     {
         var eligible = members.Where(p => p.OwnerId == unit.OwnerId).ToDictionary(p => p.Id);
         int? leader = governance.SelectCommander(eligible.Values, abilities)?.Id;
-        var ranks = unit.MemberRanks.Where(p => eligible.ContainsKey(p.Key)).ToImmutableDictionary();
-        if (unit.CommanderId != leader || unit.MemberRanks.Count != ranks.Count)
-            world.Replace(unit with { CommanderId = leader, MemberRanks = ranks });
+        var positions = unit.MemberPositions.Where(p => eligible.ContainsKey(p.Key)).ToImmutableDictionary();
+        if (unit.CommanderId != leader || unit.MemberPositions.Count != positions.Count)
+            world.Replace(unit with { CommanderId = leader, MemberPositions = positions });
     }
 }

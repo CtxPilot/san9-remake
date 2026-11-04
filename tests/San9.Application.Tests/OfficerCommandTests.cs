@@ -7,7 +7,7 @@ using San9.Core.Simulation;
 
 namespace San9.Application.Tests;
 
-public sealed class OfficerCommandTests
+public sealed partial class OfficerCommandTests
 {
     private readonly ScenarioInitialState definition;
     private readonly WorldSnapshot initial;
@@ -163,12 +163,12 @@ public sealed class OfficerCommandTests
             {
                 FormationId = 900, CommanderId = 1, ServicePlaceId = 1,
                 Order = new(MilitaryOrderKind.AttackSettlement, null, 2),
-                MemberRanks = new Dictionary<int, BattleRank> { [1] = BattleRank.Rear, [2] = BattleRank.Front, [3] = BattleRank.Middle }.ToImmutableDictionary()
+                MemberPositions = San9.Tests.FormationTestData.Members(new Dictionary<int, BattleRank> { [1] = BattleRank.Rear, [2] = BattleRank.Front, [3] = BattleRank.Middle }.ToImmutableDictionary())
             },
             new(20, 2, new(7, 7), 1000)
             {
                 FormationId = 900, CommanderId = 4,
-                MemberRanks = new Dictionary<int, BattleRank> { [4] = BattleRank.Middle }.ToImmutableDictionary()
+                MemberPositions = San9.Tests.FormationTestData.Members(new Dictionary<int, BattleRank> { [4] = BattleRank.Middle }.ToImmutableDictionary())
             }
         ]
     };
@@ -224,7 +224,7 @@ public sealed class OfficerCommandTests
     {
         var world = Deployed();
         var transport = world with { Units = [world.Units[0] with
-            { MemberRanks = ImmutableDictionary<int, BattleRank>.Empty, Order = new(MilitaryOrderKind.Transport, null, 2) }, world.Units[1]] };
+            { MemberPositions = San9.Tests.FormationTestData.Members(ImmutableDictionary<int, BattleRank>.Empty), Order = new(MilitaryOrderKind.Transport, null, 2) }, world.Units[1]] };
         Assert.Equal(new[] { "输送", "—", "乙城", "—", "—", "—" }, Read(transport).Select(c => c.Text));
         var unselected = world with { Officers = world.Officers.Select(o => o with { EquippedTacticId = null }).ToArray() };
         Assert.Equal("", Read(unselected)[5].Text);

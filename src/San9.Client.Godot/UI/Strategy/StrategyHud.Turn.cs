@@ -68,15 +68,20 @@ public partial class StrategyHud
         OverlayHost.AddChild(_seasonChangeView);
     }
 
-    private void RequestAdvance()
+    private void RequestAdvance() => RequestAdvance(requireConfirmation: true);
+
+    private void RequestAdvance(bool requireConfirmation)
     {
         if (!Interaction.CanAdvance) return;
-        if (!Turn.Request()) return;
-        _turnConfirmation = Session.View.PlayerForceId is int force ? Session.Messages(Texts).Produce("messages.6082",
-            new Dictionary<string, MessageBinding>
-            {
-                ["force.0"] = MessageBinding.Reference(MessageEntityKind.Force, force)
-            }, _ => throw new InvalidDataException("Turn confirmation must not require randomness.")).BbCode : "继续电脑势力的行动？";
+        if (!Turn.Request(requireConfirmation)) return;
+        if (requireConfirmation)
+        {
+            _turnConfirmation = Session.View.PlayerForceId is int force ? Session.Messages(Texts).Produce("messages.6082",
+                new Dictionary<string, MessageBinding>
+                {
+                    ["force.0"] = MessageBinding.Reference(MessageEntityKind.Force, force)
+                }, _ => throw new InvalidDataException("Turn confirmation must not require randomness.")).BbCode : "继续电脑势力的行动？";
+        }
         Overview.Close();
         _mapContext.Close(); _commandMenu.Close();
         Selection.Clear(); World.HoverObject(null);

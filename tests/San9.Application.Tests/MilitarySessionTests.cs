@@ -9,7 +9,7 @@ using San9.Core.Simulation;
 
 namespace San9.Application.Tests;
 
-public sealed class MilitarySessionTests
+public sealed partial class MilitarySessionTests
 {
     [Fact]
     public void SavePreservesCandidateOrderAndConsumesOnlyTheFreshPursuitResponse()

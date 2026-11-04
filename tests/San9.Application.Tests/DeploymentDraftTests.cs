@@ -113,11 +113,11 @@ public sealed class DeploymentDraftTests
         var line = slots with { Slots = [new(0, 0), new(0, 1), new(1, 1), new(1, 2), new(2, 2)] };
         var formation = new FormationRule(100, 50, 0, 100000, 5, new(1, 1), TravelMode.Land)
             { Combat = new(10, 10, 10, 10, 50), Attack = new(1, false),
-                CaptureRanks = [BattleRank.Front, BattleRank.Middle, BattleRank.Middle, BattleRank.Rear, BattleRank.Rear] };
+                Positions = slots.Slots.Select(s => new FormationPosition(s.Column, (BattleRank)s.Row)).ToImmutableArray() };
         definition = definition with
         {
             Military = new(4, 4, Enumerable.Repeat(0, 16).ToImmutableArray(), [new(0, 1, 1)],
-                [formation,formation with { Id=900,MovementBudget=100 },formation with { Id=200,RequiredTacticId=5000,DeploymentCost=100 },
+                [formation,formation with { Id=900,MovementBudget=100, Positions = line.Slots.Select(s => new FormationPosition(s.Column, (BattleRank)s.Row)).ToImmutableArray() },formation with { Id=200,RequiredTacticId=5000,DeploymentCost=100 },
                  formation with { Id=700,TravelMode=TravelMode.Water }],
                 [new(1, MapCoordinates.Center(new(1, 1)), new(1, 1)) { FacilityTypeId = work ? 9001 : null },
                  new(2, MapCoordinates.Center(new(2, 2)), new(1, 1))

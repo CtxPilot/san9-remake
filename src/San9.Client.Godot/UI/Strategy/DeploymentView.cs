@@ -190,23 +190,27 @@ public partial class DeploymentView : FixedPage
     private void SelectOfficers()
     {
         var selection = new CatalogSelection(Draft.Candidates, Draft.Members, Draft.MemberLimit);
-        var departure = new CatalogPage("出征", [OfficerCatalog.Pages[0].Columns[0],
-            OfficerCatalog.Pages[3].Columns[1], OfficerCatalog.Pages[3].Columns[2],
-            .. OfficerCatalog.Pages[0].Columns[1..6], OfficerCatalog.Pages[1].Columns[^1], OfficerCatalog.Pages[3].Columns[5]]);
+        var personalColumns = OfficerCatalog.CorePages[3].Columns;
+        int PersonalIndex(string id) => Array.FindIndex(personalColumns, c => c.Id == id);
+        int affinity = PersonalIndex("affinity"), office = PersonalIndex("office"),
+            capacity = PersonalIndex("capacity"), personality = PersonalIndex("personality");
+        var departure = new CatalogPage("出征", [OfficerCatalog.CorePages[0].Columns[0],
+            personalColumns[affinity], personalColumns[office], personalColumns[capacity],
+            .. OfficerCatalog.CorePages[0].Columns[1..5], OfficerCatalog.CorePages[1].Columns[^1], personalColumns[personality]]);
         var ability = OfficerCatalog.Read(Draft.View, Texts, 0, null, Draft.Home.Id).Rows.ToDictionary(r => r.Key.Id);
         var personal = OfficerCatalog.Read(Draft.View, Texts, 3, null, Draft.Home.Id).Rows.ToDictionary(r => r.Key.Id);
         var belonging = OfficerCatalog.Read(Draft.View, Texts, 1, null, Draft.Home.Id).Rows.ToDictionary(r => r.Key.Id);
         CatalogRow[] Rows(int page)
         {
             if (page > 0) return OfficerCatalog.Read(Draft.View, Texts, page - 1, null, Draft.Home.Id).Rows.Where(r => Draft.Candidates.Contains(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id, r.Cells.ToArray())).ToArray();
-            return Draft.Candidates.Select(id => new CatalogRow(id, [Person(id),personal[id].Cells[1],(long)Draft.CommandCapacity(id),
-                ability[id].Cells[1],ability[id].Cells[2],ability[id].Cells[3],ability[id].Cells[4],ability[id].Cells[5],belonging[id].Cells[^1],personal[id].Cells[5]])).ToArray();
+            return Draft.Candidates.Select(id => new CatalogRow(id, [Person(id),personal[id].Cells[affinity],personal[id].Cells[office],(long)Draft.CommandCapacity(id),
+                ability[id].Cells[1],ability[id].Cells[2],ability[id].Cells[3],ability[id].Cells[4],belonging[id].Cells[^1],personal[id].Cells[personality]])).ToArray();
         }
         OpenChild(new CatalogView
         {
             Title = "选择武将",
             HintText = $"选择执行武将（最多{Draft.MemberLimit}人）。",
-            Pages = [departure, .. OfficerCatalog.Pages],
+            Pages = [departure, .. OfficerCatalog.Pages(Draft.View, Texts)],
             ReadRows = Rows,
             Service = Service,
             Textures = Textures,
