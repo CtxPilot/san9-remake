@@ -41,8 +41,13 @@ public sealed class CreatedOfficerTests
         Assert.Same(person, workspace.Library.Officers[0]); Assert.False(workspace.HasChanges);
         workspace.Set(person with { Surname = "司马" });
         Assert.Equal(42, workspace.Library.Officers[0].FlagGlyph);
-        Assert.Throws<InvalidOperationException>(() => workspace.FinishSurnameEdit(person.Id, automatic: true));
+        Assert.False(workspace.FinishSurnameEdit(person.Id, automatic: true));
+        Assert.Equal("司马", workspace.Library.Officers[0].Surname);
+        Assert.Equal(42, CreatedOfficerLibrary.Decode(workspace.Library.Encode()).Officers[0].FlagGlyph);
         workspace.UseFlagCatalog(new(OfficerFlagCatalog.CurrentSchemaVersion, new() { ["司"] = 66 }, [66]));
+        Assert.False(workspace.FinishSurnameEdits(automatic: true));
+        Assert.Equal(42, workspace.Library.Officers[0].FlagGlyph);
+        workspace.Set(workspace.Library.Officers[0] with { Surname = "司徒" });
         Assert.True(workspace.FinishSurnameEdit(person.Id, automatic: true));
         Assert.Equal(66, workspace.Library.Officers[0].FlagGlyph);
     }

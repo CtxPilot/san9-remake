@@ -45,7 +45,7 @@ public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
     public bool FinishSurnameEdit(Guid id, bool automatic)
     {
         if (!_surnameEdits.TryGetValue(id, out string? original)) return false;
-        if (automatic && Library.Officers.Any(p => p.Id == id && p.Surname != original))
+        if (automatic && FlagCatalog is not null && Library.Officers.Any(p => p.Id == id && p.Surname != original))
             return AssignFlagFromSurname(id);
         _surnameEdits.Remove(id);
         return false;
