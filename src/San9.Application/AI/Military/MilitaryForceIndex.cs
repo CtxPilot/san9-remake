@@ -15,6 +15,7 @@ public sealed record MilitaryPresence(MapObjectReference Object, MilitaryPresenc
     public UnitCondition Condition { get; init; }
     public int Morale { get; init; }
     public int? FacilityTypeId { get; init; }
+    public SettlementKind? SettlementKind { get; init; }
 }
 
 public sealed record MilitaryStrength(long GarrisonSoldiers, long MobileSoldiers, long GarrisonWounded, long MobileWounded);
@@ -151,7 +152,8 @@ public sealed class MilitaryForceIndex
     {
         var places = world.Settlements.Where(s => !s.IsDormant && !s.IsDestroyed && (owner is null || s.OwnerId == owner) && rules.TryPlace(s, out _))
             .Select(s => new MilitaryPresence(new(s.Id, true), MilitaryPresenceKind.Settlement, s.OwnerId,
-                s.CorpsId, rules.SettlementArea(s), s.Soldiers, s.Wounded) { FacilityTypeId = rules.Place(s).FacilityTypeId });
+                s.CorpsId, rules.SettlementArea(s), s.Soldiers, s.Wounded)
+                { FacilityTypeId = rules.Place(s).FacilityTypeId, SettlementKind = s.Kind });
         // An embedded guard is a representation of its settlement garrison, not another field army.
         var units = world.Units.Where(u => !u.IsEmbedded && (owner is null || u.OwnerId == owner)).Select(u => new MilitaryPresence(new(u.Id, false),
             u.IsPersonnel ? MilitaryPresenceKind.Personnel : MilitaryPresenceKind.Unit, u.OwnerId, u.CorpsId,

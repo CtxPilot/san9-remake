@@ -31,6 +31,7 @@ public sealed record MilitaryIntelligenceState([property: JsonRequired] GameCloc
                 !Enum.IsDefined(p.Kind) || p.Object.IsSettlement != (p.Kind == MilitaryPresenceKind.Settlement) ||
                 p.OwnerId is < 0 || p.CorpsId is < 0 || !Enum.IsDefined(p.Condition) || p.Morale is < 0 or > 100 ||
                 p.FacilityTypeId is int facility && !rules.Facilities.ContainsKey(facility) ||
+                p.Kind == MilitaryPresenceKind.Settlement && (p.SettlementKind is null || !Enum.IsDefined(p.SettlementKind.Value)) ||
                 p.Area.Position.X < 0 || p.Area.Position.Y < 0 ||
                 p.Area.Position.X >= rules.Map.FineWidth || p.Area.Position.Y >= rules.Map.FineHeight ||
                 p.FormationId is int formation && !rules.Formations.ContainsKey(formation) ||

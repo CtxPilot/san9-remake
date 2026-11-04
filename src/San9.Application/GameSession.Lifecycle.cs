@@ -105,6 +105,7 @@ public sealed partial class GameSession
         session._ending = snapshot.Ending;
         session._strategicContexts = snapshot.StrategicContexts;
         session._originalAi = snapshot.OriginalAi;
+        session.MilitaryCampaigns = snapshot.MilitaryCampaigns;
         session.PlayerForceController = snapshot.PlayerForceController;
         session.InitialPlayerForceIds = snapshot.InitialPlayerForceIds;
         session.HasUnsavedChanges = false;

@@ -8,24 +8,15 @@ using Xunit.Abstractions;
 
 namespace San9.Application.Tests;
 
-public sealed partial class OriginalAiMilitaryTests
+public sealed class MilitaryCityNetworkSessionTests
 {
-    [Fact]
-    public void OrdinaryMilitaryUsesImportedLinksWithoutGeographicCityConnections()
-    {
-        var content = Fixture() with { CityConnections = [] };
-        var harness = new Harness(content);
-        var report = harness.Run(OriginalAiWork.Attack, 1);
-        Assert.Equal(1, report.Submitted);
-        Assert.Equal(2, Assert.IsType<DeployUnitCommand>(Assert.Single(harness.Commands)).Order.SettlementId);
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void SessionLoadsAndRestoresOnlyTheImportedMilitaryLinks(bool empty)
     {
-        var content = Fixture() with { MilitaryCityConnections = empty ? [] : [new(2, 1)] };
+        var content = G01ScenarioTests.Fixture() with
+        { MilitaryCityConnections = empty ? [] : [new(2, 1)], CityConnections = [new(1, 2), new(2, 1)], RegionCityIds = new() { [1] = 1, [2] = 2 }, RegionNameKeys = new() { [1] = "region.1", [2] = "region.2" } };
         var session = GameSession.Start(content, 190);
         var network = session.View.Rules.MilitaryCities;
         Assert.Equal(content.MilitaryCityConnections.ToArray(), network.Connections.ToArray());

@@ -8,6 +8,9 @@ namespace San9.Application.AI;
 public enum OriginalAiWorkEnd { Permission, Calendar, NoCandidates, PreparationFailed, ReserveReached, AttemptsExhausted, ProbabilityFailed, AnalysisIncomplete }
 public sealed record OriginalAiWorkReport(int CorpsId, OriginalAiWork Work, OriginalAiWorkEnd End, int Attempts, int Submitted)
 {
+    public string Executor { get; init; } = "original";
+    public Military.MilitaryDecisionReason? MilitaryReason { get; init; }
+    public int GroupEvaluations { get; init; }
     public long InputRevision { get; init; }
     public long ElapsedTimestampTicks { get; init; }
     public long AllocatedBytes { get; init; }

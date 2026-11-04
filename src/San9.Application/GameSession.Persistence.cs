@@ -80,6 +80,6 @@ public sealed partial class GameSession
         var chronicle = _chronicle.ToImmutableArray();
         return _capture = new(world, records, chronicle, NextOperationSequence)
             { Definitions = Definitions, InitialPlayerForceIds = InitialPlayerForceIds, Ending = _ending, StrategicContexts = _strategicContexts, PlayerForceController = PlayerForceController, OriginalAi = _originalAi, History = History, DeploymentPresets = DeploymentPresets,
-                MilitaryIntelligence = _militaryIntelligence?.State };
+                MilitaryIntelligence = _militaryIntelligence?.State, MilitaryCampaigns = MilitaryCampaigns };
     }
 }

@@ -28,7 +28,7 @@ internal static class ForceElimination
             }
             else if (person.IsServing)
             {
-                int? place = person.UnitId is int unit ? rules.Military!.RegionAt(world.Units[unit].Position)
+                int? place = person.UnitId is int unit ? BattlePersonnel.Location(world.Units[unit], rules.Military!, world.Units[unit].Position)
                     : person.SettlementId ?? person.RegionId;
                 BattlePersonnel.DisplaceAtPlace(world, person.Id, place, rules.Personnel, events);
             }
@@ -43,7 +43,8 @@ internal static class ForceElimination
         }
         foreach (var unit in world.Units.Values.Where(u => u.OwnerId == forceId).OrderBy(u => u.Id).ToArray())
         {
-            ReleaseCaptives(world, world.UnitMembers(unit.Id), rules.Military?.RegionAt(unit.Position), unit.Position, rules, events);
+            ReleaseCaptives(world, world.UnitMembers(unit.Id), rules.Military is { } military
+                ? BattlePersonnel.Location(unit, military, unit.Position) : unit.ServicePlaceId, unit.Position, rules, events);
             int? city = rules.Military?.RegionAt(unit.Position) is int region ? Demobilization.City(world, region, rules.Personnel) : null;
             UnitTerminationService.Demobilize(world, unit.Id, unit.IsPersonnel ? null : city, events);
         }

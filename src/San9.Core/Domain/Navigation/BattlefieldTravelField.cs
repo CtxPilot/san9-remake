@@ -5,7 +5,10 @@ namespace San9.Core.Domain;
 public enum TravelFieldStatus { Reachable, Unreachable, BeyondHorizon, Incomplete }
 public sealed record TravelFieldEndpoint(int Id, MapOccupancy Area);
 public sealed record TravelFieldRoute(int Id, TravelFieldStatus Status, long Cost, RouteTerrainCost TerrainCost,
-    ImmutableArray<MapCell> Cells);
+    ImmutableArray<MapCell> Cells)
+{
+    public ImmutableArray<long> CumulativeCosts { get; init; } = [];
+}
 
 /// <summary>A single bounded terrain search for many fixed destinations. This is a coarse transport
 /// estimate, not a promise of fine footprint clearance, public command eligibility or daily arrival.</summary>
@@ -118,7 +121,8 @@ public sealed class BattlefieldTravelField
             var cells = new List<MapCell>();
             for (int cell = at; cell >= 0; cell = previous[cell]) cells.Add(new(cell % map.Width, cell / map.Width));
             cells.Reverse();
-            routes.Add(new(targets[i].Id, TravelFieldStatus.Reachable, distance[at], components[at], cells.ToImmutableArray()));
+            routes.Add(new(targets[i].Id, TravelFieldStatus.Reachable, distance[at], components[at], cells.ToImmutableArray())
+                { CumulativeCosts = cells.Select(cell => distance[cell.Y * map.Width + cell.X]).ToImmutableArray() });
         }
         return new(routes.MoveToImmutable(), expanded, count, !work.Exhausted);
 

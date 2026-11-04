@@ -12,12 +12,12 @@ public sealed partial class GameSession
     internal sealed record OperationInput(SimulationEngine Simulation, ScenarioSessionDefinition Definition,
         StrategySnapshot View, long Sequence, OriginalAiState OriginalAi,
         EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts, ImmutableList<ChronicleFact> History,
-        ImmutableArray<DeploymentPreset> DeploymentPresets, AI.Military.MilitaryIntelligencePublication? MilitaryIntelligence);
+        ImmutableArray<DeploymentPreset> DeploymentPresets, AI.Military.MilitaryIntelligencePublication? MilitaryIntelligence, AI.Military.MilitaryCampaignState MilitaryCampaigns);
 
     internal sealed record OperationCommit(SimulationEngine Simulation, OriginalAiState OriginalAi,
         ImmutableArray<OriginalAiWorkReport> AiReports, EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts,
         ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note, ImmutableArray<DeploymentPreset> DeploymentPresets,
-        AI.Military.MilitaryIntelligencePublication? MilitaryIntelligence);
+        AI.Military.MilitaryIntelligencePublication? MilitaryIntelligence, AI.Military.MilitaryCampaignState MilitaryCampaigns);
 
     internal sealed record PreparedOperation(SessionResult Result, StrategySnapshot View,
         OperationCommit? Commit = null)
@@ -26,7 +26,7 @@ public sealed partial class GameSession
     }
 
     private OperationInput CaptureOperationInput() => new(_simulation, _definition, View,
-        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets, _militaryIntelligence);
+        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets, _militaryIntelligence, MilitaryCampaigns);
 
     public SessionResult Apply(SessionRequest request)
     {
@@ -64,7 +64,7 @@ public sealed partial class GameSession
             var candidate = input.Simulation.Fork();
             var originalAi = input.OriginalAi;
             List<OriginalAiWorkReport> aiReports = [];
-            var terrainRoutes = new OriginalAiTerrainRoutes();
+            var militaryBatch = new AI.Military.MilitaryTurnBatch(input.MilitaryIntelligence, input.MilitaryCampaigns);
             List<DomainEvent> events = [];
             List<ResolutionPresentationTransition> transitions = [];
             using var observation = captureTransitions ? candidate.ObserveResolution(transition => transitions.Add(new(transition.Phase,
@@ -146,7 +146,7 @@ public sealed partial class GameSession
                         controlState.ActiveControl >= controlState.Controls.Length ||
                         controlState.Controls[controlState.ActiveControl].ControllerId != request.ControllerId)
                         return Rejected(SessionRejection.NotStable);
-                    originalAi = AutomaticTurnRunner.EndControl(candidate, new(request.ControllerId), events, input.Definition, originalAi, aiReports, terrainRoutes);
+                    originalAi = AutomaticTurnRunner.EndControl(candidate, new(request.ControllerId), events, input.Definition, originalAi, aiReports, militaryBatch);
                     break;
                 case PrepareAdvanceOperation:
                 case AdvanceOperation:
@@ -160,7 +160,7 @@ public sealed partial class GameSession
                         var seat = candidate.Snapshot.Simulation.Controls[candidate.Snapshot.Simulation.ActiveControl];
                         if (request.Operation is PrepareAdvanceOperation && closedPlayer && seat.Kind == ControllerKind.Player) break;
                         closedPlayer |= seat.Kind == ControllerKind.Player;
-                        originalAi = AutomaticTurnRunner.EndControl(candidate, new(seat.ControllerId), events, input.Definition, originalAi, aiReports, terrainRoutes);
+                        originalAi = AutomaticTurnRunner.EndControl(candidate, new(seat.ControllerId), events, input.Definition, originalAi, aiReports, militaryBatch);
                     }
                     if (request.Operation is AdvanceOperation && candidate.Snapshot.Simulation.Boundary == SimulationBoundary.Stable)
                     {
@@ -187,7 +187,7 @@ public sealed partial class GameSession
                     return Rejected(SessionRejection.InvalidRequest);
             }
             AutomaticResponseRunner.Run(candidate, events);
-            originalAi = AutomaticTurnRunner.Resume(candidate, events, input.Definition, originalAi, aiReports, terrainRoutes);
+            originalAi = AutomaticTurnRunner.Resume(candidate, events, input.Definition, originalAi, aiReports, militaryBatch);
             var completed = events.OfType<DevelopmentCompletedEvent>().Select(e =>
                 new SessionRecord(e.Clock, e.Command.ForceId, e.Command.SettlementId, e.Command.OfficerIds[0],
                     e.Command.Activity, e.Increment, e.Cost)).ToArray();
@@ -209,7 +209,7 @@ public sealed partial class GameSession
                     strategicContexts.GetValueOrDefault(force, StrategicContextState.Empty)));
             var publishedEvents = events.ToImmutableArray();
             var commit = new OperationCommit(candidate, originalAi.Reconcile(snapshot), aiReports.ToImmutableArray(),
-                ending, strategicContexts, history, completed, note, deploymentPresets, intelligence);
+                ending, strategicContexts, history, completed, note, deploymentPresets, intelligence, militaryBatch.State.Reconcile(snapshot));
             return new(new(SessionDisposition.Accepted, SessionRejection.None, publishedEvents, snapshot, Development: development),
                 view, commit) { Transitions = transitions.ToArray() };
         }
@@ -231,6 +231,7 @@ public sealed partial class GameSession
                 _view = prepared.View;
                 _originalAi = commit.OriginalAi;
                 _militaryIntelligence = commit.MilitaryIntelligence;
+                MilitaryCampaigns = commit.MilitaryCampaigns;
                 LastOriginalAiWork = commit.AiReports;
                 _ending = commit.Ending;
                 _strategicContexts = commit.StrategicContexts;

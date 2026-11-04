@@ -5,6 +5,7 @@ namespace San9.Application;
 
 public sealed partial class GameSession
 {
+    public MilitaryCampaignState MilitaryCampaigns { get; private set; } = new();
     private MilitaryTransportNetwork? _militaryTransport;
 
     /// <summary>Player and automatic planners use the same published observation and query rules.

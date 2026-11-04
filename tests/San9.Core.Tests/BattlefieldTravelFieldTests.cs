@@ -19,6 +19,7 @@ public sealed class BattlefieldTravelFieldTests
             Assert.Equal(route.Cost, route.TerrainCost.Land);
             Assert.Equal(new MapCell(0, 0), route.Cells[0]);
             Assert.Equal(new MapCell(route.Id, 0), route.Cells[^1]);
+            Assert.Equal(Enumerable.Range(0, route.Cells.Length).Select(i => 10L * i), route.CumulativeCosts);
         });
         int separateWork = targets.Sum(t => BattlefieldTravelField.Build(map, [new(2, 2)], [t], TravelMode.Land, 1000, new(1000)).Expanded);
         Assert.True(separateWork > 10 * field.Expanded);

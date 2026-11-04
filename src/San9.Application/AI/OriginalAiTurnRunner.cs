@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using San9.Content.Scenarios;
+using San9.Application.AI.Military;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
@@ -8,16 +9,14 @@ namespace San9.Application.AI;
 internal static class OriginalAiTurnRunner
 {
     internal static readonly ImmutableArray<OriginalAiWork> RootFirst = [OriginalAiWork.Offices, OriginalAiWork.CreateCorps,
-        OriginalAiWork.Retreat, OriginalAiWork.Deploy, OriginalAiWork.Gift, OriginalAiWork.Surrender, OriginalAiWork.Trade,
+        OriginalAiWork.Gift, OriginalAiWork.Surrender, OriginalAiWork.Trade,
         OriginalAiWork.RecruitLocal, OriginalAiWork.ReturnPrisoner, OriginalAiWork.MoveOfficers, OriginalAiWork.Adviser,
         OriginalAiWork.ConfiscateTreasure, OriginalAiWork.DisposePrisoner, OriginalAiWork.GrantTreasure, OriginalAiWork.Reward, OriginalAiWork.RequestAttack];
-    internal static readonly ImmutableArray<OriginalAiWork> ChildFirst = [OriginalAiWork.Retreat, OriginalAiWork.Deploy,
-        OriginalAiWork.Trade, OriginalAiWork.RecruitLocal, OriginalAiWork.MoveOfficers];
-    internal static readonly ImmutableArray<OriginalAiWork> BarbarianFirst = [OriginalAiWork.Retreat, OriginalAiWork.Deploy,
-        OriginalAiWork.Attack, OriginalAiWork.FulfillRequest, OriginalAiWork.Train, OriginalAiWork.Recruit, OriginalAiWork.Repair, OriginalAiWork.Gift];
+    internal static readonly ImmutableArray<OriginalAiWork> ChildFirst = [OriginalAiWork.Trade, OriginalAiWork.RecruitLocal, OriginalAiWork.MoveOfficers];
+    internal static readonly ImmutableArray<OriginalAiWork> BarbarianFirst = [OriginalAiWork.Train, OriginalAiWork.Recruit, OriginalAiWork.Repair, OriginalAiWork.Gift];
 
     internal static OriginalAiState Run(SimulationEngine engine, ScenarioSessionDefinition definition, ControlSeat seat,
-        OriginalAiState state, List<DomainEvent> events, List<OriginalAiWorkReport> reports, OriginalAiTerrainRoutes terrainRoutes)
+        OriginalAiState state, List<DomainEvent> events, List<OriginalAiWorkReport> reports, MilitaryTurnBatch militaryBatch)
     {
         var cursor = state.Continuation;
         if (cursor is null)
@@ -53,11 +52,13 @@ internal static class OriginalAiTurnRunner
             {
                 state = state with { Corps = state.Corps.Where(c => c.CorpsId != corps.Id).Append(strategy).OrderBy(c => c.CorpsId).ToImmutableArray() };
                 cursor = cursor with { Prepared = true, Quotas = OriginalAiStaffing.Quotas(engine.Snapshot, corps.Id, geography) };
+                reports.Add(MilitaryTurnRunner.Run(engine, definition, corps, context, militaryBatch, events));
             }
             var forceState = state.Forces.Single(f => f.ForceId == seat.ForceId);
             var policy = state.Policy;
             var works = (force.IsBarbarian ? BarbarianFirst : corps.IsRoot ? RootFirst : ChildFirst)
-                .Concat(force.IsBarbarian ? [] : policy.SecondaryBatches[strategy.Mode]).Append(OriginalAiWork.Residual).ToArray();
+                .Concat(force.IsBarbarian ? [] : policy.SecondaryBatches[strategy.Mode])
+                .Where(work => !MilitaryTurnRunner.Replaces(work)).Append(OriginalAiWork.Residual).ToArray();
             var domestic = new OriginalAiProjection(engine, definition.Content, corps.Id, geography, policy.RecruitmentEnabled);
             OriginalDomesticInputs Capture() => domestic.Domestic();
             bool Submitted(CommandExecutionResult result)
@@ -165,12 +166,6 @@ internal static class OriginalAiTurnRunner
                 else if (OriginalAiActions.Handles(work))
                     Report(new OriginalAiActions(engine, definition.Content with { OriginalAi = policy }, definition.MilitaryRules,
                         corps.Id, context, random, Submit).Run(work, limit, state, strategy));
-                else if (OriginalAiMilitary.Handles(work))
-                    Report(definition.MilitaryRules is { } military
-                        ? new OriginalAiMilitary(engine, definition.Content with { OriginalAi = policy }, military, definition.Rules,
-                            geographyContext, terrainRoutes, corps.Id, context, random, (command, prepared) => Submitted(prepared is null
-                                ? engine.Execute(context, command) : engine.Execute(context, (DeployUnitCommand)command, prepared))).Run(work, limit, state, strategy)
-                        : new(corps.Id, work, OriginalAiWorkEnd.PreparationFailed, 0, 0));
                 else if (work == OriginalAiWork.DisposePrisoner)
                 {
                     var progress = personnel.Dispose(cursor.Prisoners ?? personnel.PreparePrisoners(), limit);

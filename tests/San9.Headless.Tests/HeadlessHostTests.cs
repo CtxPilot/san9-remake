@@ -172,7 +172,7 @@ public sealed class HeadlessHostTests : IDisposable
         var verified = Run("verify", "--fixture", "--strategy", "autonomous", "--xuns", "6",
             "--seed", seed.ToString(), "--output", _directory);
         Assert.Equal(0, verified.Code);
-        Assert.Equal("original-complete-v1", verified.Report.GetProperty("proactiveAi").GetString());
+        Assert.Equal("civilian-with-campaigns-v1", verified.Report.GetProperty("proactiveAi").GetString());
         Assert.Equal(6, verified.Report.GetProperty("completedXun").GetInt32());
         var initial = StrictJson.Deserialize<SaveEnvelope>(File.ReadAllBytes(FilePath("initial.save.json"))).Session;
         Assert.All(initial.World.Simulation.Controls, seat => Assert.Equal(ControllerKind.Automatic, seat.Kind));

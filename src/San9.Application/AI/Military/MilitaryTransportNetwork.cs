@@ -4,10 +4,12 @@ using San9.Core.Domain;
 
 namespace San9.Application.AI.Military;
 
+public enum MilitaryTransitPassage { Military, Terrain }
 public sealed record MilitaryTransitRoute(int SourceId, int TargetId, TravelFieldStatus Status, int? Days,
     long Cost, RouteTerrainCost TerrainCost, ImmutableArray<MapCell> Cells)
 {
     public bool RequiresNavigationCheck => true;
+    public ImmutableArray<long> CumulativeCosts { get; init; } = [];
 }
 public sealed record MilitaryTransitQuery(ImmutableArray<MilitaryTransitRoute> Routes, int Expanded,
     int CellsInitialized, bool CacheHit);
@@ -48,9 +50,11 @@ public sealed class MilitaryTransportNetwork
 
     public MilitaryTransitQuery Query(int sourceId, IEnumerable<int> targetIds, int formationId,
         int? navalFormationId, uint soldiers, MilitaryQueryBudget budget, int horizonDays = 60,
-        Func<int, int?, bool>? isHostile = null, int? marchingForceId = null)
+        Func<int, int?, bool>? isHostile = null, int? marchingForceId = null,
+        MilitaryTransitPassage passage = MilitaryTransitPassage.Military)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(horizonDays);
+        if (!Enum.IsDefined(passage)) throw new ArgumentOutOfRangeException(nameof(passage));
         var targets = targetIds.Distinct().Order().ToArray();
         var places = geometry.ToDictionary(p => p.Id, p => p.Area);
         if (!places.TryGetValue(sourceId, out var source) || targets.Any(t => !places.ContainsKey(t)))
@@ -58,7 +62,7 @@ public sealed class MilitaryTransportNetwork
         if (!rules.ValidFormationPair(formationId, navalFormationId)) throw new ArgumentException("Invalid movement conditions.");
         var travel = rules.Travel(formationId, navalFormationId, soldiers);
         int owner = marchingForceId ?? nodes.Single(p => p.Object.Id == sourceId).OwnerId ?? -1;
-        var obstacles = nodes.Where(p => p.Object.Id != sourceId && (p.FacilityTypeId is int type && rules.Facilities[type].IsWork ||
+        var obstacles = nodes.Where(p => passage == MilitaryTransitPassage.Military && p.Object.Id != sourceId && (p.FacilityTypeId is int type && rules.Facilities[type].IsWork ||
             (isHostile?.Invoke(owner, p.OwnerId) ?? (p.OwnerId != owner)))).ToArray();
         var key = new Key(sourceId, travel, string.Join(',', targets.Select(t => t.ToString(CultureInfo.InvariantCulture))), horizonDays,
             string.Join(',', obstacles.Select(p => p.Object.Id.ToString(CultureInfo.InvariantCulture))));
@@ -95,6 +99,6 @@ public sealed class MilitaryTransportNetwork
         MilitaryTransitQuery Convert(BattlefieldTravelField field, bool hit, int initialized) => new(field.Routes.Select(r =>
             new MilitaryTransitRoute(sourceId, r.Id, r.Status, r.Status == TravelFieldStatus.Reachable
                 ? (int)Math.Min(int.MaxValue, (r.Cost + travel.DailyBudget - 1) / travel.DailyBudget) : null,
-                r.Cost, r.TerrainCost, r.Cells)).ToImmutableArray(), field.Expanded, initialized, hit);
+                r.Cost, r.TerrainCost, r.Cells) { CumulativeCosts = r.CumulativeCosts }).ToImmutableArray(), field.Expanded, initialized, hit);
     }
 }

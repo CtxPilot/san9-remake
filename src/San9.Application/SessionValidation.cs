@@ -32,6 +32,7 @@ internal static class SessionValidation
         if (!Enum.IsDefined(snapshot.PlayerForceController)) throw new ArgumentException("Invalid player force controller.");
         if (snapshot.OriginalAi is null) throw new ArgumentException("Missing original AI state.");
         snapshot.OriginalAi.Validate(snapshot.World, definition.Content);
+        (snapshot.MilitaryCampaigns ?? throw new ArgumentException("Missing military campaign state.")).Validate(snapshot.World);
         if (definition.MilitaryRules is { } military)
             (snapshot.MilitaryIntelligence ?? throw new ArgumentException("Missing military intelligence publication.")).Validate(snapshot.World, military);
         else if (snapshot.MilitaryIntelligence is not null) throw new ArgumentException("Unexpected military intelligence without a map.");

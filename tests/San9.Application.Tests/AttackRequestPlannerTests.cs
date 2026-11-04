@@ -51,7 +51,7 @@ public sealed class AttackRequestPlannerTests
     [InlineData("domestic")]
     [InlineData("force")]
     [InlineData("settlement")]
-    public void AutomaticCorpsPreservesDelegationWithoutGeneratingWork(string policy)
+    public void AutomaticCorpsUsesItsDelegationAndRestoresSubmittedMilitaryWork(string policy)
     {
         var basis = Fixture();
         var home = basis.Settlements[0] with { Id = 5, NameKey = "root-home", X = 1, Y = 2, Soldiers = 100, CorpsId = 10 };
@@ -79,7 +79,8 @@ public sealed class AttackRequestPlannerTests
         Assert.Equal(SessionDisposition.Accepted, result.Disposition);
         EventAssert.Equal(result.Events, restored.Apply(request).Events);
         StateAssert.Equal(session.Capture(), restored.Capture());
-        Assert.Empty(session.Snapshot.Units);
+        if (policy == "domestic") Assert.Empty(session.Snapshot.Units);
+        else Assert.NotEmpty(session.Snapshot.Units);
         Assert.Equal(delegation, session.Snapshot.Corps.Single(c => c.Id == 20).Delegation);
         var authored = content with { Information = content.Information with { Corps = content.Information.Corps.Select(c =>
             c.Id == 20 ? c with { Delegation = delegation } : c).ToArray() } };
@@ -118,7 +119,7 @@ public sealed class AttackRequestPlannerTests
         // so this scenario measures requested-target planning and fulfillment, not a new deployment.
         var content = basis with { Military = basis.Military! with
             { Places = basis.Military.Places.Select(p => p.Id == 2 ? p with { Attack = null } : p).ToImmutableArray() } };
-        var session = GameSession.Start(content, 42);
+        var session = GameSession.Start(content, 42, playerForceIds: [1, 2, 3]);
         var before = session.Capture();
         var command = Assert.IsType<DeployUnitCommand>(MilitaryPlanner.Choose(session, new("player", 1, ControllerKind.Player), Guid.NewGuid()));
         Assert.Equal(3, command.Order.SettlementId);

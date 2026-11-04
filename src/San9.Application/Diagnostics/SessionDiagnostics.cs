@@ -11,7 +11,7 @@ public sealed record SessionDiagnosticSnapshot(WorldDiagnosticSnapshot World, Im
     ImmutableArray<ChronicleEntry> Chronicle, ImmutableList<ChronicleFact> History, EndingSelection? Ending, ImmutableDictionary<int, Presentation.StrategicContextState> StrategicContexts,
     long NextOperationSequence, ControllerKind PlayerForceController, AI.OriginalAiState OriginalAi,
     ImmutableArray<DeploymentPreset> DeploymentPresets, San9.Content.Scenarios.SessionDefinitions Definitions,
-    AI.Military.MilitaryIntelligenceState? MilitaryIntelligence);
+    AI.Military.MilitaryIntelligenceState? MilitaryIntelligence, AI.Military.MilitaryCampaignState MilitaryCampaigns);
 
 public static class SessionDiagnostics
 {
@@ -21,7 +21,7 @@ public static class SessionDiagnostics
 
     public static SessionDiagnosticSnapshot Capture(SessionSnapshot session) => new(WorldDiagnostics.Capture(session.World),
         session.Records, session.Chronicle, session.History, session.Ending, session.StrategicContexts,
-        session.NextOperationSequence, session.PlayerForceController, session.OriginalAi, session.DeploymentPresets, session.Definitions, session.MilitaryIntelligence);
+        session.NextOperationSequence, session.PlayerForceController, session.OriginalAi, session.DeploymentPresets, session.Definitions, session.MilitaryIntelligence, session.MilitaryCampaigns);
 
     public static JsonElement Serialize(SessionSnapshot session) =>
         JsonSerializer.SerializeToElement(Capture(session), SessionDiagnosticJsonContext.Default.SessionDiagnosticSnapshot);
@@ -46,6 +46,7 @@ public static class SessionDiagnostics
             comparison.Check(expected.DeploymentPresets, actual.DeploymentPresets, "$.deploymentPresets") &&
             comparison.Check(expected.Ending, actual.Ending, "$.ending") &&
             comparison.Check(expected.History, actual.History, "$.history") &&
+            comparison.Check(expected.MilitaryCampaigns, actual.MilitaryCampaigns, "$.militaryCampaigns") &&
             comparison.Check(expected.MilitaryIntelligence, actual.MilitaryIntelligence, "$.militaryIntelligence") &&
             comparison.Check(expected.NextOperationSequence, actual.NextOperationSequence, "$.nextOperationSequence") &&
             comparison.Check(expected.OriginalAi, actual.OriginalAi, "$.originalAi") &&

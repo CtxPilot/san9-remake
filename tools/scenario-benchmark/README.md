@@ -1,6 +1,6 @@
 # 剧本与军事 AI 基准
 
-`military-baseline`是[军事 AI 重做计划](../../specs/military-ai-plan.md) M0 的隔离测量入口。使用当前生产 AI 和公共会话操作，不切换军事策略，不读取原版资源，不生成文件哈希。
+`military-baseline`是[军事 AI 重做计划](../../specs/military-ai-plan.md) M0 的隔离测量入口。使用当前分支的实际 AI 和公共会话操作，工具本身不切换军事策略，不读取原版资源，不生成文件哈希。
 
 ## 可复现测量
 
@@ -38,7 +38,7 @@ dotnet tools/scenario-benchmark/bin/Release/net10.0/ScenarioBenchmark.dll milita
 
 - 内容加载、初始化、检查点构造／恢复、结果比较、工作汇总和文件I/O不计入整旬；加载、初始化与每轮恢复单列。
 - 每轮新建会话，重置其业务查询缓存；JIT、PGO和进程工作区保留。测量是运行时预热后相同冷恢复条件的成本，不声称已测业务缓存热态。
-- 按工作记录AI耗时、尝试／提交／拒绝及路线工作量。工作耗时包含在准备阶段中，不能再次加到总时间。未被各工作包围的AI准备成本仍在整旬和准备时间内。
+- 按工作及`executor`记录AI耗时、尝试／提交／拒绝、编组求值及路线工作量；`military-campaign-v1`为新军事批次，`original`为保留的非军事工作。工作耗时包含在准备阶段中，不能再次加到总时间。未被各工作包围的AI准备成本仍在整旬和准备时间内。
 - `PathSearchDiagnostics`嵌套作用域互斥。总寻路次数、普通扩展和端点扩展分别为`unscoped*`加全部`work`相应计数；`unscopedMaximumExpanded`及`unscopedWorkspaceNodes`只描述外层作用域，不能当作全旬峰值。
 - `allocatedBytes`为计时段当前线程累计托管分配；`managedHeapBytes`、`workingSetBytes`是轮末非强制读数，含内容和保留的参考事件／最终状态，不是峰值、常驻保留量或独立AI内存。`maximumUnits`在每次操作后观察，不能表示日内瞬时峰值。
 - 正式汇总保留各轮总耗时、整旬中位数、线性插值P95、最大值和平均分配。完整轨迹重复次数与旬样本数分别表达，所有正式样本均纳入，不只选最快结果。
@@ -75,3 +75,5 @@ dotnet tools/scenario-benchmark/bin/Release/net10.0/ScenarioBenchmark.dll milita
 本次规则v245／存档138的证据位于忽略目录`local/generated/verification/military-ai-m0/`：`m0-m1-281-config.json`／`m0-m1-281-baseline.json`为首次加一次重复36旬，`m0-m1-foundations-config.json`／`m0-m1-foundations.json`为基础实验，`test-results/`为实际TRX。报告包含机器、运行时、构建、输入与代码说明；不提交本地内容或报告。
 
 旧参数入口仍用于显式`march`／`combat`导航压力构造，见[导航验收](../../docs/pathfinding-verification.md)；其单次测量不替代上述重复基准。
+
+实验分支已提前切换新军事入口，当前策略标识`civilian-with-campaigns-v1`、规则v246／存档139；M0/M1报告仍记录当时的原策略基线。切换后281年36旬首次加一次重复的配置与报告位于`local/generated/verification/military-ai-m2/281-switch-config.json`和`281-switch-baseline.json`；轨迹可能不同，需同时观察部队规模、求值／路径工作及完整旬成本，不能当成同等行为质量的加速比。实现进度和缺口见[计划7.2](../../specs/military-ai-plan.md#72-实验分支入口切换与m2首批闭环2026-11-04)。

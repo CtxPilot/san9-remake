@@ -41,7 +41,7 @@ public sealed class CityBattleDamageSessionTests
         const int percent = 50;
         var definition = Scenario();
         var companion = new CompanionSettings { CityBattleDamagePercent = percent };
-        var session = GameSession.Start(definition, 42, companionSettings: companion);
+        var session = GameSession.Start(definition, 42, companionSettings: companion, playerForceIds: [1, 2]);
         Assert.True(session.Execute(new("player"), new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 10000, 700,
             new(MilitaryOrderKind.AttackSettlement, null, 2))).Submission.Accepted);
         var restored = SaveService.Decode(SaveService.Encode(session), definition);

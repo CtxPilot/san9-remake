@@ -33,7 +33,7 @@ public sealed class FacilityCombatSessionTests
         , Information = new([], [], [], [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 100000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 100000)) { IsRoot = true }], []) };
         Assert.Throws<InvalidDataException>(() => (definition with { Military = definition.Military with
             { LinkRules = new(true, 20, [new(11, 9000, 45, false)]) } }).Validate());
-        var session = GameSession.Start(definition, 42, 100);
+        var session = GameSession.Start(definition, 42, 100, playerForceIds: [2, 1]);
         List<SessionRequest> requests = [];
         var inputHeader = CommandLogService.CreateHeader(session);
         SessionResult ApplyInput(SessionRequest request)
@@ -52,6 +52,7 @@ public sealed class FacilityCombatSessionTests
             return result;
         }
         SessionResult AdvanceInput() => ApplyInput(session.Request(new AdvanceOperation()));
+        Assert.Equal(SessionDisposition.Accepted, ApplyInput(session.Request(new EndControlOperation())).Disposition);
         var beforeQuery = session.Snapshot;
         Assert.True(session.View.HasCityInfluence(1, new(7, 2)));
         Assert.False(session.View.HasCityInfluence(1, new(17, 2)));
@@ -96,12 +97,12 @@ public sealed class FacilityCombatSessionTests
             CommandLogService.Write(log, inputHeader, requests);
             var header = CommandLogService.ReadHeader(log);
             Assert.Equal(100, header.ComputerDamageBonusPercent);
-            var mismatch = GameSession.Start(definition, header.Seed);
+            var mismatch = GameSession.Start(definition, header.Seed, playerForceIds: [2, 1]);
             var unchanged = mismatch.Capture();
             Assert.Equal(1, Assert.Throws<CommandLogException>(() => CommandLogService.Replay(log, mismatch)).Line);
             StateAssert.Equal(unchanged, mismatch.Capture());
             var logReplay = GameSession.Start(definition, header.Seed, header.ComputerDamageBonusPercent,
-                header.BattleDeathsEnabled);
+                header.BattleDeathsEnabled, playerForceIds: [2, 1]);
             Assert.Null(CommandLogService.Replay(log, logReplay).FirstFailure);
             StateAssert.Equal(session.Capture(), logReplay.Capture());
             Assert.Equal(session.Snapshot.Units.Single().Soldiers, logReplay.Snapshot.Units.Single().Soldiers);

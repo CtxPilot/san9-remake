@@ -46,12 +46,12 @@ public sealed class MilitaryTravelQueries
     }
 
     public MilitaryTransitQuery Transport(int sourceId, IEnumerable<int> targetIds, int formationId,
-        int? navalFormationId, uint soldiers, int horizonDays = 60)
+        int? navalFormationId, uint soldiers, int horizonDays = 60, MilitaryTransitPassage passage = MilitaryTransitPassage.Military)
     {
         lock (Network)
         {
             Network.Refresh(Observation.Forces);
-            return Network.Query(sourceId, targetIds, formationId, navalFormationId, soldiers, Budget, horizonDays, hostile);
+            return Network.Query(sourceId, targetIds, formationId, navalFormationId, soldiers, Budget, horizonDays, hostile, passage: passage);
         }
     }
 

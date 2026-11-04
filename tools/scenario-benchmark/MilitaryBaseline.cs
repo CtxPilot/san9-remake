@@ -38,7 +38,11 @@ public sealed record MilitaryBaselineOptions
 
 public sealed record BaselineWork(string Work, int Reports, int Attempts, int Submitted, int Rejected,
     int EmptyPlans, double Milliseconds, long AllocatedBytes, int PathQueries, long PathSearches,
-    long PathExpanded, long PathEndpointExpanded);
+    long PathExpanded, long PathEndpointExpanded)
+{
+    public string Executor { get; init; } = "original";
+    public int GroupEvaluations { get; init; }
+}
 
 public sealed record BaselineXun(string Started, string Ended, double Milliseconds, double PreparationMilliseconds,
     double ResolutionMilliseconds, long AllocatedBytes, long UnscopedSearches, long UnscopedExpanded, long UnscopedEndpointExpanded,
@@ -209,10 +213,11 @@ public static class MilitaryBaseline
             session.Snapshot.Simulation.Boundary != SimulationBoundary.Stable)
             throw new InvalidOperationException("Run terminated before completing a full xun; no partial sample is accepted.");
         var events = results.SelectMany(r => r.Events).ToArray();
-        var works = work.GroupBy(r => r.Work).OrderBy(g => g.Key).Select(g => new BaselineWork(g.Key.ToString(),
+        var works = work.GroupBy(r => (r.Work, r.Executor)).OrderBy(g => g.Key.Work).ThenBy(g => g.Key.Executor, StringComparer.Ordinal).Select(g => new BaselineWork(g.Key.Work.ToString(),
             g.Count(), g.Sum(r => r.Attempts), g.Sum(r => r.Submitted), g.Sum(r => r.Rejected), g.Sum(r => r.EmptyPlans),
             g.Sum(r => r.ElapsedTimestampTicks) * 1000.0 / Stopwatch.Frequency, g.Sum(r => r.AllocatedBytes),
-            g.Sum(r => r.PathQueries), g.Sum(r => r.PathSearches), g.Sum(r => r.PathExpanded), g.Sum(r => r.PathEndpointExpanded))).ToArray();
+            g.Sum(r => r.PathQueries), g.Sum(r => r.PathSearches), g.Sum(r => r.PathExpanded), g.Sum(r => r.PathEndpointExpanded))
+            { Executor = g.Key.Executor, GroupEvaluations = g.Sum(r => r.GroupEvaluations) }).ToArray();
         return (new(started.ToString(), session.Snapshot.Clock.ToString(), (ended - begin) * 1000.0 / Stopwatch.Frequency,
             (prepared - begin) * 1000.0 / Stopwatch.Frequency, (ended - prepared) * 1000.0 / Stopwatch.Frequency,
             allocatedBytes, paths?.Queries ?? 0, paths?.Expanded ?? 0, paths?.EndpointExpanded ?? 0,

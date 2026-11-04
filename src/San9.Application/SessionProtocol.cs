@@ -7,8 +7,8 @@ namespace San9.Application;
 
 public static class SessionProtocol
 {
-    public const string RulesVersion = "san9-core-g10-v245";
-    public const int SaveFormatVersion = 138;
+    public const string RulesVersion = "san9-core-g10-v246";
+    public const int SaveFormatVersion = 139;
     public const int LogFormatVersion = 163;
 }
 
@@ -69,4 +69,5 @@ public sealed record SessionSnapshot(WorldSnapshot World, ImmutableArray<Session
     [JsonRequired] public ControllerKind PlayerForceController { get; init; } = ControllerKind.Player;
     [JsonRequired] public AI.OriginalAiState OriginalAi { get; init; } = new();
     [JsonRequired] public AI.Military.MilitaryIntelligenceState? MilitaryIntelligence { get; init; }
+    [JsonRequired] public AI.Military.MilitaryCampaignState MilitaryCampaigns { get; init; } = new();
 }

@@ -28,7 +28,7 @@ public sealed class G06CampaignTests
     public void EconomyRecruitmentPlannerDeploymentConquestSaveUsePublicSession()
     {
         var definition = Fixture();
-        var session = GameSession.Start(definition, 42);
+        var session = GameSession.Start(definition, 42, playerForceIds: [1, 2]);
         var events = new List<DomainEvent>();
         foreach (var activity in new[] { DomesticActivity.Commerce, DomesticActivity.Recruit })
         {

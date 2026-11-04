@@ -1,19 +1,20 @@
 using San9.Core.Domain;
+using San9.Application.AI.Military;
 using San9.Core.Simulation;
 
 namespace San9.Application.AI;
 
-/// <summary>Unique automatic control entry, including the original economic work cycle.</summary>
+/// <summary>Unique automatic control entry, with the campaign military batch and retained civilian work cycle.</summary>
 internal static class AutomaticTurnRunner
 {
     internal static OriginalAiState EndControl(SimulationEngine engine, CommandContext context, List<DomainEvent> events,
-        ScenarioSessionDefinition definition, OriginalAiState ai, List<OriginalAiWorkReport> reports, OriginalAiTerrainRoutes terrainRoutes)
+        ScenarioSessionDefinition definition, OriginalAiState ai, List<OriginalAiWorkReport> reports, MilitaryTurnBatch militaryBatch)
     {
         var state = engine.Snapshot.Simulation;
         if (state.Boundary != SimulationBoundary.Stable || state.ActiveControl >= state.Controls.Length ||
             state.Controls[state.ActiveControl].ControllerId != context.ControllerId)
             throw new InvalidOperationException("Not the active stable controller.");
-        ai = OriginalAiTurnRunner.Run(engine, definition, state.Controls[state.ActiveControl], ai, events, reports, terrainRoutes);
+        ai = OriginalAiTurnRunner.Run(engine, definition, state.Controls[state.ActiveControl], ai, events, reports, militaryBatch);
         if (engine.Snapshot.Simulation.Boundary == SimulationBoundary.Stable)
             events.AddRange(engine.EndControl(context).Events);
         AutomaticResponseRunner.Run(engine, events);
@@ -21,9 +22,9 @@ internal static class AutomaticTurnRunner
     }
 
     internal static OriginalAiState Resume(SimulationEngine engine, List<DomainEvent> events,
-        ScenarioSessionDefinition definition, OriginalAiState ai, List<OriginalAiWorkReport> reports, OriginalAiTerrainRoutes terrainRoutes)
+        ScenarioSessionDefinition definition, OriginalAiState ai, List<OriginalAiWorkReport> reports, MilitaryTurnBatch militaryBatch)
     {
         if (ai.Continuation is not { } continuation || engine.Snapshot.Simulation.Boundary != SimulationBoundary.Stable) return ai;
-        return EndControl(engine, new(continuation.Seat.ControllerId), events, definition, ai, reports, terrainRoutes);
+        return EndControl(engine, new(continuation.Seat.ControllerId), events, definition, ai, reports, militaryBatch);
     }
 }

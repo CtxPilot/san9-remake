@@ -33,9 +33,6 @@ public sealed class SnipingSessionTests
                 new(3, "reserve", 2, 99, 1, 10000, 100, 100, 100, [])], [], [])
         {
             NaturalDeathsEnabled = false,
-            OriginalAi = OriginalAiDefinition.Default with { WorkRules = OriginalAiDefinition.Default.WorkRules
-                .SetItem(OriginalAiWork.Retreat, new(int.MaxValue, 0, 5, true, true))
-                .SetItem(OriginalAiWork.Deploy, new(int.MaxValue, 0, 255, true, true)) },
             Officers = [new("actor", actor), new("commander", commander), new("ruler", ruler),
                 new("heir", new(23, 2, 3, new(50, 50, 50, 50), false))],
             Units = [..(facility ? Array.Empty<UnitState>() : [new(1, 1, new(102, 7), 100000)
@@ -151,7 +148,9 @@ public sealed class SnipingSessionTests
         Assert.Equal(0UL, new StableRandom(StableRandom.DeriveSeed(seed, "military-sniping-death")).NextUInt64() % 100);
         Assert.True(new StableRandom(StableRandom.DeriveSeed(seed, "military-sniping")).NextUInt64() % 100 < 50);
         Assert.Equal(1UL, new StableRandom(StableRandom.DeriveSeed(seed, "military-sniping-target")).NextUInt64() % 2);
-        var scenario = Scenario("field") with { PlayerForceId = 1 };
+        var basis = Scenario("field");
+        // Keep the combatants fixed while exercising the automatic response: no spare actor can start another command before combat.
+        var scenario = basis with { PlayerForceId = 1, Officers = basis.Officers.Where(p => p.State.Id != 23).ToArray() };
         var session = GameSession.Start(scenario, seed, battleDeathsEnabled: true);
         var events = AutomaticResponseVerification.Advance(session, scenario, 1);
         Assert.Contains(events.OfType<OfficerDiedEvent>(), e => e.OfficerId == 22);

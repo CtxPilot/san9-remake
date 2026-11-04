@@ -53,7 +53,7 @@ public sealed partial class OriginalAiPersonnelTests
         {
             events.Clear();
             reports.Clear();
-            state = OriginalAiTurnRunner.Run(engine, definition, world.Simulation.Controls[0], state, events, reports, new());
+            state = OriginalAiTurnRunner.Run(engine, definition, world.Simulation.Controls[0], state, events, reports, new(null, new()));
         }
 
         Run();
@@ -65,7 +65,7 @@ public sealed partial class OriginalAiPersonnelTests
         var reward = Assert.Single(reports, r => r.Work == OriginalAiWork.Reward);
         Assert.Equal(1, reward.CorpsId);
         Assert.Equal(2, reward.Submitted);
-        Assert.All(reports.Where(r => r.Work != OriginalAiWork.Reward && r.End != OriginalAiWorkEnd.Permission),
+        Assert.All(reports.Where(r => r.Executor == "original" && r.Work != OriginalAiWork.Reward && r.End != OriginalAiWorkEnd.Permission),
             r => Assert.Equal(OriginalAiWorkEnd.Calendar, r.End));
         Assert.Equal(new[] { 2, 3 }, events.OfType<OfficerRewardedEvent>().Select(e => e.OfficerId).Order());
         Assert.Equal(2100u, engine.Snapshot.Corps.Single(c => c.Id == 1).Treasury.Money);

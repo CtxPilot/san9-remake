@@ -45,9 +45,15 @@ internal static class BattlePersonnel
         MilitaryRulebook military, List<DomainEvent> events)
     {
         var person = world.Officers[officerId];
-        int? originPlace = person.UnitId is null ? person.SettlementId ?? person.RegionId : military.RegionAt(origin);
+        int? originPlace = person.UnitId is int unitId ? Location(world.Units[unitId], military, origin)
+            : person.SettlementId ?? person.RegionId;
         DisplaceAtPlace(world, officerId, originPlace, places, events);
     }
+
+    // Maps may omit regional geography. In that case a unit's recorded departure place is
+    // its last identified location; do not discard it or invent a nearest-place teleport.
+    internal static int? Location(UnitState unit, MilitaryRulebook military, WorldPosition position) =>
+        military.RegionAt(position) ?? unit.ServicePlaceId;
 
     internal static void DisplaceAtPlace(WorldMutation world, int officerId, int? originPlace, PersonnelRulebook places,
         List<DomainEvent> events)
