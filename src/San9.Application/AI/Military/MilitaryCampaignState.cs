@@ -73,6 +73,7 @@ public sealed record MilitaryCampaignState
                 var root = world.Corps.FirstOrDefault(p => p.OwnerId == c.ForceId && p.IsRoot);
                 if (root is null) return c with { Stage = MilitaryCampaignStage.Cancelled };
                 c = c with { CorpsId = root.Id };
+                controller = root;
             }
             if (c.Purpose is MilitaryCampaignPurpose.Evacuation or MilitaryCampaignPurpose.Recovery)
             {
@@ -99,7 +100,7 @@ public sealed record MilitaryCampaignState
             }
             if (c.Stage == MilitaryCampaignStage.Assembling &&
                 (!places.TryGetValue(c.ObjectiveId, out var final) || final.IsDestroyed || final.OwnerId == c.ForceId ||
-                    !MilitaryDiplomacy.AutomaticEnemy(world, c.ForceId, final.OwnerId)))
+                    !MilitaryCampaignPolicy.AllowsObjective(world, controller, final.Id)))
                 return c with { Stage = final?.OwnerId == c.ForceId ? living.Length == 0 ? MilitaryCampaignStage.Completed : MilitaryCampaignStage.Consolidating :
                     living.Length == 0 ? MilitaryCampaignStage.Cancelled : MilitaryCampaignStage.Withdrawing, ProgressAt = world.Clock };
             if (physical is null && living.Length > 0)
@@ -146,7 +147,8 @@ public sealed record MilitaryCampaignState
             var next = c with { LastPosition = unit.Position, TargetDurability = target?.Durability ?? 0,
                 ProgressAt = progress ? world.Clock : c.ProgressAt };
             if (target?.OwnerId == c.ForceId) return next with { Stage = MilitaryCampaignStage.Preparing };
-            if (target is null || target.IsDestroyed || !MilitaryDiplomacy.AutomaticEnemy(world, c.ForceId, target.OwnerId) ||
+            if (target is null || target.IsDestroyed || !MilitaryCampaignPolicy.CanAttack(world, c.ForceId, target.OwnerId) ||
+                !MilitaryCampaignPolicy.AllowsObjective(world, controller, c.ObjectiveId) ||
                 world.Clock.DayNumber - next.ProgressAt.DayNumber >= 60)
                 return next with { Stage = MilitaryCampaignStage.Withdrawing };
             return next;

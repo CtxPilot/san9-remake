@@ -21,7 +21,8 @@ internal sealed class MilitaryTurnBatch(MilitaryIntelligencePublication? publica
     {
         var key = (queries.Observation.Forces, unit, target);
         if (committedArrivals.TryGetValue(key, out var prior)) return prior;
-        var arrival = queries.FromUnit(unit.Id, target, arrival: unit.Order?.Kind == MilitaryOrderKind.Transport ? NavigationArrival.Region : NavigationArrival.Range);
+        var arrival = queries.FromUnit(unit.Id, target, policies: unit.Policies,
+            arrival: unit.Order?.Kind == MilitaryOrderKind.Transport ? NavigationArrival.Region : NavigationArrival.Range);
         if (arrival.Status is ArrivalEstimateStatus.Known or ArrivalEstimateStatus.Unreachable) committedArrivals[key] = arrival;
         return arrival;
     }

@@ -45,10 +45,19 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 if (!emergency)
                 {
                     queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
-                    if (active is { Stage: MilitaryCampaignStage.Preparing } &&
-                        engine.Snapshot.Units.FirstOrDefault(u => u.Id == active.UnitId && !u.IsEmbedded) is { } moving)
-                        Continue(active, moving, queries);
-                    else if (!SupportCampaign(queries) && (active is null || active.Stage == MilitaryCampaignStage.Preparing)) Start(active, queries);
+                    foreach (var preparing in batch.State.Campaigns.Where(c => c.CorpsId == corps.Id &&
+                        c.Purpose == MilitaryCampaignPurpose.Conquest && c.Stage == MilitaryCampaignStage.Preparing).ToArray())
+                    {
+                        if (engine.Snapshot.Units.FirstOrDefault(u => u.Id == preparing.UnitId && !u.IsEmbedded) is { } moving)
+                            Continue(preparing, moving, queries);
+                        else Start(preparing, queries);
+                        queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
+                    }
+                    int? requested = MilitaryCampaignPolicy.RequestedObjective(engine.Snapshot, corps);
+                    bool pendingRequest = requested is not null && !batch.State.Campaigns.Any(c => c.ForceId == corps.OwnerId &&
+                        c.Purpose == MilitaryCampaignPurpose.Conquest && c.ObjectiveId == requested &&
+                        c.Stage is not (MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled or MilitaryCampaignStage.Withdrawing));
+                    if (pendingRequest || !SupportCampaign(queries)) Start(null, batch.Queries(engine.Snapshot, rules, corps.OwnerId));
                 }
                 if (!emergency) RecoverStaff(batch.Queries(engine.Snapshot, rules, corps.OwnerId));
             }
@@ -78,13 +87,8 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
     bool OwnSource(SettlementState s) => s.OwnerId == corps.OwnerId && (s.CorpsId == corps.Id || s.CorpsId is null && corps.IsRoot) &&
         !s.IsDormant && !s.IsDestroyed && rules.TryPlace(s, out _) && s.CanHostPersons && engine.CanStartSettlementWork(s.Id);
     bool Target(MilitaryPresence p) => p.Kind == MilitaryPresenceKind.Settlement &&
-        MilitaryDiplomacy.AutomaticEnemy(engine.Snapshot, corps.OwnerId, p.OwnerId) && corps.Delegation switch
-        {
-            DomesticDelegation => false,
-            DefeatForceDelegation directive => p.OwnerId == directive.ForceId,
-            CaptureSettlementDelegation directive => p.Object.Id == directive.SettlementId,
-            _ => true
-        };
+        MilitaryCampaignPolicy.AllowsObjective(engine.Snapshot, corps, p.Object.Id);
+    UnitPolicies CombatPolicies => MilitaryCampaignPolicy.CombatPolicies(engine.Snapshot.Forces.Single(f => f.Id == corps.OwnerId));
     void Replace(MilitaryCampaign old, MilitaryCampaign next) =>
         batch.State = batch.State with { Campaigns = batch.State.Campaigns.Replace(old, next) };
     bool Submit(GameCommand command)
@@ -109,7 +113,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
             var at = new MapOccupancy(MapCoordinates.Center(cell), new(5, 5));
             var obstacle = observation.Forces.Nearby(at).Objects.FirstOrDefault(p => p.Object.Id != source &&
                 p.Kind == MilitaryPresenceKind.Settlement && p.OwnerId != corps.OwnerId &&
-                MilitaryDiplomacy.AutomaticEnemy(engine.Snapshot, corps.OwnerId, p.OwnerId));
+                MilitaryCampaignPolicy.CanAttack(engine.Snapshot, corps.OwnerId, p.OwnerId));
             if (obstacle is not null) return new(obstacle, i);
         }
         return observation.Forces.Find(new(final, true)) is { } destination ? new(destination, cells.Length - 1) : null;
@@ -120,14 +124,15 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         var force = world.Forces.Single(f => f.Id == corps.OwnerId);
         var busy = world.Simulation.Tasks.Select(t => t.OfficerId).ToHashSet();
         var evaluator = new MilitaryGroupEvaluator(rules!);
+        int? requested = MilitaryCampaignPolicy.RequestedObjective(world, corps);
         int lastSource = batch.State.LastSources.GetValueOrDefault(corps.Id, -1);
         var eligible = world.Settlements.Where(s => OwnSource(s) && s.Soldiers > 0 &&
             (continuation is null || s.Id == continuation.TargetId)).OrderBy(s => s.Id).ToArray();
         var sources = eligible.Where(s => s.Id > lastSource).Concat(eligible.Where(s => s.Id <= lastSource)).ToArray();
-        var targets = queries.Observation.Forces.Objects.Where(p => continuation is null ? Target(p) && !batch.State.Campaigns.Any(c =>
+        var targets = queries.Observation.Forces.Objects.Where(p => Target(p) && (continuation is null ? !batch.State.Campaigns.Any(c =>
                 c.ForceId == corps.OwnerId && c.Purpose == MilitaryCampaignPurpose.Conquest && c.Stage is not (MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled) &&
                 (c.ObjectiveId == p.Object.Id || c.TargetId == p.Object.Id)) :
-            p.Object == new MapObjectReference(continuation.ObjectiveId, true)).ToArray();
+            p.Object == new MapObjectReference(continuation.ObjectiveId, true))).ToArray();
         if (sources.Length == 0) { reason = MilitaryDecisionReason.NoSource; return; }
         if (targets.Length == 0) { reason = MilitaryDecisionReason.NoTarget; return; }
         reason = MilitaryDecisionReason.NoGroup;
@@ -163,7 +168,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 [rules.Formation(best.FormationId, best.NavalFormationId, rules.SettlementArea(source).Position).Id] = best
             };
             var travel = rules.Travel(best.FormationId, best.NavalFormationId, best.Soldiers);
-            var orderedTargets = targets.OrderBy(p => NavigationArrivalForecast.EarliestDays(travel,
+            var orderedTargets = targets.OrderBy(p => p.Object.Id == requested ? 0 : 1).ThenBy(p => NavigationArrivalForecast.EarliestDays(travel,
                 rules.SettlementArea(source).Position, p.Area)).ThenBy(p => p.Object.Id).Take(8).ToArray();
             var routes = queries.Transport(source.Id, orderedTargets.Select(p => p.Object.Id), best.FormationId,
                 best.NavalFormationId, best.Soldiers, passage: MilitaryTransitPassage.Terrain);
@@ -212,6 +217,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                     new(MilitaryOrderKind.AttackSettlement, null, target.Object.Id))
                 {
                     NavalFormationId = best.NavalFormationId,
+                    Policies = CombatPolicies, ConfirmAttack = true,
                     Positions = members.ToImmutableDictionary(p => p.OfficerId, p => p.Position),
                     Tactics = members.ToImmutableDictionary(p => p.OfficerId, p => p.TacticId)
                 }, source.Id, route.TargetId, target.Object.Id, score, ArrivalDays: days));
@@ -219,7 +225,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
             AssemblyOptions(source, commander, available, orderedTargets, queries, options);
         }
         // Alternatives reserve independently; only the selected public preparation can become a commitment.
-        foreach (var option in options.OrderByDescending(p => p.Score).ThenBy(p => p.SourceId).ThenBy(p => p.Objective).Take(8))
+        foreach (var option in options.OrderBy(p => p.Objective == requested ? 0 : 1).ThenByDescending(p => p.Score).ThenBy(p => p.SourceId).ThenBy(p => p.Objective).Take(8))
         {
             reason = MilitaryDecisionReason.Unreachable;
             MilitaryBattlefield? battlefield = null;
@@ -239,7 +245,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
             }
             if (option.Command is DeployUnitCommand departure && queries.FromSettlement(departure.SettlementId,
                     new(option.Target, true), departure.FormationId, departure.NavalFormationId,
-                    departure.Soldiers, verifyApproach: true).Status != ArrivalEstimateStatus.Known) continue;
+                    departure.Soldiers, policies: departure.Policies, verifyApproach: true).Status != ArrivalEstimateStatus.Known) continue;
             if (option.Command is TransportUnitCommand shipment)
             {
                 var pair = rules.TransportFormations!;
@@ -389,10 +395,10 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         if (!field.Complete) { incomplete = true; return; }
         if (field.Routes[0].Status != TravelFieldStatus.Reachable) return;
         var next = FirstObjective(field.Routes[0].Cells, queries.Observation, campaign.TargetId, campaign.ObjectiveId)?.Target;
-        if (next is null || queries.FromUnit(unit.Id, next.Object, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) return;
+        if (next is null || queries.FromUnit(unit.Id, next.Object, policies: unit.Policies, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) return;
         var id = Identity();
         if (Submit(new OrderUnitCommand(id.Id, corps.OwnerId, id.Sequence, unit.Id,
-                new(MilitaryOrderKind.AttackSettlement, null, next.Object.Id))))
+                new(MilitaryOrderKind.AttackSettlement, null, next.Object.Id)) { ConfirmAttack = true }))
             Replace(campaign, campaign with { TargetId = next.Object.Id, Stage = MilitaryCampaignStage.Marching,
                 ProgressAt = engine.Snapshot.Clock, TargetDurability = engine.Snapshot.Settlements.Single(s => s.Id == next.Object.Id).Durability });
     }

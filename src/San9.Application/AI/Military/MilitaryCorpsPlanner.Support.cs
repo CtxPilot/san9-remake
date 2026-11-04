@@ -49,7 +49,7 @@ internal sealed partial class MilitaryCorpsPlanner
             NavalFormationId = best.NavalFormationId,
             Positions = members.ToImmutableDictionary(m => m.OfficerId, m => m.Position),
             Tactics = members.ToImmutableDictionary(m => m.OfficerId, m => m.TacticId),
-            Policies = new(true, false, false, false)
+            Policies = CombatPolicies, ConfirmAttack = true
         };
     }
 
@@ -87,8 +87,12 @@ internal sealed partial class MilitaryCorpsPlanner
     private bool SupportCampaign(MilitaryTravelQueries queries)
     {
         var world = engine.Snapshot;
+        int? requested = MilitaryCampaignPolicy.RequestedObjective(world, corps);
         foreach (var campaign in batch.State.Campaigns.Where(c => c.ForceId == corps.OwnerId && c.Purpose == MilitaryCampaignPurpose.Conquest &&
-            c.Stage is MilitaryCampaignStage.Marching or MilitaryCampaignStage.Preparing).OrderBy(c => c.Started.DayNumber).ThenBy(c => c.Id).ToArray())
+            (c.Stage is MilitaryCampaignStage.Marching or MilitaryCampaignStage.Preparing) &&
+            MilitaryCampaignPolicy.AllowsObjective(world, corps, c.ObjectiveId))
+            .OrderBy(c => c.ObjectiveId == requested ? 0 : 1)
+            .ThenBy(c => c.Started.DayNumber).ThenBy(c => c.Id).ToArray())
         {
             var target = queries.Observation.Forces.Find(new(campaign.TargetId, true));
             var primary = campaign.UnitId is int lead ? world.Units.FirstOrDefault(u => u.Id == lead) : null;
@@ -102,10 +106,10 @@ internal sealed partial class MilitaryCorpsPlanner
                 bool fieldTargetAlive = escort.Order?.Kind == MilitaryOrderKind.AttackUnit && escort.Order.UnitId is int prior &&
                     queries.Observation.Forces.Find(new(prior, false)) is { } enemy && CanRespond(enemy, target.Area, window);
                 if (fieldTargetAlive || escort.Order is { Kind: MilitaryOrderKind.AttackSettlement } existing && existing.SettlementId == campaign.TargetId) continue;
-                if (queries.FromUnit(escort.Id, target.Object, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) continue;
+                if (queries.FromUnit(escort.Id, target.Object, policies: escort.Policies, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) continue;
                 var identity = Identity();
                 if (Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, escort.Id,
-                    new(MilitaryOrderKind.AttackSettlement, null, campaign.TargetId)))) return true;
+                    new(MilitaryOrderKind.AttackSettlement, null, campaign.TargetId)) { ConfirmAttack = true })) return true;
             }
             var battlefield = batch.Battlefield(queries, rules, target.Object.Id, window);
             long live = commitment.TimelySoldiers;
@@ -127,7 +131,8 @@ internal sealed partial class MilitaryCorpsPlanner
                 var role = needsGuard ? MilitaryGroupRole.Field : MilitaryGroupRole.Siege;
                 var command = Organize(source, goal, (uint)Math.Min(Spare(source, queries, campaign.Id), Math.Max(1000, demand)), role, queries, campaign.Id);
                 if (command is null) continue;
-                var arrival = queries.FromSettlement(source.Id, goal, command.FormationId, command.NavalFormationId, command.Soldiers, verifyApproach: true);
+                var arrival = queries.FromSettlement(source.Id, goal, command.FormationId, command.NavalFormationId, command.Soldiers,
+                    policies: command.Policies, verifyApproach: true);
                 if (arrival.Status != ArrivalEstimateStatus.Known) continue;
                 var food = MilitaryResourceLedger.DeploymentFood(world, corps.OwnerId, corps.Id, source, command.Soldiers,
                     arrival.Days!.Value, 10, engine.Companion);

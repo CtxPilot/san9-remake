@@ -66,11 +66,11 @@ internal sealed partial class MilitaryCorpsPlanner
                         c.Support.Any(s => s.UnitId == u.Id && s.Role == MilitaryCommitmentRole.Field))))
                 .OrderBy(u => rules.Travel(u).AreaAt(u.Position).DistanceTo(rules.SettlementArea(target.Place))).ThenBy(u => u.Id).Take(2))
             {
-                var travel = queries.FromUnit(available.Id, new(enemy.UnitId, false), verifyApproach: true, newOrder: true);
+                var travel = queries.FromUnit(available.Id, new(enemy.UnitId, false), policies: available.Policies, verifyApproach: true, newOrder: true);
                 if (travel.Status != ArrivalEstimateStatus.Known || travel.Days > survival && available.Soldiers < incoming) continue;
                 var identity = Identity();
                 if (!Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, available.Id,
-                    new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = enemy.UnitId }))) continue;
+                    new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = enemy.UnitId }) { ConfirmAttack = true })) continue;
                 foreach (var parent in batch.State.Campaigns.Where(c => c.Purpose == MilitaryCampaignPurpose.Conquest && c.Support.Any(s => s.UnitId == available.Id)).ToArray())
                 {
                     var withdrawn = parent.Support.Single(s => s.UnitId == available.Id);
@@ -123,7 +123,8 @@ internal sealed partial class MilitaryCorpsPlanner
                 if (option.Score <= 0) continue;
                 var arrival = option.Command switch
                 {
-                    DeployUnitCommand d => queries.FromSettlement(d.SettlementId, new(enemy.UnitId, false), d.FormationId, d.NavalFormationId, d.Soldiers, verifyApproach: true),
+                    DeployUnitCommand d => queries.FromSettlement(d.SettlementId, new(enemy.UnitId, false), d.FormationId, d.NavalFormationId, d.Soldiers,
+                        policies: d.Policies, verifyApproach: true),
                     TransportUnitCommand t => queries.FromSettlement(t.SettlementId, new(target.Place.Id, true), rules.TransportFormations!.LandFormationId,
                         rules.TransportFormations.NavalFormationId, t.Soldiers, arrival: NavigationArrival.Region, verifyApproach: true),
                     _ => null
