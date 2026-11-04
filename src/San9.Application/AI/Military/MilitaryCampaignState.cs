@@ -53,7 +53,9 @@ public sealed record MilitaryCampaignState
                 places.GetValueOrDefault(r.SourceId)?.OwnerId == original.ForceId &&
                 corps.GetValueOrDefault(r.CorpsId)?.OwnerId == original.ForceId &&
                 (places.GetValueOrDefault(r.SourceId)?.CorpsId == r.CorpsId || places.GetValueOrDefault(r.SourceId)?.CorpsId is null && corps.GetValueOrDefault(r.CorpsId)?.IsRoot == true) &&
-                r.OfficerIds.All(id => world.Officers.Any(p => p.Id == id && p.OwnerId == original.ForceId && p.SettlementId == r.SourceId && p.IsServing && !p.IsDormant && p.UnitId is null)))
+                places.GetValueOrDefault(r.SourceId)?.Soldiers >= r.Soldiers && corps.GetValueOrDefault(r.CorpsId)?.Treasury.Money >= r.Money &&
+                r.OfficerIds.All(id => world.Officers.Any(p => p.Id == id && p.OwnerId == original.ForceId && p.SettlementId == r.SourceId && p.IsServing && !p.IsDormant && !p.Acted && p.UnitId is null) &&
+                    !world.Simulation.Tasks.Any(t => t.OfficerId == id)))
                 .ToImmutableArray() };
             bool done = c.Stage is MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled;
             if (done) return c with { ReservedOfficers = [], Reservations = [] };

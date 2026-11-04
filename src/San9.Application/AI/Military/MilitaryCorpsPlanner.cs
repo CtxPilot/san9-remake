@@ -17,7 +17,7 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         MilitaryCampaignStage Stage = MilitaryCampaignStage.Marching, int? DeliveryOfficerId = null,
         int ArrivalDays = 0, ImmutableArray<int> Officers = default);
 
-    internal OriginalAiWorkReport Run()
+    internal OriginalAiWorkReport Run(MilitaryPlanningPass pass = MilitaryPlanningPass.Complete)
     {
         long started = System.Diagnostics.Stopwatch.GetTimestamp(), allocated = GC.GetAllocatedBytesForCurrentThread();
         using var paths = new PathSearchDiagnostics();
@@ -27,29 +27,38 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
         {
             reason = MilitaryDecisionReason.NoSource;
             var queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
-            ReviewCampaigns(queries);
             foreach (var withdrawing in batch.State.Campaigns.Where(c => c.ForceId == corps.OwnerId &&
                 c.Stage is MilitaryCampaignStage.Withdrawing or MilitaryCampaignStage.Consolidating).ToArray()) Withdraw(withdrawing, queries);
-            bool emergency = Rescue(queries);
-            Evacuate(queries);
-            var active = batch.State.Campaigns.FirstOrDefault(c => c.CorpsId == corps.Id && c.Purpose == MilitaryCampaignPurpose.Conquest &&
-                c.Stage is not (MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled));
-            if (active is not null && submitted == 0) reason = active.Stage switch
+            if (pass != MilitaryPlanningPass.Finalize)
             {
-                MilitaryCampaignStage.Assembling => MilitaryDecisionReason.AwaitingAssembly,
-                MilitaryCampaignStage.Consolidating => MilitaryDecisionReason.Consolidating,
-                MilitaryCampaignStage.Withdrawing => MilitaryDecisionReason.Withdrawing,
-                _ => MilitaryDecisionReason.ExistingCommitment
-            };
-            if (!emergency)
+                bool emergency = Rescue(queries);
+                Evacuate(queries);
+                var active = batch.State.Campaigns.FirstOrDefault(c => c.CorpsId == corps.Id && c.Purpose == MilitaryCampaignPurpose.Conquest &&
+                    c.Stage is not (MilitaryCampaignStage.Completed or MilitaryCampaignStage.Cancelled));
+                if (active is not null && submitted == 0) reason = active.Stage switch
+                {
+                    MilitaryCampaignStage.Assembling => MilitaryDecisionReason.AwaitingAssembly,
+                    MilitaryCampaignStage.Consolidating => MilitaryDecisionReason.Consolidating,
+                    MilitaryCampaignStage.Withdrawing => MilitaryDecisionReason.Withdrawing,
+                    _ => MilitaryDecisionReason.ExistingCommitment
+                };
+                if (!emergency)
+                {
+                    queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
+                    if (active is { Stage: MilitaryCampaignStage.Preparing } &&
+                        engine.Snapshot.Units.FirstOrDefault(u => u.Id == active.UnitId && !u.IsEmbedded) is { } moving)
+                        Continue(active, moving, queries);
+                    else if (!SupportCampaign(queries) && (active is null || active.Stage == MilitaryCampaignStage.Preparing)) Start(active, queries);
+                }
+                if (!emergency) RecoverStaff(batch.Queries(engine.Snapshot, rules, corps.OwnerId));
+            }
+            if (pass != MilitaryPlanningPass.Allocate)
             {
                 queries = batch.Queries(engine.Snapshot, rules, corps.OwnerId);
-                if (active is { Stage: MilitaryCampaignStage.Preparing } &&
-                    engine.Snapshot.Units.FirstOrDefault(u => u.Id == active.UnitId && !u.IsEmbedded) is { } moving)
-                    Continue(active, moving, queries);
-                else if (!SupportCampaign(queries) && (active is null || active.Stage == MilitaryCampaignStage.Preparing)) Start(active, queries);
+                ReviewCampaigns(queries);
+                foreach (var withdrawing in batch.State.Campaigns.Where(c => c.ForceId == corps.OwnerId && c.Stage == MilitaryCampaignStage.Withdrawing).ToArray())
+                    Withdraw(withdrawing, batch.Queries(engine.Snapshot, rules, corps.OwnerId));
             }
-            if (!emergency) RecoverStaff(batch.Queries(engine.Snapshot, rules, corps.OwnerId));
             incomplete |= queries.Budget.Exhausted;
         }
         return new(corps.Id, OriginalAiWork.Attack, incomplete ? OriginalAiWorkEnd.AnalysisIncomplete :
@@ -188,7 +197,8 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 }
                 // Mobilize to the task, including zero-garrison defenses; this is a heuristic, not an eligibility gate.
                 uint soldiers = (uint)Math.Min(battleGroup.Soldiers, Math.Max(1000L, 2L * target.Soldiers));
-                if (soldiers == 0) continue;
+                soldiers = DepartureLimit(source, soldiers, battleGroup.Members.Select(m => m.OfficerId), queries);
+                if (soldiers == 0) { reason = MilitaryDecisionReason.SourceExposed; continue; }
                 int days = (int)((route.CumulativeCosts[objective.CellIndex] + travel.DailyBudget - 1) / travel.DailyBudget);
                 long nearby = queries.PotentialThreats(target.Object.Id, days).Candidates
                     .Sum(p => (long)p.Soldiers);
@@ -271,6 +281,8 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
     {
         var world = engine.Snapshot;
         var force = world.Forces.Single(f => f.Id == corps.OwnerId);
+        var allowance = DepartureAllowance(source, [courier.Id], queries);
+        if (!allowance.OfficersCanLeave) { reason = MilitaryDecisionReason.SourceExposed; return; }
         foreach (var front in world.Settlements.Where(s => OwnSource(s) && s.Id != source.Id && targets.Any(t =>
                 NavigationArrivalForecast.EarliestDays(rules.Travel(rules.Formations.Values.First(f => f.TravelMode == TravelMode.Land).Id, rules.BasicNavalFormationId, 1000), rules.SettlementArea(s).Position, t.Area) <
                 NavigationArrivalForecast.EarliestDays(rules.Travel(rules.Formations.Values.First(f => f.TravelMode == TravelMode.Land).Id, rules.BasicNavalFormationId, 1000), rules.SettlementArea(source).Position, t.Area)))
@@ -291,6 +303,8 @@ internal sealed partial class MilitaryCorpsPlanner(SimulationEngine engine, Scen
                 uint shipped = transport ? Math.Min(available, Math.Min(capacity, rules!.Formations[rules.TransportFormations!.LandFormationId].SoldierCapacity)) : 0;
                 if (transport && rules.TransportFormations!.NavalFormationId is int naval)
                     shipped = Math.Min(shipped, rules.Formations[naval].SoldierCapacity);
+                shipped = Math.Min(shipped, allowance.Maximum);
+                if (transport && shipped == 0) continue;
                 uint ready = (uint)Math.Min(front.SoldierCapacity, (long)front.Soldiers + shipped);
                 if (ready == 0) continue;
                 if (shipped > MilitaryResourceLedger.ReceivingSpace(world, front)) continue;

@@ -9,7 +9,7 @@ using San9.Tests;
 
 namespace San9.Application.Tests;
 
-public sealed class MilitaryCoordinationTests
+public sealed partial class MilitaryCoordinationTests
 {
     private static (ScenarioSessionDefinition Definition, SimulationEngine Engine) Setup(Func<WorldSnapshot, WorldSnapshot>? change = null,
         ScenarioInitialState? content = null)
@@ -99,7 +99,7 @@ public sealed class MilitaryCoordinationTests
         var (definition, engine) = Setup(w => w with
         {
             Settlements = w.Settlements.Select(s => s.Id == 1002 ? s with { Soldiers = 10000 } : s).ToArray(),
-            Units = [new(50, 1, new(52, 7), 4000) { FormationId = 10, Morale = 100, CorpsId = 1, ServicePlaceId = 999, CommanderId = 1,
+            Units = [new(50, 1, new(arrivalDay == 30 ? 2 : 52, 7), 4000) { FormationId = 10, Morale = 100, DepartureDaysRemaining = arrivalDay == 30 ? 9 : 0, CorpsId = 1, ServicePlaceId = 999, CommanderId = 1,
                 Order = new(MilitaryOrderKind.AttackSettlement, null, 1002) }],
             Officers = w.Officers.Select(p => p.Id == 1 ? p with { UnitId = 50, SettlementId = null } : p).ToArray()
         });
@@ -112,7 +112,8 @@ public sealed class MilitaryCoordinationTests
             Assert.Empty(events.OfType<UnitDeployedEvent>());
             var pending = Assert.Single(Assert.Single(batch.State.Campaigns).Reservations);
             Assert.True(pending.NotBeforeDay > engine.Snapshot.Clock.DayNumber);
-            var later = engine.Snapshot with { Clock = engine.Snapshot.Clock.Advance().Advance() };
+            var later = engine.Snapshot with { Clock = engine.Snapshot.Clock.Advance().Advance(),
+                Units = engine.Snapshot.Units.Select(u => u.Id == 50 ? u with { Position = new(52, 7), DepartureDaysRemaining = 0 } : u).ToArray() };
             engine = GameSession.EngineFactory(definition.Content)(WorldState.Restore(later));
             batch = new MilitaryTurnBatch(null, batch.State);
             Run(definition, engine, batch, events);
@@ -238,7 +239,7 @@ public sealed class MilitaryCoordinationTests
     {
         var content = MilitaryCampaignSessionTests.Fixture();
         var combat = content.Military!.Formations[0];
-        content = content with { Military = content.Military with { Formations = [combat with { MovementBudget = 1 },
+        content = content with { Officers = content.Officers.Append(new("garrison", new(4, 1, 1000, new(40, 40, 40, 40), true) { BirthYear = 160 })).ToArray(), Military = content.Military with { Formations = [combat with { MovementBudget = 1 },
             combat with { Id = 30, MovementBudget = 10, IsCommon = false, Combat = combat.Combat! with { AgainstWalls = wallAttack } }, new(20, 40, 0, 10000, 1, new(1, 1), TravelMode.Land)],
             TransportFormations = new(20, null), Places = content.Military.Places.Select(p => p.Id == 1000 ? p with { Combat = new(1, 1000, 1000, 800, 10) } : p).ToImmutableArray() } };
         var (definition, engine) = Setup(w => w with

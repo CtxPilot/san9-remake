@@ -39,9 +39,11 @@ internal sealed partial class MilitaryCorpsPlanner
             definition.Content.Information.Ranks.FirstOrDefault(r => r.Id == force.RankId)?.CommandCapacity,
             definition.Content.Information.Offices.FirstOrDefault(o => o.Id == leader.OfficeId)?.CommandCapacity);
         var members = best.Members.OrderBy(m => m.OfficerId == best.CommanderId ? 0 : 1).ThenBy(m => m.OfficerId).ToArray();
+        uint soldiers = DepartureLimit(source, Math.Min(best.Soldiers, capacity), members.Select(m => m.OfficerId), queries);
+        if (soldiers == 0) { reason = MilitaryDecisionReason.SourceExposed; return null; }
         var id = Identity();
         return new(id.Id, force.Id, id.Sequence, source.Id, members.Select(m => m.OfficerId).ToImmutableArray(),
-            Math.Min(best.Soldiers, capacity), best.FormationId, target.IsSettlement
+            soldiers, best.FormationId, target.IsSettlement
                 ? new(MilitaryOrderKind.AttackSettlement, null, target.Id) : new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = target.Id })
         {
             NavalFormationId = best.NavalFormationId,
@@ -51,21 +53,27 @@ internal sealed partial class MilitaryCorpsPlanner
         };
     }
 
-    private int? ExecuteDeparture(GameCommand command)
+    private int? ExecuteDeparture(GameCommand command, long? campaignId = null)
     {
         attempts++;
         CommandExecutionResult result;
         if (command is DeployUnitCommand deployment)
         {
             if (engine.PrepareDeployments(context).TryPrepare(deployment, out var prepared) != CommandRejection.None)
-            { rejected++; return null; }
+            { rejected++; Release(); return null; }
             result = engine.Execute(context, deployment, prepared!);
         }
         else result = engine.Execute(context, command);
-        if (!result.Submission.Accepted) { rejected++; return null; }
+        if (!result.Submission.Accepted) { rejected++; Release(); return null; }
         submitted++; events.AddRange(result.Events);
         AutomaticResponseRunner.Run(engine, events);
         return result.Events.OfType<UnitDeployedEvent>().Select(e => (int?)e.UnitId).SingleOrDefault();
+
+        void Release()
+        {
+            int? source = command switch { DeployUnitCommand d => d.SettlementId, TransportUnitCommand t => t.SettlementId, _ => null };
+            if (campaignId is long campaign && source is int place) ReleaseReservation(campaign, place);
+        }
     }
     private void AddSupport(MilitaryCampaign campaign, int unitId, int source, MilitaryCommitmentRole role, int? destination = null)
     {
@@ -85,32 +93,34 @@ internal sealed partial class MilitaryCorpsPlanner
             var target = queries.Observation.Forces.Find(new(campaign.TargetId, true));
             var primary = campaign.UnitId is int lead ? world.Units.FirstOrDefault(u => u.Id == lead) : null;
             if (target is null || primary is null || target.OwnerId == corps.OwnerId) continue;
+            var commitment = CommittedForces(campaign, queries);
+            int window = commitment.Window;
             foreach (var guard in campaign.Support.Where(s => s.Role == MilitaryCommitmentRole.Field))
             {
                 var escort = engine.Snapshot.Units.FirstOrDefault(u => u.Id == guard.UnitId);
                 if (escort is null || !Controls(escort) || !escort.CanReceiveOrders || escort.CommandedThisXun) continue;
                 bool fieldTargetAlive = escort.Order?.Kind == MilitaryOrderKind.AttackUnit && escort.Order.UnitId is int prior &&
-                    queries.Observation.Forces.Find(new(prior, false)) is not null;
+                    queries.Observation.Forces.Find(new(prior, false)) is { } enemy && CanRespond(enemy, target.Area, window);
                 if (fieldTargetAlive || escort.Order is { Kind: MilitaryOrderKind.AttackSettlement } existing && existing.SettlementId == campaign.TargetId) continue;
                 if (queries.FromUnit(escort.Id, target.Object, verifyApproach: true, newOrder: true).Status != ArrivalEstimateStatus.Known) continue;
                 var identity = Identity();
                 if (Submit(new OrderUnitCommand(identity.Id, corps.OwnerId, identity.Sequence, escort.Id,
                     new(MilitaryOrderKind.AttackSettlement, null, campaign.TargetId)))) return true;
             }
-            int window = (int)Math.Clamp(campaign.PlannedArrivalDay - world.Clock.DayNumber, 1, 60);
             var battlefield = batch.Battlefield(queries, rules, target.Object.Id, window);
-            var members = campaign.UnitIds.Select(id => world.Units.FirstOrDefault(u => u.Id == id)).OfType<UnitState>()
-                .Where(u => u.OwnerId == corps.OwnerId && u.FormationId is not null && u.Order?.Kind is not (MilitaryOrderKind.Return or MilitaryOrderKind.Transport)).ToArray();
-            long live = members.Where(u => NavigationArrivalForecast.EarliestDays(rules.Travel(u), u.Position, target.Area,
-                u.DepartureDaysRemaining, u.MovementRemainder) <= window).Sum(u => (long)u.Soldiers);
+            long live = commitment.TimelySoldiers;
             var field = battlefield.Contributions.FirstOrDefault(c => c.Kind == MilitaryContributionKind.FieldResponse && (c.ArrivalDay ?? c.EarliestDay) <= window);
-            bool needsGuard = field is not null && !campaign.Support.Any(s => s.Role == MilitaryCommitmentRole.Field && world.Units.Any(u => u.Id == s.UnitId));
+            bool needsGuard = field is not null && !commitment.HasGuard;
             long demand = Math.Max(0, 2 * battlefield.PossibleAt(window) - live);
             if (demand == 0 && !needsGuard)
             {
-                if (!campaign.Reservations.IsEmpty) Replace(campaign, campaign with { Reservations = [] });
+                if (!campaign.Reservations.IsEmpty)
+                { var actual = batch.State.Campaigns.Single(c => c.Id == campaign.Id); Replace(actual, actual with { Reservations = [] }); }
                 continue;
             }
+            if (commitment.Uncertain) { incomplete = true; continue; }
+            foreach (var pending in campaign.Reservations.Where(r => r.CorpsId == corps.Id && r.NotBeforeDay <= world.Clock.DayNumber))
+                if (!world.Settlements.Any(s => s.Id == pending.SourceId && OwnSource(s))) ReleaseReservation(campaign.Id, pending.SourceId);
             foreach (var source in Sources(queries, campaign.Id).Take(4))
             {
                 var goal = needsGuard ? field!.Source : target.Object;
@@ -137,7 +147,7 @@ internal sealed partial class MilitaryCorpsPlanner
                 }
                 if (arrival.Days.Value > window + 10 && !needsGuard) continue;
                 command = command with { DepartureDelayDays = wait };
-                if (ExecuteDeparture(command) is not int unit) continue;
+                if (ExecuteDeparture(command, campaign.Id) is not int unit) continue;
                 AddSupport(campaign, unit, source.Id, needsGuard ? MilitaryCommitmentRole.Field : MilitaryCommitmentRole.Siege);
                 return true;
             }

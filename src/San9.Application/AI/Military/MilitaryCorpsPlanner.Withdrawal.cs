@@ -13,17 +13,74 @@ internal sealed partial class MilitaryCorpsPlanner
             var target = queries.Observation.Forces.Find(new(campaign.TargetId, true));
             var living = campaign.UnitIds.Select(id => engine.Snapshot.Units.FirstOrDefault(u => u.Id == id && u.OwnerId == corps.OwnerId)).OfType<UnitState>().ToArray();
             if (target is null || target.OwnerId == corps.OwnerId || living.Length == 0) continue;
-            long live = living.Sum(u => (long)u.Soldiers);
-            long wallDamage = living.Where(u => u.FormationId is not null).Sum(u => (long)CombatMath.DurabilityDamage(u.Soldiers,
-                u.CommanderId is int leader ? engine.GetAbilities(engine.Snapshot)[leader].Leadership : 40,
-                rules.Formation(u.FormationId!.Value, u.NavalFormationId, target.Area.Position).Combat?.AgainstWalls ?? 0, target.Durability));
-            bool imminent = target.Durability <= 2 * wallDamage && living.Any(u => rules.Travel(u).AreaAt(u.Position).DistanceTo(target.Area) <= 3);
-            bool depleted = campaign.InitialSoldiers > 0 && live * 3 < campaign.InitialSoldiers;
-            // Losses alone do not abandon a nearly completed siege. Changed opposition is re-observed before adding support.
-            long opposition = batch.Battlefield(queries, rules, target.Object.Id, 10).PossibleAt(10);
-            if (!imminent && depleted && opposition > live)
-                Replace(campaign, campaign with { Stage = MilitaryCampaignStage.Withdrawing, Reservations = [], ReservedOfficers = [] });
+            var committed = CommittedForces(campaign, queries);
+            long live = committed.TimelySoldiers;
+            long wallDamage = committed.Participants.Where(p => p.Days <= committed.Window && p.Unit.FormationId is not null && p.Unit.EffectiveOrder is { Kind: MilitaryOrderKind.AttackSettlement }).Sum(p => (long)CombatMath.DurabilityDamage(p.Unit.Soldiers,
+                p.Unit.CommanderId is int leader ? engine.GetAbilities(engine.Snapshot)[leader].Leadership : 40,
+                rules.Formation(p.Unit.FormationId!.Value, p.Unit.NavalFormationId, target.Area.Position).Combat?.AgainstWalls ?? 0, target.Durability));
+            long captureDays = CaptureDays(committed, target, wallDamage);
+            bool imminent = captureDays <= 2 && committed.Participants.Any(p => p.Days <= 1 && p.Unit.EffectiveOrder is { Kind: MilitaryOrderKind.AttackSettlement });
+            bool depleted = campaign.InitialSoldiers > 0 && living.Sum(u => (long)u.Soldiers) * 3 < campaign.InitialSoldiers;
+            var battlefield = batch.Battlefield(queries, rules, target.Object.Id, committed.Window);
+            long opposition = battlefield.PossibleAt(committed.Window);
+            bool fieldResponse = battlefield.Contributions.Any(c => c.Kind == MilitaryContributionKind.FieldResponse &&
+                c.Status is not (ArrivalEstimateStatus.Unreachable or ArrivalEstimateStatus.NotApplicable) && (c.ArrivalDay ?? c.EarliestDay) <= committed.Window);
+            bool exposed = fieldResponse && SiegeExposed(campaign, committed, target, battlefield, queries, captureDays);
+            if (committed.Uncertain) { incomplete = true; continue; }
+            if (!imminent && (depleted && opposition > live || exposed))
+            {
+                var actual = batch.State.Campaigns.Single(c => c.Id == campaign.Id);
+                Replace(actual, actual with { Stage = MilitaryCampaignStage.Withdrawing, Reservations = [], ReservedOfficers = [] });
+                reason = MilitaryDecisionReason.Withdrawing;
+            }
         }
+    }
+
+    private long CaptureDays(CampaignForces own, MilitaryPresence target, long wallDamage)
+    {
+        if (target.Soldiers == 0) return 1;
+        long wall = wallDamage == 0 ? long.MaxValue : (target.Durability + wallDamage - 1) / wallDamage;
+        var profile = target.FacilityTypeId is int facility ? rules.Facilities[facility].Combat : rules.Places.GetValueOrDefault(target.Object.Id)?.Combat;
+        if (profile is null) return wall;
+        long damage = own.Participants.Where(p => p.Days <= own.Window && p.Unit.FormationId is not null && p.Unit.EffectiveOrder is { Kind: MilitaryOrderKind.AttackSettlement }).Sum(p =>
+        {
+            var unit = p.Unit;
+            var attack = rules.Formation(unit.FormationId!.Value, unit.NavalFormationId, target.Area.Position).Combat;
+            if (attack is null) return 0L;
+            int leadership = unit.CommanderId is int leader ? engine.GetAbilities(engine.Snapshot)[leader].Leadership : 40;
+            return CombatMath.TroopDamage(new(unit.Soldiers, unit.Morale, leadership, 1, 10), new(target.Soldiers, target.Morale, 70, 1, 10), attack, profile, true, target.Durability);
+        });
+        return Math.Max(1, Math.Min(wall, damage == 0 ? long.MaxValue : (target.Soldiers + damage - 1) / damage));
+    }
+
+    private bool SiegeExposed(MilitaryCampaign campaign, CampaignForces own, MilitaryPresence target,
+        MilitaryBattlefield battlefield, MilitaryTravelQueries queries, long captureDays)
+    {
+        var primary = own.Participants.FirstOrDefault(p => p.Unit.Id == campaign.UnitId && p.Days <= own.Window)?.Unit;
+        if (primary?.FormationId is not int formation || rules.Formation(formation, primary.NavalFormationId, target.Area.Position).Combat is not { } defense) return false;
+        int leadership = primary.CommanderId is int leader ? engine.GetAbilities(engine.Snapshot)[leader].Leadership : 40;
+        var defender = new CombatStrength(primary.Soldiers, primary.Morale, leadership, 1, 10);
+        long dailyLoss = 0;
+        foreach (var contribution in battlefield.Contributions.Where(c => c.Kind == MilitaryContributionKind.FieldResponse &&
+            c.Status is not (ArrivalEstimateStatus.Unreachable or ArrivalEstimateStatus.NotApplicable) && (c.ArrivalDay ?? c.EarliestDay) <= own.Window).Take(4))
+        {
+            var enemy = queries.Observation.Forces.Find(contribution.Source);
+            if (enemy?.FormationId is not int enemyFormation || rules.Formation(enemyFormation, enemy.NavalFormationId, enemy.Area.Position).Combat is not { } attack) continue;
+            var enemyStrength = new CombatStrength(enemy.Soldiers, enemy.Morale, 70, 1, 10);
+            bool intercepted = own.Participants.Where(p => p.Role == MilitaryCommitmentRole.Field && p.Days <= own.Window).Any(guard =>
+            {
+                var unit = guard.Unit;
+                if (unit.FormationId is not int id || rules.Formation(id, unit.NavalFormationId, enemy.Area.Position).Combat is not { } profile) return false;
+                var strength = new CombatStrength(unit.Soldiers, unit.Morale, unit.CommanderId is int commander ? engine.GetAbilities(engine.Snapshot)[commander].Leadership : 40, 1, 10);
+                long dealt = CombatMath.TroopDamage(strength, enemyStrength, profile, attack, false, 0);
+                long received = CombatMath.TroopDamage(enemyStrength, strength, attack, profile, false, 0);
+                return dealt > 0 && (enemy.Soldiers + dealt - 1) / dealt <= (received == 0 ? long.MaxValue : (unit.Soldiers + received - 1) / received);
+            });
+            if (!intercepted) dailyLoss += CombatMath.TroopDamage(enemyStrength, defender, attack, defense, false, 0);
+        }
+        if (dailyLoss == 0 || target.Soldiers == 0) return false;
+        long survival = (primary.Soldiers + dailyLoss - 1) / dailyLoss;
+        return survival < captureDays;
     }
 
     private void Withdraw(MilitaryCampaign campaign, MilitaryTravelQueries queries)
@@ -31,7 +88,7 @@ internal sealed partial class MilitaryCorpsPlanner
         foreach (int unitId in campaign.UnitIds.ToArray())
         {
             var unit = engine.Snapshot.Units.FirstOrDefault(u => u.Id == unitId);
-            if (unit is null || unit.IsEmbedded || !Controls(unit) || !unit.CanReceiveOrders || unit.CommandedThisXun) continue;
+            if (unit is null || unit.IsEmbedded || !Controls(unit) || !unit.CanReceiveOrders) continue;
             var currentHome = engine.Snapshot.Settlements.FirstOrDefault(p => p.Id == unit.Order?.SettlementId && Friendly(p));
             if (unit.Order?.Kind == MilitaryOrderKind.Return && currentHome is not null &&
                 (long)unit.Soldiers + unit.Wounded <= MilitaryResourceLedger.ReceivingSpace(engine.Snapshot, currentHome, unit.Id) &&

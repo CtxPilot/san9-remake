@@ -26,6 +26,9 @@ public sealed class MilitaryQueryBudget
         this.maximumDetailedRoutes = maximumDetailedRoutes;
     }
 
+    internal MilitaryQueryBudget Partition(int expanded, int sources, int routes) =>
+        new(Math.Min(expanded, RemainingExpanded), Math.Min(sources, RemainingSourceFields), Math.Min(routes, RemainingDetailedRoutes)) { parent = this };
+
     internal MilitaryQueryBudget Slice(int remainingCorps)
     {
         int Share(int value) => value == 0 ? 0 : Math.Max(1, value / Math.Max(1, remainingCorps));
