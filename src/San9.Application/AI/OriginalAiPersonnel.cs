@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using San9.Application.AI.Military;
 using San9.Content.Scenarios;
 using San9.Core.Domain;
 using San9.Core.Simulation;
@@ -10,6 +11,8 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
     OriginalAiGeography geography, CommandContext context, OriginalAiRandom random,
     Func<GameCommand, bool> submit)
 {
+    internal MilitaryCampaignState Commitments { get; init; } = new();
+
     private WorldSnapshot World => engine.Snapshot;
     // Reuse each projection while its immutable input collections remain unchanged.
     // Commands still refresh current records, abilities and task availability before the next candidate.
@@ -61,7 +64,7 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
     {
         Refresh();
         return p.IsServing && p.OwnerId == _corps.OwnerId && !p.Acted && p.UnitId is null &&
-            p.SettlementId is int home && _placeIds.Contains(home) && !_busy.Contains(p.Id);
+            p.SettlementId is int home && _placeIds.Contains(home) && !_busy.Contains(p.Id) && !MilitaryResourceLedger.OfficerReserved(Commitments, p.Id);
     }
     private IEnumerable<OfficerState> Actors(int politics) => Own.Where(p => Available(p) && engine.CanStartSettlementWork(p.SettlementId!.Value) &&
         _cityIds.Contains(p.SettlementId!.Value) && Ability(p).Politics >= politics)
@@ -271,7 +274,7 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
         var surplus = places.ToDictionary(s => s.Id, s => counts.GetValueOrDefault(s.Id) - quotas.GetValueOrDefault(s.Id));
         var sources = places.Where(s => surplus[s.Id] > 0 && engine.CanStartSettlementWork(s.Id)).ToList();
         if (sources.Count == 0 && !places.Any(s => counts.GetValueOrDefault(s.Id) > 1 && engine.CanStartSettlementWork(s.Id))) yield break;
-        var destinations = places.Where(s => surplus[s.Id] < 0).OrderBy(s => surplus[s.Id]).ToArray();
+        var destinations = places.Where(s => surplus[s.Id] < 0 && !Commitments.EvacuatedPlaces.ContainsKey(s.Id)).OrderBy(s => surplus[s.Id]).ToArray();
         foreach (var destination in destinations)
         {
             var available = Own.Where(p => Available(p) && engine.CanStartSettlementWork(p.SettlementId!.Value)).ToLookup(p => p.SettlementId!.Value);

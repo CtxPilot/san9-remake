@@ -76,4 +76,6 @@ dotnet tools/scenario-benchmark/bin/Release/net10.0/ScenarioBenchmark.dll milita
 
 旧参数入口仍用于显式`march`／`combat`导航压力构造，见[导航验收](../../docs/pathfinding-verification.md)；其单次测量不替代上述重复基准。
 
-实验分支已提前切换新军事入口，当前策略标识`civilian-with-campaigns-v1`、规则v246／存档139；M0/M1报告仍记录当时的原策略基线。切换后281年36旬首次加一次重复的配置与报告位于`local/generated/verification/military-ai-m2/281-switch-config.json`和`281-switch-baseline.json`；轨迹可能不同，需同时观察部队规模、求值／路径工作及完整旬成本，不能当成同等行为质量的加速比。实现进度和缺口见[计划7.2](../../specs/military-ai-plan.md#72-实验分支入口切换与m2首批闭环2026-11-04)。
+实验分支已提前切换新军事入口，当前策略标识`civilian-with-campaigns-v1`、规则v247／存档140；M0/M1报告仍记录当时的原策略基线。切换后281年36旬首次加一次重复的配置与报告位于`local/generated/verification/military-ai-m2/281-switch-config.json`和`281-switch-baseline.json`；轨迹可能不同，需同时观察部队规模、求值／路径工作及完整旬成本，不能当成同等行为质量的加速比。实现进度和缺口见[计划7.2](../../specs/military-ai-plan.md#72-实验分支入口切换与m2首批闭环2026-11-04)。
+
+M2／M3协同增量的固定36旬配置和报告为`local/generated/verification/military-ai-m2/281-coordination-config.json`及`281-coordination-baseline.json`；同样只运行首次加一次重复，不为计时收敛增加轮数。当前进展及限制见[计划7.3](../../specs/military-ai-plan.md#73-m2m3协同与保障增量2026-11-04)。

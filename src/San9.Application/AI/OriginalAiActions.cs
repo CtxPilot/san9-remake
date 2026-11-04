@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using San9.Application.AI.Military;
 using San9.Content.Scenarios;
 using San9.Core.Domain;
 using San9.Core.Simulation;
@@ -10,6 +11,8 @@ internal sealed partial class OriginalAiActions(SimulationEngine engine, Scenari
     MilitaryRulebook? military, int corpsId, CommandContext context, OriginalAiRandom random,
     Func<GameCommand, bool> submit)
 {
+    internal MilitaryCampaignState Commitments { get; init; } = new();
+
     private int pathQueries;
     private OriginalAiGeography? geography;
     private OriginalAiProjection? domestic;
@@ -34,7 +37,7 @@ internal sealed partial class OriginalAiActions(SimulationEngine engine, Scenari
     private OriginalDomesticInputs Domestic()
     {
         var currentGeography = Geography;
-        domestic ??= new(engine, content, corpsId, currentGeography, content.OriginalAi.RecruitmentEnabled);
+        domestic ??= new(engine, content, corpsId, currentGeography, content.OriginalAi.RecruitmentEnabled) { Commitments = Commitments };
         return domestic.Domestic();
     }
     private WorldSnapshot World => engine.Snapshot;
@@ -61,7 +64,7 @@ internal sealed partial class OriginalAiActions(SimulationEngine engine, Scenari
     private bool Available(OfficerState p) => !p.IsDormant && p.IsServing && p.OwnerId == Owner && !p.Acted && p.UnitId is null &&
         p.SettlementId is int home && World.Settlements.Any(s => s.Id == home && Direct(s) && !s.IsDestroyed &&
             !s.IsDormant && s.Kind == SettlementKind.City && s.Durability > 0 && s.Facility?.BuilderUnitId is null && engine.CanStartSettlementWork(s.Id)) &&
-        !World.Simulation.Tasks.Any(t => t.OfficerId == p.Id);
+        !World.Simulation.Tasks.Any(t => t.OfficerId == p.Id) && !MilitaryResourceLedger.OfficerReserved(Commitments, p.Id);
     private int City(int id) => content.RegionCityIds.GetValueOrDefault(id, id);
     private bool Near(int source, int target) => City(source) == City(target) ||
         content.CityConnections.Any(c => c.FromCityId == City(source) && c.ToCityId == City(target));

@@ -209,7 +209,7 @@ public sealed partial class GameSession
                     strategicContexts.GetValueOrDefault(force, StrategicContextState.Empty)));
             var publishedEvents = events.ToImmutableArray();
             var commit = new OperationCommit(candidate, originalAi.Reconcile(snapshot), aiReports.ToImmutableArray(),
-                ending, strategicContexts, history, completed, note, deploymentPresets, intelligence, militaryBatch.State.Reconcile(snapshot));
+                ending, strategicContexts, history, completed, note, deploymentPresets, intelligence, militaryBatch.State.Reconcile(snapshot, input.Definition.MilitaryRules));
             return new(new(SessionDisposition.Accepted, SessionRejection.None, publishedEvents, snapshot, Development: development),
                 view, commit) { Transitions = transitions.ToArray() };
         }

@@ -23,6 +23,7 @@ internal static class OriginalAiTurnRunner
         {
             state = OriginalAiStrategy.PrepareGlobal(engine.Snapshot, state);
             PlayerDomesticAutomation.Run(engine, definition, seat, state, events, reports);
+            MilitaryTurnRunner.RunForce(engine, definition, seat, militaryBatch, events, reports);
             cursor = new(seat, engine.Snapshot.Corps.Where(c => c.OwnerId == seat.ForceId)
                 .OrderByDescending(c => c.IsRoot).Select(c => c.Id).ToImmutableArray(), [], 0, false, 0,
                 ImmutableDictionary<int, long>.Empty, null);
@@ -52,14 +53,13 @@ internal static class OriginalAiTurnRunner
             {
                 state = state with { Corps = state.Corps.Where(c => c.CorpsId != corps.Id).Append(strategy).OrderBy(c => c.CorpsId).ToImmutableArray() };
                 cursor = cursor with { Prepared = true, Quotas = OriginalAiStaffing.Quotas(engine.Snapshot, corps.Id, geography) };
-                reports.Add(MilitaryTurnRunner.Run(engine, definition, corps, context, militaryBatch, events));
             }
             var forceState = state.Forces.Single(f => f.ForceId == seat.ForceId);
             var policy = state.Policy;
             var works = (force.IsBarbarian ? BarbarianFirst : corps.IsRoot ? RootFirst : ChildFirst)
                 .Concat(force.IsBarbarian ? [] : policy.SecondaryBatches[strategy.Mode])
                 .Where(work => !MilitaryTurnRunner.Replaces(work)).Append(OriginalAiWork.Residual).ToArray();
-            var domestic = new OriginalAiProjection(engine, definition.Content, corps.Id, geography, policy.RecruitmentEnabled);
+            var domestic = new OriginalAiProjection(engine, definition.Content, corps.Id, geography, policy.RecruitmentEnabled) { Commitments = militaryBatch.State };
             OriginalDomesticInputs Capture() => domestic.Domestic();
             bool Submitted(CommandExecutionResult result)
             {
@@ -70,7 +70,18 @@ internal static class OriginalAiTurnRunner
                 }
                 return result.Submission.Accepted;
             }
-            bool Submit(GameCommand command) => Submitted(engine.Execute(context, command));
+            bool Submit(GameCommand command)
+            {
+                long reserved = MilitaryResourceLedger.ReservedMoney(militaryBatch.State, corps.Id);
+                if (reserved > 0)
+                {
+                    var preview = engine.PreviewResources(context, command);
+                    if (preview.Rejection != CommandRejection.None) return false;
+                    long debit = -preview.Changes.Where(e => e.Account == new ResourceAccount(ResourceOwnerKind.Corps, corps.Id) && e.Resource == ResourceKind.Money).Sum(e => e.Actual);
+                    if (engine.Snapshot.Corps.Single(c => c.Id == corps.Id).Treasury.Money - debit < reserved) return false;
+                }
+                return Submitted(engine.Execute(context, command));
+            }
             (Guid Id, long Sequence) Identity()
             {
                 long sequence = engine.Snapshot.Simulation.NextSequence;
@@ -81,14 +92,14 @@ internal static class OriginalAiTurnRunner
                 var id = Identity();
                 return Submit(new DevelopCommand(id.Id, seat.ForceId, id.Sequence, development));
             }
-            var personnel = new OriginalAiPersonnel(engine, definition.Content, corps.Id, geography, context, random, Submit);
+            var personnel = new OriginalAiPersonnel(engine, definition.Content, corps.Id, geography, context, random, Submit) { Commitments = militaryBatch.State };
             for (int workIndex = cursor.WorkIndex; workIndex < works.Length; workIndex++)
             {
                 if (!ReferenceEquals(geography, geographyContext.Get(engine.Snapshot)))
                 {
                     geography = geographyContext.Get(engine.Snapshot);
-                    domestic = new(engine, definition.Content, corps.Id, geography, policy.RecruitmentEnabled);
-                    personnel = new(engine, definition.Content, corps.Id, geography, context, random, Submit);
+                    domestic = new(engine, definition.Content, corps.Id, geography, policy.RecruitmentEnabled) { Commitments = militaryBatch.State };
+                    personnel = new(engine, definition.Content, corps.Id, geography, context, random, Submit) { Commitments = militaryBatch.State };
                     cursor = cursor with { Quotas = OriginalAiStaffing.Quotas(engine.Snapshot, corps.Id, geography) };
                 }
                 var work = works[workIndex];
@@ -165,7 +176,7 @@ internal static class OriginalAiTurnRunner
                     Report(personnel.Run(work, limit, state, cursor.Quotas));
                 else if (OriginalAiActions.Handles(work))
                     Report(new OriginalAiActions(engine, definition.Content with { OriginalAi = policy }, definition.MilitaryRules,
-                        corps.Id, context, random, Submit).Run(work, limit, state, strategy));
+                        corps.Id, context, random, Submit) { Commitments = militaryBatch.State }.Run(work, limit, state, strategy));
                 else if (work == OriginalAiWork.DisposePrisoner)
                 {
                     var progress = personnel.Dispose(cursor.Prisoners ?? personnel.PreparePrisoners(), limit);

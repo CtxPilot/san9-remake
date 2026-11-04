@@ -667,7 +667,7 @@ public sealed partial class OriginalAiPersonnelTests
         Assert.Equal(SessionDisposition.Accepted, result.Disposition);
         Assert.Single(result.Events.OfType<CorpsDissolvedEvent>());
         Assert.DoesNotContain(session.Snapshot.Corps, c => c.Id == 10);
-        Assert.DoesNotContain(session.LastOriginalAiWork, r => r.CorpsId == 10);
+        Assert.DoesNotContain(session.LastOriginalAiWork, r => r.CorpsId == 10 && r.Executor == "original");
         Assert.Equal(1, session.Snapshot.Settlements.Single(s => s.Id == 3).CorpsId);
         Assert.Contains(session.LastOriginalAiWork, r => r.CorpsId == 1 && r.Work == OriginalAiWork.MoveOfficers);
     }

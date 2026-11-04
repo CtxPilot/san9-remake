@@ -40,7 +40,7 @@ public sealed class MilitaryTravelQueries
         Budget = budget;
         this.hostile = hostile;
         this.ownJourneys = ownJourneys ?? ImmutableDictionary<int, MilitaryOwnJourney>.Empty;
-        travelProfiles = observation.Forces.Objects.Where(p => p.Kind == MilitaryPresenceKind.Unit && p.FormationId is not null)
+        travelProfiles = observation.Forces.Objects.Where(p => p.Kind == MilitaryPresenceKind.Unit && p.FormationId is int id && rules.Purpose(id) == UnitPurpose.Combat)
             .Select(p => rules.Travel(p.FormationId!.Value, p.NavalFormationId, p.Soldiers)).Distinct().ToImmutableArray();
         maximumRange = rules.Formations.Values.Select(f => f.Attack is { } attack ? checked(attack.Range + attack.MaximumElevationBonus) : 1).DefaultIfEmpty(1).Max();
     }
@@ -57,7 +57,7 @@ public sealed class MilitaryTravelQueries
 
     /// <summary>Even a distant/unknown public order does not erase nearby physical threats. Units
     /// are listed once; this is a candidate set, never an assumption that all threats act together.</summary>
-    public MilitaryThreatQuery PotentialThreats(int settlementId, int responseDays)
+    public MilitaryThreatQuery PotentialThreats(int settlementId, int responseDays, int? defendingForceId = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(responseDays);
         var target = Observation.Forces.Find(new(settlementId, true)) ?? throw new ArgumentException("Unknown defended settlement.");
@@ -65,13 +65,15 @@ public sealed class MilitaryTravelQueries
             t.Shape.Width + (long)t.Shape.Height + 2L * maximumRange).DefaultIfEmpty(0).Max();
         var nearby = Observation.Forces.Nearby(target.Area, (int)Math.Min(int.MaxValue, distance));
         var candidates = nearby.Objects.Where(p => p.Kind == MilitaryPresenceKind.Unit && p.FormationId is not null &&
-                p.OwnerId is int owner && hostile(Observation.ViewerForceId, owner))
+                p.OwnerId is int owner && owner != (defendingForceId ?? Observation.ViewerForceId) && rules.Purpose(p.FormationId.Value) == UnitPurpose.Combat &&
+                (hostile(defendingForceId ?? Observation.ViewerForceId, owner) || Observation.FindUnit(p.Object.Id)?.Order is
+                    { IsKnown: true, Value.Kind: MilitaryOrderKind.AttackSettlement, Value.SettlementId: int attacked } && attacked == settlementId))
             .Select(p =>
             {
                 var travel = rules.Travel(p.FormationId!.Value, p.NavalFormationId, p.Soldiers);
                 int earliest = NavigationArrivalForecast.EarliestDays(travel, p.Area.Position, target.Area, maximumRange: maximumRange);
                 return new MilitaryPotentialThreat(p.Object.Id, p.OwnerId!.Value, p.Soldiers, earliest,
-                    Observation.FindUnit(p.Object.Id)?.Order is { IsKnown: true, Value.SettlementId: int place } && place == settlementId);
+                    Observation.FindUnit(p.Object.Id)?.Order is { IsKnown: true, Value.Kind: MilitaryOrderKind.AttackSettlement, Value.SettlementId: int place } && place == settlementId);
             }).Where(p => p.EarliestDays <= responseDays).OrderBy(p => p.EarliestDays).ThenBy(p => p.UnitId).ToImmutableArray();
         return new(candidates, nearby);
     }

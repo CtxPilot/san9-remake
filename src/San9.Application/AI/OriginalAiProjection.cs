@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using San9.Application.AI.Military;
 using San9.Content.Scenarios;
 using San9.Core.Domain;
 using San9.Core.Simulation;
@@ -103,6 +104,8 @@ internal sealed class OriginalAiGeography
 internal sealed class OriginalAiProjection(SimulationEngine engine, ScenarioInitialState content, int corpsId,
     OriginalAiGeography geography, bool recruitmentAllowed)
 {
+    internal MilitaryCampaignState Commitments { get; init; } = new();
+
     private readonly Dictionary<int, int> salaries = content.Information.Offices.ToDictionary(o => o.Id, o => o.Salary);
     private WorldSnapshot? projected;
     private OriginalDomesticInputs? inputs;
@@ -116,12 +119,13 @@ internal sealed class OriginalAiProjection(SimulationEngine engine, ScenarioInit
         var world = engine.Snapshot;
         if (ReferenceEquals(projected, world)) return inputs!;
         var corps = world.Corps.Single(c => c.Id == corpsId);
+        corps = corps with { Treasury = corps.Treasury with { Money = (uint)Math.Max(0, corps.Treasury.Money - MilitaryResourceLedger.ReservedMoney(Commitments, corpsId)) } };
         var accountPlaces = world.Settlements.Where(s => !s.IsDormant && !s.IsDestroyed && s.OwnerId == corps.OwnerId &&
             (s.CorpsId == corps.Id || s.CorpsId is null && corps.IsRoot)).ToArray();
         var places = accountPlaces.Where(s => s.CanHostPersons && engine.CanStartSettlementWork(s.Id)).ToArray();
         var busy = world.Simulation.Tasks.Where(t => t.ForceId == corps.OwnerId).Select(t => t.OfficerId).ToHashSet();
         var available = world.Officers.Where(o => !o.IsDormant && o.OwnerId == corps.OwnerId && o.IsServing && !o.Acted &&
-            o.UnitId is null && o.SettlementId is not null && !busy.Contains(o.Id)).ToLookup(o => o.SettlementId!.Value);
+            o.UnitId is null && o.SettlementId is not null && !busy.Contains(o.Id) && !MilitaryResourceLedger.OfficerReserved(Commitments, o.Id)).ToLookup(o => o.SettlementId!.Value);
         int root = world.Corps.Single(c => c.OwnerId == corps.OwnerId && c.IsRoot).Id;
         var units = world.Units.Where(u => u.OwnerId == corps.OwnerId).ToDictionary(u => u.Id);
         var settlementCorps = world.Settlements.Where(s => !s.IsDestroyed && s.OwnerId == corps.OwnerId).ToDictionary(s => s.Id, s => s.CorpsId ?? root);

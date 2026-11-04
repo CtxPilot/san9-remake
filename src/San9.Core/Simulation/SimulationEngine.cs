@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using San9.Core.Domain;
 
 namespace San9.Core.Simulation;
@@ -275,6 +276,14 @@ public sealed partial class SimulationEngine
                 events.OfType<CorpsChangedEvent>().FirstOrDefault()?.LeaderId;
         });
         return new(result.Submission.Rejection, arrival, governor) { JourneyDays = journeyDays };
+    }
+
+    /// <summary>Resource deltas from the same isolated submission path. Requested only when a caller needs cost reservations.</summary>
+    public CommandResourcePreview PreviewResources(CommandContext context, GameCommand command)
+    {
+        ImmutableArray<ResourceChangedEvent> changes = [];
+        var result = Evaluate(context, command, commit: false, events => changes = events.OfType<ResourceChangedEvent>().ToImmutableArray());
+        return new(result.Submission.Rejection, changes);
     }
 
     public AllianceFormationCandidates GetAllianceCandidates()

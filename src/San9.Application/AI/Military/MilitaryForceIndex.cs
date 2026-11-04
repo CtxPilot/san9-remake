@@ -16,6 +16,9 @@ public sealed record MilitaryPresence(MapObjectReference Object, MilitaryPresenc
     public int Morale { get; init; }
     public int? FacilityTypeId { get; init; }
     public SettlementKind? SettlementKind { get; init; }
+    public int StationedOfficers { get; init; }
+    public int Durability { get; init; }
+    public uint SoldierCapacity { get; init; }
 }
 
 public sealed record MilitaryStrength(long GarrisonSoldiers, long MobileSoldiers, long GarrisonWounded, long MobileWounded);
@@ -150,10 +153,13 @@ public sealed class MilitaryForceIndex
 
     internal static IEnumerable<MilitaryPresence> ProjectPhysical(WorldSnapshot world, MilitaryRulebook rules, int? owner = null)
     {
+        var personnel = world.Officers.Where(p => p.IsServing && !p.IsDormant && p.SettlementId is not null &&
+                (owner is null || p.OwnerId == owner)).GroupBy(p => p.SettlementId!.Value).ToDictionary(g => g.Key, g => g.Count());
         var places = world.Settlements.Where(s => !s.IsDormant && !s.IsDestroyed && (owner is null || s.OwnerId == owner) && rules.TryPlace(s, out _))
             .Select(s => new MilitaryPresence(new(s.Id, true), MilitaryPresenceKind.Settlement, s.OwnerId,
                 s.CorpsId, rules.SettlementArea(s), s.Soldiers, s.Wounded)
-                { FacilityTypeId = rules.Place(s).FacilityTypeId, SettlementKind = s.Kind });
+                { FacilityTypeId = rules.Place(s).FacilityTypeId, SettlementKind = s.Kind, Morale = s.Morale,
+                    StationedOfficers = personnel.GetValueOrDefault(s.Id), Durability = s.Durability, SoldierCapacity = s.SoldierCapacity });
         // An embedded guard is a representation of its settlement garrison, not another field army.
         var units = world.Units.Where(u => !u.IsEmbedded && (owner is null || u.OwnerId == owner)).Select(u => new MilitaryPresence(new(u.Id, false),
             u.IsPersonnel ? MilitaryPresenceKind.Personnel : MilitaryPresenceKind.Unit, u.OwnerId, u.CorpsId,

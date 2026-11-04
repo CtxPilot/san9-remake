@@ -29,7 +29,7 @@ public sealed record MilitaryIntelligenceState([property: JsonRequired] GameCloc
         if (Revision < 0 || Revision > world.Revision || PublishedAt != world.Clock || Physical.IsDefault || Units.IsDefault ||
             Physical.Any(p => p is null || p.Object is null || p.Object.Id < 0 || !p.Area.Footprint.IsValid ||
                 !Enum.IsDefined(p.Kind) || p.Object.IsSettlement != (p.Kind == MilitaryPresenceKind.Settlement) ||
-                p.OwnerId is < 0 || p.CorpsId is < 0 || !Enum.IsDefined(p.Condition) || p.Morale is < 0 or > 100 ||
+                p.OwnerId is < 0 || p.CorpsId is < 0 || p.StationedOfficers < 0 || p.Durability < 0 || !Enum.IsDefined(p.Condition) || p.Morale is < 0 or > 100 ||
                 p.FacilityTypeId is int facility && !rules.Facilities.ContainsKey(facility) ||
                 p.Kind == MilitaryPresenceKind.Settlement && (p.SettlementKind is null || !Enum.IsDefined(p.SettlementKind.Value)) ||
                 p.Area.Position.X < 0 || p.Area.Position.Y < 0 ||
