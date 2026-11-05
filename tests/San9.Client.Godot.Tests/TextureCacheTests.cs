@@ -5,6 +5,38 @@ namespace San9.Client.Godot.Tests;
 
 public sealed class TextureCacheTests
 {
+    [Fact]
+    public void MixedResolutionPortraitViewsShareOneTexturePerMotherImage()
+    {
+        var portraits = new[] { 240, 512, 1024 }.Select((size, id) =>
+            new PortraitDefinition(id, new($"portrait/{id}", $"{id}.png", size, size, 3), 38d / 240, 0)).ToArray();
+        var loads = new System.Collections.Concurrent.ConcurrentDictionary<ImageFile, int>();
+        var uploads = new Dictionary<ImageFile, int>();
+        using var cache = new TextureCache<Gpu>((file, _) =>
+        {
+            loads.AddOrUpdate(file, 1, (_, count) => count + 1);
+            return new(file.Width, file.Height, file.Channels, new byte[file.Width * file.Height * file.Channels]);
+        }, (file, _) =>
+        {
+            uploads[file] = uploads.GetValueOrDefault(file) + 1;
+            return new(file.Width);
+        }, _ => { });
+        var leases = portraits.SelectMany(p => Enum.GetValues<PortraitView>().Select(v => cache.Acquire([p.GetView(v).File]))).ToArray();
+        try
+        {
+            Until(cache, () => leases.All(lease => lease.IsReady));
+            Assert.Equal(portraits.Length, cache.Count);
+            Assert.Equal(portraits.Sum(p => (long)p.Image.Width * p.Image.Height * p.Image.File.Channels), cache.Bytes);
+            foreach (var portrait in portraits)
+            {
+                Assert.Equal(1, loads[portrait.Image.File]);
+                Assert.Equal(1, uploads[portrait.Image.File]);
+                Assert.Equal(portrait.Image.Width, cache.Get(portrait.Image.File).Value);
+            }
+        }
+        finally { foreach (var lease in leases) lease.Dispose(); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

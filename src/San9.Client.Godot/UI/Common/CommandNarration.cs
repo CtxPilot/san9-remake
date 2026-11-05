@@ -149,8 +149,10 @@ public partial class CommandNarration : FixedPage
                 Service.CreateScope(new Dictionary<string,San9.Content.Images.ImageAsset> { [imageRole]=Service.Roles[imageRole] });
             _illustration.Request([imageRole]);
             var asset=_illustration.Assets[imageRole];
-            float scale=Math.Min(1,Math.Min(928f/asset.Width,(592-resultBodyHeight)/asset.Height));
-            var imageSize=new Vector2(asset.Width,asset.Height)*scale;
+            // Portrait resolution describes sampling quality, not the event's logical layout.
+            var logicalSize = entry.IllustrationPersonId is not null ? new Vector2(240, 240) : new Vector2(asset.Width, asset.Height);
+            float scale=Math.Min(1,Math.Min(928f/logicalSize.X,(592-resultBodyHeight)/logicalSize.Y));
+            var imageSize=logicalSize*scale;
             float top=(768-imageSize.Y-64-(resultBodyHeight+112))/2;
             _imageFrameBounds=new((1024-imageSize.X-64)/2,top,imageSize.X+64,imageSize.Y+64);
             _image = new TextureRect { Texture=_illustration.Get(imageRole, this),Position=_imageFrameBounds.Value.Position+new Vector2(32,32),Size=imageSize,
