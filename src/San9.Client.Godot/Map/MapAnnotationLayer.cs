@@ -89,7 +89,7 @@ internal sealed class MapAnnotationLayer
             {
                 if (opacity <= 0) return;
                 var fill = textures.Get($"bar-{kind}-{state}", target);
-                target.DrawTextureRectRegion(fill, new(point + new Vector2(4, 4), new Vector2(width, fill.GetHeight())),
+                target.DrawTextureRectRegion(fill, new(point + new Vector2(3, 3), new Vector2(width, fill.GetHeight())),
                     new(0, 0, width, fill.GetHeight()), new Color(1, 1, 1, opacity));
             }
         }
