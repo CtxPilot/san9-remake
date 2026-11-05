@@ -39,7 +39,7 @@ public sealed class TextureRebuildTests : IDisposable
     public void RebuildingSkinDiscardsItsObsoleteSchemaButRequiresRetainedUnitsToBeReadable()
     {
         var skin = new InterfaceSkin(35, [], [], [], []) { BuildingTargetOffsets = new() { [0] = new(-16, -58) } };
-        var package = new TexturePackage(5, 25, "test", [new("shared.s9", 10, DateTime.UnixEpoch)],
+        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, 25, "test", [new("shared.s9", 10, DateTime.UnixEpoch)],
             new([], [], [], [], [], new int[288], new int[16], [], new byte[32]), skin, new(3, []), []);
         var manifest = JsonSerializer.SerializeToNode(package, PackageFiles.JsonOptions)!.AsObject();
         manifest["skin"] = JsonNode.Parse("{\"schemaVersion\":29}");
@@ -52,6 +52,33 @@ public sealed class TextureRebuildTests : IDisposable
         Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(package.Map, PackageFiles.JsonOptions), manifest["map"]));
         manifest["map"]!.AsObject().Remove("units");
         Assert.Throws<JsonException>(() => TexturePackageRebuilder.ReplaceUnit(manifest, "skin", skin));
+    }
+
+    [Fact]
+    public void UnitReplacementKeepsRetainedReferencesAndPublicationDropsUnusedFiles()
+    {
+        var retained = new ImageAsset("retained", "images/retained.png", 16, 16);
+        var obsolete = new ImageAsset("obsolete", "images/obsolete.png", 8, 8);
+        var replacement = new ImageAsset("replacement", ".sources/replacement.png", 32, 32);
+        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, 25, "test", [],
+            new([], [retained], [], [], [], new int[288], new int[16], [], new byte[32]),
+            new(InterfaceSkin.CurrentSchemaVersion, [obsolete], [], [], []),
+            new(3, [new("alias", "interface", [new(0, 0, retained)])]), []);
+        var manifest = JsonSerializer.SerializeToNode(package, PackageFiles.JsonOptions)!.AsObject();
+        manifest["skin"] = JsonNode.Parse("{\"schemaVersion\":0}");
+        var rebuilt = TexturePackageRebuilder.ReplaceUnit(manifest, "skin",
+            new InterfaceSkin(InterfaceSkin.CurrentSchemaVersion, [replacement], [], [], []));
+        Assert.Equal(retained, Assert.Single(rebuilt.Map.Assets));
+        Assert.Same(rebuilt.Map.Assets[0].File, rebuilt.Library.Assets.Single().File);
+        Assert.Equal(replacement, Assert.Single(rebuilt.Skin.Assets));
+        var published = JsonSerializer.SerializeToNode(rebuilt, PackageFiles.JsonOptions)!;
+        Assert.Equal(2, published["files"]!.AsArray().Count);
+        Assert.DoesNotContain(obsolete.Path, published.ToJsonString());
+        var restored = published.Deserialize<TexturePackage>(PackageFiles.JsonOptions)!;
+        Assert.Equal(retained, Assert.Single(restored.Map.Assets));
+        Assert.Equal(replacement, Assert.Single(restored.Skin.Assets));
+        var skin = TexturePackageFiles.ReadUnit<InterfaceSkin>(published.AsObject(), "skin");
+        Assert.Equal(replacement, Assert.Single(skin.Assets));
     }
 
     [Fact]
@@ -80,7 +107,7 @@ public sealed class TextureRebuildTests : IDisposable
         var first = new ImageAsset("library/first", new ImageFile("images/shared.png", 2, 1, 3), 0, 0, 1, 1);
         var second = first with { Id = "library/second", X = 1 };
         var replacement = new ImageAsset("ui-test", ".sources/0.png", 1, 1, 3);
-        var package = new TexturePackage(5, 23, "test", [],
+        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, 23, "test", [],
             new([], [], [], [], [], new int[288], new int[16], [], new byte[32]),
             new(InterfaceSkin.CurrentSchemaVersion, [replacement], new() { ["test"] = replacement.Id }, [], []),
             new(3, [new("original", "interface", [new(0, 0, first), new(1, 0, second)])]), []);
@@ -112,7 +139,7 @@ public sealed class TextureRebuildTests : IDisposable
         Directory.CreateDirectory(Path.Combine(root, ".sources"));
         File.WriteAllBytes(Path.Combine(root, ".sources", "0.png"), new PngImage(1, 1, 3, [10, 20, 30]).Encode());
         var image = new ImageAsset("ui-test", ".sources/0.png", 1, 1, 3);
-        var package = new TexturePackage(5, 23, "test", [],
+        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, 23, "test", [],
             new([], [], [], [], [], new int[288], new int[16], [], new byte[32]),
             new(InterfaceSkin.CurrentSchemaVersion, [image], new() { ["test"] = image.Id }, [], []),
             new(3, [new("original", "interface", [new(0, 0, image with { Id = "library/test" })])]), []);

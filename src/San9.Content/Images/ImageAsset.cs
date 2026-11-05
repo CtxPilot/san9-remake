@@ -4,7 +4,7 @@ namespace San9.Content.Images;
 
 public sealed record ImageFile(string Path, int Width, int Height, int Channels);
 
-[System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
+[System.Text.Json.Serialization.JsonConverter(typeof(ImageAssetJsonConverter))]
 [method: System.Text.Json.Serialization.JsonConstructor]
 public sealed record ImageAsset(string Id, ImageFile File, int X, int Y, int Width, int Height)
 {

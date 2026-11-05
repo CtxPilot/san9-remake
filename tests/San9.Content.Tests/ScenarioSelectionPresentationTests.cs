@@ -1,5 +1,7 @@
+using System.Text.Json;
 using San9.Content.Images;
 using San9.Content.Interface;
+using San9.Content.Packages;
 
 namespace San9.Content.Tests;
 
@@ -25,6 +27,17 @@ public sealed class ScenarioSelectionPresentationTests
             Preview = new(sprite, sprite, 1, 1, 0, 0),
             Settings = new([sprite], [sprite, sprite], "image", new(["image"], 1, 0, 0, .25), button, button, button, sprite) };
         scene.Validate(images);
+        var menu = new StartMenuPresentation([], [], [], button, button, "提示", []) { QuitPrompt = "退出？" };
+        var opening = new OpeningContent(menu, scene) { Audio = new("music", "start", []) };
+        string json = JsonSerializer.Serialize(opening, PackageFiles.JsonOptions);
+        using (var document = JsonDocument.Parse(json))
+        {
+            Assert.Equal(OpeningContent.CurrentSchemaVersion, document.RootElement.GetProperty("schemaVersion").GetInt32());
+            Assert.Single(document.RootElement.GetProperty("files").EnumerateArray());
+        }
+        var restored = JsonSerializer.Deserialize<OpeningContent>(json, PackageFiles.JsonOptions)!;
+        restored.Selection.Validate(images);
+        Assert.All(restored.Selection.Forces.MapSkin.Values, image => Assert.Same(restored.Selection.Forces.MapSkin.Values.First().File, image.File));
         foreach (var invalid in new[]
         {
             scene with { Entries = [entry with { CityColors = new() { [8] = "green" } }] },

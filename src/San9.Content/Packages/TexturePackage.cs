@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using San9.Content.Images;
 using San9.Content.Interface;
 using San9.Content.Maps;
@@ -16,16 +18,18 @@ public sealed record MapResources(MapSeason[] Seasons, ImageAsset[] Assets, MapM
 }
 
 /// <summary>Source-version resources. No scenario state or scenario identifier belongs here.</summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(TexturePackageJsonConverter))]
 public sealed record TexturePackage(int SchemaVersion, int ConversionVersion, string SourceBuild, TextureSourceStamp[] Sources,
     MapResources Map, InterfaceSkin Skin, TextureLibrary Library, PortraitDefinition[] Portraits)
 {
+    public const int CurrentSchemaVersion = 6;
     [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<ImageAsset> Assets => Map.Assets.Concat(Map.Seasons.SelectMany(s => s.Textures))
         .Concat(Skin.Assets).Concat(Library.Assets).Concat(Portraits.Select(p => p.Image));
 
     public void Validate()
     {
-        if (SchemaVersion != 5 || Map.MinimapColors.Length != 32 || Map.MaskPositions.Length != 288 ||
+        if (SchemaVersion != CurrentSchemaVersion || Map.MinimapColors.Length != 32 || Map.MaskPositions.Length != 288 ||
             Map.MaskHeightAdjustments.Length != 16) throw new InvalidDataException("Invalid texture package.");
         if (Portraits.Select(p => p.Id).Distinct().Count() != Portraits.Length) throw new InvalidDataException("Duplicate portrait ID.");
         foreach (var portrait in Portraits) portrait.Validate();
@@ -38,6 +42,30 @@ public sealed record TexturePackage(int SchemaVersion, int ConversionVersion, st
 
 public static class TexturePackageFiles
 {
+    private static ImageFileTable ReadFiles(JsonObject manifest)
+    {
+        var files = manifest["files"]?.Deserialize<ImageFile[]>(PackageFiles.JsonOptions)
+            ?? throw new JsonException("Missing image file table.");
+        ContentStructure.Validate(files);
+        return new(files);
+    }
+
+    public static T ReadUnit<T>(JsonObject manifest, string unit)
+    {
+        return manifest[unit].Deserialize<T>(ReadFiles(manifest).Options(PackageFiles.JsonOptions))
+            ?? throw new InvalidDataException($"Missing texture unit: {unit}");
+    }
+
+    /// <summary>Replaces a unit without interpreting its obsolete definitions. Retained file indices stay valid.</summary>
+    public static TexturePackage ReplaceUnit<T>(JsonObject manifest, string unit, T replacement)
+    {
+        var table = ReadFiles(manifest);
+        manifest[unit] = JsonSerializer.SerializeToNode(replacement, table.Options(PackageFiles.JsonOptions));
+        manifest["files"] = JsonSerializer.SerializeToNode(table.Files, PackageFiles.JsonOptions);
+        return manifest.Deserialize<TexturePackage>(PackageFiles.JsonOptions)
+            ?? throw new InvalidDataException("Empty texture package.");
+    }
+
     public static async Task<TexturePackage> LoadAsync(string root, CancellationToken token = default)
     {
         var package = await PackageFiles.ReadAsync<TexturePackage>(Path.Combine(root, "textures.json"), token);

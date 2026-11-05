@@ -25,8 +25,10 @@ public sealed record OpeningAudioDefinition(string Music, string GameStartSound,
     }
 }
 
+[System.Text.Json.Serialization.JsonConverter(typeof(OpeningContentJsonConverter))]
 public sealed record OpeningContent(StartMenuPresentation Menu, ScenarioSelectionPresentation Selection)
 {
+    public const int CurrentSchemaVersion = 1;
     [System.Text.Json.Serialization.JsonRequired] public OpeningAudioDefinition Audio { get; init; } = null!;
 }
 

@@ -15,8 +15,7 @@ internal static class TexturePackageRebuilder
     internal static TexturePackage ReplaceUnit<T>(JsonObject manifest, string unit, T replacement)
     {
         // The selected unit is regenerated in full; its old schema is not an input contract.
-        manifest[unit] = JsonSerializer.SerializeToNode(replacement, PackageFiles.JsonOptions);
-        return manifest.Deserialize<TexturePackage>(PackageFiles.JsonOptions) ?? throw new InvalidDataException("Empty texture package.");
+        return TexturePackageFiles.ReplaceUnit(manifest, unit, replacement);
     }
 
     internal static InterfaceSkin ReplaceCursors(InterfaceSkin skin, Dictionary<string, CursorDefinition> cursors, ImageAsset[] assets)
@@ -42,7 +41,7 @@ internal static class TexturePackageRebuilder
         // precisely what is missing a newly required role or contains an incorrect definition.
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(output, "textures.json"), token))?.AsObject()
             ?? throw new InvalidDataException("Empty texture package.");
-        if (manifest["schemaVersion"]?.GetValue<int>() != 5 || manifest["sourceBuild"]?.GetValue<string>() != San9PkTc101Detector.SourceBuildId)
+        if (manifest["schemaVersion"]?.GetValue<int>() != TexturePackage.CurrentSchemaVersion || manifest["sourceBuild"]?.GetValue<string>() != San9PkTc101Detector.SourceBuildId)
             throw new InvalidDataException("Targeted rebuilding requires a matching texture package schema and source build.");
         if (scope == "map/formation-appearance")
         {
@@ -88,8 +87,7 @@ internal static class TexturePackageRebuilder
                 {
                     List<ImageAsset> assets = [];
                     var cursors = ExecutableCursorCompiler.Compile(pe, assets, Save);
-                    var skin = manifest["skin"].Deserialize<InterfaceSkin>(PackageFiles.JsonOptions)
-                        ?? throw new InvalidDataException("Missing interface skin.");
+                    var skin = TexturePackageFiles.ReadUnit<InterfaceSkin>(manifest, "skin");
                     package = ReplaceUnit(manifest, "skin", ReplaceCursors(skin, cursors, assets.ToArray()));
                 }
                 break;
@@ -105,8 +103,7 @@ internal static class TexturePackageRebuilder
             default:
                 string archiveId = scope[8..];
                 var converted = TextureLibraryCompiler.Compile(Read(source.Executable), source.Root, Read, Save, progress, token, archiveId);
-                var library = manifest["library"].Deserialize<TextureLibrary>(PackageFiles.JsonOptions)
-                    ?? throw new InvalidDataException("Missing texture library.");
+                var library = TexturePackageFiles.ReadUnit<TextureLibrary>(manifest, "library");
                 package = ReplaceUnit(manifest, "library", library with {
                     Archives = library.Archives.Where(a => a.Id != archiveId).Concat(converted.Archives).OrderBy(a => a.Id, StringComparer.Ordinal).ToArray() });
                 break;

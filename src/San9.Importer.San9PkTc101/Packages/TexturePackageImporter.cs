@@ -8,7 +8,7 @@ namespace San9.Importer.San9PkTc101.Packages;
 
 public static class TexturePackageImporter
 {
-    public const int ConversionVersion = 64;
+    public const int ConversionVersion = 65;
 
     public static async Task<TexturePackage> ImportAsync(string gameDirectory, string output,
         Action<string>? progress = null, CancellationToken token = default, string? rebuild = null)
@@ -26,7 +26,7 @@ public static class TexturePackageImporter
         if (File.Exists(manifest))
         {
             using var header = JsonDocument.Parse(await File.ReadAllTextAsync(manifest, token));
-            reusable = header.RootElement.GetProperty("schemaVersion").GetInt32() == 5 &&
+            reusable = header.RootElement.GetProperty("schemaVersion").GetInt32() == TexturePackage.CurrentSchemaVersion &&
                 header.RootElement.TryGetProperty("conversionVersion", out var version) && version.GetInt32() == ConversionVersion;
         }
         if (reusable && rebuild != "all")
@@ -71,7 +71,7 @@ public static class TexturePackageImporter
         var skin = InterfaceSkinCompiler.Compile(exe, dataDirectory, Read, Save);
         var portraits = PortraitCompiler.Compile(dataDirectory, Read, Save);
         var library = TextureLibraryCompiler.Compile(exe, dataDirectory, Read, Save, progress, token);
-        var package = new TexturePackage(5, ConversionVersion, San9PkTc101Detector.SourceBuildId,
+        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, ConversionVersion, San9PkTc101Detector.SourceBuildId,
             sources.Distinct().OrderBy(s => s.Name, StringComparer.Ordinal).ToArray(), map, skin, library, portraits);
         using var publication = new TexturePublication();
         package = TexturePackagePacking.Pack(output, package, "images", token, publication.Write);
