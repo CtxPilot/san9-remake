@@ -185,7 +185,7 @@ internal static class DecisionPresentationCompiler
                     role == "gift" ? shared["gift-actor-refused"] : M(6635, "actor", inputs: [("person.0", "actor"), ("person.1", "host")])]));
         }
         shared["alliance-formation-image"] = M(9391, image: "decision-alliance", inputs: [("force.0", "leader-force")]);
-        shared["alliance-leader-declaration"] = M(9392, "other");
+        shared["alliance-leader-declaration"] = M(9392, "other", inputs: [("force.0", "target-force")]);
         shared["alliance-leader-trust"] = M(9393, inputs: [("force.0", "leader-force")]);
         foreach (var (role, prompt, intro, reply) in new[] {
             ("disaster-relief",8012,7922,7923), ("volunteers",8013,7846,7925), ("bribe",8015,7934,7935),

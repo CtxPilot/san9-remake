@@ -46,5 +46,9 @@ public sealed class DecisionPresentationCompilerTests
         Assert.Equal("force", alliance.Prompt.Bindings["force.0"]);
         Assert.Equal("target-force", alliance.Prompt.Bindings["force.1"]);
         Assert.Equal("target-force", Assert.Single(alliance.Results["decline"]).Bindings["force.0"]);
+        var declaration = decisions.Shared["alliance-leader-declaration"];
+        Assert.Equal("messages.9392", declaration.Key);
+        Assert.Equal("other", declaration.Speaker);
+        Assert.Equal("target-force", declaration.Bindings["force.0"]);
     }
 }
