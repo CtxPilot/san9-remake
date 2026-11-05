@@ -10,6 +10,8 @@ public sealed partial class GameSession
 {
     private SimulationEngine _simulation;
     private readonly ScenarioSessionDefinition _definition;
+    private SettlementTransitNetwork? _transitNetwork;
+    internal SettlementTransitNetwork? TransitNetwork => _transitNetwork;
     public San9.Content.Scenarios.SessionDefinitions Definitions => _definition.Definitions;
     private readonly StrategySnapshotSource _snapshotSource;
     private StrategySnapshot _view;

@@ -50,6 +50,7 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
         commandersByPlace.Clear();
         reserves.Clear();
         attackFormations.Clear();
+        attackConnections.Clear();
         bool placesChanged = projected is null || projected.Settlements != world.Settlements;
         bool corpsChanged = projected is null || projected.Corps != world.Corps;
         bool ownerChanged = projected is null || corpsChanged &&
@@ -68,7 +69,11 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
         if (diplomacyChanged || corpsChanged) currentForce = null;
         if (placesChanged || corpsChanged) places = null;
         if (officersChanged || corpsChanged || projected!.Simulation.Tasks != world.Simulation.Tasks) people = null;
-        if (unitsChanged || corpsChanged) assignedTroops = null;
+        if (unitsChanged || corpsChanged)
+        {
+            assignedTroops = null;
+            militaryIndex = null;
+        }
         // Strategic routes read targets, occupancy and diplomacy, not treasury or acted flags.
         if (placesChanged || unitsChanged || diplomacyChanged || ownerChanged)
         {

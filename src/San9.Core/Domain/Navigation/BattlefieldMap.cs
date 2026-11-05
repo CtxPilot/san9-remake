@@ -108,6 +108,8 @@ public sealed class BattlefieldMap
         }).ToArray());
         template.CopyTo(target, 0);
     }
+
+    internal int TerrainIdAt(MapCell cell) => cells[cell.Y * Width + cell.X].Terrain.Id;
     private BattlefieldMap(BattlefieldMap source, TravelTopology profile)
     {
         Width = source.Width; Height = source.Height; FineWidth = source.FineWidth; FineHeight = source.FineHeight;

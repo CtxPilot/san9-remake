@@ -1,14 +1,27 @@
 using San9.Core.Domain;
+using San9.Core.Simulation;
 
 namespace San9.Application.AI;
 
 /// <summary>Terrain-only routes shared for one session operation. Dynamic world decisions remain with each caller.</summary>
-internal sealed class OriginalAiTerrainRoutes
+internal sealed class OriginalAiTerrainRoutes(SettlementTransitNetwork? initialTransitNetwork = null)
 {
     private readonly record struct Key(BattlefieldMap Map, WorldPosition Start, MapOccupancy Target,
         Footprint Shape, TravelMode Mode, bool IntoRange);
 
     private readonly Dictionary<Key, MovementRoute> routes = [];
+    private SettlementTransitNetwork? transitNetwork = initialTransitNetwork;
+    private IReadOnlyList<SettlementState>? transitSettlements;
+
+    internal SettlementTransitNetwork TransitNetwork(MilitaryRulebook rules, WorldSnapshot world)
+    {
+        if (transitNetwork is null || !transitNetwork.UsesRules(rules))
+            transitNetwork = SettlementTransitNetwork.Build(rules, world.Settlements);
+        else if (!ReferenceEquals(transitSettlements, world.Settlements))
+            transitNetwork = transitNetwork.Update(world.Settlements);
+        transitSettlements = world.Settlements;
+        return transitNetwork;
+    }
 
     internal MovementRoute FindRoute(BattlefieldMap map, WorldPosition start, WorldPosition destination,
         Footprint shape, TravelMode mode) => Get(new(map, start, new(destination, new(1, 1)), shape, mode, false));

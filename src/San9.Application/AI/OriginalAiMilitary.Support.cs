@@ -7,7 +7,7 @@ namespace San9.Application.AI;
 internal sealed partial class OriginalAiMilitary
 {
     private Route? UnitTo(UnitState unit, int home) => RouteTo(unit, new(MilitaryOrderKind.Return, null, home), unit.Id);
-    private UnitState[] Pressure(int home, bool includeNew = false) => World.Units.Where(u => Active(u) &&
+    private UnitState[] Pressure(int home, bool includeNew = false) => MilitaryIndex.AttackCandidates.Where(u => Active(u) &&
         (includeNew || u.HasEnteredDailyCycle) && ProjectedOrder(u) is
         { Kind: MilitaryOrderKind.AttackSettlement, SettlementId: int target } && target == home).ToArray();
     private long PressureNear(int home, int days) => Pressure(home).Where(u => UnitTo(u, home) is { } r && r.Days < days).Sum(u => (long)u.Soldiers);

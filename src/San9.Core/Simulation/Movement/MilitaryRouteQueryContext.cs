@@ -11,12 +11,13 @@ public sealed class MilitaryRouteQueryContext(WorldSnapshot snapshot, MilitaryRu
     private WorldQuery? world;
     private readonly Dictionary<(int Owner, UnitPolicies Policies), IReadOnlyList<MapOccupancy>> deploymentOccupancy = [];
     private readonly Dictionary<ReachabilityQuery, RouteReachability> reachability = [];
+    private readonly Dictionary<ReachabilityQuery, RouteCostEstimate> estimates = [];
 
     // Speed changes route preference and ETA, but not connectivity. PlanningMap retains both
     // land/water footprints and passage rules while normalizing their relative speeds.
     private readonly record struct ReachabilityQuery(BattlefieldMap Map, WorldPosition Start, MapOccupancy Target,
         Footprint Shape, TravelMode Mode, int Owner, UnitPolicies Policies, int? MovingUnit,
-        int? ConstructionRegion, NavigationArrival Arrival);
+        int? ConstructionRegion, NavigationArrival Arrival, int? DeclaredTargetOwner, int? EffectiveTargetOwner);
 
     public MilitaryRoutePlan Plan(UnitState unit, int? movingUnit, int maximumDays = 4096, int maximumExpanded = 100000) =>
         MilitaryRouteQuery.Plan(world ??= new(snapshot), rules, unit, movingUnit, maximumDays, maximumExpanded);
@@ -48,18 +49,28 @@ public sealed class MilitaryRouteQueryContext(WorldSnapshot snapshot, MilitaryRu
             order.SettlementId is int home ? rules.SettlementArea(query.Settlements[home]) : new MapOccupancy(order.Position!.Value, new(1, 1));
         var arrival = MilitaryNavigation.Arrival(order);
         var key = new ReachabilityQuery(travel.Map.PlanningMap(), unit.Position, target, travel.Shape, travel.Mode,
-            unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, arrival);
+            unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, arrival,
+            MilitaryDiplomacy.TargetOwner(query, unit.Order), MilitaryDiplomacy.TargetOwner(query, order));
         if (connectivityOnly && reachability.TryGetValue(key, out var cached)) return new(cached);
+        // Actual land/water scaling belongs to cost results; only connectivity may use the
+        // normalized map. Soldier counts with identical footprints can share this search.
+        var estimateKey = key with { Map = travel.Map };
+        if (!connectivityOnly && estimates.TryGetValue(estimateKey, out var estimate)) return estimate;
         var route = travel.Map.EstimateTravelCost(unit.Position, target, travel.Shape, travel.Mode,
             query.MovementOccupancy(rules, unit.OwnerId, unit.Policies, movingUnit, order.Construction?.RegionId, unit),
             new NavigationWorkBudget(maximumExpanded), arrival: arrival, includeCells: !connectivityOnly);
-        if (route.Status != RouteReachability.Incomplete) reachability[key] = route.Status;
+        if (route.Status != RouteReachability.Incomplete)
+        {
+            reachability[key] = route.Status;
+            if (!connectivityOnly) estimates[estimateKey] = route;
+        }
         return route;
     }
 
-    public WorldPosition? DeploymentPosition(SettlementState source, int land, int? naval, int owner, UnitPolicies policies)
+    public WorldPosition? DeploymentPosition(SettlementState source, int land, int? naval, int owner, UnitPolicies policies,
+        uint soldiers = 1)
     {
-        var travel = rules.Travel(land, naval);
+        var travel = rules.Travel(land, naval, soldiers);
         if (travel.DailyBudget <= 0 || !rules.TryPlace(source, out var place)) return null;
         var key = (owner, policies);
         if (!deploymentOccupancy.TryGetValue(key, out var occupancy))

@@ -137,11 +137,12 @@ internal sealed partial class OriginalAiMilitary
     }
 
     private DeployUnitCommand? Deployment(SettlementState source, OfficerState[] people, uint soldiers, MilitaryOrder order,
-        SettlementState? building, UnitState? target, bool deployment, bool fallback = false, int delay = 0)
+        SettlementState? building, UnitState? target, bool deployment, bool fallback = false, int delay = 0,
+        Route? initialRoute = null)
     {
         var basic = Basic(people, fallback);
         if (basic is null) return null;
-        var initial = RouteFrom(source, basic.Value.Land, basic.Value.Naval, order, Policies(fallback));
+        var initial = initialRoute ?? RouteFrom(source, basic.Value.Land, basic.Value.Naval, order, Policies(fallback));
         if (initial is null) return null;
         bool harbor = building is not null && rules.TryPlace(building, out var place) &&
             place.FacilityTypeId is int type && rules.Facilities[type].IsHarbor;

@@ -16,10 +16,10 @@ public sealed partial class OriginalAiMilitaryTests
         var basis = Fixture();
         var content = basis with
         {
-            Settlements = [.. basis.Settlements, basis.Settlements[1] with { Id = 3, Kind = SettlementKind.Facility, X = 13, Y = 2 }],
+            Settlements = [.. basis.Settlements, basis.Settlements[1] with { Id = 3, Kind = SettlementKind.Facility, X = 1, Y = 2 }],
             RegionCityIds = new(basis.RegionCityIds) { [3] = 2 },
             RegionNameKeys = new(basis.RegionNameKeys) { [3] = "target" },
-            Military = basis.Military! with { Places = basis.Military.Places.Add(new(3, new(67, 12), new(1, 1))
+            Military = basis.Military! with { Places = basis.Military.Places.Add(new(3, new(7, 12), new(1, 1))
                 { Combat = basis.Military.Places[1].Combat }) }
         };
         var h = new Harness(content);
@@ -152,7 +152,7 @@ public sealed partial class OriginalAiMilitaryTests
     }
 
     [Fact]
-    public void ConstructionConversionUsesTheRoutePrefixEndingAtTheInterceptingBuilding()
+    public void ConstructionConversionUsesTheSelectedSourceAndTargetRoute()
     {
         var basis = AttackAlignmentConstruction();
         var content = basis with
@@ -172,7 +172,8 @@ public sealed partial class OriginalAiMilitaryTests
         };
         var h = new Harness(content);
         AssertAttackAlignmentConstructionAvailable(content, h.Engine, 4, 700, new(27, 7));
-        Assert.Equal(1, h.Run(OriginalAiWork.Attack, 1).Submitted);
+        Assert.Equal(1, h.Military.Run(OriginalAiWork.Attack, 1, h.State,
+            new(1, OriginalAiMode.TargetSettlement, null, 3)).Submitted);
         Assert.Equal(4, Assert.IsType<ConstructFacilityCommand>(Assert.Single(h.Commands)).RegionId);
     }
 
@@ -185,14 +186,14 @@ public sealed partial class OriginalAiMilitaryTests
         var content = basis with
         {
             Settlements = [.. basis.Settlements.Select(s => s.Id == 2 ? s with { Soldiers = defenders } : s),
-                basis.Settlements[1] with { Id = 3, X = 13, Y = 13, Soldiers = 1000 }],
+                basis.Settlements[1] with { Id = 3, X = 1, Y = 13, Soldiers = 1000 }],
             MilitaryCityConnections = [new(1, 2), new(2, 1), new(1, 3), new(3, 1)],
             CityConnections = [new(1, 2), new(2, 1), new(1, 3), new(3, 1)],
             RegionCityIds = new(basis.RegionCityIds) { [3] = 3 },
             RegionNameKeys = new(basis.RegionNameKeys) { [3] = "weaker" },
             Military = basis.Military! with { Height = 20, TerrainIds = Enumerable.Repeat(0, 400).ToImmutableArray(),
                 TerritoryExits = Enumerable.Repeat(TerritoryExits.All, 400).ToImmutableArray(),
-                Places = basis.Military.Places.Add(new(3, new(67, 67), new(1, 1)) { Combat = basis.Military.Places[1].Combat }),
+                Places = basis.Military.Places.Add(new(3, new(7, 67), new(1, 1)) { Combat = basis.Military.Places[1].Combat }),
                 RegionIds = Enumerable.Range(0, 400).Select(i => (int?)(i / 20 >= 10 ? 3 : i % 20 < 10 ? 1 : 2)).ToImmutableArray() }
         };
         var h = new Harness(content);

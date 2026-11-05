@@ -20,7 +20,9 @@ public sealed class MovementForecastTests
         Assert.Equal(400, estimate.Days);
         Assert.Equal(1, diagnostics.Queries);
         Assert.Equal(0, context.Estimate(unit with { Order = new(MilitaryOrderKind.Move, unit.Position, null) }, unit.Id).Days);
-        var incomplete = context.Estimate(unit, unit.Id, maximumExpanded: 1);
+        Assert.Equal(estimate.Days, context.Estimate(unit, unit.Id, maximumExpanded: 1).Days);
+        var incomplete = new MilitaryRouteQueryContext(World(unit).CreateSnapshot(), rules)
+            .Estimate(unit, unit.Id, maximumExpanded: 1);
         Assert.Equal(RouteReachability.Incomplete, incomplete.Status);
         Assert.Null(incomplete.Days);
         var unreachable = context.Estimate(unit with { Order = new(MilitaryOrderKind.Move, new(502, 2), null) }, unit.Id);

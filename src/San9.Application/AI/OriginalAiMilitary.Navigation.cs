@@ -71,9 +71,11 @@ internal sealed partial class OriginalAiMilitary
         int owner, int? targetRegion)
     {
         public int Days => days;
+        public ImmutableArray<MapCell> Cells => cells;
         public int CellCount => cells.Length;
         public bool Slow => slow;
         public bool Obstacle => obstacle;
+        public TransitRouteSummary? TransitSummary { get; init; }
         private bool? hostileBuilding, hostileRegion;
         public bool HostileBuilding => hostileBuilding ??= InspectHostility(buildingOnly: true);
         public bool HostileRegion => hostileRegion ??= InspectHostility(buildingOnly: false);
@@ -82,6 +84,9 @@ internal sealed partial class OriginalAiMilitary
             OriginalAiStrategy.IsOpponent(world, owner, other);
         private bool InspectHostility(bool buildingOnly)
         {
+            if (TransitSummary is { } summary)
+                return (buildingOnly ? summary.ViaSettlementIds : summary.RegionIds)
+                    .Any(id => buildings.TryGetValue(id, out var building) && Hostile(building));
             foreach (var cell in cells)
             {
                 var point = MapCoordinates.Center(cell);

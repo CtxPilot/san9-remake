@@ -12,11 +12,12 @@ public sealed partial class GameSession
     internal sealed record OperationInput(SimulationEngine Simulation, ScenarioSessionDefinition Definition,
         StrategySnapshot View, long Sequence, OriginalAiState OriginalAi,
         EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts, ImmutableList<ChronicleFact> History,
-        ImmutableArray<DeploymentPreset> DeploymentPresets);
+        ImmutableArray<DeploymentPreset> DeploymentPresets, SettlementTransitNetwork? TransitNetwork);
 
     internal sealed record OperationCommit(SimulationEngine Simulation, OriginalAiState OriginalAi,
         ImmutableArray<OriginalAiWorkReport> AiReports, EndingSelection? Ending, ImmutableDictionary<int, StrategicContextState> StrategicContexts,
-        ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note, ImmutableArray<DeploymentPreset> DeploymentPresets);
+        ImmutableList<ChronicleFact> History, SessionRecord[] Records, ChronicleEntry? Note, ImmutableArray<DeploymentPreset> DeploymentPresets,
+        SettlementTransitNetwork? TransitNetwork);
 
     internal sealed record PreparedOperation(SessionResult Result, StrategySnapshot View,
         OperationCommit? Commit = null)
@@ -25,7 +26,7 @@ public sealed partial class GameSession
     }
 
     private OperationInput CaptureOperationInput() => new(_simulation, _definition, View,
-        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets);
+        NextOperationSequence, _originalAi, _ending, _strategicContexts, History, DeploymentPresets, _transitNetwork);
 
     public SessionResult Apply(SessionRequest request)
     {
@@ -63,7 +64,7 @@ public sealed partial class GameSession
             var candidate = input.Simulation.Fork();
             var originalAi = input.OriginalAi;
             List<OriginalAiWorkReport> aiReports = [];
-            var terrainRoutes = new OriginalAiTerrainRoutes();
+            var terrainRoutes = new OriginalAiTerrainRoutes(input.TransitNetwork);
             List<DomainEvent> events = [];
             List<ResolutionPresentationTransition> transitions = [];
             using var observation = captureTransitions ? candidate.ObserveResolution(transition => transitions.Add(new(transition.Phase,
@@ -200,7 +201,8 @@ public sealed partial class GameSession
                     strategicContexts.GetValueOrDefault(force, StrategicContextState.Empty)));
             var publishedEvents = events.ToImmutableArray();
             var commit = new OperationCommit(candidate, originalAi.Reconcile(snapshot), aiReports.ToImmutableArray(),
-                ending, strategicContexts, history, completed, note, deploymentPresets);
+                ending, strategicContexts, history, completed, note, deploymentPresets,
+                input.Definition.MilitaryRules is { } military ? terrainRoutes.TransitNetwork(military, snapshot) : null);
             return new(new(SessionDisposition.Accepted, SessionRejection.None, publishedEvents, snapshot, Development: development),
                 view, commit) { Transitions = transitions.ToArray() };
         }
@@ -219,6 +221,7 @@ public sealed partial class GameSession
             if (prepared.Commit is { } commit)
             {
                 _simulation = commit.Simulation;
+                _transitNetwork = commit.TransitNetwork;
                 _view = prepared.View;
                 _originalAi = commit.OriginalAi;
                 LastOriginalAiWork = commit.AiReports;

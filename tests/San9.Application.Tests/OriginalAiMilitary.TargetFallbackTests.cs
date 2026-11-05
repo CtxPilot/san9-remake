@@ -8,6 +8,44 @@ namespace San9.Application.Tests;
 
 public sealed partial class OriginalAiMilitaryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AllocatedAttackEndsItsCityBatchEvenWhenEveryDeploymentFails(bool emptyPlan)
+    {
+        var basis = Fixture();
+        var content = basis with
+        {
+            Settlements = [.. basis.Settlements, basis.Settlements[1] with { Id = 3, X = 1, Y = 13 }],
+            RegionCityIds = new(basis.RegionCityIds) { [3] = 3 },
+            RegionNameKeys = new(basis.RegionNameKeys) { [3] = "fallback" },
+            Military = basis.Military! with
+            {
+                Height = 20,
+                TerrainIds = Enumerable.Repeat(0, 400).ToImmutableArray(),
+                TerritoryExits = Enumerable.Repeat(TerritoryExits.All, 400).ToImmutableArray(),
+                Formations = basis.Military.Formations.Select(f => emptyPlan && f.Id == 400
+                    ? f with { SoldierCapacity = 1000 } : f).ToImmutableArray(),
+                Places = basis.Military.Places.Add(new(3, new(7, 67), new(1, 1)) { Combat = basis.Military.Places[1].Combat }),
+                RegionIds = Enumerable.Range(0, 400).Select(i => (int?)(i / 20 >= 10 ? 3 :
+                    i % 20 < 10 ? 1 : 2)).ToImmutableArray()
+            }
+        };
+        var h = new Harness(content, rejectCommand: c => c is DeployUnitCommand d && d.Order.SettlementId == 2);
+        if (!emptyPlan) AssertAttackAlignmentCommandAvailable(content, h.Engine, 20000, 3);
+
+        var report = h.Military.Run(OriginalAiWork.Attack, 20, h.State,
+            new(1, OriginalAiMode.TargetSettlement, null, 2));
+
+        Assert.Equal(0, report.Submitted);
+        Assert.Equal(1, report.Attempts);
+        Assert.Equal(emptyPlan ? 1 : 0, report.EmptyPlans);
+        Assert.Equal(emptyPlan ? 0 : 1, report.Rejected);
+        if (emptyPlan) Assert.Empty(h.Commands);
+        else Assert.Equal(2, Assert.IsType<DeployUnitCommand>(Assert.Single(h.Commands)).Order.SettlementId);
+        Assert.Empty(h.Engine.Snapshot.Units);
+    }
+
     [Fact]
     public void UnreachablePreferredTargetDoesNotBlockTheNextTarget()
     {
@@ -48,7 +86,7 @@ public sealed partial class OriginalAiMilitaryTests
     }
 
     [Fact]
-    public void InterveningTargetWithoutSourcesDoesNotBlockTheNextTarget()
+    public void InterveningEnemyFacilityKeepsPreferredCityPriorityEvenWhenADirectBypassExists()
     {
         var basis = Fixture();
         var content = basis with
@@ -79,12 +117,17 @@ public sealed partial class OriginalAiMilitaryTests
         var h = new Harness(content);
         var geography = new OriginalAiGeography(content, new(content.Military!), h.Engine.Snapshot);
         Assert.DoesNotContain(geography.Neighbors(1), p => p.Id == 4);
-        AssertAttackAlignmentCommandAvailable(content, h.Engine, 20000, 6);
+        Assert.Contains(geography.Neighbors(4), p => p.OwnerId == 1);
+        AssertAttackAlignmentCommandAvailable(content, h.Engine, 20000, 2);
+        var rules = new MilitaryRulebook(content.Military!);
+        var trace = MilitaryRouteQuery.Plan(h.Engine.Snapshot, rules, new(0, 1, new(7, 7), 20000)
+            { FormationId = 400, Order = new(MilitaryOrderKind.AttackSettlement, null, 2) }, null);
+        Assert.DoesNotContain(trace.Steps, p => rules.SettlementArea(h.Engine.Snapshot.Settlements.Single(s => s.Id == 4)).Contains(p));
 
         Assert.Equal(1, h.Military.Run(OriginalAiWork.Attack, 1, h.State,
             new(1, OriginalAiMode.TargetSettlement, null, 2)).Submitted);
         var command = Assert.IsType<DeployUnitCommand>(Assert.Single(h.Commands));
         Assert.Equal(1, command.SettlementId);
-        Assert.Equal(6, command.Order.SettlementId);
+        Assert.Equal(4, command.Order.SettlementId);
     }
 }

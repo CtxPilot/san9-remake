@@ -49,6 +49,8 @@ public sealed partial class OriginalAiMilitaryTests
         internal SimulationEngine Engine { get; }
         internal OriginalAiMilitary Military { get; }
         internal OriginalAiState State { get; }
+        internal MilitaryRulebook Rules { get; }
+        internal OriginalAiTerrainRoutes TerrainRoutes { get; } = new();
         internal List<GameCommand> Commands { get; } = [];
         internal Harness(ScenarioInitialState content, Func<WorldSnapshot, WorldSnapshot>? change = null, Func<int, int>? draw = null, bool reject = false,
             Func<GameCommand, bool>? rejectCommand = null)
@@ -63,9 +65,9 @@ public sealed partial class OriginalAiMilitaryTests
             };
             Engine = GameSession.EngineFactory(content)(WorldState.Restore(change?.Invoke(world) ?? world));
             var context = new CommandContext("player");
-            var rules = definition.Rules.Military!;
+            var rules = Rules = definition.Rules.Military!;
             Military = new(Engine, content, rules, definition.Rules,
-                new(content, rules), new(), 1, context, new OriginalAiRandom(draw ?? (_ => 0)), (command, prepared) =>
+                new(content, rules), TerrainRoutes, 1, context, new OriginalAiRandom(draw ?? (_ => 0)), (command, prepared) =>
             {
                 Commands.Add(command);
                 if (reject || rejectCommand?.Invoke(command) == true) return false;
@@ -272,10 +274,10 @@ public sealed partial class OriginalAiMilitaryTests
     [InlineData("target-city", 2)]
     [InlineData("neighbor-city", 2)]
     [InlineData("neighbor-facility", 2)]
-    [InlineData("distant-facility", 0)]
+    [InlineData("distant-facility", 2)]
     [InlineData("other-corps", 0)]
     [InlineData("single-officer", 1)]
-    public void AttackCollectsSourcesAroundTheFinalTargetWithoutBorrowingUnrelatedOrOtherCorpsTroops(string relation, int expected)
+    public void AttackSourcesUseActualRoutesAndKeepCorpsAndPersonnelLimits(string relation, int expected)
     {
         bool city = relation is "neighbor-city" or "other-corps" or "single-officer";
         bool distant = relation == "distant-facility";
@@ -1685,9 +1687,9 @@ public sealed partial class OriginalAiMilitaryTests
     }
 
     [Theory]
-    [InlineData(1, 0)]
-    [InlineData(2, 1)]
-    public void SelectedShipRechecksConnectivityOnlyWhenItsPassageConditionsChange(int size, int additionalSearches)
+    [InlineData(1)]
+    [InlineData(2)]
+    public void SelectedShipStillPassesFinalChecksWithChangedSpeedAndFootprint(int size)
     {
         var content = WithNavalFormations(Fixture(), slow: true, harbor: true);
         var baseline = new Harness(content with { OriginalAi = content.OriginalAi with
@@ -1701,7 +1703,7 @@ public sealed partial class OriginalAiMilitaryTests
         var actual = selected.Run(OriginalAiWork.Attack, 1);
         Assert.Equal(1, actual.Submitted);
         Assert.Equal(801, Assert.IsType<DeployUnitCommand>(Assert.Single(selected.Commands)).NavalFormationId);
-        Assert.Equal(expected.PathSearches + additionalSearches, actual.PathSearches);
+        Assert.Equal(801, Assert.Single(selected.Engine.Snapshot.Units).NavalFormationId);
     }
 
     [Theory]
