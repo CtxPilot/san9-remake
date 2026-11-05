@@ -1,5 +1,7 @@
 # BEH-AI-0001：AI 观察、规划与命令提交边界
 
+> 实验状态（2026-11-05）：军事 AI 改写已终止、未通过整体验收。本分支的新入口及相关规则描述仅记录实验代码，不代表 main 已采用，也不再要求继续补齐；具体边界见[实验收口](../../docs/military-ai-experiment-closure.md)。
+
 - 状态：已确认
 - 最后更新：2026-11-05
 - 关联决策：[DEC-AI-0001](../decisions/DEC-AI-0001-deterministic-planning-boundary.md)、[DEC-SIM-0001](../decisions/DEC-SIM-0001-determinism-and-saves.md)

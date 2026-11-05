@@ -17,8 +17,8 @@
 
 - [整体路线图](roadmap.md)
 - [原版AI新规格](original-ai/README.md)（独立建立行为、实施和验收；研究只引用[唯一权威正文](../research/ai.md)）
-- [军事AI重做计划](military-ai-plan.md)（实验分支已切换新军事入口；M1～M3均未完成，基础实现、核心缺口及阶段纠正见7.7）
-- [军事AI下一步待办](military-ai-next-steps.md)（撤回搜索式实验后的规则基准、实施顺序与停止条件；风险仍统一在原清单）
+- [军事 AI 实验收口](../docs/military-ai-experiment-closure.md)（已终止、未通过整体验收；不整体合入 main）
+- [军事 AI 原计划](military-ai-plan.md)与[风险核查](military-ai-risk-review.md)（冻结的设计和证据；原实施待办已关闭）
 - [旧自主AI规格](ai/README.md)（冻结的增强路线与暂停实现记录，不继续追加原版AI规格）
 - [表现层后续接入规划](presentation-implementation-plan.md)（操作、消息、战场与剧情演出及整局收口）
 - [粗格导航设计](navigation-redesign.md)（已采用：粗格导航、细步执行与端点接驳）
