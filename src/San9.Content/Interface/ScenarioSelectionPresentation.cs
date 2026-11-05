@@ -58,7 +58,7 @@ public sealed record ForceSelectionPresentation(StartMenuSprite[] Foreground, St
     [System.Text.Json.Serialization.JsonRequired] public NewForcePresentation NewForces { get; init; } = null!;
     public static IReadOnlyList<string> RequiredSkinRoles { get; } = Array.AsReadOnly(new[]
     {
-        "background", "panel", "frame-top-left", "frame-top-right", "frame-bottom-left", "frame-bottom-right",
+        "background", "panel", "city-panel", "frame-top-left", "frame-top-right", "frame-bottom-left", "frame-bottom-right",
         "top", "bottom", "left", "right", "title-left", "title-middle", "title-right", "footer-left", "footer-middle", "footer-right", "city-marker"
     }.Select(role => "opening-" + role).ToArray());
     [System.Text.Json.Serialization.JsonRequired] public Dictionary<string, ImageAsset> MapSkin { get; init; } = [];

@@ -88,7 +88,7 @@ public partial class ForceSelectionMapView : ModalView
         _list = new CatalogView { Name = "ForceList", Title = "选择势力", HintText = "请选择势力。", CloseTitle = "中止",
             Service = Service, Textures = _textures, Selection = Selection, ConfirmSelection = selected => Confirmed(selected),
             Closed = Closed, ShowMap = CloseList,
-            WindowPainter = (canvas, body) => OpeningWindowPainter.Draw(canvas, _textures, body), MinimumBodyWidth = 788, TitleWidth = 208, MapButtonWidth = 112,
+            WindowPainter = (canvas, body) => OpeningWindowPainter.Draw(canvas, _textures, body), MinimumBodyWidth = 788, TitleBounds = OpeningWindowPainter.TitleBounds, MapButtonWidth = 112,
             Pages = OpeningForceCatalog.Pages,
             ReadRows = page => Scenario.Forces.Select(f => new CatalogRow(f.Id, OpeningForceCatalog.Pages[page].Columns.Select(c => OpeningForceCatalog.Cell(f, c.Id)).ToArray())).ToArray() };
         AddChild(_list); QueueRedraw();

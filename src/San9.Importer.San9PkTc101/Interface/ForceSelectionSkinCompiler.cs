@@ -16,6 +16,7 @@ public static class ForceSelectionSkinCompiler
             ("footer-left", 208), ("footer-middle", 209), ("footer-right", 210) })
             skin.Add("opening-" + role, Image("g_start2", image));
         skin.Add("opening-panel", Image("g_mmap", 169));
+        skin.Add("opening-city-panel", Image("g_mmap", 170));
         skin.Add("opening-city-marker", Image("g_mmap", 155));
         foreach (var (role, index) in new[] { ("catalog-header-left", 202), ("catalog-header-middle", 203), ("catalog-header-right", 204) })
         for (int frame = 0; frame < 4; frame++)

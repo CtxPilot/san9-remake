@@ -18,7 +18,7 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
     public TextureScope Textures { get; init; } = null!;
     public Action<CanvasItem, Rect2>? WindowPainter { get; init; }
     public int MinimumBodyWidth { get; init; }
-    public int TitleWidth { get; init; } = 248;
+    public Rect2 TitleBounds { get; init; } = new(-16, -8, 248, 56);
     public int MapButtonWidth { get; init; } = 108;
     public Vector2 PortraitSize { get; init; } = new(64, 80);
     public string PortraitFrameRole { get; init; } = "catalog-portrait-frame";
@@ -79,7 +79,7 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
         int height = 226 + 24 * _visibleRows + (Pages.Count > 7 ? 32 : 0);
         _body = new((1024 - width) / 2, (768 - height) / 2, width, height);
         _tableOrigin = _body.Position + new Vector2(40, Pages.Count > 7 ? 148 : 116);
-        var title = LabelAt(Title, _body.Position + new Vector2(-16, -8), new(TitleWidth, 56), 24);
+        var title = LabelAt(Title, _body.Position + TitleBounds.Position, TitleBounds.Size, 24);
         title.HorizontalAlignment = HorizontalAlignment.Center;
         for (int i = 0; i < Pages.Count; i++)
         {

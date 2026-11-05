@@ -5,6 +5,9 @@ namespace San9.Client.Godot;
 /// <summary>Opening catalog chrome, composed around one body rectangle with native transparent margins.</summary>
 public static class OpeningWindowPainter
 {
+    // The 264px title strip has 65px transparent end margins and 24px above its visible frame.
+    public static Rect2 TitleBounds => new(25, 8, 134, 40);
+
     public static void Draw(CanvasItem canvas, TextureScope textures, Rect2 body, bool pairedActions = true)
     {
         Texture2D T(string role) => textures.Get("opening-" + role, canvas);

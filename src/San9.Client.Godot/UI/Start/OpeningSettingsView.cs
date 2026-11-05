@@ -38,7 +38,7 @@ public partial class OpeningSettingsView : ModalView
         Size = new(1024, 768); MouseFilter = MouseFilterEnum.Stop;
         _textures = Service.CreateScope(Service.LibraryAssets);
         _textures.Request(Art.Assets.Concat([Help.Asset, Close.Asset]));
-        Label("开局设定", new(48, 16), new(224, 32), OpeningSettingsTextStyles.Heading);
+        OpeningPageHeading.Add(this, _text, "开局设定", OpeningSettingsTextStyles.Heading);
         Label("难度", new(100, 156), new(360, 24), OpeningSettingsTextStyles.Field);
         Choice("Beginner", "初级", new(80, 175), () => Advanced = false, () => !Advanced);
         Choice("Advanced", "高级", new(200, 175), () => Advanced = true, () => Advanced);

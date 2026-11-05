@@ -40,7 +40,7 @@ public partial class ForceSelectionView : ModalView
         _preparation = new(LoadScenario); _token = _preparation.Token;
         _textures = Service.CreateScope(Service.LibraryAssets);
         _textures.Request(Definition.Forces.Assets.Concat([Help.Asset, Close.Asset]));
-        Label("选择势力", new(48, 16), new(224, 32));
+        OpeningPageHeading.Add(this, _text, "选择势力");
         Label($"{Entry.Year}年{Entry.Month}月 {Entry.Title}", new(32, 108), new(960, 28), new("00f878"));
         Button(Definition.Forces.Choose, "ChooseForces", "选择势力", () => OpenPrepared(draft => OpenPreparedMap(draft.Selection())));
         Button(Definition.Forces.CreateForces, "CreateForces", "创作新势力", () => OpenSetup(create: true)).Disabled = true;

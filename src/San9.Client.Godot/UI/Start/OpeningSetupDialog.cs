@@ -53,7 +53,7 @@ public partial class OpeningSetupDialog : ModalView
     {
         for (int i = 0; i < Draft.Setup.Forces.Length; i++)
         { _rulers[i] = Draft.Setup.Forces[i].RulerId; _cities[i] = Draft.Setup.Forces[i].CityId; }
-        Label("创作新势力", new(48, 16), new(224, 32), 24);
+        OpeningPageHeading.Add(this, _text, "创作新势力");
         StartMenuButton? first = null;
         for (int i = 0; i < _rulers.Length; i++)
         {
@@ -113,7 +113,7 @@ public partial class OpeningSetupDialog : ModalView
         var people = _officers.Values.Where(p => CancelDeployment ? Draft.Setup.Placements.Any(a => a.OfficerId == p.Id) :
             NewGameComposer.CanDeploy(p, Draft.Source) && !Draft.Setup.Forces.Any(f => f.RulerId == p.Id) &&
             !Draft.Setup.Placements.Any(a => a.OfficerId == p.Id)).ToArray();
-        PeopleList(CancelDeployment ? "取消部署" : "部署新武将", people, _people, Math.Max(1, people.Length), ids =>
+        PeopleList("选择武将", people, _people, Math.Max(1, people.Length), ids =>
         {
             _people.Clear(); _people.UnionWith(ids); CloseList();
             if (CancelDeployment) Apply(() => Draft.CancelDeployment(_people.Select(id => _officers[id].Id)));
@@ -138,7 +138,7 @@ public partial class OpeningSetupDialog : ModalView
         bool single = CreateForces;
         var pages = OpeningOfficerCatalog.Pages(Draft.Source, Draft.Text);
         _list = new CatalogView { Title = title, HintText = single ? "选择担任新势力君主的武将。" : "请选择武将后决定。",
-            Service = Service, Textures = _skin, CloseTitle = "中止", TitleWidth = 208, TabStripFollowsPage = true, MinimumBodyWidth = 588,
+            Service = Service, Textures = _skin, CloseTitle = "中止", TitleBounds = OpeningWindowPainter.TitleBounds, TabStripFollowsPage = true, MinimumBodyWidth = 588,
             WindowPainter = (canvas, body) => OpeningWindowPainter.Draw(canvas, _skin, body, pairedActions: !single),
             Pages = pages, ReadRows = page => people.Select(p => new CatalogRow(_ids[p.Id],
                 pages[page].Columns.Select(c => OpeningOfficerCatalog.Cell(p, c.Id)).ToArray())).ToArray(),

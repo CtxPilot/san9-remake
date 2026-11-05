@@ -40,7 +40,7 @@ public partial class ScenarioSelectionView : ModalView
                 panels.DrawTexture(_textures.Get(sprite.Asset, panels), new(sprite.X, sprite.Y));
         };
         AddChild(panels);
-        AddLabel(Definition.Title, new(48, 16), new(224, 32), 24, Colors.White);
+        OpeningPageHeading.Add(this, _text, Definition.Title);
         _heading = AddLabel("", new(548, 108), new(476, 24), 24, new("00f878"));
         _hint = AddLabel(Definition.Prompt, new(0, 736), new(1024, 24), 16, Colors.White, HorizontalAlignment.Center);
         _description = new GameRichTextLabel { Name = "Description", Textures = _textures,

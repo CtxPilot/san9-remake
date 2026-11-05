@@ -74,7 +74,7 @@ public partial class OpeningCityPicker : ModalView
         foreach (var child in GetChildren().OfType<CanvasItem>()) child.Hide();
         _list = new CatalogView { Title = Title, HintText = Hint, CloseTitle = "中止", Service = Service, Textures = Textures,
             WindowPainter = (canvas, body) => OpeningWindowPainter.Draw(canvas, Textures, body, pairedActions: false),
-            TitleWidth = 208, MinimumBodyWidth = 800, MapButtonWidth = 112, TabStripFollowsPage = true,
+            TitleBounds = OpeningWindowPainter.TitleBounds, MinimumBodyWidth = 800, MapButtonWidth = 112, TabStripFollowsPage = true,
             Pages = OpeningCityCatalog.Pages, ReadRows = page => _catalog.Read(Candidates, page),
             TableState = _table, InitialCurrentId = _table.Current is null ? InitialCurrentId : null, Activated = Confirmed, Closed = Closed, ShowMap = CloseList };
         AddChild(_list); QueueRedraw();
@@ -98,7 +98,7 @@ public partial class OpeningCityPicker : ModalView
         DrawRect(new(0, 0, 1024, 768), new(0, 0, 0, .45f));
         if (!Textures.IsReady) { Textures.BindRedraw(this); return; }
         OpeningWindowPainter.Draw(this, Textures, new(56, 30, 912, 708), pairedActions: false);
-        DrawTexture(Textures.Get("opening-panel", this), new(88, 92));
+        DrawTexture(Textures.Get("opening-city-panel", this), new(88, 92));
     }
     public override void _ExitTree() { _mapTextures.Dispose(); _text.Dispose(); }
 }
