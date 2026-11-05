@@ -10,15 +10,6 @@ namespace San9.Client.Godot.Tests;
 public sealed class BuildingHoverTests
 {
     [Theory]
-    [InlineData(5, 0, MapHoverTheme.Own)]
-    [InlineData(null, 100, MapHoverTheme.Other)]
-    [InlineData(6, 39, MapHoverTheme.Other)]
-    [InlineData(6, 40, MapHoverTheme.Friendly)]
-    [InlineData(6, 100, MapHoverTheme.Friendly)]
-    public void ThemeFollowsOwnershipAndRelationBoundary(int? owner, int relation, MapHoverTheme expected) =>
-        Assert.Equal(expected, MapHoverInfo.ThemeFor(owner, 5, relation));
-
-    [Theory]
     [InlineData(643, 200, 316, 643, 200)]
     [InlineData(644, 200, 248, 644, 200)]
     [InlineData(1023, 760, 316, 863, 420)]

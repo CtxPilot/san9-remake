@@ -47,7 +47,7 @@ public sealed class UnitCatalogTests
         Assert.Equal(engaged, view.IsUnitEngaged(subject.Id));
         Assert.Equal(expected, UnitCatalog.Read(view, view.MilitaryRules, texts, 1).Rows.Single(r => r.Key.Id == subject.Id).Cells[4].Text);
         Assert.Equal(expected, UnitDetails.Read(view, view.MilitaryRules, texts, subject.Id).Condition);
-        Assert.Equal(expected, UnitMapInteraction.Hover(view, texts, subject.Id)!.Rows.Single(r => r.Label == "状态").Value);
+        Assert.Equal(expected, UnitMapInteraction.Hover(view, texts, subject.Id, MapInformationContext.Strategy)!.Rows.Single(r => r.Label == "状态").Value);
         Assert.Equal(expected, MapCommandSummary.Unit(view, texts, subject.Id).Status);
         var targets = new UnitCommandTargets(view, source.Id, UnitCommandKind.Attack);
         var catalog = new MilitaryTargetCatalog(targets, texts);

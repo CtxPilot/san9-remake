@@ -10,6 +10,41 @@ namespace San9.Application.Tests;
 public sealed class UnitMapInteractionTests
 {
     [Fact]
+    public void BuildingAndUnitHoverUseDiplomacyInStrategyAndPlayerControlInExecution()
+    {
+        var definition = G01ScenarioTests.Fixture();
+        var world = GameSession.Start(definition, 1).Snapshot;
+        definition = definition with { Military = new(4, 4, Enumerable.Repeat(0, 16).ToImmutableArray(),
+            [new(0, 1, 1)], [new(100, 50, 0, 100000, 5, new(1, 1), TravelMode.Land)], []) };
+        var view = new StrategySnapshot(definition, world with
+        {
+            Relations = [new(1, 2, 40)],
+            Units = [new(77, 2, new(12, 12), 1000) { FormationId = 100, CorpsId = 2, ServicePlaceId = 2 }],
+            Simulation = world.Simulation with
+            {
+                Controls = [new("first", 1, ControllerKind.Player), new("second", 2, ControllerKind.Player)],
+                ActiveControl = 0
+            }
+        });
+        var texts = MissionScenario.Texts(view);
+        Assert.Equal(MapHoverTheme.Friendly, MapHoverInfo.Resolve(view, texts, 2, MapInformationContext.Strategy)!.Theme);
+        Assert.Equal(MapHoverTheme.Friendly, UnitMapInteraction.Hover(view, texts, 77, MapInformationContext.Strategy)!.Theme);
+        Assert.Equal(MapHoverTheme.Own, MapHoverInfo.Resolve(view, texts, 2, MapInformationContext.Execution)!.Theme);
+        Assert.Equal(MapHoverTheme.Own, UnitMapInteraction.Hover(view, texts, 77, MapInformationContext.Execution)!.Theme);
+
+        var automatic = view.ForWorld(view.World with
+        {
+            Simulation = view.World.Simulation with
+            {
+                Controls = [.. view.World.Simulation.Controls.Select(c => c with { Kind = ControllerKind.Automatic })],
+                ActiveControl = 2
+            }
+        });
+        Assert.Equal(MapHoverTheme.Other, MapHoverInfo.Resolve(automatic, texts, 2, MapInformationContext.Execution)!.Theme);
+        Assert.Equal(MapHoverTheme.Other, UnitMapInteraction.Hover(automatic, texts, 77, MapInformationContext.Execution)!.Theme);
+    }
+
+    [Fact]
     public void PortDefectionUpdatesConstructionArmyServicePlaceInTheWorldAndHover()
     {
         var definition = G01ScenarioTests.Fixture();
@@ -41,7 +76,7 @@ public sealed class UnitMapInteractionTests
         Assert.Equal(3, view.World.Units.Single().ServicePlaceId);
         Assert.Equal(2, view.World.Units.Single().OwnerId);
         Assert.Equal(order, view.World.Units.Single().Order);
-        var hover = UnitMapInteraction.Hover(view, texts, 77)!;
+        var hover = UnitMapInteraction.Hover(view, texts, 77, MapInformationContext.Strategy)!;
         Assert.Equal(texts.Resolve("city.3"), hover.Rows.Single(r => r.Label == "所属").Value);
         Assert.Equal(texts.Resolve("officer.4"), hover.Rows.Single(r => r.Label == "势力").Value);
         Assert.Equal(hover.Rows.Single(r => r.Label == "所属").Value,
@@ -66,10 +101,10 @@ public sealed class UnitMapInteractionTests
             .Concat(definition.Settlements.Select(s => s.NameKey));
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, keys.ToDictionary(k => k, k => k));
         var before = new StrategySnapshot(definition, world);
-        Assert.Equal("city.2", UnitMapInteraction.Hover(before, texts, 77)!.Rows.Single(r => r.Label == "所属").Value);
+        Assert.Equal("city.2", UnitMapInteraction.Hover(before, texts, 77, MapInformationContext.Strategy)!.Rows.Single(r => r.Label == "所属").Value);
         var changed = before.ForWorld(world with { Settlements = world.Settlements.Select(s => s.Id == 2
             ? s with { OwnerId = portOwner, IsDestroyed = destroyed } : s).ToImmutableArray() });
-        var hover = UnitMapInteraction.Hover(changed, texts, 77)!;
+        var hover = UnitMapInteraction.Hover(changed, texts, 77, MapInformationContext.Strategy)!;
         Assert.Equal("无", hover.Rows.Single(r => r.Label == "所属").Value);
         Assert.Equal(2, hover.Force!.Id);
         Assert.Equal("officer.4", hover.Rows.Single(r => r.Label == "势力").Value);
@@ -93,7 +128,7 @@ public sealed class UnitMapInteractionTests
         var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, keys.ToDictionary(k => k, k => k));
         var view = new StrategySnapshot(definition, world);
         var hash = world;
-        var card = UnitMapInteraction.Hover(view, texts, 1)!;
+        var card = UnitMapInteraction.Hover(view, texts, 1, MapInformationContext.Strategy)!;
         Assert.Equal("officer.1队", card.Name);
         Assert.Equal(["一般", "officer.1", "city.1", "18000", "85/100", "formation", "1"], card.Rows.Select(r => r.Value));
         var menu = UnitMapInteraction.Menu(view, 1);
@@ -108,12 +143,12 @@ public sealed class UnitMapInteractionTests
         Assert.True(browser.IsDetail); Assert.Equal(1, browser.SelectedId);
         browser.Back(); Assert.False(browser.IsOpen);
         var changed = new StrategySnapshot(definition, world with { Units = [unit with { Soldiers = 9000, Morale = 42, Condition = UnitCondition.Confused }] });
-        Assert.Equal("混乱", UnitMapInteraction.Hover(changed, texts, 1)!.Rows[0].Value);
-        Assert.Equal("9000", UnitMapInteraction.Hover(changed, texts, 1)!.Rows[3].Value);
+        Assert.Equal("混乱", UnitMapInteraction.Hover(changed, texts, 1, MapInformationContext.Strategy)!.Rows[0].Value);
+        Assert.Equal("9000", UnitMapInteraction.Hover(changed, texts, 1, MapInformationContext.Strategy)!.Rows[3].Value);
         foreach (var hidden in new[] { unit with { IsEmbedded = true }, unit with { IsPersonnel = true }, unit with { Soldiers = 0 }, unit with { FormationId = null } })
         {
             var absent = new StrategySnapshot(definition, world with { Units = [hidden] });
-            Assert.Null(UnitMapInteraction.Hover(absent, texts, 1));
+            Assert.Null(UnitMapInteraction.Hover(absent, texts, 1, MapInformationContext.Strategy));
             Assert.Empty(UnitMapInteraction.Menu(absent, 1));
         }
         Assert.Empty(UnitMapInteraction.Menu(new(definition, world with { Units = [], Officers = original.Officers }), 1));

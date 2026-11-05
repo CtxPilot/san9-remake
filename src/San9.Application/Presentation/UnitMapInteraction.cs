@@ -16,7 +16,7 @@ public static class UnitMapInteraction
         return entries;
     }
 
-    public static MapHoverInfo? Hover(StrategySnapshot view, TextCatalog texts, int id)
+    public static MapHoverInfo? Hover(StrategySnapshot view, TextCatalog texts, int id, MapInformationContext context)
     {
         var unit = view.World.Units.FirstOrDefault(u => u.Id == id && UnitCatalog.IsListed(u) && u.FormationId is not null && u.Soldiers > 0);
         if (unit is null) return null;
@@ -24,11 +24,9 @@ public static class UnitMapInteraction
         var corps = view.World.Corps.FirstOrDefault(c => c.Id == unit.CorpsId);
         string Person(int? person) => view.Officers.FirstOrDefault(o => o.Id == person) is {} officer ? texts.Resolve(officer.NameKey) : "----";
         var formation = view.Information.Formations.FirstOrDefault(f => f.Id == view.FormationId(unit));
-        int relation = view.World.Relations.FirstOrDefault(r =>
-            r.FirstId == view.PlayerForceId && r.SecondId == unit.OwnerId || r.SecondId == view.PlayerForceId && r.FirstId == unit.OwnerId)?.Value ?? 0;
         bool own = unit.OwnerId == view.PlayerForceId;
         return new(id, (unit.CommanderId is null ? texts.Resolve(force.NameKey) : Person(unit.CommanderId)) + "队",
-            MapHoverInfo.ThemeFor(unit.OwnerId, view.PlayerForceId, relation), force, [],
+            MapHoverInfo.ThemeFor(view, unit.OwnerId, context), force, [],
             [new("状态", UnitCatalog.Condition(view, unit)),
              new(own ? "军团" : "势力", own ? Person(corps?.LeaderId) : texts.Resolve(force.NameKey)),
              new("所属", UnitCatalog.ServicePlace(view, unit)?.ResolveName(texts) ?? "无"),

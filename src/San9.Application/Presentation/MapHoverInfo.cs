@@ -1,5 +1,6 @@
 using San9.Content.Text;
 using San9.Core.Domain;
+using San9.Core.Simulation;
 
 namespace San9.Application.Presentation;
 
@@ -12,8 +13,19 @@ public sealed record MapHoverInfo(int Id, string Name, MapHoverTheme Theme, Forc
     public int? FlagGlyph { get; init; }
     public bool IsRulerCommander { get; init; }
 
-    public static MapHoverTheme ThemeFor(int? owner, int? player, int relation) =>
-        player is not null && owner == player ? MapHoverTheme.Own : owner is null || relation < 40 ? MapHoverTheme.Other : MapHoverTheme.Friendly;
+    public static MapHoverTheme ThemeFor(StrategySnapshot view, int? owner, MapInformationContext context)
+    {
+        // Execution has no single player's diplomatic perspective; blue identifies any player polity.
+        if (context == MapInformationContext.Execution)
+            return owner is int force && view.World.Simulation.Controls.Any(c => c.ForceId == force && c.Kind == ControllerKind.Player)
+                ? MapHoverTheme.Own : MapHoverTheme.Other;
+        if (context != MapInformationContext.Strategy) throw new ArgumentOutOfRangeException(nameof(context));
+        if (owner is null || view.PlayerForceId is not int player) return MapHoverTheme.Other;
+        if (owner == player) return MapHoverTheme.Own;
+        int relation = view.World.Relations.SingleOrDefault(r =>
+            r.FirstId == player && r.SecondId == owner || r.SecondId == player && r.FirstId == owner)?.Value ?? 0;
+        return relation >= 40 ? MapHoverTheme.Friendly : MapHoverTheme.Other;
+    }
 
     public static MapHoverInfo? Resolve(StrategySnapshot view, TextCatalog texts, int id, MapInformationContext context)
     {
@@ -30,8 +42,6 @@ public sealed record MapHoverInfo(int Id, string Name, MapHoverTheme Theme, Forc
             _ => throw new ArgumentOutOfRangeException(nameof(context))
         };
         string Person(int? person) => view.Officers.SingleOrDefault(o => o.Id == person) is { } o ? texts.Resolve(o.NameKey) : "----";
-        int relation = view.World.Relations.SingleOrDefault(r =>
-            r.FirstId == view.PlayerForceId && r.SecondId == s.OwnerId || r.SecondId == view.PlayerForceId && r.FirstId == s.OwnerId)?.Value ?? 0;
         bool own = view.PlayerForceId is not null && s.OwnerId == view.PlayerForceId;
         List<MapHoverRow> rows =
         [
@@ -45,7 +55,7 @@ public sealed record MapHoverInfo(int Id, string Name, MapHoverTheme Theme, Forc
         rows.AddRange([new("耐久", $"{s.Durability}/{s.MaxDurability}", true),
             new("士气", s.Soldiers == 0 ? "----" : $"{s.Morale}/100", true),
             new("士兵", s.Soldiers.ToString(), true), new("在任", $"{serving,3}/{staffing.Assigned,3}", true)]);
-        return new(id, s.ResolveName(texts), ThemeFor(s.OwnerId, view.PlayerForceId, relation), force,
+        return new(id, s.ResolveName(texts), ThemeFor(view, s.OwnerId, context), force,
             city ? s.Icons : [], rows, city ? 316 : 248);
     }
 }

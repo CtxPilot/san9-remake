@@ -43,14 +43,14 @@ public partial class MilitaryPolicyView : FixedPage
                 "到达预定按当前目标、中继点及阻挡预测行军时间。") };
         AddChild(_window);
         string facility = Selection.Source.IsUnit
-            ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id)?.Name
+            ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id, MapInformationContext.Strategy)?.Name
             : "命令设施　" + Selection.View.Settlements.Single(s => s.Id == Selection.Source.Id).ResolveName(Texts);
         _facilityWidth = facility.Sum(c => c < 128 ? 8 : 16) + 32;
         Label(facility, new(0, 0, _facilityWidth, 32));
         AddArrival();
         RefreshArrival();
         var target = Selection.Selected!.Value;
-        var info = target.IsUnit ? UnitMapInteraction.Hover(Selection.View, Texts, target.Id) : MapHoverInfo.Resolve(Selection.View, Texts, target.Id, MapInformationContext.Strategy);
+        var info = target.IsUnit ? UnitMapInteraction.Hover(Selection.View, Texts, target.Id, MapInformationContext.Strategy) : MapHoverInfo.Resolve(Selection.View, Texts, target.Id, MapInformationContext.Strategy);
         Label("命令", new(0, 48, 96, 32));
         Label(Selection.Candidates[target] == MilitaryMarker.Enter ? "进军" : "攻击", new(104, 48, 48, 32));
         Label("目标", new(0, 88, 96, 32)); Label(info?.Name ?? "—", new(104, 88, 160, 32));
@@ -79,7 +79,7 @@ public partial class MilitaryPolicyView : FixedPage
             Help = () => Notice("决定部队是否可以自主撤退。到达预定包含所选中继点。") };
         AddChild(_window);
         string home = Selection.Source.IsUnit
-            ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id)?.Name
+            ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id, MapInformationContext.Strategy)?.Name
             : "命令设施　" + Selection.View.Settlements.Single(s => s.Id == Selection.Source.Id).ResolveName(Texts);
         _facilityWidth = home.Sum(c => c < 128 ? 8 : 16) + 32; Label(home,new(0,0,_facilityWidth,32));
         AddArrival(); RefreshArrival();
