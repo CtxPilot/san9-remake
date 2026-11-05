@@ -263,7 +263,8 @@ internal static class DecisionPresentationCompiler
         for (int i = 0; i < sacrificePlaces.Length; i++) subjects["homecoming-sacrifice." + sacrificePlaces[i]] = sacrificeNames[i];
         string[] tactics = ["步兵", "骑兵", "弓骑", "弩兵", "水军", "攻城", "智略", "谋略", "策略"];
         for (int i = 0; i < tactics.Length; i++) subjects["tactic-category." + i] = tactics[i];
-        int[] bandits = [0, 1, 0, 2, 1, 2, 1, 3, 3, 0, 4, 4, 1, 2]; string[] banditNames = ["马贼", "山贼", "海贼", "盗贼", "江贼"];
+        // RE-0181: the source has no valid bandit name for the barbarian area; use the generic land bandits.
+        int[] bandits = [0, 1, 0, 2, 1, 2, 1, 3, 3, 0, 4, 4, 1, 2, 3]; string[] banditNames = ["马贼", "山贼", "海贼", "盗贼", "江贼"];
         for (int i = 0; i < bandits.Length; i++) subjects["bandits." + i] = banditNames[bandits[i]];
         return new(events, new() { ["citizen"] = Person(671), ["soldier"] = Person(670), ["north-dipper"] = Person(666), ["south-dipper"] = Person(667) })
         { Subjects = subjects, Shared = shared };

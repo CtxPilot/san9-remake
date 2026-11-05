@@ -10,6 +10,46 @@ namespace San9.Application.Tests;
 public sealed class DecisionDraftTests
 {
     [Theory]
+    [InlineData("bandit", "bandit-suppression")]
+    [InlineData("rescue", "traveler-rescue")]
+    [InlineData("mediation", "bandit-mediation")]
+    public void BanditEncountersInTheBarbarianAreaPresentAndResume(string kind, string role)
+    {
+        var definition = SearchConflictSessionTests.Definition(kind);
+        definition = definition with
+        {
+            CityProvinceIds = new() { [1] = 14 },
+            SearchEvents = [definition.SearchEvents.Single() with { Id = role }]
+        };
+        var session = SearchSession(definition, 20);
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, [])
+        {
+            Messages = new()
+            {
+                ["subject"] = new([new MessageValue(new("binding", "string.0"))]),
+                ["prompt"] = new([new MessageLiteral("选择")])
+            }
+        };
+        var presentation = CommandPresentation.Empty with
+        {
+            Decisions = new(new()
+            {
+                [role] = new(DecisionWindowKind.VerticalChoice, new("prompt", []),
+                    [new("subject", new() { ["string.0"] = "subject" }, Illustration: "bandit-image")],
+                    [], new() { ["Decline"] = "拒绝", ["Fight"] = "讨伐", ["Appease"] = "怀柔", ["MediatePeace"] = "仲裁" })
+            }, new() { ["citizen"] = 1 }) { Subjects = new() { ["bandits.14"] = "盗贼" } }
+        };
+        var draft = DecisionDraft.Read(session, texts, presentation)!;
+        var introduction = Assert.Single(draft.Introduction);
+        Assert.Equal("盗贼", introduction.Message.BbCode);
+        Assert.Equal("decision-bandits-land", introduction.IllustrationRole);
+        var answer = draft.Options.Single(o => o.Role == "Decline")
+            .CreateCommand(Guid.NewGuid(), session.Snapshot.Simulation.NextSequence, null, 0);
+        Assert.True(session.Execute(new("player"), answer).Submission.Accepted);
+        Assert.Null(session.GetSearchConflictPrompt());
+    }
+
+    [Theory]
     [MemberData(nameof(CommunitySearchSessionTests.Choices), MemberType = typeof(CommunitySearchSessionTests))]
     public void CommunityOptionsSubmitTheirActualChoice(string kind, CommunitySearchChoice choice)
     {

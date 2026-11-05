@@ -11,6 +11,8 @@ public sealed class DecisionPresentationCompilerTests
             0, 6000, 0, 0, 0, 0, 0, biography, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             [], 0, 0, [], 0)).ToArray();
         var decisions = DecisionPresentationCompiler.Compile(people);
+        Assert.Equal("盗贼", decisions.Subjects["bandits.14"]);
+        Assert.Equal("海贼", decisions.Subjects["bandits.13"]);
         var succession = decisions.Shared["ending-succession-year"];
         Assert.Equal("messages.7628", succession.Key);
         Assert.Equal("ruler", succession.Bindings["person.0"]);
