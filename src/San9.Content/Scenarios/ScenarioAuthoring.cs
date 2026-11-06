@@ -14,8 +14,11 @@ public sealed record ContentOverride<T>(T Value);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScenarioDefinitions
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 5;
     [JsonRequired] public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+    [JsonRequired] public long NextFormationId { get; init; }
+    [JsonRequired] public long NextTacticId { get; init; }
+    [JsonRequired] public long NextOfficeId { get; init; }
     [JsonRequired] public required OfficerGrowthRules OfficerGrowth { get; init; }
     [JsonRequired] public required OriginalAiDefinition OriginalAi { get; init; }
     [JsonRequired] public required int FoodExchangeRate { get; init; }
@@ -45,6 +48,9 @@ public sealed record ScenarioDefinitions
 
     public static ScenarioDefinitions From(ScenarioInitialState scenario) => new()
     {
+        NextFormationId = (long)(scenario.Military?.Formations.Select(f => f.Id).DefaultIfEmpty(-1).Max() ?? -1) + 1,
+        NextTacticId = (long)(scenario.Military?.Tactics.Select(t => t.Id).DefaultIfEmpty(-1).Max() ?? -1) + 1,
+        NextOfficeId = (long)scenario.Information.Offices.Select(o => o.Id).DefaultIfEmpty(-1).Max() + 1,
         OfficerGrowth = scenario.OfficerGrowth,
         OriginalAi = scenario.OriginalAi,
         FoodExchangeRate = scenario.FoodExchangeRate,
@@ -198,7 +204,7 @@ public sealed record InformationCatalog
     [JsonRequired] public required OfficeDefinition[] Offices { get; init; }
     [JsonRequired] public required TreasureDefinition[] Treasures { get; init; }
     [JsonRequired] public required ImmutableArray<int> MapContextExcludedFacilityIds { get; init; }
-    [JsonRequired] public required MilitaryCatalogDefinition[] Tactics { get; init; }
+    [JsonRequired] public required TacticCatalogDefinition[] Tactics { get; init; }
     [JsonRequired] public required FormationCatalogDefinition[] Formations { get; init; }
     [JsonRequired] public required CountryTitleDefinition[] CountryTitles { get; init; }
 
@@ -369,7 +375,7 @@ public sealed record ScenarioGeography
 public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements)
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     [JsonRequired] public required GameClock? ThreeVisitsStarted { get; init; }
     [JsonRequired] public required bool UnitDefectionsEnabled { get; init; }
     [JsonRequired] public required bool SettlementDefectionsEnabled { get; init; }

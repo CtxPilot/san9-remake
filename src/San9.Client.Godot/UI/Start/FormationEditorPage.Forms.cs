@@ -33,6 +33,11 @@ public partial class FormationEditorPage
         var page = Page("基础");
         var catalog = Workspace.GetFormationCatalog(id);
         ContentEditorControls.AddText(page, "描述", catalog.Description, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Description = v }); RefreshList(); UpdateHeading(); }), true);
+        var appearances = Workspace.FormationAppearances;
+        if (appearances.Count > 0)
+            ContentEditorControls.Choices(page, "部队外观", appearances.Select(a => a.Name).ToArray(),
+                appearances.ToList().FindIndex(a => a.MapAppearanceId == catalog.MapAppearanceId),
+                Guard<int>(index => Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { MapAppearanceId = appearances[index].MapAppearanceId })));
         var grid = Section(page, "行军与编制", "距离与占地以细单位计，5单位为1地图格；普通陆地每格基础消耗50移动力。");
         Number(grid, "每日移动力", f.MovementBudget, 1, int.MaxValue, v => Edit(id, p => p with { MovementBudget = (int)v }), "FormationMovement");
         Number(grid, "出征费用", f.DeploymentCost, 0, int.MaxValue, v => Edit(id, p => p with { DeploymentCost = (int)v }), "FormationCost");

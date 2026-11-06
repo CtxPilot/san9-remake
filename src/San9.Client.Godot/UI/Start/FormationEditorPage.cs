@@ -21,9 +21,10 @@ public partial class FormationEditorPage : SharedDataEditorPage
     private int? _current;
     private int _generation;
     private bool _building, _rawDirty;
+    private SharedCatalogActions _actions = null!;
     public override void Activate() { if (IsNodeReady() && !HasPendingChanges) RefreshAfterSave(); }
-    public override bool HasPendingChanges => _rawDirty;
-    public override bool CommitPending() => CommitJson();
+    public override bool HasPendingChanges => _rawDirty || _actions.Busy;
+    public override bool CommitPending() => !_actions.Busy && CommitJson();
     public override void RefreshAfterSave() { RefreshList(); ShowCurrent(); }
     private static readonly JsonSerializerOptions EditorJson = new(ScenarioContentFiles.DataJsonOptions)
     { WriteIndented = true, UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
@@ -32,6 +33,19 @@ public partial class FormationEditorPage : SharedDataEditorPage
     {
         _split = new HSplitContainer { SizeFlagsVertical = SizeFlags.ExpandFill, SplitOffsets = [230] }; AddChild(_split); _split.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var sidebar = ContentEditorControls.Sidebar(_split);
+        _actions = new()
+        {
+            Page = this, Subject = "阵形", Identity = "Formation", Current = () => _current,
+            CanDelete = Workspace.IsCreatedFormation, EntryName = id => Workspace.GetFormationCatalog(id).Name,
+            Create = async (id, token) => (await Workspace.CreateFormationAsync(id, token)).Id,
+            Delete = Workspace.DeleteFormationAsync, Commit = CommitJson,
+            Select = id =>
+            {
+                _current = id ?? Workspace.Formations.FirstOrDefault()?.Id;
+                _search.Text = ""; RefreshList(); if (_current is not null) _list.EnsureCurrentIsVisible(); ShowCurrent();
+            }
+        };
+        sidebar.AddChild(_actions);
         _search = new LineEdit { PlaceholderText = "搜索阵形", Name = "FormationSearch" }; sidebar.AddChild(_search);
         _search.TextChanged += _ => RefreshList();
         _list = new ItemList { SizeFlagsVertical = SizeFlags.ExpandFill, Name = "FormationList" }; sidebar.AddChild(_list);
@@ -90,10 +104,14 @@ public partial class FormationEditorPage : SharedDataEditorPage
 
     private void ShowCurrent()
     {
-        if (_current is not int id) return;
         int tab = Math.Max(0, _tabs.CurrentTab);
         _building = true; _generation++; _json = null; _positionEditor = null;
         foreach (Node child in _tabs.GetChildren()) { _tabs.RemoveChild(child); child.QueueFree(); }
+        _title.Editable = _current is not null; _preview.Visible = _current is not null;
+        if (_current is not int id)
+        {
+            _title.Text = ""; _changed.Visible = false; _building = false; _actions.Refresh(); return;
+        }
         var rule = Workspace.GetFormation(id);
         BuildBasics(rule); BuildCombat(rule); BuildTactics(rule); BuildAdvanced(rule);
         _tabs.CurrentTab = Math.Min(tab, _tabs.GetTabCount() - 1); _building = false; UpdateHeading();
@@ -101,6 +119,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
 
     private void UpdateHeading()
     {
+        _actions.Refresh();
         if (_current is not int id) return;
         var rule = Workspace.GetFormation(id);
         string name = Workspace.FormationNames.GetValueOrDefault(id, $"阵形 {id}");

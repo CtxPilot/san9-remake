@@ -1,11 +1,39 @@
+using Godot;
 using San9.Content.Scenarios;
 
 namespace San9.Client.Godot;
 
 public partial class OfficeEditorPage : SharedCatalogEditorPage
 {
+    private SharedCatalogActions _actions = null!;
+    public override bool HasPendingChanges => _actions.Busy;
+    public override bool CommitPending() => !_actions.Busy;
+    protected override void BuildSidebarActions(VBoxContainer sidebar)
+    {
+        _actions = new()
+        {
+            Page = this, Subject = "官职", Identity = "Office", Current = () => Current,
+            CanDelete = Workspace.IsCreatedOffice, EntryName = id => Workspace.GetOffice(id).Name,
+            Create = async (id, token) => (await Workspace.CreateOfficeAsync(id, token)).Id,
+            Delete = Workspace.DeleteOfficeAsync, Select = SelectEntry,
+            SuccessMessage = "已更新共享官职草稿，尚未保存；符合爵位条件后可供玩家及电脑任命。"
+        };
+        sidebar.AddChild(_actions);
+    }
+    protected override void RefreshActions() => _actions.Refresh();
+    protected override ItemList CreateList() => new CatalogOrderList
+    {
+        CanReorder = () => !_actions.Busy && !IsFiltering && CanProcess(),
+        Reorder = (id, index) =>
+        {
+            if (Workspace.MoveOfficeTo(id, index)) { SelectEntry(id); Status("已调整官职顺序，尚未保存。"); }
+        },
+        TooltipText = "拖动官职调整顺序；搜索期间不可排序。"
+    };
     protected override string Subject => "官职";
-    protected override IEnumerable<(int Id, string Name)> Entries => Workspace.Offices.Select(o => (o.Id, o.Name));
+    protected override string RestoreText => "恢复官职及顺序";
+    protected override string RestoreTooltip => "恢复所选官职的资料及整个列表的顺序，保留其他官职的资料修改。";
+    protected override IEnumerable<(int Id, string Name)> Entries => Workspace.OrderedOffices.Select(o => (o.Id, o.Name));
     protected override Action<int, string> Rename => (id, value) => Edit(id, p => p with { Name = value });
     protected override bool Changed(int id) => Workspace.IsOfficeChanged(id);
     protected override void Restore(int id) => Workspace.RestoreOffice(id);
@@ -17,7 +45,6 @@ public partial class OfficeEditorPage : SharedCatalogEditorPage
         var basics = Section("基本参数");
         Number(basics, "带兵量", office.CommandCapacity, 0, uint.MaxValue, v => Edit(id, p => p with { CommandCapacity = (uint)v }), "OfficeCapacity");
         Number(basics, "每旬俸禄", office.Salary, 0, int.MaxValue, v => Edit(id, p => p with { Salary = (int)v }), "OfficeSalary");
-        Number(basics, "太守排序优先级", office.GovernorPriority, 0, int.MaxValue, v => Edit(id, p => p with { GovernorPriority = (int)v }), "OfficePriority");
         Choice(basics, "官职类别", ["武官", "文官"], (int)office.AppointmentGroup, v => Edit(id, p => p with { AppointmentGroup = (OfficeAppointmentGroup)v }));
         var bonuses = Section("任职能力加成");
         Number(bonuses, "统率", office.AbilityBonuses.Leadership, 0, int.MaxValue, v => Edit(id, p => p with { AbilityBonuses = p.AbilityBonuses with { Leadership = (int)v } }), "OfficeLeadership");

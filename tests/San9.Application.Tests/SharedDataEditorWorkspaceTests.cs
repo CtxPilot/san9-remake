@@ -8,7 +8,7 @@ using San9.Core.Domain;
 
 namespace San9.Application.Tests;
 
-public sealed class SharedDataEditorWorkspaceTests : IDisposable
+public sealed partial class SharedDataEditorWorkspaceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "san9-formations-" + Guid.NewGuid().ToString("N"));
 

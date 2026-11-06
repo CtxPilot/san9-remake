@@ -18,7 +18,7 @@ internal static class PresentationTacticFixture
             {
                 Tactics = Enumerable.Range(0, 3).Select(id => new TacticRule(id, 0, TacticEffect.Martial, 10, 1, 0, true, false, [])).ToImmutableArray()
             },
-            Information = source.Information with { Tactics = Enumerable.Range(0, 3).Select(id => new MilitaryCatalogDefinition(id, new[] { "奋战", "奋斗", "奋迅" }[id])).ToArray() }
+            Information = source.Information with { Tactics = Enumerable.Range(0, 3).Select(id => new TacticCatalogDefinition(id, new[] { "奋战", "奋斗", "奋迅" }[id])).ToArray() }
         };
     }
 }

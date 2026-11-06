@@ -6,6 +6,22 @@ namespace San9.Client.Godot;
 
 public partial class TacticEditorPage : SharedCatalogEditorPage
 {
+    private SharedCatalogActions _actions = null!;
+    public override bool HasPendingChanges => _actions.Busy;
+    public override bool CommitPending() => !_actions.Busy;
+    protected override void BuildSidebarActions(VBoxContainer sidebar)
+    {
+        _actions = new()
+        {
+            Page = this, Subject = "兵法", Identity = "Tactic", Current = () => Current,
+            CanDelete = Workspace.IsCreatedTactic, EntryName = id => Workspace.GetTacticCatalog(id).Name,
+            Create = async (id, token) => (await Workspace.CreateTacticAsync(id, token)).Id,
+            Delete = Workspace.DeleteTacticAsync, Select = SelectEntry,
+            SuccessMessage = "已更新共享兵法草稿，尚未保存；新增兵法不会自动授予武将。"
+        };
+        sidebar.AddChild(_actions);
+    }
+    protected override void RefreshActions() => _actions.Refresh();
     protected override string Subject => "兵法";
     protected override IEnumerable<(int Id, string Name)> Entries => Workspace.Tactics.Select(t => (t.Id, Workspace.GetTacticCatalog(t.Id).Name));
     protected override Action<int, string> Rename => (id, value) => Workspace.SetTacticCatalog(Workspace.GetTacticCatalog(id) with { Name = value });
@@ -17,6 +33,10 @@ public partial class TacticEditorPage : SharedCatalogEditorPage
         var t = Workspace.GetTactic(id); var catalog = Workspace.GetTacticCatalog(id);
         TextField("描述", catalog.Description, v => Workspace.SetTacticCatalog(Workspace.GetTacticCatalog(id) with { Description = v }), true);
         Form.AddChild(new Label { Text = "效果：" + EffectLabel(t.Effect) });
+        var appearances = Workspace.TacticAppearances(t.Effect);
+        Choice(Form, "战斗表现", new[] { "无" }.Concat(appearances.Select(a => a.Name)).ToArray(),
+            appearances.ToList().FindIndex(a => a.BattleAppearanceId == catalog.BattleAppearanceId) + 1,
+            index => Workspace.SetTacticCatalog(Workspace.GetTacticCatalog(id) with { BattleAppearanceId = index == 0 ? null : appearances[index - 1].BattleAppearanceId }));
         var basics = Section("基本参数");
         if (t.Effect != TacticEffect.FacilityAttack)
             Choice(basics, "熟练类别", TacticCategoryLabels.Names, t.Category ?? 0, v => Edit(id, x => x with { Category = v }));

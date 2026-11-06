@@ -11,6 +11,9 @@ namespace San9.Application.Authoring;
 public sealed partial class SharedDataEditorWorkspace
 {
     private readonly ScenarioDefinitions _opened;
+    private readonly ScenarioDefinitions _baseDefinitions;
+    private readonly Dictionary<int, OfficeDefinition> _officeBaselines;
+    private Dictionary<int, int> _officeOrderBaseline;
     private ScenarioDefinitions _saved;
     private byte[]? _expectedPlayer, _expectedOfficers;
     private readonly HashSet<int> _changedOfficers = [];
@@ -42,7 +45,7 @@ public sealed partial class SharedDataEditorWorkspace
 
     private SharedDataEditorWorkspace(string path, string reference, ScenarioDefinitions definitions,
         string officerPath, OfficerDefaultsCatalog officers, Dictionary<string, byte[]> inputs, byte[]? expectedPlayer,
-        byte[]? expectedOfficers, ScenarioReference[] scenarios, OfficerDefaultsCatalog baseOfficers)
+        byte[]? expectedOfficers, ScenarioReference[] scenarios, OfficerDefaultsCatalog baseOfficers, ScenarioDefinitions baseDefinitions)
     {
         DefinitionPath = path; ReferenceScenarioId = reference;
         _opened = _saved = Definitions = definitions;
@@ -50,6 +53,11 @@ public sealed partial class SharedDataEditorWorkspace
         _baseOfficerIds = baseOfficers.Officers.Select(p => p.Id).ToHashSet();
         _baseOfficerIdentityFloor = Math.Max(baseOfficers.NextOfficerId, (long)_baseOfficerIds.DefaultIfEmpty(-1).Max() + 1);
         _officerBaselines = officers.Officers.ToDictionary(p => p.Id);
+        _baseDefinitions = baseDefinitions;
+        _officeBaselines = Offices.ToDictionary(o => o.Id);
+        _officeOrderBaseline = Offices.ToDictionary(o => o.Id, o => o.GovernorPriority);
+        _formationBaselines = Formations.ToDictionary(f => f.Id, f => (f, GetFormationCatalog(f.Id)));
+        _tacticBaselines = Tactics.ToDictionary(t => t.Id, t => (t, GetTacticCatalog(t.Id)));
         _expectedOfficers = expectedOfficers;
         _inputs = inputs; _expectedPlayer = expectedPlayer; _scenarios = scenarios;
     }
@@ -75,12 +83,16 @@ public sealed partial class SharedDataEditorWorkspace
         }
         var selected = entries.Single(e => e.Id == reference.Id);
         string path = PackageFiles.Resolve(selected.Root, selected.Manifest.Definitions);
+        var baseDefinitions = await files.ReadAsync<ScenarioDefinitions>(path, token);
         string activePath = PlayerDefinitionFiles.ActivePath(path);
         var definitions = await files.ReadAsync<ScenarioDefinitions>(activePath, token);
         var inputs = files.Snapshots();
         byte[]? expectedPlayer = activePath == path ? null : inputs[activePath];
-        if (definitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion)
+        if (definitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion || baseDefinitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion)
             throw new InvalidDataException("共享定义版本不符，请先重建世界内容。");
+        if (definitions.NextFormationId < 0 || definitions.NextTacticId < 0 || definitions.NextOfficeId < 0 ||
+            baseDefinitions.NextFormationId < 0 || baseDefinitions.NextTacticId < 0 || baseDefinitions.NextOfficeId < 0)
+            throw new InvalidDataException("共享资料身份分配记录无效。");
         string officerPath = PackageFiles.Resolve(selected.Root, selected.Manifest.OfficerDefaults);
         var baseOfficers = await files.ReadAsync<OfficerDefaultsCatalog>(officerPath, token);
         string activeOfficers = PlayerDefinitionFiles.ActivePath(officerPath);
@@ -97,53 +109,8 @@ public sealed partial class SharedDataEditorWorkspace
             .Equals(path, StringComparison.OrdinalIgnoreCase) || PackageFiles.Resolve(e.Root, e.Manifest.OfficerDefaults)
             .Equals(officerPath, StringComparison.OrdinalIgnoreCase)).ToArray();
         return new SharedDataEditorWorkspace(path, reference.Id, definitions, officerPath, officers,
-            files.Snapshots(), expectedPlayer, expectedOfficers, scenarios, baseOfficers);
+            files.Snapshots(), expectedPlayer, expectedOfficers, scenarios, baseOfficers, baseDefinitions);
     }
-
-    public FormationRule GetFormation(int id) => Formations.Single(f => f.Id == id);
-    public bool IsFormationChanged(int id) => !ContentComparison.Equal(GetFormation(id), _saved.Military!.Formations.Single(f => f.Id == id)) ||
-        !ContentComparison.Equal(GetFormationCatalog(id), _saved.Information.Formations.Single(f => f.Id == id));
-
-    public void SetFormation(FormationRule formation)
-    {
-        ContentStructure.Validate(formation);
-        var formations = Definitions.Military?.Formations ?? [];
-        int index = -1;
-        for (int i = 0; i < formations.Length; i++) if (formations[i].Id == formation.Id) { index = i; break; }
-        if (index < 0) throw new InvalidDataException("只能修改现有阵形，不能改变阵形身份。");
-        Definitions = Definitions with { Military = Definitions.Military! with { Formations = formations.SetItem(index, formation) } };
-        Definitions = ProjectFormation(Definitions, _opened, formation);
-    }
-
-    public void RestoreFormation(int id)
-    {
-        SetFormation(_opened.Military!.Formations.Single(f => f.Id == id));
-        SetFormationCatalog(_opened.Information.Formations.Single(f => f.Id == id));
-    }
-    public FormationCatalogDefinition GetFormationCatalog(int id) => Definitions.Information.Formations.Single(f => f.Id == id);
-    public void SetFormationCatalog(FormationCatalogDefinition value)
-    {
-        var entries = Definitions.Information.Formations.ToArray();
-        int index = Array.FindIndex(entries, f => f.Id == value.Id);
-        if (index < 0) throw new InvalidDataException("找不到阵形。");
-        entries[index] = value;
-        Definitions = Definitions with { Information = Definitions.Information with { Formations = entries } };
-    }
-
-    public OfficeDefinition GetOffice(int id) => Definitions.Information.Offices.Single(o => o.Id == id);
-    public bool IsOfficeChanged(int id) => !ContentComparison.Equal(GetOffice(id), _saved.Information.Offices.Single(o => o.Id == id));
-
-    public void SetOffice(OfficeDefinition office)
-    {
-        ContentStructure.Validate(office);
-        var offices = Definitions.Information.Offices.ToArray();
-        int index = Array.FindIndex(offices, o => o.Id == office.Id);
-        if (index < 0) throw new InvalidDataException("只能修改现有官职，不能改变官职身份。");
-        offices[index] = office;
-        Definitions = Definitions with { Information = Definitions.Information with { Offices = offices } };
-    }
-
-    public void RestoreOffice(int id) => SetOffice(_opened.Information.Offices.Single(o => o.Id == id));
 
     public RankDefinition GetRank(int id) => Definitions.Information.Ranks.Single(r => r.Id == id);
     public bool IsRankChanged(int id) => !ContentComparison.Equal(GetRank(id), _saved.Information.Ranks.Single(r => r.Id == id));
@@ -160,47 +127,20 @@ public sealed partial class SharedDataEditorWorkspace
 
     public void RestoreRank(int id) => SetRank(_opened.Information.Ranks.Single(r => r.Id == id));
 
-    public TacticRule GetTactic(int id) => Tactics.Single(t => t.Id == id);
-    public MilitaryCatalogDefinition GetTacticCatalog(int id) => Definitions.Information.Tactics.Single(t => t.Id == id);
-    public bool IsTacticChanged(int id) => !ContentComparison.Equal(GetTactic(id), _saved.Military!.Tactics.Single(t => t.Id == id)) ||
-        !ContentComparison.Equal(GetTacticCatalog(id), _saved.Information.Tactics.Single(t => t.Id == id));
-    public void SetTactic(TacticRule value)
+    private async Task<ContentReadSession> ValidateDraftAsync(ScenarioDefinitions draft, CancellationToken token)
     {
-        ContentStructure.Validate(value);
-        var tactics = Definitions.Military?.Tactics ?? [];
-        int index = -1;
-        for (int i = 0; i < tactics.Length; i++) if (tactics[i].Id == value.Id) { index = i; break; }
-        if (index < 0) throw new InvalidDataException("只能修改现有兵法。");
-        if (value.Effect != _opened.Military!.Tactics.Single(t => t.Id == value.Id).Effect)
-            throw new InvalidDataException("本页保留兵法效果类型。");
-        Definitions = Definitions with { Military = Definitions.Military! with { Tactics = tactics.SetItem(index, value) } };
-    }
-    public void SetTacticCatalog(MilitaryCatalogDefinition value)
-    {
-        var entries = Definitions.Information.Tactics.ToArray();
-        int index = Array.FindIndex(entries, t => t.Id == value.Id);
-        if (index < 0) throw new InvalidDataException("找不到兵法。");
-        entries[index] = value;
-        Definitions = Definitions with { Information = Definitions.Information with { Tactics = entries } };
-    }
-    public void RestoreTactic(int id)
-    {
-        SetTactic(_opened.Military!.Tactics.Single(t => t.Id == id));
-        SetTacticCatalog(_opened.Information.Tactics.Single(t => t.Id == id));
-    }
-
-    private async Task<ContentReadSession> ValidateForSaveAsync(CancellationToken token)
-    {
-        ContentStructure.Validate(Definitions);
-        foreach (var formation in Formations)
+        ContentStructure.Validate(draft);
+        ValidateMilitaryProfiles(draft, Officers, "共享武将");
+        foreach (var formation in draft.Military?.Formations ?? [])
             if ((!formation.Positions.IsEmpty || formation.Attack is not null) && formation.Positions.Length != formation.OfficerCapacity)
                 throw new InvalidDataException($"{FormationNames.GetValueOrDefault(formation.Id, formation.Id.ToString())}：武将上限 {formation.OfficerCapacity} 与阵位数 {formation.Positions.Length} 不一致，请在阵位页调整。");
         var deletedOfficers = _savedOfficers.Officers.Select(p => p.Id).Except(Officers.Select(p => p.Id)).ToHashSet();
         if (deletedOfficers.Count > 0)
-            ValidateDeletedOfficerReferences(PersonReferences(Officers, "共享武将").Concat(RuleReferences(Definitions, "共享规则")), deletedOfficers);
-        // Save owns a fresh read session. Shared geography and person defaults are
+            ValidateDeletedOfficerReferences(PersonReferences(Officers, "共享武将").Concat(RuleReferences(draft, "共享规则")), deletedOfficers);
+        // Each validation owns a fresh read session. Shared geography and person defaults are
         // parsed once for this operation, even when many scenarios reference them.
         var files = new ContentReadSession();
+        var validatedGeographies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in _scenarios)
         {
             token.ThrowIfCancellationRequested();
@@ -211,18 +151,30 @@ public sealed partial class SharedDataEditorWorkspace
                 var officers = officersPath.Equals(OfficerPath, StringComparison.OrdinalIgnoreCase) ? OfficerCatalog
                     : await files.ReadAsync<OfficerDefaultsCatalog>(PlayerDefinitionFiles.ActivePath(officersPath), token);
                 string definitionsPath = PackageFiles.Resolve(entry.Root, entry.Manifest.Definitions);
-                var definitions = definitionsPath.Equals(DefinitionPath, StringComparison.OrdinalIgnoreCase) ? Definitions
+                var definitions = definitionsPath.Equals(DefinitionPath, StringComparison.OrdinalIgnoreCase) ? draft
                     : await files.ReadAsync<ScenarioDefinitions>(PlayerDefinitionFiles.ActivePath(definitionsPath), token);
-                var geography = await files.ReadAsync<ScenarioGeography>(PackageFiles.Resolve(entry.Root, entry.Manifest.Geography), token);
+                string geographyPath = PackageFiles.Resolve(entry.Root, entry.Manifest.Geography);
+                var geography = await files.ReadAsync<ScenarioGeography>(geographyPath, token);
+                var effectiveDefinitions = document.DefinitionOverrides.Apply(definitions);
                 if (officers.SchemaVersion != OfficerDefaultsCatalog.CurrentSchemaVersion)
                     throw new InvalidDataException("人物默认资料版本不符。");
                 if (deletedOfficers.Count > 0 && officersPath.Equals(OfficerPath, StringComparison.OrdinalIgnoreCase))
-                    ValidateDeletedOfficerReferences(ScenarioReferences(document, document.DefinitionOverrides.Apply(definitions), $"剧本 {entry.Id}"), deletedOfficers);
+                    ValidateDeletedOfficerReferences(ScenarioReferences(document, effectiveDefinitions, $"剧本 {entry.Id}"), deletedOfficers);
                 var scenario = document.Compile(definitions, officers.Officers, geography);
+                foreach (var person in scenario.Officers)
+                    if (person.State.OfficeId is int office && !scenario.Information.Offices.Any(o => o.Id == office))
+                        throw new InvalidDataException($"武将 {person.State.Id} 的初始官职引用不存在的官职 {office}。");
                 scenario.Validate();
+                var profiles = OfficerComposition.Profiles(document.Officers, [.. officers.Officers, .. document.AdditionalOfficerDefaults]);
+                ValidateMilitaryProfiles(effectiveDefinitions, profiles, $"剧本 {entry.Id}");
+                if (scenario.Forces.Any(f => f.ProvidedTactics.Any(id => scenario.Military?.Tactics.Any(t => t.Id == id) != true)))
+                    throw new InvalidDataException("势力授予兵法引用不存在的兵法。");
+                if (definitionsPath.Equals(DefinitionPath, StringComparison.OrdinalIgnoreCase) && draft.Military is { } military &&
+                    validatedGeographies.Add(geographyPath))
+                    _ = new MilitaryRulebook(military.Compile(geography.Military!, []));
                 var messages = await ReadMessagesAsync(entry, files, token);
                 MessageGraph.ValidateCatalogReferences(messages, scenario.Information);
-                foreach (var person in OfficerComposition.Profiles(document.Officers, [.. officers.Officers, .. document.AdditionalOfficerDefaults]))
+                foreach (var person in profiles)
                     if (person.Biography is { } biography) MessageStyles.ValidateMarkup(biography);
             }
             catch (Exception error) when (error is ArgumentException or InvalidDataException or OverflowException)
@@ -254,7 +206,7 @@ public sealed partial class SharedDataEditorWorkspace
     {
         if (!HasChanges) return;
         await EnsureUnchangedAsync(_inputs, token);
-        var validation = await ValidateForSaveAsync(token);
+        var validation = await ValidateDraftAsync(Definitions, token);
         // Worlds are read at save time; check that both the editor source and that
         // validation snapshot are still current before replacing the player copy.
         await EnsureUnchangedAsync(_inputs, token);
@@ -262,7 +214,6 @@ public sealed partial class SharedDataEditorWorkspace
         var published = await ScenarioDataFiles.WritePlayerDocumentsAsync([
             new(PlayerDefinitionPath, Definitions, _expectedPlayer), new(PlayerOfficerPath, OfficerCatalog, _expectedOfficers)], token);
         _expectedPlayer = published[PlayerDefinitionPath]; _expectedOfficers = published[PlayerOfficerPath];
-        _inputs.Remove(DefinitionPath);
         _inputs[PlayerDefinitionPath] = _expectedPlayer; _inputs[PlayerOfficerPath] = _expectedOfficers;
         _saved = Definitions; _savedOfficers = OfficerCatalog; _changedOfficers.Clear();
     }
@@ -303,32 +254,6 @@ public sealed partial class SharedDataEditorWorkspace
         }
 
         public Dictionary<string, byte[]> Snapshots() => _entries.ToDictionary(e => e.Key, e => e.Value.Bytes, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static ScenarioDefinitions ProjectFormation(ScenarioDefinitions definitions, ScenarioDefinitions opened, FormationRule rule)
-    {
-        int index = Array.FindIndex(definitions.Information.Formations, f => f.Id == rule.Id);
-        if (index < 0 || opened.Information.Formations.Single(f => f.Id == rule.Id).Presentation is not { } presentation)
-            return definitions;
-        var original = opened.Military!.Formations.Single(f => f.Id == rule.Id);
-        bool changedPositions = !rule.Positions.SequenceEqual(original.Positions);
-        bool changedVision = rule.Vision != original.Vision;
-        int visionRadius = rule.Vision is { } vision
-            ? (int)Math.Min(int.MaxValue, ((long)vision.Radius + MapCoordinates.UnitsPerCell - 1) / MapCoordinates.UnitsPerCell) : 0;
-        var catalogs = definitions.Information.Formations.ToArray();
-        catalogs[index] = catalogs[index] with { Presentation = presentation with
-        {
-            Columns = changedPositions ? Math.Max(1, rule.Positions.Select(p => p.Column + 1).DefaultIfEmpty(1).Max()) : presentation.Columns,
-            Slots = changedPositions ? rule.Positions.Select(p => new FormationSlot(p.Column, p.Row)).ToImmutableArray() : presentation.Slots,
-            VisionRadius = changedVision ? visionRadius : presentation.VisionRadius,
-            VisionAngleDegrees = changedVision ? rule.Vision?.ArcDegrees ?? 0 : presentation.VisionAngleDegrees,
-            BackgroundRole = changedPositions ? null : presentation.BackgroundRole,
-            AvailableRole = changedPositions ? null : presentation.AvailableRole
-        } };
-        return definitions with { Information = definitions.Information with
-        {
-            Formations = catalogs
-        } };
     }
 
 }

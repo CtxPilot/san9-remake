@@ -35,7 +35,7 @@ public sealed record MapInstance(MapDefinition Definition, MapBuildingPlacement[
         return new(MapPackage.CurrentSchemaVersion,d.SourceBuild,scenario.ScenarioId,season,d.Width,d.Height,
             d.CanvasWidth,d.CanvasHeight,d.Squares,r.Seasons,r.Assets,r.Masks,d.Terrain,d.Bridges,Buildings,
             r.Compositions,d.Clouds,d.LeftEdge,d.RightEdge,[],new(r.Clips,d.Water),d.Boundaries)
-            { Units = r.Units, BuildingTypes = d.BuildingTypes, MinimapColors = r.MinimapColors };
+            { Units = r.Units.BindFormations(scenario.Information.Formations), BuildingTypes = d.BuildingTypes, MinimapColors = r.MinimapColors };
     }
 }
 
@@ -48,7 +48,7 @@ public sealed record ScenarioContent(int SchemaVersion, TextureDependency Textur
     [System.Text.Json.Serialization.JsonRequired]
     public San9.Content.Interface.CommandPresentation Presentation { get; init; } = San9.Content.Interface.CommandPresentation.Empty;
     [System.Text.Json.Serialization.JsonIgnore] public string ResourceRoot { get; init; } = "";
-    public const int CurrentSchemaVersion = 248;
+    public const int CurrentSchemaVersion = 249;
 }
 
 /// <summary>Selected scenario data and static display references, read from the authoritative content files.</summary>

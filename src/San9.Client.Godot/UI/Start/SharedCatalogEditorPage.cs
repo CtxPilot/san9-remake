@@ -19,8 +19,12 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     protected abstract IEnumerable<(int Id, string Name)> Entries { get; }
     protected virtual Action<int, string>? Rename => null;
     protected virtual bool ScrollForm => true;
+    protected virtual string RestoreText => "恢复打开时的值";
+    protected virtual string RestoreTooltip => "";
+    protected bool IsFiltering => _search is { Text.Length: > 0 };
     protected virtual void BuildSidebarActions(VBoxContainer sidebar) { }
     protected virtual void RefreshActions() { }
+    protected virtual ItemList CreateList() => new();
     protected abstract bool Changed(int id);
     protected abstract void Restore(int id);
     protected abstract void BuildForm(int id);
@@ -37,9 +41,10 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
         BuildSidebarActions(side);
         _search = new LineEdit { PlaceholderText = "搜索" + Subject, Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "Search" }; side.AddChild(_search);
         _search.TextChanged += _ => RefreshList();
-        _list = new ItemList { SizeFlagsVertical = SizeFlags.ExpandFill, Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "List" }; side.AddChild(_list);
+        _list = CreateList(); _list.SizeFlagsVertical = SizeFlags.ExpandFill;
+        _list.Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "List"; side.AddChild(_list);
         _list.ItemSelected += index => { if (!_building && CanProcess()) { Current = _visible[(int)index]; ShowCurrent(); } };
-        var restore = new Button { Text = "恢复打开时的值", CustomMinimumSize = new(0, 34) }; side.AddChild(restore);
+        var restore = new Button { Text = RestoreText, TooltipText = RestoreTooltip, CustomMinimumSize = new(0, 34) }; side.AddChild(restore);
         restore.Pressed += () => { if (Current is int id && CanProcess()) { Restore(id); RefreshAfterSave(); Status("已恢复，尚未保存。"); } };
         var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(600, 0) }; body.AddThemeConstantOverride("separation", 12); split.AddChild(body);
         var heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); body.AddChild(heading);
@@ -77,6 +82,7 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
         {
             if (_search.Text.Length > 0 && !name.Contains(_search.Text, StringComparison.OrdinalIgnoreCase) && id.ToString() != _search.Text) continue;
             _visible.Add(id); _list.AddItem(name + (Changed(id) ? "  *" : ""));
+            _list.SetItemMetadata(_visible.Count - 1, id);
             if (Current == id) _list.Select(_visible.Count - 1);
         }
         _building = false;
@@ -140,7 +146,7 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     protected void SelectEntry(int? id)
     {
         Current = id ?? Entries.Select(e => (int?)e.Id).FirstOrDefault();
-        _search.Text = ""; RefreshList(); _list.EnsureCurrentIsVisible(); ShowCurrent();
+        _search.Text = ""; RefreshList(); if (Current is not null) _list.EnsureCurrentIsVisible(); ShowCurrent();
     }
 
     protected void Rebuild() => ShowCurrent();

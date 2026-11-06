@@ -194,10 +194,13 @@ public static class ScenarioContentFiles
         var display = await displayTask;
         var text = display.Text;
         var (scenario, profiles) = await scenarioTask;
+        var presentation = display.Presentation;
+        if (presentation.Battle is { } battle)
+            presentation = presentation with { Battle = battle.BindCatalog(scenario.Information) };
         return new(ScenarioContent.CurrentSchemaVersion, manifest.Textures, await mapTask, scenario,
             OfficerComposition.ProjectText(new(text.SchemaVersion, text.Entries) { Messages = await messagesTask,
                 MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), OfficerComposition.ProjectPortraits(display.Illustrations, profiles))
-            { Presentation = display.Presentation, ResourceRoot = resourceRoot, Preview = manifest.Preview };
+            { Presentation = presentation, ResourceRoot = resourceRoot, Preview = manifest.Preview };
     }
 
     public static async Task WriteAsync(string root, ScenarioContent content, CancellationToken token = default,

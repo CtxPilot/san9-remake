@@ -1,4 +1,5 @@
 using San9.Core.Domain;
+using San9.Content.Scenarios;
 using System.Text.Json.Serialization;
 
 namespace San9.Content.Maps;
@@ -54,10 +55,31 @@ public sealed record MapUnitCatalog(MapUnitBody[] Bodies, MapUnitFormation[] For
     [JsonRequired] public Dictionary<MapProjectileKind, MapProjectile> Projectiles { get; init; } = [];
     [JsonRequired] public MapUnitEffect[] VisionSlices { get; init; } = [];
     public static MapUnitCatalog Empty { get; } = new([], [], [], -1);
+    private MapUnitFormation[]? BoundAppearanceFormations { get; init; }
+
+    /// <summary>Bind gameplay identities to authored display resources before rendering.</summary>
+    public MapUnitCatalog BindFormations(IEnumerable<FormationCatalogDefinition> definitions)
+    {
+        var sources = Formations.ToDictionary(f => f.FormationId);
+        var bound = new Dictionary<int, MapUnitFormation>(sources);
+        // Resolve resource-to-resource references before introducing gameplay IDs.
+        // An author may remap an original gameplay ID that is also a resource key.
+        var appearances = WithFormationAppearance().Formations.ToDictionary(f => f.FormationId);
+        var boundAppearances = new Dictionary<int, MapUnitFormation>(appearances);
+        foreach (var definition in definitions)
+        {
+            if (!sources.TryGetValue(definition.MapAppearanceId, out var source))
+                throw new InvalidDataException($"Unknown map appearance {definition.MapAppearanceId} for formation {definition.Id}.");
+            bound[definition.Id] = source with { FormationId = definition.Id };
+            boundAppearances[definition.Id] = appearances[definition.MapAppearanceId] with { FormationId = definition.Id };
+        }
+        return this with { Formations = bound.Values.ToArray(), BoundAppearanceFormations = boundAppearances.Values.ToArray() };
+    }
 
     /// <summary>Compose central groups from authored references, retaining the base catalog.</summary>
     public MapUnitCatalog WithFormationAppearance()
     {
+        if (BoundAppearanceFormations is { } bound) return this with { Formations = bound };
         if (FormationAppearance.Length == 0) return this;
         var replacements = FormationAppearance.ToDictionary(a => a.FormationId);
         var formations = Formations.ToDictionary(f => f.FormationId);

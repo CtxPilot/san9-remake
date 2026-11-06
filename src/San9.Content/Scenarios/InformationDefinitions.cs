@@ -43,8 +43,13 @@ public record MilitaryCatalogDefinition(int Id, string Name)
 public readonly record struct FormationSlot(int Column, int Row);
 public sealed record FormationPresentation(int Columns, int Rows, ImmutableArray<FormationSlot> Slots,
     int VisionRadius, int VisionAngleDegrees, string? BackgroundRole, string? AvailableRole);
+public sealed record TacticCatalogDefinition(int Id, string Name) : MilitaryCatalogDefinition(Id, Name)
+{
+    [JsonRequired] public int? BattleAppearanceId { get; init; }
+}
 public sealed record FormationCatalogDefinition(int Id, string Name) : MilitaryCatalogDefinition(Id, Name)
 {
+    [JsonRequired] public int MapAppearanceId { get; init; } = Id;
     [JsonRequired] public FormationPresentation? Presentation { get; init; }
 }
 
@@ -53,7 +58,7 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
 {
     [JsonRequired] public bool ShowOfficerAges { get; init; } = true;
     [JsonRequired] public ImmutableArray<int> MapContextExcludedFacilityIds { get; init; } = [];
-    [JsonRequired] public MilitaryCatalogDefinition[] Tactics { get; init; } = [];
+    [JsonRequired] public TacticCatalogDefinition[] Tactics { get; init; } = [];
     [JsonRequired] public FormationCatalogDefinition[] Formations { get; init; } = [];
     [JsonRequired] public CountryTitleDefinition[] CountryTitles { get; init; } = [];
     [JsonRequired] public ForceRelation[] Relations { get; init; } = [];
@@ -72,7 +77,7 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
         if (CountryTitles is null || CountryTitles.Any(t => t is null || t.Rule is null || string.IsNullOrWhiteSpace(t.NameKey) || t.FlagGlyph is < -1 or > 185))
             throw new InvalidDataException("Invalid country title definition.");
         Unique(CountryTitles.Select(t => t.Id));
-        if (Tactics is null || Formations is null || Tactics.Concat(Formations).Any(d => d is null || string.IsNullOrWhiteSpace(d.Name) || d.Description is null))
+        if (Tactics is null || Formations is null || Tactics.Concat<MilitaryCatalogDefinition>(Formations).Any(d => d is null || string.IsNullOrWhiteSpace(d.Name) || d.Description is null))
             throw new InvalidDataException("Invalid military catalog metadata.");
         foreach (var formation in Formations)
             if (formation.Presentation is { } p && (p.Columns <= 0 || p.Rows <= 0 || p.Slots.IsDefault ||
@@ -82,6 +87,8 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
                 p.AvailableRole is not null && string.IsNullOrWhiteSpace(p.AvailableRole)))
                 throw new InvalidDataException("Invalid formation presentation.");
         Unique(Tactics.Select(t => t.Id)); Unique(Formations.Select(f => f.Id));
+        if (Tactics.Any(t => t.BattleAppearanceId < 0) || Formations.Any(f => f.MapAppearanceId < 0))
+            throw new InvalidDataException("Invalid military appearance reference.");
         if (Tactics.Any(t => scenario.Military?.Tactics.Any(r => r.Id == t.Id) != true) ||
             Formations.Any(f => scenario.Military?.Formations.Any(r => r.Id == f.Id) != true))
             throw new InvalidDataException("Unknown military catalog rule reference.");

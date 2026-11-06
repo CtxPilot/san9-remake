@@ -176,6 +176,30 @@ public sealed record TacticPresentationDefinition(Dictionary<string, DecisionMes
 public sealed record BattlePresentationDefinition(Dictionary<string, DecisionMessageDefinition> Messages,
     Dictionary<int, TacticPresentationDefinition> Tactics, string HitSound, string BlockSound)
 {
+    public BattlePresentationDefinition BindCatalog(San9.Content.Scenarios.InformationDefinitions catalog)
+    {
+        var bound = new Dictionary<int, TacticPresentationDefinition>(Tactics);
+        foreach (var definition in catalog.Tactics)
+        {
+            bound.Remove(definition.Id);
+            if (definition.BattleAppearanceId is not int appearance) continue;
+            if (!Tactics.TryGetValue(appearance, out var source))
+                throw new InvalidDataException($"Unknown battle appearance {appearance} for tactic {definition.Id}.");
+            bound[definition.Id] = source;
+        }
+        Dictionary<int, BattleZoomBody> BindBodies(Dictionary<int, BattleZoomBody> sources)
+        {
+            var bodies = new Dictionary<int, BattleZoomBody>(sources);
+            foreach (var formation in catalog.Formations)
+            {
+                bodies.Remove(formation.Id);
+                if (sources.TryGetValue(formation.MapAppearanceId, out var body)) bodies[formation.Id] = body;
+            }
+            return bodies;
+        }
+        return this with { Tactics = bound.ToDictionary(p => p.Key, p => p.Value.Zoom is not { } zoom ? p.Value :
+            p.Value with { Zoom = zoom with { SourceFormations = BindBodies(zoom.SourceFormations), TargetFormations = BindBodies(zoom.TargetFormations) } }) };
+    }
     [System.Text.Json.Serialization.JsonRequired]
     public Dictionary<UnitCondition, BattleSprite> ConditionEffects { get; init; } = [];
     [System.Text.Json.Serialization.JsonRequired]

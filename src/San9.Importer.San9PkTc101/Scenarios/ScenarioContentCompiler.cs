@@ -116,7 +116,8 @@ public static class ScenarioContentCompiler
             ShowOfficerAges = !header.IgnoresPersonAge,
             MapContextExcludedFacilityIds = ConstructionContentCompiler.MapContextExcludedFacilityIds,
             Tactics = Read(San9ScenarioTacticArchive.ReadKnownRecords)
-                .Select(t => new MilitaryCatalogDefinition(t.Id, text.Tactic(t.Id)) { Description = text.TacticDescription(t.Id) }).ToArray(),
+                .Select(t => new TacticCatalogDefinition(t.Id, text.Tactic(t.Id)) { Description = text.TacticDescription(t.Id),
+                    BattleAppearanceId = t.Id is <= 11 or 23 or >= 25 and <= 38 ? t.Id : null }).ToArray(),
             Formations = formations
                 .Select(f => new FormationCatalogDefinition(f.Id, text.Formation(f.Id)) { Description = text.FormationDescription(f.Id),
                     Presentation = new(3, 3, Enumerable.Range(0, f.DeploymentSlotCodes.Count).Select(f.GetDeploymentSlotPosition)

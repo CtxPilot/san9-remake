@@ -36,7 +36,7 @@ public sealed class DeploymentTacticConfigurationTests
                 Tactics = definition.Military.Tactics.AddRange(additions)
             },
             Information = definition.Information with
-            { Tactics = [.. definition.Information.Tactics, .. additions.Select(t => new MilitaryCatalogDefinition(t.Id, "tactic-" + t.Id))] }
+            { Tactics = [.. definition.Information.Tactics, .. additions.Select(t => new TacticCatalogDefinition(t.Id, "tactic-" + t.Id))] }
         };
     }, companion: CompanionSettings.Default with { ConfigureTacticsOnFormationSelection = configureOnSelection });
 

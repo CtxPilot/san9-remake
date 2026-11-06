@@ -7,6 +7,16 @@ namespace San9.Client.Godot.Tests;
 
 public sealed class UnitVisualsTests
 {
+    [Fact]
+    public void NewFormationIdentityRendersThroughItsExplicitAppearance()
+    {
+        var catalog = Catalog.BindFormations([new(30000, "新阵形") { MapAppearanceId = State.FormationId }]);
+        var original = Sample(State, Catalog);
+        var created = Sample(State with { FormationId = 30000 }, catalog);
+        Assert.Equal(original.Animations, created.Animations);
+        Assert.Equal(original.AnchorX, created.AnchorX);
+        Assert.Equal(original.LabelY, created.LabelY);
+    }
     private static UnitVisual Resolve(UnitVisualState state) => Sample(state, Catalog);
 
     [Fact]
