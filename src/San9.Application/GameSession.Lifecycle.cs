@@ -18,7 +18,8 @@ public sealed partial class GameSession
         _initialEvents = simulation.InitialEvents;
         _snapshotSource = new(definition.Content, definition.Rules, definition.Definitions);
         _view = _snapshotSource.Project(simulation.Snapshot, simulation.Companion);
-        _initialView = _view;
+        _initialView = simulation.InitialSnapshot is { } initial
+            ? _snapshotSource.Project(initial, simulation.Companion) : _view;
         _strategicContexts = simulation.Snapshot.Simulation.Controls.Where(c => c.Kind == ControllerKind.Player)
             .ToImmutableDictionary(c => c.ForceId, _ => StrategicContextState.Empty with { Clock = simulation.Snapshot.Clock.IsXunBoundary ? simulation.Snapshot.Clock : null });
         _readOnlyRecords = _records.AsReadOnly();

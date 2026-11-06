@@ -3,7 +3,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using San9.Application.Persistence;
+using San9.Application.Presentation;
+using San9.Content.Interface;
 using San9.Content.Scenarios;
+using San9.Content.Text;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
@@ -11,6 +14,44 @@ namespace San9.Application.Tests;
 
 public sealed class ThreeVisitsSessionTests
 {
+    [Fact]
+    public void InitialRecommendationFollowsTheOrderPromptWithoutRepeatingOrChangingTheWorld()
+    {
+        var definition = Definition();
+        var session = GameSession.Start(definition, 17);
+        var roles = ProgressPresentationDefinition.IntroductionRoles.Append("order").Append("recommendation");
+        var texts = MissionScenario.Texts(session.View) with
+        {
+            Messages = roles.ToDictionary(role => role, role => new MessageDefinition([new MessageLiteral(role)]))
+        };
+        var content = CommandPresentation.Empty with
+        {
+            Progress = new([], [])
+            {
+                Introduction = ProgressPresentationDefinition.IntroductionRoles.ToDictionary(role => role,
+                    role => new DecisionMessageDefinition(role, [])),
+                OrderPrompt = new("order", [])
+            },
+            Events = new(new() { ["three-visits-recommendation"] = new("recommendation", [], "actor") })
+            { People = new() { ["recommender"] = 14 } }
+        };
+        var before = session.Capture();
+        Assert.Equal(OfficerStatus.Undiscovered, session.InitialView.World.Officers.Single(p => p.Id == 15).Status);
+        var publication = new StrategyEntrancePublication(session);
+        var output = publication.Read(1, texts, content, introduceNewGame: true)!;
+        var keys = output.Messages.Select(m => m.Message.Key).ToArray();
+        Assert.Equal("opening", keys[0]);
+        Assert.Equal(new[] { "order", "recommendation" }, keys.TakeLast(2));
+        Assert.Equal(14, output.Messages[^1].SpeakerId);
+        Assert.Null(publication.Read(1, texts, content, introduceNewGame: true));
+        Assert.Equal("order", Assert.Single(publication.Read(2, texts, content, introduceNewGame: true)!.Messages).Message.Key);
+        StateAssert.Equal(before, session.Capture());
+
+        var restored = GameSession.Restore(definition, before);
+        var restoredOutput = new StrategyEntrancePublication(restored).Read(1, texts, content, introduceNewGame: false)!;
+        Assert.Equal("order", Assert.Single(restoredOutput.Messages).Message.Key);
+    }
+
     private static ScenarioInitialState Definition() => new(ScenarioInitialState.CurrentSchemaVersion, "visits", 190, 2, 1, 1,
         [new(1, "force", 1, 100) { LeaderId = 11, BaseTrust = 100 }],
         [new(1, "home", 1, 0, 0, 100, 100, 100, 50, []) { Kind = SettlementKind.City, ConsumesFood = false }],

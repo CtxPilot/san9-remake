@@ -24,7 +24,6 @@ public partial class SessionPresentationFlow : Node
     public Func<Settings.UserSettings> ReadSettings { get; init; } = null!;
     private bool SoundEnabled => ReadSettings().SoundEnabled;
     public bool IntroduceNewGame { get; init; }
-    private readonly HashSet<int> _introducedForces = [];
     public Action? StartNewGame { get; init; }
     public Action LoadGame { get; init; } = null!;
     public Func<MapMessageRecord, bool> PresentMapRecord { get; init; } = null!;
@@ -38,10 +37,9 @@ public partial class SessionPresentationFlow : Node
     public bool HasEnding => _endingView is not null;
     public bool HasQueuedNarration => _pendingNarrations.Count != 0;
     public long Publication => _executionPublication;
-    private (int? Force, San9.Core.Simulation.GameClock? Clock)? _contextPresented;
-    private long _strategyEntrancePresented;
+    private StrategyEntrancePublication _strategyEntrance = null!;
     public Action FocusIncomingPlayer { get; init; } = null!;
-    public override void _Ready() => _contextPresented = (Session.View.PlayerForceId, Session.StrategicContext.Clock);
+    public override void _Ready() => _strategyEntrance = new(Session);
     private GameDialog? _failure;
     public void Update()
     {
@@ -74,28 +72,12 @@ public partial class SessionPresentationFlow : Node
     }
     private void UpdateStrategyEntrance()
     {
-        if (Turn.Screen == TurnScreen.Strategy && Turn.StrategyEntrance != _strategyEntrancePresented &&
-            Session.Snapshot.Simulation.Boundary == San9.Core.Simulation.SimulationBoundary.Stable)
+        if (Turn.Screen == TurnScreen.Strategy &&
+            _strategyEntrance.Read(Turn.StrategyEntrance, Texts, CommandPresentation, IntroduceNewGame) is { } output)
         {
-            _strategyEntrancePresented = Turn.StrategyEntrance;
             FocusIncomingPlayer();
-            if (CommandPresentation.Progress is { } progress)
-            {
-                var context = Session.Messages(Texts);
-                List<CommandMessage> sequence = [];
-                if (IntroduceNewGame && Session.View.PlayerForceId is int force && !_introducedForces.Contains(force))
-                {
-                    sequence.AddRange(NewGameIntroduction.Produce(Session.View, context, Texts, progress));
-                    _introducedForces.Add(force);
-                }
-                sequence.AddRange(StrategyEntryPresentation.Produce(Session.View, context, Texts, progress));
-                if (Session.StrategicContext.Clock is { } clock && _contextPresented != (Session.View.PlayerForceId, clock))
-                {
-                    _contextPresented = (Session.View.PlayerForceId, clock);
-                    sequence.AddRange(StrategicContext.Produce(Session.StrategicContext, Session.View, context, Texts, progress));
-                }
-                OpenNarration(sequence, Session.View);
-            }
+            foreach (var record in output.Records) PresentMapRecord(record);
+            OpenNarration(PresentExecutionMessages(output.Messages), Session.View);
         }
     }
     private WorkflowWindows? _windows;

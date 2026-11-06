@@ -133,6 +133,7 @@ public sealed partial class SimulationEngine
         }
         if (world.Simulation.Boundary == SimulationBoundary.New)
         {
+            InitialSnapshot = world.CreateSnapshot();
             _world.EnterExecution();
             try
             {
@@ -152,6 +153,7 @@ public sealed partial class SimulationEngine
     }
 
     public IReadOnlyList<DomainEvent> InitialEvents { get; } = Array.Empty<DomainEvent>();
+    public WorldSnapshot? InitialSnapshot { get; }
     public WorldSnapshot Snapshot => _world.CreateSnapshot();
     public TacticStudyPrompt? GetTacticStudyPrompt()
     {
