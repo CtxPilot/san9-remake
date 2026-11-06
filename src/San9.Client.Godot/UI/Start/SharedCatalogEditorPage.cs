@@ -19,6 +19,8 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     protected abstract IEnumerable<(int Id, string Name)> Entries { get; }
     protected virtual Action<int, string>? Rename => null;
     protected virtual bool ScrollForm => true;
+    protected virtual void BuildSidebarActions(VBoxContainer sidebar) { }
+    protected virtual void RefreshActions() { }
     protected abstract bool Changed(int id);
     protected abstract void Restore(int id);
     protected abstract void BuildForm(int id);
@@ -32,6 +34,7 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
         var split = new HSplitContainer { SplitOffsets = [230] }; AddChild(split);
         split.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var side = ContentEditorControls.Sidebar(split);
+        BuildSidebarActions(side);
         _search = new LineEdit { PlaceholderText = "搜索" + Subject, Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "Search" }; side.AddChild(_search);
         _search.TextChanged += _ => RefreshList();
         _list = new ItemList { SizeFlagsVertical = SizeFlags.ExpandFill, Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "List" }; side.AddChild(_list);
@@ -92,6 +95,7 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
             }
         }
         else _title!.Text = Current is not null ? name : "没有可编辑的" + Subject;
+        RefreshActions();
     }
     private void ShowCurrent()
     {
@@ -133,5 +137,11 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     {
         ContentEditorControls.Choices(parent, title, labels, selected, Guard(changed));
     }
+    protected void SelectEntry(int? id)
+    {
+        Current = id ?? Entries.Select(e => (int?)e.Id).FirstOrDefault();
+        _search.Text = ""; RefreshList(); _list.EnsureCurrentIsVisible(); ShowCurrent();
+    }
+
     protected void Rebuild() => ShowCurrent();
 }

@@ -7,7 +7,10 @@ namespace San9.Content.Packages;
 [System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
 public sealed record OfficerDefaultsCatalog(int SchemaVersion, OfficerDefaults[] Officers)
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
+    // Allocation history is authoring state: deleting an item must not recycle its identity.
+    [System.Text.Json.Serialization.JsonRequired]
+    public long NextOfficerId { get; init; } = (long)Officers.Select(p => p.Id).DefaultIfEmpty(-1).Max() + 1;
 }
 
 /// <summary>Explicitly owned reusable inputs; no automatic discovery or content-based relocation.</summary>

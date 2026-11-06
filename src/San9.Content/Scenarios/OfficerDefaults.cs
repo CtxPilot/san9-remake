@@ -47,6 +47,18 @@ public sealed record OfficerDefaults(int Id)
     [JsonRequired] public required bool AutomaticSurrenderAllowed { get; init; }
     [JsonRequired] public required bool HasRecruitmentPoliticsBonus { get; init; }
 
+    public static OfficerDefaults Create(int id) => new(id)
+    {
+        NameKey = $"authored.officer.{id}", Name = "新武将", Surname = "新", CourtesyName = null, Biography = null,
+        PortraitKey = null, AgeAtScenarioStart = null, FlagGlyph = -1, CourtesyNameKey = null, BiographyKey = null,
+        War = 50, Intelligence = 50, Politics = 50, Leadership = 50, Affinity = 75,
+        TacticLinkBonus = 0, DuelAdvantages = DuelAdvantages.None, MasteredCategories = [], LearnedTactics = [],
+        TacticProficiencies = [0, 0, 0, 0, 0, 0, 0, 0, 0], ParentId = null, IsFemale = false,
+        Personality = 1, BirthYear = 170, LifespanTier = 7, SuccessionPriority = 0, AppearanceYear = 184,
+        BloodlineId = id, Righteousness = 10, Ambition = 10, ForceFounderPriority = 0,
+        PrefersConsolidationLeadership = false, AutomaticSurrenderAllowed = true, HasRecruitmentPoliticsBonus = false
+    };
+
     public static OfficerDefaults From(OfficerInitialState value, TextCatalog texts) => new(value.State.Id)
     {
         NameKey = value.NameKey,

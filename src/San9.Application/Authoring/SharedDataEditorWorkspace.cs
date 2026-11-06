@@ -8,13 +8,15 @@ using San9.Core.Domain;
 namespace San9.Application.Authoring;
 
 /// <summary>An editor visit over shared catalogs and person defaults, published as complete player documents.</summary>
-public sealed class SharedDataEditorWorkspace
+public sealed partial class SharedDataEditorWorkspace
 {
     private readonly ScenarioDefinitions _opened;
     private ScenarioDefinitions _saved;
     private byte[]? _expectedPlayer, _expectedOfficers;
     private readonly HashSet<int> _changedOfficers = [];
-    private readonly OfficerDefaultsCatalog _openedOfficers;
+    private readonly HashSet<int> _baseOfficerIds;
+    private readonly long _baseOfficerIdentityFloor;
+    private readonly Dictionary<int, OfficerDefaults> _officerBaselines;
     private OfficerDefaultsCatalog _savedOfficers;
     public OfficerDefaultsCatalog OfficerCatalog { get; private set; }
     public string OfficerPath { get; }
@@ -36,15 +38,18 @@ public sealed class SharedDataEditorWorkspace
     public ImmutableArray<TacticRule> Tactics => Definitions.Military?.Tactics
         .Where(t => Definitions.Information.Tactics.Any(c => c.Id == t.Id)).ToImmutableArray() ?? [];
     public int ScenarioCount => _scenarios.Length;
-    public bool HasChanges => !ContentComparison.Equal(Definitions, _saved) || _changedOfficers.Count != 0;
+    public bool HasChanges => !ContentComparison.Equal(Definitions, _saved) || _changedOfficers.Count != 0 || OfficerCatalog.NextOfficerId != _savedOfficers.NextOfficerId;
 
     private SharedDataEditorWorkspace(string path, string reference, ScenarioDefinitions definitions,
         string officerPath, OfficerDefaultsCatalog officers, Dictionary<string, byte[]> inputs, byte[]? expectedPlayer,
-        byte[]? expectedOfficers, ScenarioReference[] scenarios)
+        byte[]? expectedOfficers, ScenarioReference[] scenarios, OfficerDefaultsCatalog baseOfficers)
     {
         DefinitionPath = path; ReferenceScenarioId = reference;
         _opened = _saved = Definitions = definitions;
-        OfficerPath = officerPath; OfficerCatalog = _openedOfficers = _savedOfficers = officers;
+        OfficerPath = officerPath; OfficerCatalog = _savedOfficers = officers;
+        _baseOfficerIds = baseOfficers.Officers.Select(p => p.Id).ToHashSet();
+        _baseOfficerIdentityFloor = Math.Max(baseOfficers.NextOfficerId, (long)_baseOfficerIds.DefaultIfEmpty(-1).Max() + 1);
+        _officerBaselines = officers.Officers.ToDictionary(p => p.Id);
         _expectedOfficers = expectedOfficers;
         _inputs = inputs; _expectedPlayer = expectedPlayer; _scenarios = scenarios;
     }
@@ -77,10 +82,13 @@ public sealed class SharedDataEditorWorkspace
         if (definitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion)
             throw new InvalidDataException("共享定义版本不符，请先重建世界内容。");
         string officerPath = PackageFiles.Resolve(selected.Root, selected.Manifest.OfficerDefaults);
+        var baseOfficers = await files.ReadAsync<OfficerDefaultsCatalog>(officerPath, token);
         string activeOfficers = PlayerDefinitionFiles.ActivePath(officerPath);
         var officers = await files.ReadAsync<OfficerDefaultsCatalog>(activeOfficers, token);
-        if (officers.SchemaVersion != OfficerDefaultsCatalog.CurrentSchemaVersion)
+        if (officers.SchemaVersion != OfficerDefaultsCatalog.CurrentSchemaVersion || baseOfficers.SchemaVersion != OfficerDefaultsCatalog.CurrentSchemaVersion)
             throw new InvalidDataException("人物资料版本不符，请重建内容包。");
+        if (officers.NextOfficerId < 0 || baseOfficers.NextOfficerId < 0)
+            throw new InvalidDataException("武将身份分配记录无效。请检查人物资料。");
         byte[]? expectedOfficers = activeOfficers == officerPath ? null : files.Snapshots()[activeOfficers];
         if ((definitions.Military is null || definitions.Military.Formations.IsEmpty && definitions.Military.Tactics.IsEmpty) &&
             definitions.Information.Offices.Length == 0 && definitions.Information.Ranks.Length == 0 && officers.Officers.Length == 0)
@@ -89,7 +97,7 @@ public sealed class SharedDataEditorWorkspace
             .Equals(path, StringComparison.OrdinalIgnoreCase) || PackageFiles.Resolve(e.Root, e.Manifest.OfficerDefaults)
             .Equals(officerPath, StringComparison.OrdinalIgnoreCase)).ToArray();
         return new SharedDataEditorWorkspace(path, reference.Id, definitions, officerPath, officers,
-            files.Snapshots(), expectedPlayer, expectedOfficers, scenarios);
+            files.Snapshots(), expectedPlayer, expectedOfficers, scenarios, baseOfficers);
     }
 
     public FormationRule GetFormation(int id) => Formations.Single(f => f.Id == id);
@@ -152,23 +160,6 @@ public sealed class SharedDataEditorWorkspace
 
     public void RestoreRank(int id) => SetRank(_opened.Information.Ranks.Single(r => r.Id == id));
 
-    public OfficerDefaults GetOfficer(int id) => Officers.Single(p => p.Id == id);
-    public bool IsOfficerChanged(int id) => _changedOfficers.Contains(id);
-    public void SetOfficer(OfficerDefaults value)
-    {
-        ContentStructure.Validate(value);
-        var entries = Officers.ToArray();
-        int index = Array.FindIndex(entries, p => p.Id == value.Id);
-        if (index < 0) throw new InvalidDataException("只能修改现有武将。");
-        var original = _openedOfficers.Officers.Single(p => p.Id == value.Id);
-        if (value.NameKey != original.NameKey || value.CourtesyNameKey != original.CourtesyNameKey || value.BiographyKey != original.BiographyKey)
-            throw new InvalidDataException("请保留人物文本引用身份。");
-        entries[index] = value;
-        OfficerCatalog = OfficerCatalog with { Officers = entries };
-        if (ContentComparison.Equal(value, _savedOfficers.Officers.Single(p => p.Id == value.Id))) _changedOfficers.Remove(value.Id);
-        else _changedOfficers.Add(value.Id);
-    }
-    public void RestoreOfficer(int id) => SetOfficer(_openedOfficers.Officers.Single(p => p.Id == id));
     public TacticRule GetTactic(int id) => Tactics.Single(t => t.Id == id);
     public MilitaryCatalogDefinition GetTacticCatalog(int id) => Definitions.Information.Tactics.Single(t => t.Id == id);
     public bool IsTacticChanged(int id) => !ContentComparison.Equal(GetTactic(id), _saved.Military!.Tactics.Single(t => t.Id == id)) ||
@@ -204,6 +195,9 @@ public sealed class SharedDataEditorWorkspace
         foreach (var formation in Formations)
             if ((!formation.Positions.IsEmpty || formation.Attack is not null) && formation.Positions.Length != formation.OfficerCapacity)
                 throw new InvalidDataException($"{FormationNames.GetValueOrDefault(formation.Id, formation.Id.ToString())}：武将上限 {formation.OfficerCapacity} 与阵位数 {formation.Positions.Length} 不一致，请在阵位页调整。");
+        var deletedOfficers = _savedOfficers.Officers.Select(p => p.Id).Except(Officers.Select(p => p.Id)).ToHashSet();
+        if (deletedOfficers.Count > 0)
+            ValidateDeletedOfficerReferences(PersonReferences(Officers, "共享武将").Concat(RuleReferences(Definitions, "共享规则")), deletedOfficers);
         // Save owns a fresh read session. Shared geography and person defaults are
         // parsed once for this operation, even when many scenarios reference them.
         var files = new ContentReadSession();
@@ -222,6 +216,8 @@ public sealed class SharedDataEditorWorkspace
                 var geography = await files.ReadAsync<ScenarioGeography>(PackageFiles.Resolve(entry.Root, entry.Manifest.Geography), token);
                 if (officers.SchemaVersion != OfficerDefaultsCatalog.CurrentSchemaVersion)
                     throw new InvalidDataException("人物默认资料版本不符。");
+                if (deletedOfficers.Count > 0 && officersPath.Equals(OfficerPath, StringComparison.OrdinalIgnoreCase))
+                    ValidateDeletedOfficerReferences(ScenarioReferences(document, document.DefinitionOverrides.Apply(definitions), $"剧本 {entry.Id}"), deletedOfficers);
                 var scenario = document.Compile(definitions, officers.Officers, geography);
                 scenario.Validate();
                 var messages = await ReadMessagesAsync(entry, files, token);
@@ -266,7 +262,7 @@ public sealed class SharedDataEditorWorkspace
         var published = await ScenarioDataFiles.WritePlayerDocumentsAsync([
             new(PlayerDefinitionPath, Definitions, _expectedPlayer), new(PlayerOfficerPath, OfficerCatalog, _expectedOfficers)], token);
         _expectedPlayer = published[PlayerDefinitionPath]; _expectedOfficers = published[PlayerOfficerPath];
-        _inputs.Remove(DefinitionPath); _inputs.Remove(OfficerPath);
+        _inputs.Remove(DefinitionPath);
         _inputs[PlayerDefinitionPath] = _expectedPlayer; _inputs[PlayerOfficerPath] = _expectedOfficers;
         _saved = Definitions; _savedOfficers = OfficerCatalog; _changedOfficers.Clear();
     }

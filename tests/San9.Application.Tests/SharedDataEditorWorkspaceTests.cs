@@ -70,6 +70,144 @@ public sealed class SharedDataEditorWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreatingAndCopyingPeoplePreservesOriginalIdentityAndDoesNotDeployThem()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var original = workspace.GetOfficer(9001);
+        var created = await workspace.CreateOfficerAsync();
+        var copy = await workspace.CreateOfficerAsync(original.Id);
+        Assert.True(workspace.IsCreatedOfficer(created.Id));
+        Assert.True(workspace.IsCreatedOfficer(copy.Id));
+        Assert.False(workspace.IsCreatedOfficer(original.Id));
+        Assert.NotEqual(original.NameKey, copy.NameKey);
+        Assert.Equal(original.LearnedTactics, copy.LearnedTactics);
+        Assert.Equal(original.ParentId, copy.ParentId);
+        Assert.Equal(original.BloodlineId, copy.BloodlineId);
+        Assert.Equal(original, workspace.GetOfficer(original.Id));
+        await workspace.SaveAsync();
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.True(reopened.IsCreatedOfficer(created.Id));
+        Assert.True(reopened.IsCreatedOfficer(copy.Id));
+        Assert.False(reopened.IsCreatedOfficer(original.Id));
+        Assert.Equal(9001, Assert.Single((await ScenarioContentFiles.LoadAsync(Path.Combine(_root, "a"))).Scenario.Officers).State.Id);
+        reopened.SetOfficer(reopened.GetOfficer(created.Id) with { War = 88 });
+        reopened.RestoreOfficer(created.Id);
+        Assert.True(ContentComparison.Equal(created, reopened.GetOfficer(created.Id)));
+        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => reopened.DeleteOfficerAsync(original.Id));
+        Assert.Contains("原有武将", failure.Message);
+        Assert.True(ContentComparison.Equal(original, reopened.GetOfficer(original.Id)));
+    }
+
+    [Theory]
+    [InlineData(10001)]
+    [InlineData(20000)]
+    public async Task NewIdentitiesRespectTheBaseCatalogEvenWhenThePlayerCopyOmitsAnUnusedBasePerson(long baseNextId)
+    {
+        await CreatePeopleAndTactics();
+        string path = Path.Combine(_root, "shared", "officers.json");
+        var original = JsonSerializer.Deserialize<OfficerDefaultsCatalog>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
+        var baseline = original with { Officers = [.. original.Officers, OfficerDefaults.Create(10000)], NextOfficerId = baseNextId };
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(baseline, ScenarioContentFiles.DataJsonOptions));
+        await File.WriteAllTextAsync(PlayerDefinitionFiles.PlayerPath(path), JsonSerializer.Serialize(
+            original with { NextOfficerId = 10000 }, ScenarioContentFiles.DataJsonOptions));
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var created = await workspace.CreateOfficerAsync();
+        Assert.True(created.Id >= baseNextId);
+        Assert.True(workspace.IsCreatedOfficer(created.Id));
+        Assert.DoesNotContain(workspace.Officers, p => p.Id == 10000);
+        await workspace.SaveAsync();
+    }
+
+    [Fact]
+    public async Task SavedDeletionNeverRecyclesAnAuthoredOfficerIdentity()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var created = await workspace.CreateOfficerAsync();
+        await workspace.SaveAsync();
+        await workspace.DeleteOfficerAsync(created.Id);
+        Assert.True(workspace.HasChanges);
+        await workspace.SaveAsync();
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var next = await reopened.CreateOfficerAsync();
+        Assert.True(next.Id > created.Id);
+        Assert.DoesNotContain(reopened.Officers, p => p.Id == created.Id);
+    }
+
+    [Fact]
+    public async Task ParentAndBloodlineReferencesBlockDeletionWithoutChangingTheDraft()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var parent = await workspace.CreateOfficerAsync();
+        var child = await workspace.CreateOfficerAsync();
+        workspace.SetOfficer(child with { ParentId = parent.Id, BloodlineId = parent.Id });
+        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => workspace.DeleteOfficerAsync(parent.Id));
+        Assert.Contains("亲代", failure.Message); Assert.Contains("血缘", failure.Message);
+        Assert.Equal(parent, workspace.GetOfficer(parent.Id));
+        workspace.SetOfficer(child);
+        await workspace.DeleteOfficerAsync(parent.Id);
+        Assert.DoesNotContain(workspace.Officers, p => p.Id == parent.Id);
+    }
+
+    [Fact]
+    public async Task NewIdentitiesAvoidScenarioOnlyPeopleAndUnresolvedFamilyReferences()
+    {
+        await CreatePeopleAndTactics();
+        string path = Path.Combine(_root, "a", "scenario.json");
+        var document = JsonSerializer.Deserialize<ScenarioDocument>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document with
+        { AdditionalOfficerDefaults = [OfficerDefaults.Create(20000)] }, ScenarioContentFiles.DataJsonOptions));
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetOfficer(workspace.GetOfficer(9001) with { ParentId = 30000 });
+        var created = await workspace.CreateOfficerAsync();
+        Assert.True(created.Id > 30000);
+        await workspace.SaveAsync();
+    }
+
+    [Fact]
+    public async Task NonPlacementRuleReferencesAlsoProtectAuthoredPeople()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var created = await workspace.CreateOfficerAsync();
+        await workspace.SaveAsync();
+        var definitions = workspace.Definitions with { OriginalAi = workspace.Definitions.OriginalAi with
+        { FamilyRankBonuses = ImmutableDictionary<int, int>.Empty.Add(created.Id, 100) } };
+        await File.WriteAllTextAsync(workspace.PlayerDefinitionPath, JsonSerializer.Serialize(definitions, ScenarioContentFiles.DataJsonOptions));
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var failure = await Assert.ThrowsAsync<InvalidDataException>(() => reopened.DeleteOfficerAsync(created.Id));
+        Assert.Contains("家族排序", failure.Message);
+        Assert.True(ContentComparison.Equal(created, reopened.GetOfficer(created.Id)));
+    }
+
+    [Fact]
+    public async Task ScenarioPlacementBlocksDeletionAndLateReferencesBlockPublication()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var created = await workspace.CreateOfficerAsync();
+        await workspace.SaveAsync();
+        byte[] saved = await File.ReadAllBytesAsync(workspace.PlayerOfficerPath);
+        string path = Path.Combine(_root, "a", "scenario.json");
+        var document = JsonSerializer.Deserialize<ScenarioDocument>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
+        var placement = document.Officers[0] with { Id = created.Id, Overrides = new() };
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document with
+        { Officers = [.. document.Officers, placement] }, ScenarioContentFiles.DataJsonOptions));
+        var blocked = await Assert.ThrowsAsync<InvalidDataException>(() => workspace.DeleteOfficerAsync(created.Id));
+        Assert.Contains("剧本 a", blocked.Message); Assert.Contains("初始状态", blocked.Message);
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document, ScenarioContentFiles.DataJsonOptions));
+        await workspace.DeleteOfficerAsync(created.Id);
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document with
+        { Officers = [document.Officers[0] with { Overrides = new() { ParentId = new(created.Id) } }] }, ScenarioContentFiles.DataJsonOptions));
+        var late = await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.Contains("亲代覆盖", late.Message);
+        Assert.Equal(saved, await File.ReadAllBytesAsync(workspace.PlayerOfficerPath));
+        Assert.True(workspace.HasChanges);
+    }
+
+    [Fact]
     public async Task EditingNamedRulesPreservesUnlistedMilitaryDefinitions()
     {
         await CreatePeopleAndTactics();
