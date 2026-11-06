@@ -2,7 +2,7 @@
 
 - 状态：已确认
 - 负责人：项目开发者
-- 最后更新：2026-10-12
+- 最后更新：2026-11-06
 - 关联证据：[RE-SAN9PK-0111](../../research/findings/RE-SAN9PK-0111.md)、[RE-SAN9PK-0112](../../research/findings/RE-SAN9PK-0112.md)、[RE-SAN9PK-0120](../../research/findings/RE-SAN9PK-0120.md)、[RE-SAN9PK-0122](../../research/findings/RE-SAN9PK-0122.md)、[RE-SAN9PK-0123](../../research/findings/RE-SAN9PK-0123.md)、[RE-SAN9PK-0124](../../research/findings/RE-SAN9PK-0124.md)、[RE-SAN9PK-0150](../../research/findings/RE-SAN9PK-0150.md)
 - 关联决策：[DEC-PROJECT-0002](../decisions/DEC-PROJECT-0002-selective-inheritance.md)、[DEC-SIM-0001](../decisions/DEC-SIM-0001-determinism-and-saves.md)
 - 继承方式：语义保留、领域模型现代化
@@ -41,7 +41,9 @@ G04已交付子军团直属人事权限、统一提交复验，以及登用负�
 
 通过判定后，按当前位置所属城市的有向邻接关系，收集非异民族城市所属的有效人物地点（含未建设地域），按地点ID排序后等概率选择；不自动补反向边，不改成最近据点或全地图随机。已建设但不可驻人、已毁坏或耐久为零的对象不作为目的地。没有候选时保持位置，不消费目的地随机；有候选时即使只有一个也消费一次选择随机。
 
-迁移是即时位置变化，不建立旅行任务。重制保留在野身份起始年、能力、忠诚与宝物；不因普通迁移重新执行下野身份转换。目标位置变化使尚未完成的招募等引用任务失效，经共享取消／返程规则清理后发出`FreeOfficerMigratedEvent`。稳定保存恢复不重跑该旬，开关、随机状态、位置和事件均参与保存／录像。原作安置与邻接证据见[RE-0124补核](../../research/findings/RE-SAN9PK-0124.md#2026-09-19g09在野迁移接入核对)及其引用的RE-0112。
+迁移是即时位置变化，不建立旅行任务。重制保留在野身份起始年、能力、忠诚与宝物；不因普通迁移重新执行下野身份转换。纯位置变化保留指向该人物的登用等任务，由命令继续复验当前资格；不重排去程到期日或重投成功骰，结算与返程读取当前目标位置，见[人物目标行程规则](BEH-PERSON-0001-discovery-recruitment-and-affiliation.md#野外部队登用)。完成位置变更后发出`FreeOfficerMigratedEvent`。稳定保存恢复不重跑该旬，开关、随机状态、位置和事件均参与保存。原作安置与邻接证据见[RE-0124补核](../../research/findings/RE-SAN9PK-0124.md#2026-09-19g09在野迁移接入核对)及其引用的RE-0112。
+
+上述身份年份保留及单候选仍消费随机是重制选择：原作成功迁移走公共下野链，会重写身份年份和若干临时状态；原作列表抽选在候选数小于2时不推进随机序列。不能将本节表述为逐字段或逐随机序列复刻。城市邻接随港口有效状态变化的已知实现缺口见[普通放逐](BEH-PERSON-0002-rewards-exile-and-loyalty-cycle.md#普通放逐)；本次对照与验证见[RE-0124复核](../../research/findings/RE-SAN9PK-0124.md#2026-11-06在野迁移与当前实现对照)。
 
 ### 设施自行归附
 
