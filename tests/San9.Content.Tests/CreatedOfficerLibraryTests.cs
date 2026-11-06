@@ -8,6 +8,21 @@ namespace San9.Content.Tests;
 public sealed class CreatedOfficerLibraryTests
 {
     [Fact]
+    public void BiographyMarkupSurvivesLibraryRoundTripAndIsValidatedAtBothBoundaries()
+    {
+        var person = new CreatedOfficer(Guid.NewGuid(), "人物")
+        { Biography = "[preset=blue][wave amp=50 freq=5]列传[/wave][/preset]" };
+        var library = CreatedOfficerLibrary.Empty with { Officers = [person] };
+        Assert.Equal(person.Biography, Assert.Single(CreatedOfficerLibrary.Decode(library.Encode()).Officers).Biography);
+
+        var invalid = person with { Biography = "[preset=blue]未闭合" };
+        Assert.Throws<InvalidDataException>(() => invalid.Validate());
+        var definitions = San9.Content.Scenarios.SessionDefinitions.Empty with
+        { Officers = [new(1000, "", person.Name, "", invalid.Biography, null)] };
+        Assert.Throws<InvalidDataException>(() => definitions.Validate());
+    }
+
+    [Fact]
     public void PortableLibraryPreservesLiteralNamesPortraitsAndIndependentTacticInputs()
     {
         var person = new CreatedOfficer(Guid.NewGuid(), "任意长度的自创人物姓名")

@@ -28,6 +28,7 @@ public sealed record SessionDefinitions
             Forces.Any(f => f is null || f.Id < 0 || !Officers.Any(p => p.Id == f.FounderId)) ||
             Officers.Select(p => p.Id).Distinct().Count() != Officers.Length || Forces.Select(f => f.Id).Distinct().Count() != Forces.Length)
             throw new InvalidDataException("Invalid session definitions.");
+        foreach (var person in Officers) MessageStyles.ValidateMarkup(person.Biography);
     }
 
     public void Validate(ScenarioInitialState source)
@@ -51,7 +52,8 @@ public sealed record SessionDefinitions
                 string key = $"created.{p.Id}.{suffix}"; entries[key] = MessageMarkup.Escape(value); return key;
             }
             profiles[p.Id] = new(Add("surname", p.Surname), Add("given", p.Name), p.PortraitKey);
-            Add("courtesy", p.CourtesyName); Add("biography", p.Biography);
+            Add("courtesy", p.CourtesyName);
+            if (p.BiographyKey is string biographyKey) entries[biographyKey] = p.Biography;
         }
         return source with { Entries = entries, MessagePeople = profiles };
     }

@@ -313,12 +313,16 @@ public sealed class NewGameSetupTests
     [Fact]
     public void TextCompositionKeepsNamesLiteralAndDoesNotChangeTheBaseCatalog()
     {
-        var draft = Draft(First with { Name = "[甲]", Biography = "[b]原文[/b]" });
+        const string biography = "[wave amp=50 freq=5]程家军[/wave]";
+        var draft = Draft(First with { Name = "[甲]", CourtesyName = "[乙]", Biography = biography });
         draft.Deploy([First.Id], 1, false);
         var text = draft.Composition.Definitions.AddText(draft.Text);
         var person = draft.Compose().Officers.Last();
         Assert.Equal("新[甲]", text.Resolve(person.NameKey));
-        Assert.Equal("[b]原文[/b]", text.Resolve(person.BiographyKey!));
+        Assert.Equal("[乙]", text.Resolve(person.CourtesyNameKey!));
+        Assert.Equal(biography, text.ResolveRich(person.BiographyKey!));
+        var session = GameSession.Start(draft.Source, 7, setup: draft.Setup);
+        Assert.Equal(biography, OfficerDetails.Read(session.View, text, person.State.Id).Biography);
         Assert.False(draft.Text.Entries.ContainsKey(person.NameKey));
         text.Validate();
     }

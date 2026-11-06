@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using San9.Content.Packages;
+using San9.Content.Text;
 using San9.Core.Domain;
 
 namespace San9.Content.Authoring;
@@ -58,6 +59,7 @@ public sealed record CreatedOfficer(Guid Id, string Name)
             throw new InvalidDataException($"人物“{FullName}”的资料无效，请检查姓名、年份、属性及关系。");
         if (PortraitKey is not null && string.IsNullOrWhiteSpace(PortraitKey))
             throw new InvalidDataException("头像引用不能为空白。");
+        MessageStyles.ValidateMarkup(Biography);
     }
 }
 
