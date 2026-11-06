@@ -49,9 +49,8 @@ public sealed partial class SharedDataEditorWorkspace
         if (ordered[index].IsUnranked) throw new InvalidDataException("无爵位固定在末尾。");
         if (target < 0 || target >= ordered.Count - 1) throw new ArgumentOutOfRangeException(nameof(target));
         if (target == index) return false;
-        int[] precedence = ordered.Select(r => r.Precedence).ToArray();
-        var moving = ordered[index]; ordered.RemoveAt(index); ordered.Insert(target, moving);
-        var positions = ordered.Select((r, i) => (r.Id, Precedence: precedence[i])).ToDictionary(r => r.Id, r => r.Precedence);
+        var positions = CatalogPriorityOrder.Move(ordered.Select(r => new CatalogPriorityOrder.Entry(r.Id, r.Precedence)), id, target)
+            .ToDictionary(e => e.Id, e => e.Priority);
         Definitions = Definitions with { Information = Definitions.Information with
             { Ranks = Ranks.Select(r => r with { Precedence = positions[r.Id] }).ToArray() } };
         return true;
@@ -90,11 +89,9 @@ public sealed partial class SharedDataEditorWorkspace
     {
         var ordered = OrderRanks(ranks).ToList();
         int position = after is int id ? ordered.FindIndex(r => r.Id == id) + 1 : ordered.Count - 1;
-        ordered.Insert(position, rank);
-        int above = ordered[position - 1].Precedence, below = ordered[position + 1].Precedence;
-        if ((long)above - below > 1) ordered[position] = rank with { Precedence = above - 1 };
-        else ordered = ordered.Select((r, i) => r with { Precedence = ordered.Count - 1 - i }).ToList();
-        return ordered.ToArray();
+        var priorities = CatalogPriorityOrder.Insert(ordered.Select(r => new CatalogPriorityOrder.Entry(r.Id, r.Precedence)), rank.Id, position)
+            .ToDictionary(e => e.Id, e => e.Priority);
+        return ordered.Append(rank).Select(r => r with { Precedence = priorities[r.Id] }).ToArray();
     }
 
     public async Task DeleteRankAsync(int id, CancellationToken token = default)

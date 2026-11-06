@@ -37,20 +37,14 @@ public sealed partial class SharedDataEditorWorkspace
         if (index < 0) throw new InvalidDataException("找不到官职。");
         if (target < 0 || target >= ordered.Count) throw new ArgumentOutOfRangeException(nameof(target));
         if (target == index) return false;
-        int[] priorities = ordered.Select(o => o.GovernorPriority).ToArray();
-        var moving = ordered[index]; ordered.RemoveAt(index); ordered.Insert(target, moving);
-        var assigned = ordered.Select((o, i) => o with { GovernorPriority = priorities[i] }).ToArray();
-        if (!OrderOffices(assigned).Select(o => o.Id).SequenceEqual(ordered.Select(o => o.Id)))
-            assigned = NumberOfficeOrder(ordered);
-        SetOfficeOrder(assigned);
+        var assigned = CatalogPriorityOrder.Move(ordered.Select(o => new CatalogPriorityOrder.Entry(o.Id, o.GovernorPriority)), id, target)
+            .ToDictionary(e => e.Id, e => e.Priority);
+        SetOfficeOrder(Offices.Select(o => o with { GovernorPriority = assigned[o.Id] }));
         return true;
     }
 
     private static IOrderedEnumerable<OfficeDefinition> OrderOffices(IEnumerable<OfficeDefinition> offices) =>
         offices.OrderByDescending(o => o.GovernorPriority).ThenBy(o => o.Id);
-
-    private static OfficeDefinition[] NumberOfficeOrder(IReadOnlyList<OfficeDefinition> ordered) =>
-        ordered.Select((o, i) => o with { GovernorPriority = ordered.Count - 1 - i }).ToArray();
 
     private void SetOfficeOrder(IEnumerable<OfficeDefinition> ordered)
     {
@@ -90,13 +84,9 @@ public sealed partial class SharedDataEditorWorkspace
     {
         var ordered = OrderOffices(offices).ToList();
         int position = after is int id ? ordered.FindIndex(o => o.Id == id) + 1 : ordered.Count;
-        ordered.Insert(position, office);
-        if (ordered.Count == 1) return [office with { GovernorPriority = 0 }];
-        int above = ordered[position - 1].GovernorPriority;
-        int below = position + 1 < ordered.Count ? ordered[position + 1].GovernorPriority : -1;
-        if ((long)above - below <= 1) return NumberOfficeOrder(ordered);
-        ordered[position] = office with { GovernorPriority = above - 1 };
-        return ordered.ToArray();
+        var priorities = CatalogPriorityOrder.Insert(ordered.Select(o => new CatalogPriorityOrder.Entry(o.Id, o.GovernorPriority)), office.Id, position)
+            .ToDictionary(e => e.Id, e => e.Priority);
+        return ordered.Append(office).Select(o => o with { GovernorPriority = priorities[o.Id] }).ToArray();
     }
 
     public async Task DeleteOfficeAsync(int id, CancellationToken token = default)

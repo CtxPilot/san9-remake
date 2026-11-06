@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using San9.Content.Packages;
 using San9.Content.Scenarios;
+using San9.Content.Text;
 using San9.Core.Domain;
 
 namespace San9.Application.Authoring;
@@ -10,9 +11,9 @@ public sealed partial class SharedDataEditorWorkspace
     private readonly Dictionary<int, (FormationRule Rule, FormationCatalogDefinition Catalog)> _formationBaselines;
     private readonly Dictionary<int, (TacticRule Rule, TacticCatalogDefinition Catalog)> _tacticBaselines;
 
-    public FormationRule GetFormation(int id) => Formations.Single(f => f.Id == id);
-    public bool IsFormationChanged(int id) => !ContentComparison.Equal(GetFormation(id), _saved.Military!.Formations.SingleOrDefault(f => f.Id == id)) ||
-        !ContentComparison.Equal(GetFormationCatalog(id), _saved.Information.Formations.SingleOrDefault(f => f.Id == id));
+    public FormationRule GetFormation(int id) => Catalog.FormationRules[id];
+    public bool IsFormationChanged(int id) => !ContentComparison.Equal(GetFormation(id), SavedCatalog.FormationRules.GetValueOrDefault(id)) ||
+        !ContentComparison.Equal(GetFormationCatalog(id), SavedCatalog.FormationDefinitions.GetValueOrDefault(id));
 
     public void SetFormation(FormationRule formation)
     {
@@ -30,7 +31,7 @@ public sealed partial class SharedDataEditorWorkspace
         SetFormation(_formationBaselines[id].Rule);
         SetFormationCatalog(_formationBaselines[id].Catalog);
     }
-    public FormationCatalogDefinition GetFormationCatalog(int id) => Definitions.Information.Formations.Single(f => f.Id == id);
+    public FormationCatalogDefinition GetFormationCatalog(int id) => Catalog.FormationDefinitions[id];
     public void SetFormationCatalog(FormationCatalogDefinition value)
     {
         var entries = Definitions.Information.Formations.ToArray();
@@ -40,10 +41,10 @@ public sealed partial class SharedDataEditorWorkspace
         Definitions = Definitions with { Information = Definitions.Information with { Formations = entries } };
     }
 
-    public TacticRule GetTactic(int id) => Tactics.Single(t => t.Id == id);
-    public TacticCatalogDefinition GetTacticCatalog(int id) => Definitions.Information.Tactics.Single(t => t.Id == id);
-    public bool IsTacticChanged(int id) => !ContentComparison.Equal(GetTactic(id), _saved.Military!.Tactics.SingleOrDefault(t => t.Id == id)) ||
-        !ContentComparison.Equal(GetTacticCatalog(id), _saved.Information.Tactics.SingleOrDefault(t => t.Id == id));
+    public TacticRule GetTactic(int id) => Catalog.TacticRules[id];
+    public TacticCatalogDefinition GetTacticCatalog(int id) => Catalog.TacticDefinitions[id];
+    public bool IsTacticChanged(int id) => !ContentComparison.Equal(GetTactic(id), SavedCatalog.TacticRules.GetValueOrDefault(id)) ||
+        !ContentComparison.Equal(GetTacticCatalog(id), SavedCatalog.TacticDefinitions.GetValueOrDefault(id));
     public void SetTactic(TacticRule value)
     {
         ContentStructure.Validate(value);
@@ -153,12 +154,19 @@ public sealed partial class SharedDataEditorWorkspace
         _tacticBaselines.Remove(id);
     }
 
-    private static void ValidateMilitaryProfiles(ScenarioDefinitions definitions, IEnumerable<OfficerDefaults> profiles, string scope)
+    private static void ValidateProfiles(ScenarioDefinitions definitions, IEnumerable<OfficerDefaults> profiles, string scope)
     {
         var tactics = (definitions.Military?.Tactics ?? []).Select(t => t.Id).ToHashSet();
         foreach (var person in profiles)
+        {
+            if (person.Biography is { } biography)
+            {
+                try { MessageStyles.ValidateMarkup(biography); }
+                catch (InvalidDataException error) { throw new InvalidDataException($"{scope}：{person.Name}（{person.Id}）的列传格式无效：{error.Message}", error); }
+            }
             if (person.LearnedTactics.FirstOrDefault(id => !tactics.Contains(id), -1) is >= 0 and var missing)
                 throw new InvalidDataException($"{scope}：{person.Name}（{person.Id}）的已学兵法引用不存在的兵法 {missing}。");
+        }
     }
     private static ScenarioDefinitions ProjectFormation(ScenarioDefinitions definitions,
         (FormationRule Rule, FormationCatalogDefinition Catalog) baseline, FormationRule rule)

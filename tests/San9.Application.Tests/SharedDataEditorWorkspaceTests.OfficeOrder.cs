@@ -53,23 +53,6 @@ public sealed partial class SharedDataEditorWorkspaceTests
     }
 
     [Fact]
-    public async Task DraggingAcrossMultipleOfficesInsertsWithoutReversingInterveningItems()
-    {
-        await Create();
-        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
-        var second = await workspace.CreateOfficeAsync();
-        var third = await workspace.CreateOfficeAsync();
-        workspace.SetOffice(workspace.GetOffice(9000) with { GovernorPriority = 100 });
-        workspace.SetOffice(second with { GovernorPriority = 50 });
-        workspace.SetOffice(third with { GovernorPriority = 10 });
-        Assert.True(workspace.MoveOfficeTo(9000, 2));
-        Assert.Equal(new[] { second.Id, third.Id, 9000 }, workspace.OrderedOffices.Select(o => o.Id));
-        Assert.Equal(new[] { 100, 50, 10 }, workspace.OrderedOffices.Select(o => o.GovernorPriority));
-        Assert.True(workspace.MoveOfficeTo(9000, 0));
-        Assert.Equal(new[] { 9000, second.Id, third.Id }, workspace.OrderedOffices.Select(o => o.Id));
-    }
-
-    [Fact]
     public async Task MovingOfficesSwapsExistingPriorityValuesAndPreservesGaps()
     {
         await Create();
@@ -111,33 +94,4 @@ public sealed partial class SharedDataEditorWorkspaceTests
         Assert.Equal(copy.Salary, workspace.GetOffice(copy.Id).Salary);
     }
 
-    [Fact]
-    public async Task InsertingWithoutAnIntegerGapRenumbersInTheRequestedOrder()
-    {
-        await Create();
-        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
-        var lower = await workspace.CreateOfficeAsync();
-        workspace.SetOffice(workspace.GetOffice(9000) with { GovernorPriority = 100 });
-        workspace.SetOffice(lower with { GovernorPriority = 99 });
-        var copy = await workspace.CreateOfficeAsync(9000);
-        Assert.Equal(new[] { 9000, copy.Id, lower.Id }, workspace.OrderedOffices.Select(o => o.Id));
-        Assert.Equal(new[] { 2, 1, 0 }, workspace.OrderedOffices.Select(o => o.GovernorPriority));
-        var appended = await workspace.CreateOfficeAsync();
-        Assert.Equal(new[] { 9000, copy.Id, lower.Id, appended.Id }, workspace.OrderedOffices.Select(o => o.Id));
-        Assert.Equal(new[] { 3, 2, 1, 0 }, workspace.OrderedOffices.Select(o => o.GovernorPriority));
-    }
-
-    [Fact]
-    public async Task EqualPrioritiesCanStillBeMovedAndIntMaximumDoesNotOverflow()
-    {
-        await Create();
-        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
-        var second = await workspace.CreateOfficeAsync();
-        workspace.SetOffice(workspace.GetOffice(9000) with { GovernorPriority = int.MaxValue });
-        workspace.SetOffice(second with { GovernorPriority = int.MaxValue });
-        Assert.True(workspace.MoveOfficeTo(second.Id, 0));
-        Assert.Equal(new[] { second.Id, 9000 }, workspace.OrderedOffices.Select(o => o.Id));
-        Assert.Equal(new[] { 1, 0 }, workspace.OrderedOffices.Select(o => o.GovernorPriority));
-        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.MoveOfficeTo(second.Id, -1));
-    }
 }

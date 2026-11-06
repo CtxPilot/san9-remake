@@ -67,15 +67,24 @@ public static class ScenarioDataFiles
             throw new InvalidDataException("Duplicate player document path.");
         var prepared = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         var staged = new List<(string Pending, string Target)>();
+        var locks = new List<FileStream>();
+        string transaction = Guid.NewGuid().ToString("N");
         try
         {
+            // Every writer locks the same target set in a canonical order, across processes.
+            foreach (string path in documents.Select(d => Path.GetFullPath(d.Path)).Order(StringComparer.OrdinalIgnoreCase))
+            {
+                token.ThrowIfCancellationRequested();
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                try { locks.Add(new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None)); }
+                catch (IOException error) { throw new IOException("无法取得保存锁，其他进程可能正在保存；请稍后重试。", error); }
+            }
             foreach (var document in documents)
             {
                 ContentStructure.Validate(document.Value);
-                string pending = document.Path + ".pending";
+                string pending = document.Path + "." + transaction + ".pending";
                 byte[] bytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(document.Value,
                     document.Value.GetType(), ScenarioContentFiles.DataJsonOptions));
-                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(document.Path))!);
                 staged.Add((pending, document.Path));
                 await File.WriteAllBytesAsync(pending, bytes, token);
                 prepared.Add(document.Path, bytes);
@@ -90,7 +99,12 @@ public static class ScenarioDataFiles
             ScenarioContentFiles.Publish(staged);
             return prepared;
         }
-        finally { foreach (var (pending, _) in staged) File.Delete(pending); }
+        finally
+        {
+            try { foreach (var (pending, _) in staged) File.Delete(pending); }
+            finally { foreach (var handle in locks) handle.Dispose(); }
+            // Keep lock files: unlinking them would let writers acquire different file objects.
+        }
     }
 
     public static async Task<SharedScenarioData> LoadAsync(string resourceRoot, ScenarioContentManifest manifest, CancellationToken token = default,

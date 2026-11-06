@@ -70,6 +70,25 @@ public sealed partial class SharedDataEditorWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public async Task UnplacedOfficerBiographyIsValidatedBeforeEitherPlayerDocumentIsPublished()
+    {
+        await Create();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var person = await workspace.CreateOfficerAsync();
+        workspace.SetOfficer(person with { Biography = "[preset=blue-outline]未闭合" });
+        workspace.SetOffice(workspace.GetOffice(9000) with { Name = "待保存" });
+        await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath));
+        Assert.False(File.Exists(workspace.PlayerOfficerPath));
+        Assert.True(workspace.HasChanges);
+        workspace.SetOfficer(person with { Biography = "[preset=blue-outline]有效列传[/preset]" });
+        await workspace.SaveAsync();
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal("待保存", reopened.GetOffice(9000).Name);
+        Assert.Equal("[preset=blue-outline]有效列传[/preset]", reopened.GetOfficer(person.Id).Biography);
+    }
+
+    [Fact]
     public async Task CreatingAndCopyingPeoplePreservesOriginalIdentityAndDoesNotDeployThem()
     {
         await CreatePeopleAndTactics();

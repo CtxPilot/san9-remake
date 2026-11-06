@@ -31,14 +31,12 @@ public sealed partial class SharedDataEditorWorkspace
     public string PlayerDefinitionPath => PlayerDefinitionFiles.PlayerPath(DefinitionPath);
     public bool HasPlayerCopy => _expectedPlayer is not null || _expectedOfficers is not null;
     public string ReferenceScenarioId { get; }
-    public IReadOnlyDictionary<int, string> FormationNames => Definitions.Information.Formations.ToDictionary(f => f.Id, f => f.Name);
-    public ImmutableArray<FormationRule> Formations => Definitions.Military?.Formations
-        .Where(f => Definitions.Information.Formations.Any(c => c.Id == f.Id)).ToImmutableArray() ?? [];
+    public IReadOnlyDictionary<int, string> FormationNames => Catalog.FormationNames;
+    public ImmutableArray<FormationRule> Formations => Catalog.Formations;
     public IReadOnlyList<OfficeDefinition> Offices => Definitions.Information.Offices;
     public IReadOnlyList<RankDefinition> Ranks => Definitions.Information.Ranks;
     public IReadOnlyList<OfficerDefaults> Officers => OfficerCatalog.Officers;
-    public ImmutableArray<TacticRule> Tactics => Definitions.Military?.Tactics
-        .Where(t => Definitions.Information.Tactics.Any(c => c.Id == t.Id)).ToImmutableArray() ?? [];
+    public ImmutableArray<TacticRule> Tactics => Catalog.Tactics;
     public int ScenarioCount => _scenarios.Length;
     public bool HasChanges => !ContentComparison.Equal(Definitions, _saved) || _changedOfficers.Count != 0 || OfficerCatalog.NextOfficerId != _savedOfficers.NextOfficerId;
 
@@ -116,7 +114,7 @@ public sealed partial class SharedDataEditorWorkspace
     private async Task<ContentReadSession> ValidateDraftAsync(ScenarioDefinitions draft, CancellationToken token)
     {
         ContentStructure.Validate(draft);
-        ValidateMilitaryProfiles(draft, Officers, "共享武将");
+        ValidateProfiles(draft, Officers, "共享武将");
         foreach (var formation in draft.Military?.Formations ?? [])
             if ((!formation.Positions.IsEmpty || formation.Attack is not null) && formation.Positions.Length != formation.OfficerCapacity)
                 throw new InvalidDataException($"{FormationNames.GetValueOrDefault(formation.Id, formation.Id.ToString())}：武将上限 {formation.OfficerCapacity} 与阵位数 {formation.Positions.Length} 不一致，请在阵位页调整。");
@@ -152,7 +150,7 @@ public sealed partial class SharedDataEditorWorkspace
                         throw new InvalidDataException($"武将 {person.State.Id} 的初始官职引用不存在的官职 {office}。");
                 scenario.Validate();
                 var profiles = OfficerComposition.Profiles(document.Officers, [.. officers.Officers, .. document.AdditionalOfficerDefaults]);
-                ValidateMilitaryProfiles(effectiveDefinitions, profiles, $"剧本 {entry.Id}");
+                ValidateProfiles(effectiveDefinitions, profiles, $"剧本 {entry.Id}");
                 if (scenario.Forces.Any(f => f.ProvidedTactics.Any(id => scenario.Military?.Tactics.Any(t => t.Id == id) != true)))
                     throw new InvalidDataException("势力授予兵法引用不存在的兵法。");
                 if (definitionsPath.Equals(DefinitionPath, StringComparison.OrdinalIgnoreCase) && draft.Military is { } military &&
@@ -160,8 +158,6 @@ public sealed partial class SharedDataEditorWorkspace
                     _ = new MilitaryRulebook(military.Compile(geography.Military!, []));
                 var messages = await ReadMessagesAsync(entry, files, token);
                 MessageGraph.ValidateCatalogReferences(messages, scenario.Information);
-                foreach (var person in profiles)
-                    if (person.Biography is { } biography) MessageStyles.ValidateMarkup(biography);
             }
             catch (Exception error) when (error is ArgumentException or InvalidDataException or OverflowException)
             { throw new InvalidDataException($"剧本 {entry.Id} 的共享数据校验失败：{error.Message}", error); }

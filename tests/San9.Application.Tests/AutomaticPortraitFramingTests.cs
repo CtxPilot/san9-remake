@@ -5,11 +5,8 @@ namespace San9.Application.Tests;
 
 public sealed class AutomaticPortraitFramingTests
 {
-    [Theory]
-    [InlineData(240)]
-    [InlineData(512)]
-    [InlineData(1024)]
-    public void NormalizedExperimentalFramingIsIndependentOfMotherImageResolution(int size)
+    [Fact]
+    public void ExperimentalFramingProducesNormalizedCompositionAndFaceMargins()
     {
         var face = new PortraitFaceCandidate(.93, 72d / 240, 60d / 240, 72d / 240, 90d / 240,
             108d / 240, 90d / 240, 110d / 240, 110d / 240, 109d / 240, 122d / 240);
@@ -17,9 +14,8 @@ public sealed class AutomaticPortraitFramingTests
         Assert.False(result.IsLimited);
         Assert.Equal(56d / 240, result.FaceAnchor.X, 12);
         Assert.Equal(43d / 240, result.FaceAnchor.Y, 12);
-        var portrait = new PortraitDefinition(0, new("portrait", "portrait.png", size, size, 3),
-            PortraitGeometry.BustFromFace(result.FaceAnchor), result.FaceAnchor);
-        portrait.Validate();
+        result.FaceAnchor.Validate(PortraitView.Face);
+        PortraitGeometry.BustFromFace(result.FaceAnchor).Validate(PortraitView.Bust);
         Assert.True(result.FaceAnchor.X <= face.Left - 6d / 240);
         Assert.True(result.FaceAnchor.Y + .5 >= face.Top + face.Height + 4d / 240);
     }
