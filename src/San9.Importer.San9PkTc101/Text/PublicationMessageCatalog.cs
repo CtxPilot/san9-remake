@@ -4,18 +4,27 @@ using San9.Content.Text;
 
 namespace San9.Importer.San9PkTc101.Text;
 
-/// <summary>TC101 archive coverage and confirmed file groups; message identities retain source ordinals.</summary>
+/// <summary>Separates complete TC101 source coverage from runtime message publication.</summary>
 public static class PublicationMessageCatalog
 {
-    public static IReadOnlyDictionary<string, string> Groups { get; } = BuildGroups();
+    public static IReadOnlyDictionary<string, string> SourceGroups { get; } = BuildGroups();
+    public static IReadOnlyDictionary<string, string> Groups { get; } = new ReadOnlyDictionary<string, string>(
+        SourceGroups.Where(pair => !IsDataGroup(pair.Value)).ToDictionary(pair => pair.Key, pair => pair.Value));
+
+    private static bool IsDataGroup(string group) => group is "scenario-catalog" or "person-names" or "names" or
+        "tactics" or "formations" or "offices" or "ranks" or "geography" or "country-titles" or "biographies";
 
     public static Dictionary<string, MessageDefinition> Compile(IReadOnlyDictionary<string, MessageDefinition> source)
     {
-        if (source.Count != Groups.Count || source.Keys.Any(key => !Groups.ContainsKey(key)))
+        if (source.Count != SourceGroups.Count || source.Keys.Any(key => !SourceGroups.ContainsKey(key)))
             throw new InvalidDataException("Message archive coverage differs from the reviewed publication catalog.");
         MessageGraph.Validate(source);
         // Archive order is explicit, independent of input enumeration and file grouping.
-        return Groups.Keys.ToDictionary(key => key, key => source[key], StringComparer.Ordinal);
+        var published = Groups.Keys.ToDictionary(key => key, key => source[key], StringComparer.Ordinal);
+        // A source call to extracted data must be lowered by the importer, never
+        // silently kept alive by publishing a second body or an unused alias.
+        MessageGraph.Validate(published);
+        return published;
     }
 
     private static IReadOnlyDictionary<string, string> BuildGroups()

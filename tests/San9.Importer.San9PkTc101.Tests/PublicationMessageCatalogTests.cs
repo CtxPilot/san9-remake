@@ -10,7 +10,7 @@ public sealed class PublicationMessageCatalogTests
     [Fact]
     public void ReviewedBindingsLeaveUnconfirmedColumnsInTheLargeFile()
     {
-        var groups = PublicationMessageCatalog.Groups;
+        var groups = PublicationMessageCatalog.SourceGroups;
         Assert.Equal("scenario-catalog", groups["messages.0"]);
         Assert.Equal("scenario-catalog", groups["messages.39"]);
         Assert.Equal("person-names", groups["messages.1678"]);
@@ -30,10 +30,10 @@ public sealed class PublicationMessageCatalogTests
     {
         var expected = Enumerable.Range(0, 14209).Select(id => $"messages.{id}")
             .Concat(Enumerable.Range(0, 679).Select(id => $"biographies.{id}"));
-        Assert.Equal(expected, PublicationMessageCatalog.Groups.Keys);
+        Assert.Equal(expected, PublicationMessageCatalog.SourceGroups.Keys);
     }
 
-    private static Dictionary<string, MessageDefinition> Archive() => PublicationMessageCatalog.Groups.Keys
+    private static Dictionary<string, MessageDefinition> Archive() => PublicationMessageCatalog.SourceGroups.Keys
         .ToDictionary(key => key, _ => new MessageDefinition([]));
 
     [Fact]
@@ -44,22 +44,44 @@ public sealed class PublicationMessageCatalogTests
             new MessageLiteral("返回"),
             new MessageStyled("yellow", [new MessageConditional(new("binding", "show"), [
                 new MessageChoice(new("binding", "choice"), [
-                    [new MessageReference("biographies.0", false)],
+                    [new MessageReference("messages.8676", false)],
                     [new MessageRandomChoice([[new MessageReference("messages.8677", true)], [new MessageReturn()]])]
                 ])
             ])]),
             new MessageValue(new("binding", "name"))]);
-        source["biographies.0"] = new([new MessageLiteral("同文")]);
+        source["messages.8676"] = new([new MessageLiteral("同文")]);
         source["messages.8677"] = new([new MessageLiteral("同文")]);
         var result = PublicationMessageCatalog.Compile(source.Reverse().ToDictionary(p => p.Key, p => p.Value));
-        Assert.Equal(source.Count, result.Count);
+        Assert.Equal(source.Count - 4354, result.Count);
         Assert.Equal(PublicationMessageCatalog.Groups.Keys, result.Keys);
         Assert.Equal(2, result.Values.Count(value => value.Nodes is [MessageLiteral { BbCode: "同文" }]));
-        Assert.Equal(source.Count - 3, result.Values.Count(value => value.Nodes.Length == 0));
+        Assert.Equal(result.Count - 3, result.Values.Count(value => value.Nodes.Length == 0));
 
-        foreach (var (key, original) in source)
-            Assert.Equal(JsonSerializer.Serialize(original, PackageFiles.JsonOptions),
-                JsonSerializer.Serialize(result[key], PackageFiles.JsonOptions));
+        foreach (var (key, published) in result)
+            Assert.Equal(JsonSerializer.Serialize(source[key], PackageFiles.JsonOptions),
+                JsonSerializer.Serialize(published, PackageFiles.JsonOptions));
+    }
+
+    [Theory]
+    [InlineData("messages.0")]
+    [InlineData("messages.1678")]
+    [InlineData("messages.11455")]
+    [InlineData("messages.1219")]
+    [InlineData("messages.5363")]
+    [InlineData("messages.5065")]
+    [InlineData("messages.1652")]
+    [InlineData("messages.136")]
+    [InlineData("messages.5315")]
+    [InlineData("biographies.0")]
+    public void ExtractedDataIsOmittedButRetainedMessagesCannotReferenceIt(string key)
+    {
+        var source = Archive();
+        source[key] = new([new MessageLiteral("资料正文")]);
+        Assert.DoesNotContain(key, PublicationMessageCatalog.Compile(source).Keys);
+
+        source["messages.7235"] = new([new MessageConditional(new("constant", Number: 0),
+            [new MessageChoice(new("constant", Number: 0), [[new MessageReference(key, false)]])])]);
+        Assert.Throws<InvalidDataException>(() => PublicationMessageCatalog.Compile(source));
     }
 
     [Fact]
