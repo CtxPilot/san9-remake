@@ -56,17 +56,20 @@ internal static class OfficerEditorForm
         OfficerEditorFields.Personality(details, p.Personality, p.Righteousness, p.Ambition, p.Affinity,
             v => edit(x => x with { Personality = v }), v => edit(x => x with { Righteousness = v }),
             v => edit(x => x with { Ambition = v }), v => edit(x => x with { Affinity = v }));
-        var life = ContentEditorControls.ProfileGrid(details, "生平与关系");
-        ContentEditorControls.Toggle(life, "按开局年龄确定出生年", p.AgeAtScenarioStart is not null, enabled =>
+        var life = ContentEditorControls.ProfileGrid(details, "生平与关系", header =>
         {
-            edit(x => x with { AgeAtScenarioStart = enabled ? 20 : null, BirthYear = enabled ? 0 : 170 }); rebuild();
+            var relativeAge = ContentEditorControls.Toggle(header, "相对年龄", p.AgeAtScenarioStart is not null, enabled =>
+            {
+                edit(x => x with { AgeAtScenarioStart = enabled ? 20 : null, BirthYear = enabled ? 0 : 170 }); rebuild();
+            }, "RelativeAge", "开启后，以开局年份减去“年龄差”计算出生年。");
+            ContentEditorStyle.Compact(relativeAge);
         });
         if (p.AgeAtScenarioStart is int age)
-            Number(life, "开局年龄差", age, 0, v => edit(x => x with { AgeAtScenarioStart = v }));
+            Number(life, "年龄差", age, 0, v => edit(x => x with { AgeAtScenarioStart = v }));
         else Number(life, "出生年", p.BirthYear, 1, v => edit(x => x with { BirthYear = v }), "BirthYear");
         Number(life, "登场年", p.AppearanceYear, 1, v => edit(x => x with { AppearanceYear = v }), "AppearanceYear");
-        Number(life, "寿命档", p.LifespanTier, 0, v => edit(x => x with { LifespanTier = v }));
         relationships(life);
+        Number(life, "寿命档", p.LifespanTier, 0, v => edit(x => x with { LifespanTier = v }));
         ContentEditorControls.TextArea(basic, "列传", p.Biography, v => edit(x => x with { Biography = v }), "OfficerBiography");
 
         var training = Page("兵法");
