@@ -54,6 +54,42 @@ public sealed record SharedScenarioData(string DefinitionsPath, string OfficersP
 
 public static class ScenarioDataFiles
 {
+    public sealed record PlayerDocument(string Path, object Value, byte[]? Expected);
+
+    /// <summary>Publishes complete player documents as one rollback-protected transaction.</summary>
+    public static async Task<IReadOnlyDictionary<string, byte[]>> WritePlayerDocumentsAsync(
+        IReadOnlyList<PlayerDocument> documents, CancellationToken token = default)
+    {
+        if (documents.Select(d => Path.GetFullPath(d.Path)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != documents.Count)
+            throw new InvalidDataException("Duplicate player document path.");
+        var prepared = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var staged = new List<(string Pending, string Target)>();
+        try
+        {
+            foreach (var document in documents)
+            {
+                ContentStructure.Validate(document.Value);
+                string pending = document.Path + ".pending";
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(document.Value,
+                    document.Value.GetType(), ScenarioContentFiles.DataJsonOptions));
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(document.Path))!);
+                staged.Add((pending, document.Path));
+                await File.WriteAllBytesAsync(pending, bytes, token);
+                prepared.Add(document.Path, bytes);
+            }
+            foreach (var document in documents)
+            {
+                byte[]? current = await PlayerDefinitionFiles.ReadOptionalAsync(document.Path, token);
+                if (document.Expected is null ? current is not null : current is null || !current.AsSpan().SequenceEqual(document.Expected))
+                    throw new InvalidDataException("Player content changed since editing began.");
+            }
+            token.ThrowIfCancellationRequested();
+            ScenarioContentFiles.Publish(staged);
+            return prepared;
+        }
+        finally { foreach (var (pending, _) in staged) File.Delete(pending); }
+    }
+
     public static async Task<SharedScenarioData> LoadAsync(string resourceRoot, ScenarioContentManifest manifest, CancellationToken token = default,
         bool usePlayerDefinitions = false)
     {

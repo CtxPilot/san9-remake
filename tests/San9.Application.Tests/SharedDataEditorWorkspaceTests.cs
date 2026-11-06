@@ -1,0 +1,398 @@
+using System.Collections.Immutable;
+using System.Text.Json;
+using San9.Application.Authoring;
+using San9.Content.Packages;
+using San9.Content.Scenarios;
+using San9.Content.Text;
+using San9.Core.Domain;
+
+namespace San9.Application.Tests;
+
+public sealed class SharedDataEditorWorkspaceTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "san9-formations-" + Guid.NewGuid().ToString("N"));
+
+    private async Task Create()
+    {
+        var formation = new FormationRule(7000, 50, 12, 100000, 2, new(1, 1), TravelMode.Land)
+        { Positions = [new(0, BattleRank.Front), new(1, BattleRank.Middle)], Vision = new(5, 180) };
+        var scenario = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "a", 190, 1, 1, null, [], [], [], [])
+        {
+            Military = new(2, 2, [0, 0, 0, 0], [new(0, 10, null)], [formation], []),
+            Information = new([new(8000, "自制爵位", 15000, 100, 5, 0)], [new(9000, "自制官职", 12000, 20)], [], [], []) { Formations = [new(7000, "自制阵形")
+            { Presentation = new(2, 3, [new(0, 0), new(1, 1)], 1, 180, "background", "available") }] }
+        };
+        scenario.Validate();
+        var shared = SharedScenarioData.From(scenario, "shared/definitions.json", "shared/officers.json", "shared/geography.json", new(TextCatalog.CurrentSchemaVersion, []));
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared);
+        foreach (string id in new[] { "a", "b", "private" })
+        {
+            var world = scenario with { ScenarioId = id };
+            if (id == "private") world = world with { Military = world.Military! with { Formations = [formation with { MovementBudget = 70 }] } };
+            var content = new ScenarioContent(ScenarioContent.CurrentSchemaVersion, new("../textures"),
+                new(new(MapDefinition.CurrentSchemaVersion, "fixture", 2, 2, 2, 2, [], [], [], [], [], [], [], [], []), []), world,
+                new(TextCatalog.CurrentSchemaVersion, new() { ["shape"] = "自制阵形", ["office"] = "自制官职" }), []);
+            await ScenarioContentFiles.WriteAsync(Path.Combine(_root, id), content, resourceRoot: _root, sharedScenario: shared);
+        }
+        var catalog = new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "textures", "opening.json", [new("a", "a"), new("b", "b"), new("private", "private")])
+        { OfficerFlags = "flags.json" };
+        await File.WriteAllTextAsync(Path.Combine(_root, "catalog.json"), JsonSerializer.Serialize(catalog, PackageFiles.JsonOptions));
+    }
+
+    private async Task CreatePeopleAndTactics()
+    {
+        await Create();
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, new() { ["fixture-person"] = "试将" });
+        var person = new OfficerInitialState("fixture-person", new(9001, null, null, new(70, 60, 50, 80), false)
+        { Status = OfficerStatus.Dead, BirthYear = 150, AppearanceYear = 165, Surname = "试", LearnedTactics = [6000] });
+        var profile = OfficerDefaults.From(person, texts);
+        await File.WriteAllTextAsync(Path.Combine(_root, "shared/officers.json"), JsonSerializer.Serialize(
+            new OfficerDefaultsCatalog(OfficerDefaultsCatalog.CurrentSchemaVersion, [profile]), ScenarioContentFiles.DataJsonOptions));
+        var definitions = JsonSerializer.Deserialize<ScenarioDefinitions>(await File.ReadAllTextAsync(Path.Combine(_root, "shared/definitions.json")), ScenarioContentFiles.DataJsonOptions)!;
+        definitions = definitions with
+        {
+            Information = definitions.Information with { Tactics = [new(6000, "试兵法") { Description = "原说明" }] },
+            Military = definitions.Military! with { Tactics = [new(6000, 0, TacticEffect.Martial, 10, 5, 100, true, false, [7000])] }
+        };
+        await File.WriteAllTextAsync(Path.Combine(_root, "shared/definitions.json"), JsonSerializer.Serialize(definitions, ScenarioContentFiles.DataJsonOptions));
+        foreach (string id in new[] { "a", "b", "private" })
+        {
+            string path = Path.Combine(_root, id, "scenario.json");
+            var document = JsonSerializer.Deserialize<ScenarioDocument>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document with
+            {
+                Officers = [ScenarioOfficerState.From(person, profile, texts)],
+                DefinitionOverrides = document.DefinitionOverrides.Military is { Value: { } privateMilitary }
+                    ? document.DefinitionOverrides with { Military = new(privateMilitary with { Tactics = definitions.Military!.Tactics }) }
+                    : document.DefinitionOverrides
+            }, ScenarioContentFiles.DataJsonOptions));
+        }
+    }
+
+    [Fact]
+    public async Task EditingNamedRulesPreservesUnlistedMilitaryDefinitions()
+    {
+        await CreatePeopleAndTactics();
+        string path = Path.Combine(_root, "shared", "definitions.json");
+        var definitions = JsonSerializer.Deserialize<ScenarioDefinitions>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
+        var hiddenFormation = definitions.Military!.Formations[0] with { Id = 7001 };
+        var hiddenTactic = definitions.Military.Tactics[0] with { Id = 6001 };
+        definitions = definitions with { Military = definitions.Military with
+        { Formations = definitions.Military.Formations.Add(hiddenFormation), Tactics = definitions.Military.Tactics.Add(hiddenTactic) } };
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(definitions, ScenarioContentFiles.DataJsonOptions));
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal(7000, Assert.Single(workspace.Formations).Id);
+        Assert.Equal(6000, Assert.Single(workspace.Tactics).Id);
+        workspace.SetFormation(workspace.GetFormation(7000) with { MovementBudget = 90 });
+        workspace.SetTactic(workspace.GetTactic(6000) with { Power = 20 });
+        await workspace.SaveAsync();
+        var result = (await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "b"))).Military!;
+        Assert.True(ContentComparison.Equal(hiddenFormation, result.Formations.Single(f => f.Id == 7001)));
+        Assert.True(ContentComparison.Equal(hiddenTactic, result.Tactics.Single(t => t.Id == 6001)));
+    }
+
+    [Fact]
+    public async Task InvalidMessageReferencePreventsPublishingBothPlayerDocuments()
+    {
+        await CreatePeopleAndTactics();
+        Dictionary<string, MessageDefinition> messages = new()
+        { ["missing-rank"] = new([new MessageValue(new("property", "rank.name", Arguments: [new("entity", "Rank", 12345)]))]) };
+        var library = await MessageLibraryFiles.WriteAsync(_root, "shared/messages/library.json", messages);
+        string path = Path.Combine(_root, "a", "content.json");
+        var manifest = JsonSerializer.Deserialize<ScenarioContentManifest>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
+        await File.WriteAllTextAsync(path, JsonSerializer.Serialize(manifest with { SharedMessages = library.Path }, ScenarioContentFiles.DataJsonOptions));
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetRank(workspace.GetRank(8000) with { Name = "改名" });
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.Contains("12345", error.Message);
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath)); Assert.False(File.Exists(workspace.PlayerOfficerPath));
+    }
+
+    [Fact]
+    public async Task ReplacingTheSecondPlayerFileRollsBackTheFirstAndKeepsDrafts()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        await CreatePeopleAndTactics(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetRank(workspace.GetRank(8000) with { Name = "第一次" }); await workspace.SaveAsync();
+        byte[] definitions = await File.ReadAllBytesAsync(workspace.PlayerDefinitionPath), people = await File.ReadAllBytesAsync(workspace.PlayerOfficerPath);
+        workspace.SetRank(workspace.GetRank(8000) with { Name = "第二次" });
+        workspace.SetOfficer(workspace.GetOfficer(9001) with { War = 95 });
+        using (var locked = new FileStream(workspace.PlayerOfficerPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var error = await Record.ExceptionAsync(() => workspace.SaveAsync());
+            Assert.True(error is IOException or UnauthorizedAccessException, error?.ToString());
+        }
+        Assert.Equal(definitions, await File.ReadAllBytesAsync(workspace.PlayerDefinitionPath));
+        Assert.Equal(people, await File.ReadAllBytesAsync(workspace.PlayerOfficerPath));
+        Assert.True(workspace.HasChanges);
+        Assert.Empty(Directory.GetFiles(_root, "*.pending", SearchOption.AllDirectories));
+        await workspace.SaveAsync();
+        Assert.Equal("第二次", (await SharedDataEditorWorkspace.OpenAsync(_root)).GetRank(8000).Name);
+    }
+
+    [Fact]
+    public async Task EveryPagePublishesTogetherAndPersonTextIsProjectedFromTheEffectiveProfile()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var originals = Directory.GetFiles(_root, "*", SearchOption.AllDirectories).ToDictionary(p => p, File.ReadAllBytes);
+        workspace.SetOfficer(workspace.GetOfficer(9001) with { Name = "新姓名", CourtesyName = "新字", Biography = "新列传", War = 95 });
+        workspace.SetTactic(workspace.GetTactic(6000) with { Power = 30, MinimumInterval = 9 });
+        workspace.SetTacticCatalog(workspace.GetTacticCatalog(6000) with { Name = "新兵法", Description = "新兵法说明" });
+        workspace.SetFormationCatalog(workspace.GetFormationCatalog(7000) with { Name = "新阵形", Description = "新阵形说明" });
+        workspace.SetFormation(workspace.GetFormation(7000) with { MovementBudget = 90 });
+        workspace.SetOffice(workspace.GetOffice(9000) with { Name = "新官职", Description = "新官职说明" });
+        workspace.SetRank(workspace.GetRank(8000) with { Name = "新爵位" });
+        await workspace.SaveAsync();
+        Assert.False(workspace.HasChanges);
+        foreach (var (path, bytes) in originals) Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.True(File.Exists(workspace.PlayerDefinitionPath)); Assert.True(File.Exists(workspace.PlayerOfficerPath));
+        var content = await ScenarioContentFiles.LoadAsync(Path.Combine(_root, "b"));
+        var person = Assert.Single(content.Scenario.Officers);
+        Assert.Equal(95, person.State.BaseAbilities.War);
+        Assert.Equal("新姓名", content.Text.Resolve(person.NameKey));
+        Assert.Equal("新字", content.Text.Resolve(person.CourtesyNameKey!));
+        Assert.Equal("新列传", content.Text.ResolveRich(person.BiographyKey!));
+        Assert.Equal("新兵法", Assert.Single(content.Scenario.Information.Tactics).Name);
+        Assert.Equal(30, content.Scenario.Military!.Tactics.Single().Power);
+        Assert.Equal("新阵形", Assert.Single(content.Scenario.Information.Formations).Name);
+        var selection = await ScenarioContentFiles.LoadSelectionAsync(Path.Combine(_root, "b"));
+        Assert.Equal("新姓名", selection.Text.Resolve(selection.Scenario.Officers.Single().NameKey));
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal("新姓名", reopened.GetOfficer(9001).Name);
+        workspace.RestoreFormation(7000);
+        Assert.Equal("自制阵形", workspace.GetFormationCatalog(7000).Name);
+        Assert.Equal("新兵法", workspace.GetTacticCatalog(6000).Name);
+        workspace.RestoreOfficer(9001);
+        Assert.Equal("试将", workspace.GetOfficer(9001).Name);
+        Assert.Equal(30, workspace.GetTactic(6000).Power);
+    }
+
+    [Fact]
+    public async Task ExternalPersonCopyPreventsPublishingEitherDocument()
+    {
+        await CreatePeopleAndTactics(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetOfficer(workspace.GetOfficer(9001) with { War = 95 });
+        workspace.SetRank(workspace.GetRank(8000) with { Name = "改名" });
+        byte[] outside = await File.ReadAllBytesAsync(workspace.OfficerPath);
+        await File.WriteAllBytesAsync(workspace.PlayerOfficerPath, outside);
+        await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath));
+        Assert.Equal(outside, await File.ReadAllBytesAsync(workspace.PlayerOfficerPath));
+        Assert.True(workspace.HasChanges);
+    }
+
+    [Fact]
+    public async Task RankNamesAndDescriptionsSaveWithTheSharedDraftWithoutWritingTextCatalogs()
+    {
+        await Create();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var originals = Directory.GetFiles(_root, "*", SearchOption.AllDirectories).ToDictionary(p => p, File.ReadAllBytes);
+        workspace.SetRank(workspace.GetRank(8000) with { Name = "新爵位", Description = "新说明\n第二行" });
+        await workspace.SaveAsync();
+        foreach (var (path, bytes) in originals) Assert.Equal(bytes, File.ReadAllBytes(path));
+        foreach (string id in new[] { "a", "b", "private" })
+        {
+            var rank = Assert.Single((await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, id))).Information.Ranks);
+            Assert.Equal("新爵位", rank.Name);
+            Assert.Equal("新说明\n第二行", rank.Description);
+        }
+        Assert.Equal("新爵位", (await SharedDataEditorWorkspace.OpenAsync(_root)).GetRank(8000).Name);
+        workspace.RestoreRank(8000);
+        Assert.Equal("自制爵位", workspace.GetRank(8000).Name);
+        Assert.Equal("", workspace.GetRank(8000).Description);
+        await workspace.SaveAsync();
+        Assert.Equal("自制爵位", (await SharedDataEditorWorkspace.OpenAsync(_root)).GetRank(8000).Name);
+    }
+
+    [Fact]
+    public async Task SavingACompletePlayerCopyPreservesBaseAndWorldFilesWhileChangingEffectiveRules()
+    {
+        await Create();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.False(workspace.HasChanges); Assert.Equal(3, workspace.ScenarioCount);
+        Assert.Equal("自制阵形", workspace.FormationNames[7000]);
+        var files = Directory.GetFiles(_root, "*", SearchOption.AllDirectories).ToDictionary(p => p, File.ReadAllBytes);
+        workspace.SetFormation(workspace.GetFormation(7000) with { MovementBudget = 90, DeploymentCost = 123, Vision = new(15, 120) });
+        Assert.True(workspace.HasChanges);
+        Assert.Equal(50, (await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "b"))).Military!.Formations.Single().MovementBudget);
+        await workspace.SaveAsync(); Assert.False(workspace.HasChanges);
+        foreach (var (path, bytes) in files) Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.True(File.Exists(workspace.PlayerDefinitionPath));
+        foreach (string id in new[] { "a", "b" })
+        {
+            var loaded = await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, id));
+            Assert.Equal(90, loaded.Military!.Formations.Single().MovementBudget);
+            Assert.Equal(123, loaded.Military.Formations.Single().DeploymentCost);
+            Assert.Equal(3, loaded.Information.Formations.Single().Presentation!.VisionRadius);
+            var selection = await ScenarioContentFiles.LoadSelectionAsync(Path.Combine(_root, id));
+            Assert.Equal(120, selection.Scenario.Information.Formations.Single().Presentation!.VisionAngleDegrees);
+        }
+        Assert.Equal(70, (await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "private"))).Military!.Formations.Single().MovementBudget);
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.True(reopened.HasPlayerCopy);
+        Assert.Equal(90, reopened.GetFormation(7000).MovementBudget);
+        workspace.RestoreFormation(7000); Assert.True(workspace.HasChanges); await workspace.SaveAsync();
+        Assert.Equal(50, (await SharedDataEditorWorkspace.OpenAsync(_root)).GetFormation(7000).MovementBudget);
+    }
+
+    [Fact]
+    public async Task PositionEditsUpdatePresentationAndInvalidDataDoesNotReachDisk()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        byte[] before = File.ReadAllBytes(workspace.DefinitionPath);
+        workspace.SetFormation(workspace.GetFormation(7000) with { MovementBudget = 0 });
+        await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.True(workspace.HasChanges); Assert.Equal(before, File.ReadAllBytes(workspace.DefinitionPath));
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath));
+        workspace.RestoreFormation(7000);
+        workspace.SetFormation(workspace.GetFormation(7000) with { Positions = [new(2, BattleRank.Front), new(0, BattleRank.Rear)] });
+        await workspace.SaveAsync();
+        var loaded = await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "b"));
+        var presentation = loaded.Information.Formations.Single().Presentation!;
+        Assert.Equal(3, presentation.Columns); Assert.Null(presentation.BackgroundRole); Assert.Null(presentation.AvailableRole);
+        Assert.Equal(new[] { new FormationSlot(2, 0), new FormationSlot(0, 2) }, presentation.Slots.ToArray());
+        workspace.SetFormation(workspace.GetFormation(7000) with { OfficerCapacity = 3 });
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.Contains("阵位数", error.Message);
+    }
+
+    [Fact]
+    public async Task RevertingFormationGeometryRestoresItsDerivedPresentationWithoutLosingText()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var original = workspace.GetFormation(7000);
+        var presentation = workspace.GetFormationCatalog(7000).Presentation;
+        workspace.SetFormationCatalog(workspace.GetFormationCatalog(7000) with { Name = "改名" });
+        workspace.SetFormation(original with { Positions = [new(3, BattleRank.Front), new(0, BattleRank.Rear)] });
+        Assert.Null(workspace.GetFormationCatalog(7000).Presentation!.BackgroundRole);
+        workspace.SetFormation(original);
+        Assert.True(ContentComparison.Equal(presentation, workspace.GetFormationCatalog(7000).Presentation));
+        Assert.Equal("改名", workspace.GetFormationCatalog(7000).Name);
+    }
+
+    [Theory]
+    [InlineData("shared/definitions.json")]
+    [InlineData("shared/definitions.player.json")]
+    [InlineData("b/content.json")]
+    public async Task ExternalInputChangesArePreservedAndRequireReopening(string relative)
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetFormation(workspace.GetFormation(7000) with { DeploymentCost = 99 });
+        string path = Path.Combine(_root, relative);
+        byte[] original = File.ReadAllBytes(File.Exists(path) ? path : workspace.DefinitionPath);
+        await File.WriteAllBytesAsync(path, [.. original, (byte)'\n']);
+        await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.True(workspace.HasChanges); Assert.Equal(original.Length + 1, new FileInfo(path).Length);
+        Assert.Empty(Directory.GetFiles(_root, "*.pending", SearchOption.AllDirectories));
+    }
+
+    [Theory]
+    [InlineData("a/scenario.json")]
+    [InlineData("shared/geography.json")]
+    public async Task OpeningDefersWorldAndGeographyUntilSave(string relative)
+    {
+        await Create();
+        await File.WriteAllTextAsync(Path.Combine(_root, relative), "invalid deferred data");
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal(3, workspace.ScenarioCount);
+        Assert.Equal(50, workspace.GetFormation(7000).MovementBudget);
+        workspace.SetFormation(workspace.GetFormation(7000) with { DeploymentCost = 99 });
+        await Assert.ThrowsAsync<JsonException>(() => workspace.SaveAsync());
+        Assert.True(workspace.HasChanges);
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath));
+    }
+
+    [Fact]
+    public async Task SavingUsesWorldDataReadAtSaveTime()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        string worldPath = Path.Combine(_root, "b", "scenario.json");
+        byte[] original = await File.ReadAllBytesAsync(worldPath);
+        byte[] updated = [.. original, (byte)'\n'];
+        await File.WriteAllBytesAsync(worldPath, updated);
+        workspace.SetFormation(workspace.GetFormation(7000) with { DeploymentCost = 99 });
+        await workspace.SaveAsync();
+        Assert.Equal(updated, await File.ReadAllBytesAsync(worldPath));
+        Assert.Equal(99, (await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "b"))).Military!.Formations.Single().DeploymentCost);
+    }
+
+    [Fact]
+    public async Task CompletePlayerCopyDoesNotInheritLaterChangesToUneditedBaseFields()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetFormation(workspace.GetFormation(7000) with { MovementBudget = 90 }); await workspace.SaveAsync();
+        var document = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(workspace.DefinitionPath))!;
+        document["military"]!["formations"]![0]!["deploymentCost"] = 999;
+        await File.WriteAllTextAsync(workspace.DefinitionPath, document.ToJsonString());
+        var loaded = await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "b"));
+        Assert.Equal(90, loaded.Military!.Formations.Single().MovementBudget);
+        Assert.Equal(12, loaded.Military.Formations.Single().DeploymentCost);
+    }
+
+    [Fact]
+    public async Task FormationOfficeAndRankDraftsRestoreIndependentlyAndSaveTogether()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal("自制官职", workspace.GetOffice(9000).Name);
+        Assert.Equal("自制爵位", workspace.GetRank(8000).Name);
+        workspace.SetFormation(workspace.GetFormation(7000) with { MovementBudget = 90 });
+        workspace.SetOffice(workspace.GetOffice(9000) with { Salary = 77 });
+        workspace.SetRank(workspace.GetRank(8000) with { CommandCapacity = 22000, RequiredTrust = 345, LoyaltyBonus = 12 });
+        workspace.RestoreOffice(9000);
+        Assert.Equal(90, workspace.GetFormation(7000).MovementBudget);
+        Assert.Equal(20, workspace.GetOffice(9000).Salary);
+        Assert.Equal(345, workspace.GetRank(8000).RequiredTrust);
+        workspace.SetOffice(workspace.GetOffice(9000) with { Salary = 77,
+            AbilityBonuses = workspace.GetOffice(9000).AbilityBonuses with { Leadership = 12 } });
+        workspace.RestoreFormation(7000);
+        Assert.Equal(77, workspace.GetOffice(9000).Salary);
+        workspace.SetFormation(workspace.GetFormation(7000) with { DeploymentCost = 199 });
+        workspace.RestoreRank(8000);
+        Assert.Equal(100, workspace.GetRank(8000).RequiredTrust);
+        Assert.Equal(199, workspace.GetFormation(7000).DeploymentCost);
+        Assert.Equal(77, workspace.GetOffice(9000).Salary);
+        workspace.SetRank(workspace.GetRank(8000) with { CommandCapacity = 22000, RequiredTrust = 345, LoyaltyBonus = 12 });
+        await workspace.SaveAsync();
+        var loaded = await ScenarioContentFiles.LoadScenarioAsync(Path.Combine(_root, "b"));
+        Assert.Equal(199, loaded.Military!.Formations.Single().DeploymentCost);
+        Assert.Equal(77, loaded.Information.Offices.Single().Salary);
+        Assert.Equal(12, loaded.Information.Offices.Single().AbilityBonuses.Leadership);
+        Assert.Equal(22000u, loaded.Information.Ranks.Single().CommandCapacity);
+        Assert.Equal(345, loaded.Information.Ranks.Single().RequiredTrust);
+        Assert.Equal(12, loaded.Information.Ranks.Single().LoyaltyBonus);
+        Assert.False((await SharedDataEditorWorkspace.OpenAsync(_root)).HasChanges);
+    }
+
+    [Fact]
+    public async Task InvalidOfficePreventsPublishingEveryPageAndKeepsAllDrafts()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        byte[] original = await File.ReadAllBytesAsync(workspace.DefinitionPath);
+        workspace.SetFormation(workspace.GetFormation(7000) with { DeploymentCost = 199 });
+        workspace.SetOffice(workspace.GetOffice(9000) with { Salary = -1 });
+        await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath));
+        Assert.Equal(original, await File.ReadAllBytesAsync(workspace.DefinitionPath));
+        Assert.Equal(199, workspace.GetFormation(7000).DeploymentCost);
+        Assert.Equal(-1, workspace.GetOffice(9000).Salary);
+        Assert.True(workspace.HasChanges);
+    }
+
+    [Fact]
+    public async Task InvalidRankPreventsPublishingOtherPages()
+    {
+        await Create(); var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.SetFormation(workspace.GetFormation(7000) with { DeploymentCost = 199 });
+        workspace.SetOffice(workspace.GetOffice(9000) with { Salary = 77 });
+        workspace.SetRank(workspace.GetRank(8000) with { RequiredTrust = -1 });
+        await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
+        Assert.False(File.Exists(workspace.PlayerDefinitionPath));
+        Assert.Equal(199, workspace.GetFormation(7000).DeploymentCost);
+        Assert.Equal(77, workspace.GetOffice(9000).Salary);
+        Assert.Equal(-1, workspace.GetRank(8000).RequiredTrust);
+        Assert.True(workspace.HasChanges);
+    }
+
+    public void Dispose() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
+}

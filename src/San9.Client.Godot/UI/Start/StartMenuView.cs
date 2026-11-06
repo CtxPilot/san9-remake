@@ -19,6 +19,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     public Settings.UiPreferencesSession Preferences { get; init; } = new();
     public string ContentRoot { get; init; } = "";
     private CreatedOfficerEditor? _officerEditor;
+    private SharedDataEditor? _sharedDataEditor;
     private TextureScope _textures = null!;
     private StartMenuArtwork _artwork = null!;
     private Label _hint = null!;
@@ -69,6 +70,8 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
         AddButton(Definition.Help, "").MouseEntered += RestorePrompt;
         var close = AddButton(Definition.Close, "");
         close.Name = "Close"; close.MouseEntered += RestorePrompt; close.Pressed += RequestQuit;
+        var sharedDataEditor = new Button { Name = "OpenSharedDataEditor", Text = "共享数据编辑器", Position = new(18, 710), Size = new(242, 34) };
+        sharedDataEditor.Pressed += OpenSharedDataEditor; _controls.AddChild(sharedDataEditor);
         first?.GrabFocus();
         RestorePrompt();
     }
@@ -90,6 +93,17 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
             _controls.GetNode<StartMenuButton>("create-officer").GrabFocus();
         } };
         AddChild(_officerEditor);
+    }
+    private void OpenSharedDataEditor()
+    {
+        if (_sharedDataEditor is not null) return;
+        _controls.Hide();
+        _sharedDataEditor = new SharedDataEditor { Name = "SharedDataEditor", ContentRoot = ContentRoot, Closed = () =>
+        {
+            _sharedDataEditor!.QueueFree(); _sharedDataEditor = null; _controls.Show();
+            _controls.GetNode<Button>("OpenSharedDataEditor").GrabFocus();
+        } };
+        AddChild(_sharedDataEditor);
     }
     private void OpenScenarioSelection()
     {

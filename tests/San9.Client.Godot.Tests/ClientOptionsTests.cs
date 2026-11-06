@@ -5,6 +5,15 @@ namespace San9.Client.Godot.Tests;
 public sealed class ClientOptionsTests
 {
     [Fact]
+    public void SharedDataEditorCanChooseAReferenceWithoutStartingAWorld()
+    {
+        var options = ClientOptions.Parse(["--shared-data-editor", "--scenario", "custom"], Environment.CurrentDirectory);
+        Assert.True(options.SharedDataEditor); Assert.Equal("custom", options.ScenarioId);
+        Assert.False(options.RequiresWorldVerification); Assert.False(options.OfficerEditor);
+        Assert.Throws<ArgumentException>(() => ClientOptions.Parse(["--shared-data-editor", "--officer-editor"], Environment.CurrentDirectory));
+        Assert.Throws<ArgumentException>(() => ClientOptions.Parse(["--shared-data-editor", "--map-smoke"], Environment.CurrentDirectory));
+    }
+    [Fact]
     public void OpeningStartupHasNoImplicitScenarioAndExplicitSelectionHasNoYearConvention()
     {
         var opening = ClientOptions.Parse([], Environment.CurrentDirectory);
