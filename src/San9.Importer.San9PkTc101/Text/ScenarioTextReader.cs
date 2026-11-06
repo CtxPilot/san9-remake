@@ -3,6 +3,7 @@ using San9.Importer.San9PkTc101.Interface;
 using System.Buffers.Binary;
 using System.Reflection.PortableExecutable;
 using San9.Content.Text;
+using San9.Importer.San9PkTc101.Images;
 
 namespace San9.Importer.San9PkTc101.Text;
 
@@ -21,7 +22,7 @@ public sealed class ScenarioTextReader(byte[] messages, byte[] executable) : IDi
     public void MessagePerson(int id, int family, int given, int portrait)
     {
         _messagePeople.Add(id, new(AddOptional($"officer-surname.{id}", Text(1678 + 4 * family)),
-            AddOptional($"officer-given-name.{id}", Text(1679 + 4 * given)), $"portrait.{portrait}"));
+            AddOptional($"officer-given-name.{id}", Text(1679 + 4 * given)), PortraitCompiler.ImageId(portrait)));
     }
     public void ReadStrategyHints()
     {

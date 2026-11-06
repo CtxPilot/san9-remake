@@ -168,6 +168,7 @@ public sealed class San9MessageTableTests
         reader.MessagePerson(person, person, person, person);
         var catalog = reader.Catalog;
         var profile = catalog.MessagePeople[person];
+        Assert.Equal(San9.Importer.San9PkTc101.Images.PortraitCompiler.ImageId(person), profile.PortraitKey);
         Assert.Equal(expectedName, catalog.Resolve("person.test"));
         Assert.Equal(expectedFamily, reader.Surname(person));
         Assert.Equal(expectedFamily.Length == 0 ? null : expectedFamily, profile.SurnameKey is null ? null : catalog.Resolve(profile.SurnameKey));
