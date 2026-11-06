@@ -9,6 +9,9 @@ namespace San9.Content.Packages;
 public sealed record ScenarioContentManifest(int SchemaVersion,
     TextureDependency Textures, string Map, string Scenario, string Text, string[] Messages, string Illustrations)
 {
+    [System.Text.Json.Serialization.JsonRequired] public string Definitions { get; init; } = "definitions.json";
+    [System.Text.Json.Serialization.JsonRequired] public string OfficerDefaults { get; init; } = "officer-defaults.json";
+    [System.Text.Json.Serialization.JsonRequired] public string Geography { get; init; } = "geography.json";
     public ScenarioPreviewEntry? Preview { get; init; }
     [System.Text.Json.Serialization.JsonRequired] public string ResourceRoot { get; init; } = ".";
     [System.Text.Json.Serialization.JsonRequired] public string Presentation { get; init; } = "presentation.json";
@@ -69,22 +72,40 @@ public static class ScenarioContentFiles
         finally { File.Delete(pending); }
     }
 
-    /// <summary>Publishes a newly compiled world without rebuilding unchanged presentation, map or texture resources.</summary>
-    public static async Task WriteScenarioAsync(string root, ScenarioInitialState scenario, CancellationToken token = default)
+    /// <summary>Publishes shared inputs and rebuilt worlds together, preserving map and presentation resources.</summary>
+    public static async Task WriteWorldsAsync(string resourceRoot, SharedScenarioData shared,
+        IReadOnlyList<(string Package, ScenarioInitialState Scenario)> worlds, CancellationToken token = default)
     {
-        // Authoring reads the manifest layout directly: the rebuilt world establishes the new package version.
-        var manifest = await PackageFiles.ReadAsync<ScenarioContentManifest>(Path.Combine(root, "content.json"), token);
-        scenario.Validate();
-        if (manifest.Preview is { } preview && (preview.Id != scenario.ScenarioId || preview.Year != scenario.Year || preview.Month != scenario.Month))
-            throw new InvalidDataException("Rebuilt world differs from scenario selection metadata.");
-        string resourceRoot = ResolveResourceRoot(root, manifest.ResourceRoot);
-        string worldTarget = PackageFiles.Resolve(resourceRoot, manifest.Scenario), manifestTarget = Path.Combine(root, "content.json");
-        List<(string Pending, string Target)> files = [(worldTarget + ".pending", worldTarget), (manifestTarget + ".pending", manifestTarget)];
+        shared.Validate();
+        resourceRoot = Path.GetFullPath(resourceRoot);
+        List<(string Pending, string Target)> files = [];
+        List<(string Path, ScenarioContentManifest Manifest)> manifests = [];
         try
         {
-            await File.WriteAllTextAsync(files[0].Pending, JsonSerializer.Serialize(scenario, DataJsonOptions), System.Text.Encoding.UTF8, token);
-            await File.WriteAllTextAsync(files[1].Pending, JsonSerializer.Serialize(manifest with
-                { SchemaVersion = ScenarioContent.CurrentSchemaVersion }, PackageFiles.JsonOptions), System.Text.Encoding.UTF8, token);
+            await ScenarioDataFiles.StageSharedAsync(resourceRoot, shared, files, token);
+            foreach (var (package, scenario) in worlds)
+            {
+                string root = PackageFiles.Resolve(resourceRoot, package);
+                // Read publication metadata only; the old world is never interpreted.
+                var layout = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(root, "content.json"), token))!.AsObject();
+                layout["definitions"] = shared.DefinitionsPath;
+                layout["officerDefaults"] = shared.OfficersPath;
+                layout["geography"] = shared.GeographyPath;
+                var manifest = layout.Deserialize<ScenarioContentManifest>(PackageFiles.JsonOptions)
+                    ?? throw new InvalidDataException("Empty scenario manifest.");
+                scenario.Validate();
+                if (ResolveResourceRoot(root, manifest.ResourceRoot) != resourceRoot)
+                    throw new InvalidDataException("Rebuilt scenario uses a different publication root.");
+                if (manifest.Preview is { } preview && (preview.Id != scenario.ScenarioId || preview.Year != scenario.Year || preview.Month != scenario.Month))
+                    throw new InvalidDataException("Rebuilt world differs from scenario selection metadata.");
+                await ScenarioDataFiles.StageAsync(resourceRoot, manifest.Scenario, shared.Describe(scenario), files, DataJsonOptions, token);
+                manifests.Add((Path.GetRelativePath(resourceRoot, Path.Combine(root, "content.json")),
+                    manifest with { SchemaVersion = ScenarioContent.CurrentSchemaVersion }));
+            }
+            // All dependency and world files precede every entry point. Publish rolls
+            // back the whole batch if replacing any file fails.
+            foreach (var (path, manifest) in manifests)
+                await ScenarioDataFiles.StageAsync(resourceRoot, path, manifest, files, PackageFiles.JsonOptions, token);
             token.ThrowIfCancellationRequested();
             Publish(files);
         }
@@ -123,7 +144,7 @@ public static class ScenarioContentFiles
 
     private static async Task<ScenarioSelectionContent> ReadSelectionAsync(ScenarioContentManifest manifest, string resourceRoot, CancellationToken token)
     {
-        var scenario = await ReadDataAsync<ScenarioSelectionState>(resourceRoot, manifest.Scenario, token);
+        var scenario = await ScenarioDataFiles.LoadSelectionAsync(resourceRoot, manifest, token);
         if (scenario.SchemaVersion != ScenarioInitialState.CurrentSchemaVersion)
             throw new InvalidDataException("Unsupported scenario state version; reconvert the package.");
         var text = await ReadDataAsync<StaticTextContent>(resourceRoot, manifest.Text, token);
@@ -149,7 +170,7 @@ public static class ScenarioContentFiles
                 throw new InvalidDataException("Unsupported map definition version; reconvert the package.");
             return new MapInstance(definition, mapManifest.Buildings);
         }, token);
-        var scenarioTask = Task.Run(() => Read<ScenarioInitialState>(manifest.Scenario), token);
+        var scenarioTask = Task.Run(() => ScenarioDataFiles.LoadScenarioAsync(resourceRoot, manifest, token), token);
         var displayTask = Task.Run(async () =>
         {
             var text = await Read<StaticTextContent>(manifest.Text);
@@ -180,7 +201,7 @@ public static class ScenarioContentFiles
     public static async Task WriteAsync(string root, ScenarioContent content, CancellationToken token = default,
         IReadOnlyDictionary<string, string>? messageGroups = null, string? resourceRoot = null,
         SharedMessageLibrary? sharedMessages = null, IReadOnlyCollection<string>? messageOverrides = null,
-        SharedMapDefinition? sharedMap = null)
+        SharedMapDefinition? sharedMap = null, SharedScenarioData? sharedScenario = null)
     {
         if (content.SchemaVersion != ScenarioContent.CurrentSchemaVersion) throw new InvalidDataException("Unsupported scenario content version.");
         if (content.Map.Definition.SchemaVersion != MapDefinition.CurrentSchemaVersion) throw new InvalidDataException("Unsupported map definition version.");
@@ -195,6 +216,12 @@ public static class ScenarioContentFiles
             != JsonSerializer.Serialize(content.Map.Definition, DataJsonOptions))
             throw new InvalidDataException("Scenario geography differs from its explicitly referenced shared map.");
         string mapDefinitionPath = sharedMap?.Path ?? ownPrefix + "map-definition.json";
+        var scenarioData = sharedScenario ?? SharedScenarioData.From(content.Scenario, ownPrefix + "definitions.json",
+            ownPrefix + "officer-defaults.json", ownPrefix + "geography.json");
+        var reusablePaths = scenarioData.ResolvePaths(resourceRoot).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (reusablePaths.Contains(PackageFiles.Resolve(resourceRoot, mapDefinitionPath)))
+            throw new InvalidDataException("Map display and scenario inputs must use distinct paths.");
+        var scenarioDocument = scenarioData.Describe(content.Scenario);
         var overrides = (messageOverrides ?? []).ToHashSet(StringComparer.Ordinal);
         var privateMessages = content.Text.Messages.Where(p => sharedMessages is null || !sharedMessages.Messages.ContainsKey(p.Key) || overrides.Contains(p.Key))
             .ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
@@ -214,7 +241,8 @@ public static class ScenarioContentFiles
         var manifest = new ScenarioContentManifest(ScenarioContent.CurrentSchemaVersion, content.Textures,
             ownPrefix + "map.json", ownPrefix + "scenario.json", ownPrefix + "messages/text.json", messageFiles.Keys.ToArray(), ownPrefix + "illustrations.json")
             { Presentation = ownPrefix + "presentation.json", ResourceRoot = relativeRoot, Preview = content.Preview,
-                SharedMessages = sharedMessages?.Path, MessageOverrides = overrides.Order(StringComparer.Ordinal).ToArray() };
+                SharedMessages = sharedMessages?.Path, MessageOverrides = overrides.Order(StringComparer.Ordinal).ToArray(),
+                Definitions = scenarioData.DefinitionsPath, OfficerDefaults = scenarioData.OfficersPath, Geography = scenarioData.GeographyPath };
         string manifestPath = Path.Combine(root, "content.json");
         string[] previousFiles = [];
         if (File.Exists(manifestPath))
@@ -235,10 +263,13 @@ public static class ScenarioContentFiles
                 }
                 string oldRoot = previous.RootElement.TryGetProperty("resourceRoot", out var oldResourceRoot)
                     ? ResolveResourceRoot(root, oldResourceRoot.GetString()!) : root;
-                // Only the standalone definition belongs to this writer. Referenced shared
-                // geography can live beneath the same root and is owned by its publisher.
+                // Only canonical standalone inputs belong to this writer. Referenced
+                // shared inputs can live beneath the same root and belong to their publisher.
                 previousFiles = paths.Select(path => PackageFiles.Resolve(oldRoot, path))
                     .Append(Path.Combine(root, "map-definition.json"))
+                    .Append(Path.Combine(root, "definitions.json"))
+                    .Append(Path.Combine(root, "officer-defaults.json"))
+                    .Append(Path.Combine(root, "geography.json"))
                     .Where(path => IsInside(root, path)).ToArray();
             }
         }
@@ -246,6 +277,9 @@ public static class ScenarioContentFiles
         async Task Stage<T>(string name, T value, JsonSerializerOptions options)
         {
             string target = name == "content.json" ? manifestPath : PackageFiles.Resolve(resourceRoot, name);
+            if (files.Any(f => f.Target.Equals(target, StringComparison.OrdinalIgnoreCase)) ||
+                sharedScenario is not null && reusablePaths.Contains(target))
+                throw new InvalidDataException($"Scenario publication collides with another content file: {name}.");
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             string pending = target + ".pending";
             files.Add((pending, target));
@@ -256,7 +290,13 @@ public static class ScenarioContentFiles
         {
             if (sharedMap is null) await Stage(mapDefinitionPath, content.Map.Definition, DataJsonOptions);
             await Stage(manifest.Map, new ScenarioMapManifest(mapDefinitionPath, content.Map.Buildings), DataJsonOptions);
-            await Stage(manifest.Scenario, content.Scenario, DataJsonOptions);
+            if (sharedScenario is null)
+            {
+                await Stage(scenarioData.DefinitionsPath, scenarioData.Definitions, DataJsonOptions);
+                await Stage(scenarioData.OfficersPath, scenarioData.Officers, DataJsonOptions);
+                await Stage(scenarioData.GeographyPath, scenarioData.Geography, DataJsonOptions);
+            }
+            await Stage(manifest.Scenario, scenarioDocument, DataJsonOptions);
             await Stage(manifest.Text, new StaticTextContent(content.Text.SchemaVersion, content.Text.Entries)
                 { MessagePeople = content.Text.MessagePeople, MessageTags = content.Text.MessageTags }, DataJsonOptions);
             foreach (var (path, messages) in messageFiles) await Stage(path, messages, MessageJsonOptions);
@@ -268,6 +308,8 @@ public static class ScenarioContentFiles
             File.Delete(Path.Combine(root, "preview.json"));
             var currentFiles = files.Select(file => file.Target).ToHashSet(StringComparer.OrdinalIgnoreCase);
             currentFiles.Add(PackageFiles.Resolve(resourceRoot, mapDefinitionPath));
+            foreach (string path in new[] { scenarioData.DefinitionsPath, scenarioData.OfficersPath, scenarioData.GeographyPath })
+                currentFiles.Add(PackageFiles.Resolve(resourceRoot, path));
             foreach (string obsolete in previousFiles.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (currentFiles.Contains(obsolete)) continue;
@@ -327,7 +369,7 @@ public static class ScenarioContentFiles
     public static async Task<ScenarioInitialState> LoadScenarioAsync(string root, CancellationToken token = default)
     {
         var manifest = await ReadManifestAsync(root, token);
-        return await ReadDataAsync<ScenarioInitialState>(ResolveResourceRoot(root, manifest.ResourceRoot), manifest.Scenario, token);
+        return await ScenarioDataFiles.LoadScenarioAsync(ResolveResourceRoot(root, manifest.ResourceRoot), manifest, token);
     }
 
     public static string ResolveResourceRoot(string scenarioRoot, string relative)

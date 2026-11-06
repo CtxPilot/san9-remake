@@ -2,7 +2,7 @@ using San9.Core.Domain;
 
 namespace San9.Content.Scenarios;
 
-/// <summary>Read projection of scenario.json for force selection; no independently authored or cached data.</summary>
+/// <summary>Resolved initial state for force selection; no independently authored or cached data.</summary>
 public sealed record ScenarioSelectionState(int SchemaVersion, int Year, int Month, int Day,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements, OfficerInitialState[] Officers,
     UnitState[] Units, InformationDefinitions Information, AllianceState? Alliance)

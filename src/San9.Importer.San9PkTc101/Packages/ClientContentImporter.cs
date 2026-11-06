@@ -12,7 +12,7 @@ public static class ClientContentImporter
         string textureRoot, string output, Action<string>? progress = null, bool messageReports = false, CancellationToken token = default, string? resourceRoot = null,
         SharedMessageLibrary? sharedMessages = null, bool publishSharedMessages = false,
         SharedMapDefinition? sharedMap = null, bool publishSharedMap = false,
-        San9.Content.Interface.ScenarioPreviewEntry? preview = null)
+        San9.Content.Interface.ScenarioPreviewEntry? preview = null, SharedScenarioData? sharedScenario = null)
     {
         var sourceDirectory = new San9SourceDirectory(gameDirectory);
         string sourceExe = sourceDirectory.Executable, dataDirectory = sourceDirectory.Root;
@@ -108,7 +108,7 @@ public static class ClientContentImporter
         if (publishSharedMap)
             sharedMap = await MapDefinitionFiles.WriteAsync(resourceRoot, "shared/maps/china/map.json", content.Map.Definition, token);
         await ScenarioContentFiles.WriteAsync(output, content, token, PublicationMessageCatalog.Groups, resourceRoot, sharedMessages,
-            sharedMap: sharedMap);
+            sharedMap: sharedMap, sharedScenario: sharedScenario);
         var currentAudio = sounds.Keys.Select(path => PackageFiles.Resolve(resourceRoot, path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (string path in shared ? [] : new[] { "music", "sound-effects" }.SelectMany(directory =>
             Directory.EnumerateFiles(Path.Combine(output, directory), "*", SearchOption.AllDirectories)))

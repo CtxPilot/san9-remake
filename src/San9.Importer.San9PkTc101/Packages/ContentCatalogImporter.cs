@@ -32,6 +32,16 @@ public static class ContentCatalogImporter
         List<ScenarioCatalogEntry> entries = [];
         SharedMessageLibrary? sharedMessages = null;
         SharedMapDefinition? sharedMap = null;
+        SharedScenarioData? sharedScenario = null;
+        if (!openingOnly)
+        {
+            // TC101 explicitly chooses scenario 0 as its publication baseline. Every
+            // other scenario retains its differences; no majority-value inference.
+            var (baseline, _) = ScenarioContentCompiler.Compile(exe, await File.ReadAllBytesAsync(source.File("D_Sce001.S9"), token),
+                messageBytes, await File.ReadAllBytesAsync(source.File("M_RtdnPK.s9"), token));
+            sharedScenario = SharedScenarioData.From(baseline, "shared/definitions.json", "shared/officer-defaults.json", "shared/maps/china/geography.json");
+            await ScenarioDataFiles.WriteSharedAsync(output, sharedScenario, token);
+        }
         foreach (var preview in selection.Entries)
         {
             var header = headers.Single(h => h.ScenarioId.ToString(System.Globalization.CultureInfo.InvariantCulture) == preview.Id);
@@ -46,7 +56,7 @@ public static class ContentCatalogImporter
             var package = await ClientContentImporter.ImportAsync(gameDirectory, $"D_Sce{header.ScenarioId + 1:D3}.S9", textureRoot,
                 PackageFiles.Resolve(output, path), progress, token: token, resourceRoot: output,
                 sharedMessages: sharedMessages, publishSharedMessages: sharedMessages is null,
-                sharedMap: sharedMap, publishSharedMap: sharedMap is null, preview: preview);
+                sharedMap: sharedMap, publishSharedMap: sharedMap is null, preview: preview, sharedScenario: sharedScenario);
             sharedMessages ??= new("shared/messages/library.json", package.Text.Messages);
             sharedMap ??= new("shared/maps/china/map.json", MapDefinition.From(package.Map));
             progress?.Invoke($"Published {preview.Id}: {preview.Year}/{preview.Month} ({preview.CategoryId}).");

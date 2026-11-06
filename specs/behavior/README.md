@@ -1,5 +1,6 @@
 # 行为规格目录
 
+- [BEH-CONTENT-0001：共享内容与剧本初始状态](BEH-CONTENT-0001-shared-scenario-authoring.md)（已确认；Mod内容分层第一步）
 - [BEH-EDITOR-0001：局内世界编辑器](BEH-EDITOR-0001-world-editors.md)（已确认）
 - [BEH-EDITOR-0002：独立新武将人物库](BEH-EDITOR-0002-created-officers.md)（已实现；开局部署见BEH-UI-0011）
 

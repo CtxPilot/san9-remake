@@ -12,7 +12,7 @@ public sealed class ScenarioContentFilesTests : IDisposable
     private string PublishedPath(string name)
     {
         var manifest = JsonSerializer.Deserialize<ScenarioContentManifest>(File.ReadAllText(Path.Combine(_root, "content.json")), PackageFiles.JsonOptions)!;
-        var paths = new[] { manifest.Map, manifest.Scenario, manifest.Text, manifest.Illustrations, manifest.Presentation }.Concat(manifest.Messages);
+        var paths = new[] { manifest.Map, manifest.Scenario, manifest.Text, manifest.Illustrations, manifest.Presentation, manifest.Definitions, manifest.OfficerDefaults, manifest.Geography }.Concat(manifest.Messages);
         return PackageFiles.Resolve(_root, paths.Single(p => p == name || p.EndsWith("/" + name, StringComparison.Ordinal)));
     }
 
@@ -54,8 +54,9 @@ public sealed class ScenarioContentFilesTests : IDisposable
         var full = await ScenarioContentFiles.LoadAsync(_root);
         string scenarioPath = PublishedPath("scenario.json");
         var authored = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(scenarioPath))!;
-        authored["originalAi"] = "unused by force selection";
-        await File.WriteAllTextAsync(scenarioPath, authored.ToJsonString(), System.Text.Encoding.UTF8);
+        var definitions = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(PublishedPath("definitions.json")))!;
+        definitions["originalAi"] = "unused by force selection";
+        await File.WriteAllTextAsync(PublishedPath("definitions.json"), definitions.ToJsonString(), System.Text.Encoding.UTF8);
         foreach (string name in new[] { "map.json", "presentation.json", "shared/messages/library.json" })
             await File.WriteAllTextAsync(Path.Combine(_root, name), "invalid unused content", System.Text.Encoding.UTF8);
 
@@ -67,7 +68,7 @@ public sealed class ScenarioContentFilesTests : IDisposable
         Assert.Equal(full.IllustrationRoles, initial.IllustrationRoles);
         Assert.Empty(initial.Text.Messages);
         await Assert.ThrowsAsync<JsonException>(() => ScenarioContentFiles.LoadAsync(_root));
-        authored["schemaVersion"] = ScenarioInitialState.CurrentSchemaVersion + 1;
+        authored["schemaVersion"] = ScenarioDocument.CurrentSchemaVersion + 1;
         await File.WriteAllTextAsync(scenarioPath, authored.ToJsonString(), System.Text.Encoding.UTF8);
         await Assert.ThrowsAsync<InvalidDataException>(() => ScenarioContentFiles.LoadSelectionAsync(_root));
     }
@@ -224,7 +225,7 @@ public sealed class ScenarioContentFilesTests : IDisposable
         var restored = await ScenarioContentFiles.LoadAsync(_root);
         Assert.Equal(JsonSerializer.Serialize(content, PackageFiles.JsonOptions),
             JsonSerializer.Serialize(restored, PackageFiles.JsonOptions));
-        Assert.Equal(8, Directory.GetFiles(_root, "*", SearchOption.AllDirectories).Length);
+        Assert.Equal(11, Directory.GetFiles(_root, "*", SearchOption.AllDirectories).Length);
         string messages = await File.ReadAllTextAsync(PublishedPath("messages/general.json"));
         Assert.DoesNotContain("\"format\"", messages);
         Assert.DoesNotContain("\"binding\"", messages);
@@ -406,21 +407,23 @@ public sealed class ScenarioContentFilesTests : IDisposable
     }
 
     [Fact]
-    public async Task WorldRebuildUpdatesOnlyWorldAndManifestVersion()
+    public async Task WorldRebuildUpdatesSharedInputsAndWorldWithoutChangingPresentation()
     {
         var content = Fixture();
-        await ScenarioContentFiles.WriteAsync(_root, content);
-        string manifestPath = Path.Combine(_root, "content.json");
-        string worldPath = PublishedPath("scenario.json");
+        var shared = SharedScenarioData.From(content.Scenario, "shared/definitions.json", "shared/officer-defaults.json", "shared/geography.json");
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared);
+        string package = Path.Combine(_root, "scenario");
+        await ScenarioContentFiles.WriteAsync(package, content, resourceRoot: _root, sharedScenario: shared);
+        string manifestPath = Path.Combine(package, "content.json"), worldPath = Path.Combine(package, "scenario.json");
         var manifest = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(manifestPath))!;
         manifest["schemaVersion"] = ScenarioContent.CurrentSchemaVersion - 1;
         await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString(), System.Text.Encoding.UTF8);
         var resources = Directory.GetFiles(_root, "*", SearchOption.AllDirectories)
             .Where(path => path != worldPath && path != manifestPath).ToDictionary(path => path, File.ReadAllBytes);
 
-        await ScenarioContentFiles.WriteScenarioAsync(_root, content.Scenario with { Year = 191, PlayerForceId = null });
+        await ScenarioContentFiles.WriteWorldsAsync(_root, shared, [("scenario", content.Scenario with { Year = 191, PlayerForceId = null })]);
 
-        var rebuilt = await ScenarioContentFiles.LoadAsync(_root);
+        var rebuilt = await ScenarioContentFiles.LoadAsync(package);
         Assert.Equal(191, rebuilt.Scenario.Year);
         Assert.Equal(ScenarioContent.CurrentSchemaVersion, rebuilt.SchemaVersion);
         foreach (var (path, bytes) in resources) Assert.Equal(bytes, await File.ReadAllBytesAsync(path));
