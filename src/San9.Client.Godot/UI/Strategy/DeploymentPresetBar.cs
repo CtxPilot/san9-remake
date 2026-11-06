@@ -34,7 +34,10 @@ public partial class DeploymentPresetBar : Control
         AddChild(_scroll);
         var rows = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         rows.AddThemeConstantOverride("separation", 6); _scroll.AddChild(rows);
-        foreach (var preset in Presets.Where(p => p.ForceId == Draft.Force.Id)) AddPreset(rows, preset);
+        var presets = Presets.Where(p => p.ForceId == Draft.Force.Id)
+            .Select(p => (Preset: p, Check: Draft.CheckPreset(p)))
+            .OrderByDescending(p => p.Check.CanApply);
+        foreach (var (preset, check) in presets) AddPreset(rows, preset, check);
         var save = Slot(rows, 48, false, false);
         save.Disabled = !Draft.CanProceed;
         save.TooltipText = Draft.CanProceed
@@ -47,9 +50,8 @@ public partial class DeploymentPresetBar : Control
 
     private void RestoreScroll() => _scroll!.ScrollVertical = InitialScroll;
 
-    private void AddPreset(Control rows, DeploymentPreset preset)
+    private void AddPreset(Control rows, DeploymentPreset preset, DeploymentPresetCheck check)
     {
-        var check = Draft.CheckPreset(preset);
         int? commander = Draft.PresetCommanderId(preset);
         bool source = preset.Id == Draft.SourcePresetId;
         bool modified = source && Draft.HasPresetChanges;

@@ -110,11 +110,12 @@ public partial class DeploymentPresetView : FixedPage
     {
         int scrollPosition = _listScroll.ScrollVertical;
         foreach (var child in _rows.GetChildren()) { _rows.RemoveChild(child); child.QueueFree(); }
-        var presets = Session.DeploymentPresets.Where(p => p.ForceId == Draft.Force.Id).ToArray();
+        var presets = Session.DeploymentPresets.Where(p => p.ForceId == Draft.Force.Id)
+            .Select(p => (Preset: p, Check: Draft.CheckPreset(p)))
+            .OrderByDescending(p => p.Check.CanApply).ToArray();
         _count.Text = presets.Length.ToString();
-        foreach (var preset in presets)
+        foreach (var (preset, check) in presets)
         {
-            var check = Draft.CheckPreset(preset);
             int? commander = Draft.PresetCommanderId(preset);
             string commanderName = commander is int person ? Person(person) : "无可用主将";
             var row = new Button
