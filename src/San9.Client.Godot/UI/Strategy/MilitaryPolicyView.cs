@@ -45,7 +45,7 @@ public partial class MilitaryPolicyView : FixedPage
         string facility = Selection.Source.IsUnit
             ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id, MapInformationContext.Strategy)?.Name
             : "命令设施　" + Selection.View.Settlements.Single(s => s.Id == Selection.Source.Id).ResolveName(Texts);
-        _facilityWidth = facility.Sum(c => c < 128 ? 8 : 16) + 32;
+        (facility, _facilityWidth) = CommandPanelArt.SourcePlate(facility);
         Label(facility, new(0, 0, _facilityWidth, 32));
         AddArrival();
         RefreshArrival();
@@ -81,7 +81,7 @@ public partial class MilitaryPolicyView : FixedPage
         string home = Selection.Source.IsUnit
             ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id, MapInformationContext.Strategy)?.Name
             : "命令设施　" + Selection.View.Settlements.Single(s => s.Id == Selection.Source.Id).ResolveName(Texts);
-        _facilityWidth = home.Sum(c => c < 128 ? 8 : 16) + 32; Label(home,new(0,0,_facilityWidth,32));
+        (home, _facilityWidth) = CommandPanelArt.SourcePlate(home); Label(home,new(0,0,_facilityWidth,32));
         AddArrival(); RefreshArrival();
         var target = Selection.Selected!.Value;
         string name = IsConstruction ? Texts.Resolve(Selection.View.RegionNameKeys[target.Id]) :

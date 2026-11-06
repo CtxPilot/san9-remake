@@ -38,7 +38,8 @@ public partial class FacilityCommandView : FixedPage
         var window = new CommandWindow { Texts = Texts, Textures = Textures, Title = CommandText.Resolve(Texts, "title." + Draft.Kind), Position = new(280,Top), Size = new(464,Height),
             CanAccept = Draft.CanExecute, Accepted = Submit, Closed = Closed, Help = () => Notice(Texts.Resolve("ui.command." + Draft.Kind)) };
         _body.AddChild(window);
-        Label(CommandText.Resolve(Texts, "value.source", Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts)), new(280,Top,160,32));
+        var (source, sourceWidth) = CommandPanelArt.SourcePlate(CommandText.Resolve(Texts, "value.source", Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts)));
+        Label(source, new(280,Top,sourceWidth,32));
         window.ActionButton(CommandText.Resolve(Texts, "label.actor"), "edit", new(0,48,104,40), SelectOfficers).Disabled = Draft.Candidates.Length < 2;
         var roster = new OfficerRosterPanel { Service = Service, Textures = Textures, Position = new(384,Top+48), VisibleRows = 5,
             Columns = [new(CommandText.Resolve(Texts, "label.officer"),80), new(CommandText.Resolve(Texts, "label." + Draft.ActorPriorityField),64)] };
@@ -63,7 +64,7 @@ public partial class FacilityCommandView : FixedPage
                 (CommandText.Resolve(Texts, "label.money"),Change(Draft.Money,Draft.Kind == "buy" ? (long)Draft.Money - Draft.Cost : (long)Draft.Money + Draft.Cost,Draft.FoodAmount)),
                 (CommandText.Resolve(Texts, "label.price"),CommandText.Resolve(Texts, "value.exchange-rate", Draft.View.World.Simulation.FoodExchangeRate))] };
         int[] widths = Draft.Kind switch { "commerce" or "cultivate" => [136,96,72], "repair" => [136,96], "train" => [80], _ => [64,136,136,136] };
-        var art = new FacilityCommandFields { Textures = Textures, Field = _field, Top = Top, Widths = widths,
+        var art = new FacilityCommandFields { Textures = Textures, Field = _field, Top = Top, SourceWidth = sourceWidth, Widths = widths,
             HasQuantity = Draft.IsTrade || Draft.Kind == "recruit", MouseFilter = MouseFilterEnum.Ignore };
         _body.AddChild(art); _body.MoveChild(art,1);
         for (int i=0;i<fields.Length;i++)
@@ -120,12 +121,13 @@ internal partial class FacilityCommandFields : Control
     public TextureScope Textures { get; init; } = null!;
     public StyleBoxTexture Field { get; init; } = null!;
     public int Top { get; init; }
+    public float SourceWidth { get; init; }
     public int[] Widths { get; init; } = [];
     public bool HasQuantity { get; init; }
     public override void _Draw()
     {
         void Strip(string role, Rect2 rect) => SkinPainter.Strip(this,Textures.Get($"deployment-{role}-left", this),Textures.Get($"deployment-{role}-middle", this),Textures.Get($"deployment-{role}-right", this),rect);
-        Strip("facility",new(280,Top,160,32));
+        Strip("facility",new(280,Top,SourceWidth,32));
         SkinPainter.Tile(this,Textures.Get("deployment-divider", this),new(280,Top+40,464,5));
         for (int i=0;i<Widths.Length;i++)
         {

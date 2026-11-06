@@ -49,8 +49,7 @@ public partial class PersonnelCommandView : FixedPage
         var window = new CommandWindow { Texts = Texts, Textures = Textures, Title = CommandText.Resolve(Texts, "title." + Draft.Kind), Position = at, Size = bounds.Size,
             CanAccept = Draft.CanExecute, Accepted = Submit, Closed = Closed, Help = () => Notice(Texts.Resolve("ui.command." + Draft.Kind)) };
         _body.AddChild(window);
-        string source = CommandText.Resolve(Texts, "value.source", Draft.PlaceName(Texts, Draft.Home.Id));
-        float sourceWidth = source.Sum(c => c < 128 ? 8 : 16) + 32;
+        var (source, sourceWidth) = CommandPanelArt.SourcePlate(CommandText.Resolve(Texts, "value.source", Draft.PlaceName(Texts, Draft.Home.Id)));
         _body.AddChild(new PersonnelCommandFields { Textures = Textures, Bounds = bounds, Kind = Draft.Kind, SourceWidth = sourceWidth });
         Label(source, new(at, new(sourceWidth,32)));
         if (Draft.Kind != "summon")

@@ -45,6 +45,14 @@ public partial class OfficerCard : Control
 
 internal static class CommandPanelArt
 {
+    public static (string Text, int Width) SourcePlate(string text)
+    {
+        string display = text.TrimEnd();
+        int width = 32;
+        foreach (var rune in display.EnumerateRunes()) width += rune.IsAscii ? 8 : 16;
+        return (display, width);
+    }
+
     public static StyleBoxTexture Field(TextureScope textures, CanvasItem canvas) => new()
     {
         Texture = textures.Get("deployment-field", canvas), TextureMarginLeft = 16, TextureMarginRight = 16,

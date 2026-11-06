@@ -82,8 +82,8 @@ public partial class DeploymentView : FixedPage
             Title = "出征", ShowBehindParent = true, Closed = Closed, Accepted = Proceed, CanAccept = Draft.CanProceed,
             Help = () => Notice("选择执行武将后，可选择阵形、船和士兵。\n拖拽武将牌交换阵位，点击兵法名称或双击武将选择兵法。\n阵形名称右侧的兵法菜单可选择按当前阵形或指定类别，选中后立即配置全队。\n选阵后自动配置由优化伴侣开关控制；灰色兵法不适配当前陆阵。\n执行进入选目标；中止会放弃本次设置。") };
         AddChild(_window);
-        string facility = "执行设施　" + Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts);
-        _facilityWidth = facility.Sum(c => c < 128 ? 8 : 16) + 32;
+        var (facility, facilityWidth) = CommandPanelArt.SourcePlate("执行设施　" + Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts));
+        _facilityWidth = facilityWidth;
         Label(facility, new(136, 100, _facilityWidth, 32));
         Button("执行武将", "edit", new(136, 148, 104, 40), SelectOfficers);
         Button("常用编队", "edit", new(248, 148, 104, 40), OpenPresets);

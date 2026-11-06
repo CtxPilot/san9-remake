@@ -40,7 +40,8 @@ public partial class PatrolView : FixedPage
             CanAccept = Draft.CanExecute, Accepted = Submit, Closed = Closed,
             Help = () => Notice(CommandText.Resolve(Texts, "hint.patrol-help")) };
         _body.AddChild(window);
-        Label(CommandText.Resolve(Texts, "value.source", Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts)), new(280,228,160,32));
+        var (source, sourceWidth) = CommandPanelArt.SourcePlate(CommandText.Resolve(Texts, "value.source", Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts)));
+        Label(source, new(280,228,sourceWidth,32));
         var edit = window.ActionButton(CommandText.Resolve(Texts, "label.actor"), "edit", new(0, 48, 104, 40), SelectOfficers);
         edit.Disabled = Draft.Candidates.Length < 2;
         var roster = new OfficerRosterPanel { Service = Service, Textures = Textures,
@@ -58,7 +59,7 @@ public partial class PatrolView : FixedPage
         Label($"{Draft.Home.PublicOrder}/1000",new(384,468,96,32)); Label(Draft.DraftGrowth.ToString(),new(384,508,64,32));
         _body.AddChild(new GameMessageBar { Textures = Textures, Text = Texts.Resolve(CommandMenuSkin.HintKey("patrol")) });
         // Draw content surfaces above the command background and below its labels.
-        var art = new PatrolFields { Textures = Textures, Field = _field, MouseFilter = MouseFilterEnum.Ignore };
+        var art = new PatrolFields { Textures = Textures, Field = _field, SourceWidth = sourceWidth, MouseFilter = MouseFilterEnum.Ignore };
         _body.AddChild(art); _body.MoveChild(art, 1);
     }
     private void CloseChild()
@@ -100,10 +101,11 @@ internal partial class PatrolFields : Control
 {
     public TextureScope Textures { get; init; } = null!;
     public StyleBoxTexture Field { get; init; } = null!;
+    public float SourceWidth { get; init; }
     public override void _Draw()
     {
         void Strip(string role, Rect2 rect) => SkinPainter.Strip(this, Textures.Get($"deployment-{role}-left", this), Textures.Get($"deployment-{role}-middle", this), Textures.Get($"deployment-{role}-right", this), rect);
-        Strip("facility",new(280,228,160,32));
+        Strip("facility",new(280,228,SourceWidth,32));
         SkinPainter.Tile(this, Textures.Get("deployment-divider", this), new(280,268,464,5));
         for (int i=0;i<3;i++)
         {

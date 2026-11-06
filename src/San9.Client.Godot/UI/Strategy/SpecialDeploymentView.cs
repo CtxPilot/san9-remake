@@ -55,8 +55,8 @@ public partial class SpecialDeploymentView : FixedPage
             HintChanged = hint => _message.SetMessage(hint??Hint), AcceptHint = AcceptHint, CancelHint = Text("cancel"),
             Help = () => Notice(Construction ? "选择执行武将、士兵与工作物，再选择建设地点。" : "选择执行武将和士兵，再选择己方目标设施。") };
         AddChild(_window);
-        string home = "执行设施　" + Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts);
-        Strip(home, new(0,0,home.Length*16+32,32), "deployment-facility");
+        var (home, homeWidth) = CommandPanelArt.SourcePlate("执行设施　" + Draft.View.Settlements.Single(s => s.Id == Draft.Home.Id).ResolveName(Texts));
+        Strip(home, new(0,0,homeWidth,32), "deployment-facility");
         var officersButton = _window.ActionButton("执行武将", "edit", new(0,48,104,40), SelectOfficers);
         officersButton.Disabled = Draft.Candidates.Length <= 1; _window.BindHint(officersButton,Text("officers"));
         int soldierY = Construction ? 200 : 176;

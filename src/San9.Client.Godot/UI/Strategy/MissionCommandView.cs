@@ -49,8 +49,7 @@ public partial class MissionCommandView : CommandPreparationView
             HelpHint = CommandText.Resolve(Texts, "hint.help"), CloseHint = CommandText.Resolve(Texts, "hint.close"),
             Help = () => Notice(Texts.Resolve(CommandMenuSkin.DescriptionKey(Draft.Kind))) };
         Body.AddChild(window);
-        string source = CommandText.Resolve(Texts, "value.source", Draft.View.Settlements.Single(p => p.Id == Draft.Home.Id).ResolveName(Texts));
-        float sourceWidth = source.Sum(c => c < 128 ? 8 : 16) + 32;
+        var (source, sourceWidth) = CommandPanelArt.SourcePlate(CommandText.Resolve(Texts, "value.source", Draft.View.Settlements.Single(p => p.Id == Draft.Home.Id).ResolveName(Texts)));
         Body.AddChild(new MissionCommandFields { Textures = Textures, Bounds = bounds, SourceWidth = sourceWidth,
             DividerWidth = Draft.IsDiplomacy ? 416 : bounds.Size.X });
         Label(source, at, new(sourceWidth,32));
