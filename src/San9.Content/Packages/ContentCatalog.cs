@@ -1,15 +1,18 @@
 using San9.Content.Interface;
+using San9.Content.Scenarios;
 
 namespace San9.Content.Packages;
 
 public sealed record ScenarioCatalogEntry(string Id, string Package);
 
-/// <summary>Package discovery only; previews and world data belong to individual scenarios.</summary>
+/// <summary>Shared authoring inputs and package discovery; world data belongs to individual scenarios.</summary>
 public sealed record ContentCatalog(int SchemaVersion, string Textures, string Opening,
     ScenarioCatalogEntry[] Scenarios)
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     [System.Text.Json.Serialization.JsonRequired] public string OfficerFlags { get; init; } = null!;
+    [System.Text.Json.Serialization.JsonRequired] public string Definitions { get; init; } = null!;
+    [System.Text.Json.Serialization.JsonRequired] public string OfficerDefaults { get; init; } = null!;
     public ScenarioCatalogEntry RequireScenario(string id) => Scenarios.SingleOrDefault(s => s.Id == id)
         ?? throw new InvalidDataException($"Unknown scenario: {id}.");
 }
@@ -50,6 +53,8 @@ public static class ContentCatalogFiles
         _ = PackageFiles.Resolve(root, catalog.Textures);
         _ = PackageFiles.Resolve(root, catalog.Opening);
         _ = PackageFiles.Resolve(root, catalog.OfficerFlags);
+        _ = PackageFiles.Resolve(root, catalog.Definitions);
+        _ = PackageFiles.Resolve(root, catalog.OfficerDefaults);
         foreach (var scenario in catalog.Scenarios) _ = PackageFiles.Resolve(root, scenario.Package);
     }
 
@@ -57,6 +62,23 @@ public static class ContentCatalogFiles
     {
         var flags = await PackageFiles.ReadAsync<Authoring.OfficerFlagCatalog>(PackageFiles.Resolve(root, catalog.OfficerFlags), token);
         flags.Validate(); return flags;
+    }
+
+    public static async Task<(ScenarioDefinitions Definitions, OfficerDefaultsCatalog Officers)> LoadAuthoringAsync(
+        string root, ContentCatalog catalog, CancellationToken token = default)
+    {
+        var definitionsTask = PackageFiles.ReadAsync<ScenarioDefinitions>(
+            PlayerDefinitionFiles.ActivePath(PackageFiles.Resolve(root, catalog.Definitions)), token);
+        var officersTask = PackageFiles.ReadAsync<OfficerDefaultsCatalog>(
+            PlayerDefinitionFiles.ActivePath(PackageFiles.Resolve(root, catalog.OfficerDefaults)), token);
+        await Task.WhenAll(definitionsTask, officersTask);
+        var definitions = await definitionsTask;
+        var officers = await officersTask;
+        if (definitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion ||
+            officers.SchemaVersion != OfficerDefaultsCatalog.CurrentSchemaVersion)
+            throw new InvalidDataException("Unsupported shared authoring data version; reconvert the package.");
+        OfficerComposition.Compile([], officers.Officers);
+        return (definitions, officers);
     }
 
     public static async Task<ScenarioPreviewEntry[]> LoadPreviewsAsync(string root, ContentCatalog catalog, CancellationToken token = default)

@@ -9,6 +9,7 @@ internal static class ContentEditorStyle
     internal static Theme Create(Font font)
     {
         var theme = CompanionPanelStyle.Create(font);
+        Dialogs(theme);
         theme.SetStylebox("panel", "TabContainer", Surface("202833", "394758"));
         theme.SetStylebox("panel", "ItemList", Surface("151c24", "394758", 6));
         theme.SetStylebox("selected", "ItemList", Surface("294f4b", "60958b", 8));
@@ -30,6 +31,33 @@ internal static class ContentEditorStyle
         foreach (string color in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_disabled_color" })
             theme.SetColor(color, "OptionButton", theme.GetColor(color, "Button"));
         return theme;
+    }
+
+    private static void Dialogs(Theme theme)
+    {
+        var body = Surface("1b222c", "1b222c", 16);
+        body.SetBorderWidthAll(0);
+        body.SetCornerRadiusAll(0);
+        theme.SetStylebox("panel", "AcceptDialog", body);
+        theme.SetConstant("buttons_separation", "AcceptDialog", 16);
+
+        var frame = Surface("263240", "465260");
+        frame.SetCornerRadiusAll(10);
+        frame.ContentMarginLeft = frame.ContentMarginRight = 10;
+        frame.ContentMarginTop = 36; frame.ContentMarginBottom = 8;
+        frame.ExpandMarginLeft = frame.ExpandMarginRight = frame.ExpandMarginBottom = 8;
+        frame.ExpandMarginTop = 40;
+        theme.SetStylebox("embedded_border", "Window", frame);
+        var inactive = (StyleBoxFlat)frame.Duplicate();
+        inactive.BgColor = new("202a35"); inactive.BorderColor = new("394758");
+        theme.SetStylebox("embedded_unfocused_border", "Window", inactive);
+        theme.SetColor("title_color", "Window", new("e8edf3"));
+        theme.SetColor("title_outline_modulate", "Window", Colors.Transparent);
+        theme.SetFontSize("title_font_size", "Window", 18);
+        theme.SetConstant("title_outline_size", "Window", 0);
+        theme.SetConstant("title_height", "Window", 40);
+        theme.SetConstant("close_h_offset", "Window", 20);
+        theme.SetConstant("close_v_offset", "Window", 24);
     }
 
     internal static void Compact(Button button)

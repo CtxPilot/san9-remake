@@ -39,6 +39,35 @@ public sealed class ScenarioCompositionTests : IDisposable
         JsonSerializer.SerializeToElement(expected, Options), JsonSerializer.SerializeToElement(actual, Options)));
 
     [Fact]
+    public async Task AuthoringCatalogReadsSharedPlayerCopiesWithoutScenarioOrWorldDependencies()
+    {
+        var shared = Shared(Scenario());
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared);
+        File.Delete(PackageFiles.Resolve(_root, shared.GeographyPath));
+        var catalog = new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "missing-textures", "missing-opening.json",
+            [new("unavailable", "missing-scenario")])
+        { OfficerFlags = "missing-flags.json", Definitions = shared.DefinitionsPath, OfficerDefaults = shared.OfficersPath };
+        await File.WriteAllTextAsync(Path.Combine(_root, "catalog.json"), JsonSerializer.Serialize(catalog, PackageFiles.JsonOptions));
+        var loaded = await ContentCatalogFiles.LoadAsync(_root);
+        var baseline = await ContentCatalogFiles.LoadAuthoringAsync(_root, loaded);
+        Assert.Equal(1200, Assert.Single(baseline.Officers.Officers).Id);
+
+        var definitions = shared.Definitions with { Information = shared.Definitions.Information with
+        { Tactics = [new(9000, "共享兵法改名")] } };
+        var officers = shared.Officers with { Officers = [shared.Officers.Officers[0] with { Name = "共享人物改名" }] };
+        string definitionPath = PlayerDefinitionFiles.PlayerPath(PackageFiles.Resolve(_root, loaded.Definitions));
+        string officerPath = PlayerDefinitionFiles.PlayerPath(PackageFiles.Resolve(_root, loaded.OfficerDefaults));
+        await File.WriteAllTextAsync(definitionPath, JsonSerializer.Serialize(definitions, Options));
+        await File.WriteAllTextAsync(officerPath, JsonSerializer.Serialize(officers, Options));
+        var player = await ContentCatalogFiles.LoadAuthoringAsync(_root, loaded);
+        Assert.Equal("共享兵法改名", Assert.Single(player.Definitions.Information.Tactics).Name);
+        Assert.Equal("共享人物改名", Assert.Single(player.Officers.Officers).Name);
+
+        await File.WriteAllTextAsync(officerPath, JsonSerializer.Serialize(officers with { SchemaVersion = 0 }, Options));
+        await Assert.ThrowsAsync<InvalidDataException>(() => ContentCatalogFiles.LoadAuthoringAsync(_root, loaded));
+    }
+
+    [Fact]
     public void RankTextInheritsSharedDefinitionsUnlessTheScenarioExplicitlyOverridesIt()
     {
         var baseline = Scenario() with { Information = InformationDefinitions.Empty with

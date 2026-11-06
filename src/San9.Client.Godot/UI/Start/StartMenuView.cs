@@ -70,10 +70,37 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
         AddButton(Definition.Help, "").MouseEntered += RestorePrompt;
         var close = AddButton(Definition.Close, "");
         close.Name = "Close"; close.MouseEntered += RestorePrompt; close.Pressed += RequestQuit;
-        var sharedDataEditor = new Button { Name = "OpenSharedDataEditor", Text = "共享数据编辑器", Position = new(18, 710), Size = new(242, 34) };
-        sharedDataEditor.Pressed += OpenSharedDataEditor; _controls.AddChild(sharedDataEditor);
+        AddSharedDataEditorButton();
         first?.GrabFocus();
         RestorePrompt();
+    }
+    private void AddSharedDataEditorButton()
+    {
+        const string title = "编辑游戏资料";
+        var button = new Button
+        {
+            Name = "OpenSharedDataEditor", AccessibilityName = title,
+            Icon = GD.Load<Texture2D>("res://assets/icons/game-data-editor.svg"),
+            IconAlignment = HorizontalAlignment.Center, ExpandIcon = true,
+            Position = new(32, 560), Size = new(80, 80),
+            TextureFilter = TextureFilterEnum.LinearWithMipmaps
+        };
+        button.AddThemeConstantOverride("icon_max_width", 64);
+        var style = new StyleBoxEmpty
+        { ContentMarginLeft = 8, ContentMarginRight = 8, ContentMarginTop = 8, ContentMarginBottom = 8 };
+        foreach (string state in new[] { "normal", "hover", "pressed", "hover_pressed", "disabled", "focus" })
+            button.AddThemeStyleboxOverride(state, style);
+        button.AddThemeColorOverride("icon_normal_color", new(0.85f, 0.85f, 0.85f));
+        button.AddThemeColorOverride("icon_hover_color", Colors.White);
+        button.AddThemeColorOverride("icon_focus_color", Colors.White);
+        button.AddThemeColorOverride("icon_pressed_color", new(0.65f, 0.65f, 0.65f));
+        button.AddThemeColorOverride("icon_hover_pressed_color", new(0.65f, 0.65f, 0.65f));
+        void ShowHint() => _hint.Text = title;
+        button.MouseEntered += ShowHint;
+        button.FocusEntered += ShowHint;
+        button.MouseExited += RestorePrompt;
+        button.FocusExited += RestorePrompt;
+        button.Pressed += OpenSharedDataEditor; _controls.AddChild(button);
     }
     private StartMenuButton AddButton(StartMenuSprite sprite, string title)
     {

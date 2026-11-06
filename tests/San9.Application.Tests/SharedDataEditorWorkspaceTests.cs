@@ -35,7 +35,7 @@ public sealed class SharedDataEditorWorkspaceTests : IDisposable
             await ScenarioContentFiles.WriteAsync(Path.Combine(_root, id), content, resourceRoot: _root, sharedScenario: shared);
         }
         var catalog = new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "textures", "opening.json", [new("a", "a"), new("b", "b"), new("private", "private")])
-        { OfficerFlags = "flags.json" };
+        { OfficerFlags = "flags.json", Definitions = shared.DefinitionsPath, OfficerDefaults = shared.OfficersPath };
         await File.WriteAllTextAsync(Path.Combine(_root, "catalog.json"), JsonSerializer.Serialize(catalog, PackageFiles.JsonOptions));
     }
 

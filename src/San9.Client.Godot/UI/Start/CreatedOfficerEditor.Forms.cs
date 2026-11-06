@@ -74,9 +74,9 @@ public partial class CreatedOfficerEditor
     }
     private IEnumerable<(MilitaryCatalogDefinition Definition, TacticRule Rule)> EditableTactics()
     {
-        if (_context?.Scenario.Military is not { } military) yield break;
+        if (_definitions?.Military is not { } military) yield break;
         var rules = military.Tactics.ToDictionary(t => t.Id);
-        foreach (var definition in _context.Scenario.Information.Tactics)
+        foreach (var definition in _definitions.Information.Tactics)
             if (rules.TryGetValue(definition.Id, out var rule) && rule.IsOfficerTactic)
                 yield return (definition, rule);
     }
@@ -102,16 +102,12 @@ public partial class CreatedOfficerEditor
             .TooltipText = "自然死亡规则使用的档位，并非死亡年龄。";
         var references = new List<(string Label, Guid? Created, int? Historical)> { ("无亲代", null, null) };
         references.AddRange(Library.Officers.Where(o => o.Id != person.Id).Select(o => ("自创：" + o.FullName, (Guid?)o.Id, (int?)null)));
-        if (_context is not null) references.AddRange(_context.Scenario.Officers.Select(o => ("剧本：" + _context.Text.Resolve(o.NameKey), (Guid?)null, (int?)o.State.Id)));
+        references.AddRange(_historicalOfficers.Select(o => ("历史：" + o.Name, (Guid?)null, (int?)o.Id)));
         if (person.ScenarioParentId is int existing && references.All(r => r.Historical != existing))
-            references.Add(($"剧本人物 {existing}（当前参考中不可用）", null, existing));
-        int selected = references.FindIndex(r => r.Created == person.ParentId && r.Historical == person.ScenarioParentId);
-        Caption(grid, "亲代");
-        var choose = AddButton(grid, references[Math.Max(0, selected)].Label,
-            () => ChooseParent(references, person), "ChooseParent");
-        choose.Alignment = HorizontalAlignment.Left; choose.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        choose.CustomMinimumSize = new(112, 34); choose.ClipText = true;
-        choose.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-        choose.TooltipText = references[Math.Max(0, selected)].Label + "\n按姓名搜索人物库或参考剧本中的人物。";
+            references.Add(($"历史人物 {existing}（共享目录中不可用）", null, existing));
+        OfficerReferenceField.Add(grid, "亲代", references.Select(r => (r.Label, (r.Created, r.Historical))).ToArray(),
+            (Created: person.ParentId, Historical: person.ScenarioParentId),
+            value => Change(person.Id, p => p with { ParentId = value.Created, ScenarioParentId = value.Historical }, rebuild: true),
+            "ChooseParent", "按姓名搜索人物库或共享目录中的人物。");
     }
 }

@@ -3,6 +3,7 @@ using San9.Application.Authoring;
 using San9.Client.Godot.Persistence;
 using San9.Content.Authoring;
 using San9.Content.Packages;
+using San9.Content.Scenarios;
 using Timer = global::Godot.Timer;
 
 namespace San9.Client.Godot;
@@ -10,7 +11,6 @@ namespace San9.Client.Godot;
 /// <summary>The workspace owns drafts; portraits use the game's shared texture service.</summary>
 public partial class CreatedOfficerEditor : ModalView
 {
-    private const string DefaultReferenceScenarioId = "19";
     public CreatedOfficerStore Store { get; init; } = null!;
     public string ContentRoot { get; init; } = "";
     public TextureService? Service { get; init; }
@@ -23,16 +23,13 @@ public partial class CreatedOfficerEditor : ModalView
     private LineEdit _search = null!;
     private TabContainer _tabs = null!;
     private Label _status = null!, _count = null!, _title = null!;
-    private MenuButton _reference = null!;
-    private int _referenceScenarioIndex = -1;
     private Timer _statusTimer = null!;
     private readonly List<Guid> _visible = [];
-    private ScenarioCatalogEntry[] _scenarios = [];
-    private ScenarioContent? _context;
+    private ScenarioDefinitions? _definitions;
+    private OfficerDefaults[] _historicalOfficers = [];
     private readonly CancellationTokenSource _lifetime = new();
     private bool _refreshing;
     private TextureService? _portraitService;
-    private bool _loadingScenario;
     private bool _previousAutoAcceptQuit;
     public CreatedOfficerLibrary Library => Workspace.Library;
     public bool HasChanges => _workspace?.HasChanges ?? false;
@@ -70,8 +67,6 @@ public partial class CreatedOfficerEditor : ModalView
             if (_workspace is not null) ShowCurrent();
         };
         header.AddChild(options);
-        _reference = new MenuButton { Text = "参考剧本", Name = "ReferenceScenario", Disabled = true };
-        _reference.GetPopup().IdPressed += id => { _referenceScenarioIndex = (int)id; LoadScenario(); }; header.AddChild(_reference);
         var save = AddButton(header, "保存人物库", () => Save(), "SaveOfficers");
         save.TooltipText = "Ctrl+S"; CompanionPanelStyle.Primary(save);
         AddButton(header, "关闭", RequestClose, "CloseEditor");
@@ -118,67 +113,37 @@ public partial class CreatedOfficerEditor : ModalView
         try
         {
             var catalog = await ContentCatalogFiles.LoadAsync(ContentRoot, token);
-            if (_portraitService is null)
+            try
             {
-                string textureRoot = PackageFiles.Resolve(ContentRoot, catalog.Textures);
-                var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(textureRoot, token), token);
-                token.ThrowIfCancellationRequested();
-                var service = new TextureService(); service.Initialize(textures, textureRoot); AddChild(service);
-                _portraitService = service; ShowCurrent();
+                if (_portraitService is null)
+                {
+                    string textureRoot = PackageFiles.Resolve(ContentRoot, catalog.Textures);
+                    var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(textureRoot, token), token);
+                    token.ThrowIfCancellationRequested();
+                    var service = new TextureService(); service.Initialize(textures, textureRoot); AddChild(service);
+                    _portraitService = service; ShowCurrent();
+                }
             }
+            catch (Exception error) when (IsFileError(error))
+            { Status("头像资源读取失败，仍可编辑人物资料：" + error.Message, true); }
             try
             {
                 var flags = await ContentCatalogFiles.LoadOfficerFlagsAsync(ContentRoot, catalog, token);
                 token.ThrowIfCancellationRequested();
-                flags.ValidateReferences(_portraitService.AnimationClips.Keys.ToHashSet());
+                if (_portraitService is not null) flags.ValidateReferences(_portraitService.AnimationClips.Keys.ToHashSet());
                 Workspace.UseFlagCatalog(flags); ShowCurrent();
             }
             catch (Exception error) when (IsFileError(error))
             { Status("旗字目录读取失败，选旗和自动关联不可用：" + error.Message, true); }
-            var previews = await ContentCatalogFiles.LoadPreviewsAsync(ContentRoot, catalog, token);
-            token.ThrowIfCancellationRequested(); _scenarios = catalog.Scenarios;
-            for (int i = 0; i < _scenarios.Length; i++)
-            {
-                var entry = _scenarios[i];
-                var preview = previews.Single(p => p.Id == entry.Id);
-                _reference.GetPopup().AddRadioCheckItem($"{preview.Year}年 {preview.Title}", i);
-            }
-            int selected = Array.FindIndex(_scenarios, entry => entry.Id == DefaultReferenceScenarioId);
-            if (selected < 0) throw new InvalidDataException("缺少默认参考剧本：281年第20号剧本。");
-            _referenceScenarioIndex = selected;
-            LoadScenario();
+            var authoring = await ContentCatalogFiles.LoadAuthoringAsync(ContentRoot, catalog, token);
+            token.ThrowIfCancellationRequested();
+            _definitions = authoring.Definitions;
+            _historicalOfficers = authoring.Officers.Officers;
+            ShowCurrent();
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception error) when (IsFileError(error))
-        { Status("参考内容读取失败，仍可编辑人物资料：" + error.Message, true); }
-    }
-    private async void LoadScenario()
-    {
-        if (_loadingScenario || _referenceScenarioIndex < 0 || _scenarios.Length == 0) return;
-        _loadingScenario = true;
-        _reference.Disabled = true;
-        var token = _lifetime.Token;
-        var entry = _scenarios[_referenceScenarioIndex];
-        try
-        {
-            var content = await Task.Run(async () =>
-            {
-                var loaded = await ScenarioContentFiles.LoadAsync(PackageFiles.Resolve(ContentRoot, entry.Package), token);
-                loaded.Scenario.Validate(); return loaded;
-            }, token);
-            token.ThrowIfCancellationRequested(); _context = content; ShowCurrent();
-            _reference.Text = $"参考：{content.Scenario.Year}年";
-            _reference.TooltipText = content.Text.Resolve("scenario.title") + "\n点击更换参考剧本";
-            for (int i = 0; i < _scenarios.Length; i++) _reference.GetPopup().SetItemChecked(i, i == _referenceScenarioIndex);
-            if (Workspace.FlagCatalog is not null) Status("");
-        }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
-        catch (Exception error) when (IsFileError(error)) { Status("剧本读取失败：" + error.Message, true); }
-        finally
-        {
-            _loadingScenario = false;
-            if (!token.IsCancellationRequested) _reference.Disabled = false;
-        }
+        { Status("共享内容读取失败，仍可编辑人物资料：" + error.Message, true); }
     }
     private void RefreshList()
     {

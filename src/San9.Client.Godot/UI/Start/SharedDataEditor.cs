@@ -30,7 +30,7 @@ public partial class SharedDataEditor : ModalView
         foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 16);
         var layout = new VBoxContainer(); layout.AddThemeConstantOverride("separation", 10); margin.AddChild(layout);
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); layout.AddChild(header);
-        _title = new Label { Text = "共享数据编辑器", SizeFlagsHorizontal = SizeFlags.ExpandFill,
+        _title = new Label { Text = "游戏资料编辑器", SizeFlagsHorizontal = SizeFlags.ExpandFill,
             MouseFilter = MouseFilterEnum.Pass, TooltipText = "正在读取共享数据…" };
         _title.AddThemeFontSizeOverride("font_size", 20); header.AddChild(_title);
         _save = AddButton(header, "保存全部修改", () => _ = Save(), "SaveSharedData");

@@ -36,7 +36,7 @@ public sealed class ContentCatalogTests
         {
             var entries = Enumerable.Range(0, 20).Select(i => new ScenarioCatalogEntry($"custom-{i}", $"scenarios/custom/{i}")).ToArray();
             var catalog = new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries)
-                { OfficerFlags = "shared/officer-flags.json" };
+                { OfficerFlags = "shared/officer-flags.json", Definitions = "shared/definitions.json", OfficerDefaults = "shared/officer-defaults.json" };
             await File.WriteAllTextAsync(Path.Combine(root, "catalog.json"), JsonSerializer.Serialize(catalog, PackageFiles.JsonOptions));
             Directory.CreateDirectory(Path.Combine(root, "shared"));
             var flags = new San9.Content.Authoring.OfficerFlagCatalog(1, new() { ["司"] = 66 }, [66]);

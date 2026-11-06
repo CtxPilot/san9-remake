@@ -59,7 +59,7 @@ public partial class Main : Node
             _preferences = new(preferences, preferenceStore.Save);
             if (options.SharedDataEditor)
             {
-                GetWindow().Title = "San9R · 共享数据编辑器";
+                GetWindow().Title = "San9R · 游戏资料编辑器";
                 ui.AddChild(new SharedDataEditor { ContentRoot = options.ContentRoot, ReferenceScenarioId = options.ScenarioId,
                     Closed = () => GetTree().Quit() });
                 return;

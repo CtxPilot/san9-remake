@@ -43,11 +43,10 @@ public partial class OfficerEditorPage : SharedCatalogEditorPage
         if (p.AgeAtScenarioStart is int age) Number(profile, "开局年龄差", age, 0, int.MaxValue, v => Edit(id, x => x with { AgeAtScenarioStart = (int)v }));
         else Number(profile, "出生年份", p.BirthYear, 0, int.MaxValue, v => Edit(id, x => x with { BirthYear = (int)v }));
         var family = Section("亲缘与继承");
-        var parents = Workspace.Officers.Where(x => x.Id != id).ToArray();
-        Choice(family, "亲代", new[] { "无" }.Concat(parents.Select(x => x.Name)).ToArray(),
-            p.ParentId is int parent ? Array.FindIndex(parents, x => x.Id == parent) + 1 : 0,
-            v => Edit(id, x => x with { ParentId = v == 0 ? null : parents[v - 1].Id }));
-        Number(family, "血缘", p.BloodlineId ?? -1, -1, int.MaxValue, v => Edit(id, x => x with { BloodlineId = v < 0 ? null : (int)v }));
+        PersonReference(family, "亲代", p.ParentId, x => x.Id != id,
+            value => Edit(id, x => x with { ParentId = value }), "ChooseParent");
+        PersonReference(family, "血缘", p.BloodlineId, _ => true,
+            value => Edit(id, x => x with { BloodlineId = value }), "ChooseBloodline");
         Number(family, "继承优先级", p.SuccessionPriority, 0, int.MaxValue, v => Edit(id, x => x with { SuccessionPriority = (int)v }));
         Number(family, "拥立优先级", p.ForceFounderPriority, 0, int.MaxValue, v => Edit(id, x => x with { ForceFounderPriority = (int)v }));
         var linked = Section("兵法加成");
@@ -69,6 +68,15 @@ public partial class OfficerEditorPage : SharedCatalogEditorPage
         foreach (var flag in Enum.GetValues<DuelAdvantages>().Where(f => f != 0 && ((int)f & ((int)f - 1)) == 0))
             Toggle(flags, DuelLabel(flag), p.DuelAdvantages.HasFlag(flag), v => Edit(id, x => x with
             { DuelAdvantages = v ? x.DuelAdvantages | flag : x.DuelAdvantages & ~flag }));
+    }
+    private void PersonReference(Node parent, string title, int? current, Func<OfficerDefaults, bool> eligible,
+        Action<int?> changed, string name)
+    {
+        var candidates = new List<(string Label, int? Value)> { ("无" + title, null) };
+        candidates.AddRange(Workspace.Officers.Where(eligible).Select(p => ($"{p.Name}（{p.Id}）", (int?)p.Id)));
+        OfficerReferenceField.Add(parent, title, candidates, current, Guard(changed), name,
+            title == "血缘" ? "选择家族血缘根人物；同族使用同一人物，可选本人。" : "按姓名搜索上一代人物。",
+            $"人物 {current}（不在可选人物目录中）");
     }
     private static string DuelLabel(DuelAdvantages flag) => flag switch
     { DuelAdvantages.DominantParry => "单挑格挡优势", DuelAdvantages.DominantAttack => "单挑攻击优势",

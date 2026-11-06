@@ -84,7 +84,7 @@ public static class ContentCatalogImporter
             await Publish("shared/officer-flags.json", flags);
         }
         await Publish("catalog.json", new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries.ToArray())
-            { OfficerFlags = "shared/officer-flags.json" });
+            { OfficerFlags = "shared/officer-flags.json", Definitions = "shared/definitions.json", OfficerDefaults = "shared/officer-defaults.json" });
 
         async Task Publish<T>(string path, T value)
         {
