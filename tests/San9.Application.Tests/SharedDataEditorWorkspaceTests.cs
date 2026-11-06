@@ -136,7 +136,7 @@ public sealed class SharedDataEditorWorkspaceTests : IDisposable
         await CreatePeopleAndTactics();
         var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
         var originals = Directory.GetFiles(_root, "*", SearchOption.AllDirectories).ToDictionary(p => p, File.ReadAllBytes);
-        workspace.SetOfficer(workspace.GetOfficer(9001) with { Name = "新姓名", CourtesyName = "新字", Biography = "新列传", War = 95 });
+        workspace.SetOfficer(workspace.GetOfficer(9001) with { Name = "新姓名", CourtesyName = "新字", Biography = "新列传", PortraitKey = "portrait.edited", War = 95 });
         workspace.SetTactic(workspace.GetTactic(6000) with { Power = 30, MinimumInterval = 9 });
         workspace.SetTacticCatalog(workspace.GetTacticCatalog(6000) with { Name = "新兵法", Description = "新兵法说明" });
         workspace.SetFormationCatalog(workspace.GetFormationCatalog(7000) with { Name = "新阵形", Description = "新阵形说明" });
@@ -151,6 +151,8 @@ public sealed class SharedDataEditorWorkspaceTests : IDisposable
         var person = Assert.Single(content.Scenario.Officers);
         Assert.Equal(95, person.State.BaseAbilities.War);
         Assert.Equal("新姓名", content.Text.Resolve(person.NameKey));
+        Assert.Equal("portrait.edited", content.Text.MessagePeople[9001].PortraitKey);
+        Assert.Equal("portrait.edited", content.IllustrationRoles["catalog-person-9001"]);
         Assert.Equal("新字", content.Text.Resolve(person.CourtesyNameKey!));
         Assert.Equal("新列传", content.Text.ResolveRich(person.BiographyKey!));
         Assert.Equal("新兵法", Assert.Single(content.Scenario.Information.Tactics).Name);

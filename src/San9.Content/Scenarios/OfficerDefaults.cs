@@ -13,6 +13,7 @@ public sealed record OfficerDefaults(int Id)
 {
     [JsonRequired] public required string NameKey { get; init; }
     [JsonRequired] public required string Name { get; init; }
+    [JsonRequired] public string? PortraitKey { get; init; }
     [JsonIgnore] public string GivenName => Name.StartsWith(Surname, StringComparison.Ordinal) ? Name[Surname.Length..] : Name;
     [JsonRequired] public required string? CourtesyName { get; init; }
     [JsonRequired] public required string? Biography { get; init; }
@@ -50,6 +51,7 @@ public sealed record OfficerDefaults(int Id)
     {
         NameKey = value.NameKey,
         Name = texts.Resolve(value.NameKey),
+        PortraitKey = texts.MessagePeople.GetValueOrDefault(value.State.Id)?.PortraitKey,
         CourtesyName = value.CourtesyNameKey is { } courtesy ? texts.Resolve(courtesy) : null,
         Biography = value.BiographyKey is { } biography ? texts.ResolveRich(biography) : null,
         AgeAtScenarioStart = value.AgeAtScenarioStart,
@@ -87,6 +89,7 @@ public sealed record OfficerDefaults(int Id)
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record OfficerDefaultsOverrides
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ContentOverride<string?>? PortraitKey { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<string>? NameKey { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ContentOverride<string>? Name { get; init; }
@@ -153,6 +156,7 @@ public sealed record OfficerDefaultsOverrides
 
     public OfficerDefaults Apply(OfficerDefaults defaults) => defaults with
     {
+        PortraitKey = PortraitKey is { } portrait ? portrait.Value : defaults.PortraitKey,
         NameKey = NameKey is { } changeNameKey ? changeNameKey.Value : defaults.NameKey,
         Name = Name is { } changeName ? changeName.Value : defaults.Name,
         CourtesyName = CourtesyName is { } changeCourtesy ? changeCourtesy.Value : defaults.CourtesyName,
@@ -190,6 +194,7 @@ public sealed record OfficerDefaultsOverrides
 
     public static OfficerDefaultsOverrides Between(OfficerDefaults defaults, OfficerDefaults value) => new()
     {
+        PortraitKey = ContentComparison.Equal(defaults.PortraitKey, value.PortraitKey) ? null : new(value.PortraitKey),
         NameKey = ContentComparison.Equal(defaults.NameKey, value.NameKey) ? null : new(value.NameKey),
         Name = ContentComparison.Equal(defaults.Name, value.Name) ? null : new(value.Name),
         CourtesyName = ContentComparison.Equal(defaults.CourtesyName, value.CourtesyName) ? null : new(value.CourtesyName),
@@ -353,9 +358,19 @@ public static class OfficerComposition
             if (p.Surname.Length > 0) entries[surname] = MessageMarkup.Escape(p.Surname);
             if (givenText.Length > 0) entries[given] = MessageMarkup.Escape(givenText);
             people[p.Id] = new(p.Surname.Length > 0 ? surname : null, givenText.Length > 0 ? given : null,
-                people.GetValueOrDefault(p.Id)?.PortraitKey);
+                p.PortraitKey);
         }
         return texts with { Entries = entries, MessagePeople = people };
+    }
+
+    public static Dictionary<string, string> ProjectPortraits(IReadOnlyDictionary<string, string> source, IEnumerable<OfficerDefaults> profiles)
+    {
+        var roles = new Dictionary<string, string>(source);
+        foreach (var p in profiles)
+            foreach (string role in new[] { $"catalog-person-{p.Id}", $"information-person-{p.Id}" })
+                if (p.PortraitKey is { } portrait) roles[role] = portrait;
+                else roles.Remove(role);
+        return roles;
     }
 
     public static OfficerInitialState[] Compile(ScenarioOfficerState[] placements, OfficerDefaults[] defaults)

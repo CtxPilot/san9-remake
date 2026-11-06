@@ -18,6 +18,7 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     protected abstract string Subject { get; }
     protected abstract IEnumerable<(int Id, string Name)> Entries { get; }
     protected virtual Action<int, string>? Rename => null;
+    protected virtual bool ScrollForm => true;
     protected abstract bool Changed(int id);
     protected abstract void Restore(int id);
     protected abstract void BuildForm(int id);
@@ -55,8 +56,15 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
             _title.AddThemeFontSizeOverride("font_size", 20); heading.AddChild(_title);
         }
         _changed = new Label { Text = "*", Visible = false }; heading.AddChild(_changed);
-        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; body.AddChild(scroll);
-        Form = ContentEditorControls.PageBody(scroll);
+        if (ScrollForm)
+        {
+            var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+            body.AddChild(scroll); Form = ContentEditorControls.PageBody(scroll);
+        }
+        else
+        {
+            Form = new VBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill }; body.AddChild(Form);
+        }
         Current = Entries.Select(e => (int?)e.Id).FirstOrDefault(); RefreshList(); ShowCurrent();
     }
     private void RefreshList()

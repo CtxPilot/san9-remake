@@ -7,7 +7,7 @@ namespace San9.Content.Packages;
 [System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
 public sealed record OfficerDefaultsCatalog(int SchemaVersion, OfficerDefaults[] Officers)
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 }
 
 /// <summary>Explicitly owned reusable inputs; no automatic discovery or content-based relocation.</summary>

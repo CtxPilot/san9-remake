@@ -171,8 +171,9 @@ public partial class CreatedOfficerEditor : ModalView
         int page = _tabs.CurrentTab;
         foreach (var child in _tabs.GetChildren()) { _tabs.RemoveChild(child); child.QueueFree(); }
         if (Current is not { } person)
-        { var empty = Page("人物资料"); empty.AddChild(new Label { Text = "点击“新建”开始创作，或导入已有的人物库。" }); return; }
-        BuildProfile(person); BuildTactics(person);
+        { var empty = new VBoxContainer { Name = "人物资料" }; _tabs.AddChild(empty);
+            empty.AddChild(new Label { Text = "点击“新建”开始创作，或导入已有的人物库。" }); return; }
+        BuildPages(person);
         _tabs.CurrentTab = Math.Clamp(page, 0, _tabs.GetTabCount() - 1);
     }
     private bool Save()

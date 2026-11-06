@@ -30,11 +30,25 @@ public sealed record CreatedOfficer(Guid Id, string Name)
     [JsonRequired] public ImmutableArray<int> MasteredCategories { get; init; } = [];
     [JsonRequired] public ImmutableSortedSet<int> LearnedTactics { get; init; } = [];
 
+    public int? AgeAtScenarioStart { get; init; }
+    public Guid? BloodlineRootId { get; init; }
+    public int? HistoricalBloodlineRootId { get; init; }
+    public int SuccessionPriority { get; init; }
+    public int ForceFounderPriority { get; init; }
+    public int TacticLinkBonus { get; init; }
+    public DuelAdvantages DuelAdvantages { get; init; }
+    public bool PrefersConsolidationLeadership { get; init; }
+    public bool AutomaticSurrenderAllowed { get; init; } = true;
+    public bool HasRecruitmentPoliticsBonus { get; init; }
+
     public void Validate()
     {
         if (Id == Guid.Empty || string.IsNullOrWhiteSpace(Name) || Surname is null || CourtesyName is null || Biography is null ||
-            FlagGlyph < -1 || BirthYear < 1 || AppearanceYear < BirthYear || LifespanTier is < 0 or > 7 ||
-            Abilities.War < 1 || Abilities.Intelligence < 1 || Abilities.Politics < 1 || Abilities.Leadership < 1 ||
+            FlagGlyph < -1 || AppearanceYear < 1 || (AgeAtScenarioStart is null ? BirthYear < 1 || AppearanceYear < BirthYear : BirthYear != 0 || AgeAtScenarioStart < 0) || LifespanTier < 0 ||
+            SuccessionPriority < 0 || ForceFounderPriority < 0 || TacticLinkBonus is < 0 or > 100 ||
+            BloodlineRootId == Guid.Empty || HistoricalBloodlineRootId < 0 || BloodlineRootId is not null && HistoricalBloodlineRootId is not null ||
+            (DuelAdvantages & ~(DuelAdvantages.DominantParry | DuelAdvantages.DominantAttack | DuelAdvantages.DominantDoubleStrike)) != 0 ||
+            !Abilities.IsNonnegative ||
             Personality is < 0 or > 3 || Righteousness is < 0 or > 15 || Ambition is < 0 or > 15 || Affinity is < 0 or > 149 ||
             ParentId == Guid.Empty || ParentId == Id ||
             ScenarioParentId < 0 || ParentId is not null && ScenarioParentId is not null ||
@@ -62,6 +76,17 @@ public sealed record CreatedOfficerLibrary(int SchemaVersion, ImmutableArray<Cre
         foreach (var person in Officers)
         {
             person.Validate();
+            if (person.BloodlineRootId is Guid root && !people.ContainsKey(root))
+                throw new InvalidDataException("血缘根人物不在人物库中。");
+            var familySeen = new HashSet<Guid>();
+            for (CreatedOfficer? currentFamily = person; currentFamily is not null;)
+            {
+                if (!familySeen.Add(currentFamily.Id)) throw new InvalidDataException("血缘继承关系形成循环。");
+                Guid? next = currentFamily.BloodlineRootId is Guid explicitRoot
+                    ? explicitRoot == currentFamily.Id ? null : explicitRoot
+                    : currentFamily.HistoricalBloodlineRootId is not null ? null : currentFamily.ParentId;
+                currentFamily = next is Guid nextId && people.TryGetValue(nextId, out var nextPerson) ? nextPerson : null;
+            }
             var seen = new HashSet<Guid> { person.Id };
             for (var current = person; current.ParentId is Guid parent;)
             {

@@ -125,7 +125,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     {
         if (_sharedDataEditor is not null) return;
         _controls.Hide();
-        _sharedDataEditor = new SharedDataEditor { Name = "SharedDataEditor", ContentRoot = ContentRoot, Closed = () =>
+        _sharedDataEditor = new SharedDataEditor { Name = "SharedDataEditor", ContentRoot = ContentRoot, Service = Service, Closed = () =>
         {
             _sharedDataEditor!.QueueFree(); _sharedDataEditor = null; _controls.Show();
             _controls.GetNode<Button>("OpenSharedDataEditor").GrabFocus();

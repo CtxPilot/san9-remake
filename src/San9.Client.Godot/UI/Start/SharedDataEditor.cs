@@ -1,11 +1,16 @@
 using Godot;
 using San9.Application.Authoring;
+using San9.Content.Authoring;
+using San9.Content.Packages;
 
 namespace San9.Client.Godot;
 
 /// <summary>Owns the shared draft and the single save transaction for every content subpage.</summary>
 public partial class SharedDataEditor : ModalView
 {
+    public TextureService? Service { get; init; }
+    private TextureService? _appearanceService;
+    private OfficerFlagCatalog? _flags;
     public string ContentRoot { get; init; } = "";
     public string? ReferenceScenarioId { get; init; }
     public Action Closed { get; init; } = null!;
@@ -49,17 +54,39 @@ public partial class SharedDataEditor : ModalView
         {
             _workspace = await Task.Run(() => SharedDataEditorWorkspace.OpenAsync(ContentRoot, ReferenceScenarioId, _lifetime.Token), _lifetime.Token);
             _lifetime.Token.ThrowIfCancellationRequested();
+            string? appearanceError = await LoadAppearance();
             AddPage(new RankEditorPage { Name = "爵位", Workspace = _workspace, ReportStatus = Status });
             AddPage(new OfficeEditorPage { Name = "官职", Workspace = _workspace, ReportStatus = Status });
-            AddPage(new OfficerEditorPage { Name = "武将", Workspace = _workspace, ReportStatus = Status });
+            AddPage(new OfficerEditorPage { Name = "武将", Workspace = _workspace, ReportStatus = Status, PortraitService = _appearanceService, Flags = _flags });
             AddPage(new FormationEditorPage { Name = "阵形", Workspace = _workspace, ReportStatus = Status });
             AddPage(new TacticEditorPage { Name = "兵法", Workspace = _workspace, ReportStatus = Status });
             _pages.TabChanged += index => _editors[(int)index].Activate();
             UpdateTitleTooltip(); _save.Disabled = false;
-            Status("");
+            Status(appearanceError ?? "", appearanceError is not null);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception error) { if (!_lifetime.IsCancellationRequested) Status("读取失败：" + error.Message, true); }
+    }
+
+    private async Task<string?> LoadAppearance()
+    {
+        _appearanceService = Service;
+        try
+        {
+            var catalog = await ContentCatalogFiles.LoadAsync(ContentRoot, _lifetime.Token);
+            _flags = await ContentCatalogFiles.LoadOfficerFlagsAsync(ContentRoot, catalog, _lifetime.Token);
+            if (_appearanceService is null)
+            {
+                string root = PackageFiles.Resolve(ContentRoot, catalog.Textures);
+                var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(root, _lifetime.Token), _lifetime.Token);
+                _lifetime.Token.ThrowIfCancellationRequested();
+                _appearanceService = new TextureService(); _appearanceService.Initialize(textures, root); AddChild(_appearanceService);
+            }
+            return null;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { throw; }
+        catch (Exception error) when (error is IOException or InvalidDataException or System.Text.Json.JsonException or UnauthorizedAccessException)
+        { return "外观资源不可用：" + error.Message; }
     }
 
     private void AddPage(SharedDataEditorPage page) { _editors.Add(page); _pages.AddChild(page); }

@@ -18,7 +18,9 @@ public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
     }
     public CreatedOfficer Duplicate(Guid id)
     {
-        var person = Library.Officers.Single(p => p.Id == id) with { Id = Guid.NewGuid() };
+        var original = Library.Officers.Single(p => p.Id == id);
+        var newId = Guid.NewGuid();
+        var person = original with { Id = newId, BloodlineRootId = original.BloodlineRootId == id ? newId : original.BloodlineRootId };
         Set(person); return person;
     }
     public void Set(CreatedOfficer person)
@@ -58,7 +60,7 @@ public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
     }
     public void Delete(Guid id)
     {
-        if (Library.Officers.Any(o => o.ParentId == id)) throw new InvalidDataException("请先解除其他人物指向此人的亲代关系。");
+        if (Library.Officers.Any(o => o.Id != id && (o.ParentId == id || o.BloodlineRootId == id))) throw new InvalidDataException("请先解除其他人物指向此人的亲代或血缘关系。");
         if (!Library.Officers.Any(o => o.Id == id)) return;
         Library = Library with { Officers = Library.Officers.RemoveAll(o => o.Id == id) };
         _surnameEdits.Remove(id);
@@ -72,7 +74,8 @@ public sealed class CreatedOfficerWorkspace(CreatedOfficerLibrary library)
         var positions = Library.Officers.Select((o, index) => (o.Id, index)).ToDictionary(p => p.Id, p => p.index);
         foreach (var person in imported.Officers)
         {
-            var value = person with { Id = ids[person.Id], ParentId = person.ParentId is Guid parent ? ids[parent] : null };
+            var value = person with { Id = ids[person.Id], ParentId = person.ParentId is Guid parent ? ids[parent] : null,
+                BloodlineRootId = person.BloodlineRootId is Guid root ? ids[root] : null };
             if (positions.TryGetValue(value.Id, out int index)) people[index] = value;
             else { positions.Add(value.Id, people.Count); people.Add(value); }
         }

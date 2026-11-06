@@ -38,6 +38,46 @@ public sealed class NewGameSetupTests
         new Dictionary<string, string> { ["catalog-person-1000"] = "portrait.1" }, CreatedOfficerLibrary.Empty with { Officers = [..people] });
 
     [Fact]
+    public void AuthoredTraitsRelativeAgeAndExplicitFamilySurviveLibraryAndSaveRoundTrips()
+    {
+        var person = First with { BirthYear = 0, AgeAtScenarioStart = 30, SuccessionPriority = 42,
+            ForceFounderPriority = 37, TacticLinkBonus = 25, DuelAdvantages = DuelAdvantages.DominantAttack,
+            PrefersConsolidationLeadership = true, AutomaticSurrenderAllowed = false, HasRecruitmentPoliticsBonus = true,
+            HistoricalBloodlineRootId = 1000 };
+        var library = CreatedOfficerLibrary.Decode((CreatedOfficerLibrary.Empty with { Officers = [person] }).Encode());
+        var draft = Draft(library.Officers[0]);
+        draft.Deploy([person.Id], 2, true);
+        var session = GameSession.Start(draft.Source, 123, setup: draft.Setup);
+        var restored = SaveService.Decode(SaveService.Encode(session), draft.Source);
+        var state = Assert.Single(restored.Snapshot.Officers, p => p.Id != 1000);
+        Assert.Equal(160, state.BirthYear);
+        Assert.Equal(9000, state.BloodlineId);
+        Assert.Equal(42, state.SuccessionPriority);
+        Assert.Equal(37, state.ForceFounderPriority);
+        Assert.Equal(25, state.TacticLinkBonus);
+        Assert.Equal(DuelAdvantages.DominantAttack, state.DuelAdvantages);
+        Assert.True(state.PrefersConsolidationLeadership);
+        Assert.False(state.AutomaticSurrenderAllowed);
+        Assert.True(state.HasRecruitmentPoliticsBonus);
+    }
+
+    [Fact]
+    public void ExplicitLibraryFamilyKeepsItsUndeployedRootAndRejectsCycles()
+    {
+        var root = First with { BloodlineRootId = First.Id };
+        var child = Second with { ParentId = null, BloodlineRootId = root.Id };
+        var draft = Draft(root, child);
+        draft.Deploy([child.Id], 2, true);
+        var composed = NewGameComposer.Compose(draft.Source, draft.Setup);
+        var people = composed.Scenario.Officers.Where(p => p.State.Id != 1000).ToArray();
+        Assert.Equal(2, people.Length);
+        Assert.Single(people.Select(p => p.State.BloodlineId).Distinct());
+        Assert.Single(people, p => p.State.IsDormant);
+        var cyclic = CreatedOfficerLibrary.Empty with { Officers = [root with { BloodlineRootId = child.Id }, child] };
+        Assert.Throws<InvalidDataException>(cyclic.Validate);
+    }
+
+    [Fact]
     public void CreatedForceFlagFollowsItsCurrentRulerWithCountryTitleTakingPriority()
     {
         var original = Source();

@@ -150,7 +150,7 @@ public static class ScenarioContentFiles
         var text = await ReadDataAsync<StaticTextContent>(resourceRoot, manifest.Text, token);
         var illustrations = await ReadDataAsync<Dictionary<string, string>>(resourceRoot, manifest.Illustrations, token);
         return new(scenario, OfficerComposition.ProjectText(new(text.SchemaVersion, text.Entries)
-            { MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), illustrations);
+            { MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), OfficerComposition.ProjectPortraits(illustrations, profiles));
     }
 
     public static async Task<ScenarioContent> LoadAsync(string root, CancellationToken token = default) =>
@@ -196,7 +196,7 @@ public static class ScenarioContentFiles
         var (scenario, profiles) = await scenarioTask;
         return new(ScenarioContent.CurrentSchemaVersion, manifest.Textures, await mapTask, scenario,
             OfficerComposition.ProjectText(new(text.SchemaVersion, text.Entries) { Messages = await messagesTask,
-                MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), display.Illustrations)
+                MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), OfficerComposition.ProjectPortraits(display.Illustrations, profiles))
             { Presentation = display.Presentation, ResourceRoot = resourceRoot, Preview = manifest.Preview };
     }
 

@@ -39,6 +39,32 @@ public sealed class ScenarioCompositionTests : IDisposable
         JsonSerializer.SerializeToElement(expected, Options), JsonSerializer.SerializeToElement(actual, Options)));
 
     [Fact]
+    public async Task SharedPortraitEditsAndClearingReachSelectionAndFullContent()
+    {
+        var baseline = Scenario();
+        var shared = Shared(baseline);
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared);
+        string package = Path.Combine(_root, "portrait");
+        await ScenarioContentFiles.WriteAsync(package, Content(baseline), resourceRoot: _root, sharedScenario: shared);
+        string path = PlayerDefinitionFiles.PlayerPath(PackageFiles.Resolve(_root, shared.OfficersPath));
+        foreach (string? portrait in new string?[] { "custom-portrait", null })
+        {
+            var edited = shared.Officers with { Officers = [shared.Officers.Officers[0] with { PortraitKey = portrait }] };
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(edited, Options));
+            var selected = await ScenarioContentFiles.LoadSelectionAsync(package);
+            var full = await ScenarioContentFiles.LoadAsync(package);
+            Assert.Equal(portrait, selected.Text.MessagePeople[1200].PortraitKey);
+            Assert.Equal(portrait, full.Text.MessagePeople[1200].PortraitKey);
+            foreach (string role in new[] { "catalog-person-1200", "information-person-1200" })
+            {
+                Assert.Equal(portrait, selected.IllustrationRoles.GetValueOrDefault(role));
+                Assert.Equal(portrait, full.IllustrationRoles.GetValueOrDefault(role));
+                Assert.Equal(portrait is not null, full.IllustrationRoles.ContainsKey(role));
+            }
+        }
+    }
+
+    [Fact]
     public async Task AuthoringCatalogReadsSharedPlayerCopiesWithoutScenarioOrWorldDependencies()
     {
         var shared = Shared(Scenario());

@@ -11,7 +11,10 @@ public sealed record NewGameComposition(ScenarioInitialState Scenario, SessionDe
 public static class NewGameComposer
 {
     public static bool CanDeploy(CreatedOfficer person, ScenarioInitialState scenario) =>
-        !scenario.NaturalDeathsEnabled || scenario.Year - person.BirthYear + 1 is >= 15 and <= 90;
+        !scenario.NaturalDeathsEnabled || scenario.Year - BirthYear(person, scenario.Year) + 1 is >= 15 and <= 90;
+
+    private static int BirthYear(CreatedOfficer person, int year) => person.AgeAtScenarioStart is int age
+        ? checked(year - age) : person.BirthYear;
 
     public static IReadOnlyDictionary<Guid, int> OfficerIds(ScenarioInitialState source, NewGameSetup setup)
     {
@@ -23,8 +26,10 @@ public static class NewGameComposer
     {
         var people = setup.Library.Officers.ToDictionary(p => p.Id);
         var included = setup.Placements.Select(p => p.OfficerId).Concat(setup.Forces.Select(f => f.RulerId)).ToHashSet();
-        foreach (var id in included.ToArray())
-            for (var p = people[id]; p.ParentId is Guid parent; p = people[parent]) included.Add(parent);
+        var pending = new Queue<Guid>(included);
+        while (pending.TryDequeue(out var id))
+            foreach (var reference in new[] { people[id].ParentId, people[id].BloodlineRootId }.OfType<Guid>())
+                if (included.Add(reference)) pending.Enqueue(reference);
         return included;
     }
 
@@ -82,7 +87,12 @@ public static class NewGameComposer
             if (bloodlines.TryGetValue(p.Id, out int family)) return family;
             if (p.ScenarioParentId is int parent && !historical.ContainsKey(parent))
                 throw new InvalidDataException($"人物“{p.FullName}”的历史亲代不在当前剧本中。");
-            family = p.ParentId is Guid authored ? Family(people[authored]) : p.ScenarioParentId is int original
+            if (p.HistoricalBloodlineRootId is int root && !historical.ContainsKey(root))
+                throw new InvalidDataException($"人物“{p.FullName}”的历史血缘根不在当前剧本中。");
+            family = p.HistoricalBloodlineRootId is int historicRoot ? historical[historicRoot].State.BloodlineId ?? historicRoot
+                : p.BloodlineRootId is Guid own && own == p.Id ? checked(++bloodline)
+                : p.BloodlineRootId is Guid familyRoot ? Family(people[familyRoot])
+                : p.ParentId is Guid authored ? Family(people[authored]) : p.ScenarioParentId is int original
                 ? historical[original].State.BloodlineId ?? original : checked(++bloodline);
             return bloodlines[p.Id] = family;
         }
@@ -101,12 +111,16 @@ public static class NewGameComposer
             {
                 IsDormant = cityId is null, Status = cityId is null ? OfficerStatus.Undiscovered : ruler ? OfficerStatus.Ruler :
                     future ? OfficerStatus.NotAppeared : owner is not null ? OfficerStatus.Serving : OfficerStatus.Free,
-                IsCommander = ruler, BirthYear = p.BirthYear, AppearanceYear = p.AppearanceYear, LifespanTier = p.LifespanTier,
+                IsCommander = ruler, BirthYear = BirthYear(p, source.Year), AppearanceYear = p.AppearanceYear, LifespanTier = p.LifespanTier,
                 StatusStartYear = !future && owner is not null ? source.Year : null,
                 Surname = p.Surname, IsFemale = p.IsFemale, Personality = p.Personality, Affinity = p.Affinity,
                 Ambition = p.Ambition, Righteousness = p.Righteousness, TacticProficiencies = p.Proficiencies,
                 MasteredCategories = p.MasteredCategories, LearnedTactics = p.LearnedTactics, ForceLoyalties = loyalty,
-                ParentId = p.ParentId is Guid parent ? ids[parent] : p.ScenarioParentId, BloodlineId = Family(p)
+                ParentId = p.ParentId is Guid parent ? ids[parent] : p.ScenarioParentId, BloodlineId = Family(p),
+                SuccessionPriority = p.SuccessionPriority, ForceFounderPriority = p.ForceFounderPriority,
+                TacticLinkBonus = p.TacticLinkBonus, DuelAdvantages = p.DuelAdvantages,
+                PrefersConsolidationLeadership = p.PrefersConsolidationLeadership,
+                AutomaticSurrenderAllowed = p.AutomaticSurrenderAllowed, HasRecruitmentPoliticsBonus = p.HasRecruitmentPoliticsBonus
             };
             officers.Add(new(NameKey(state.Id), state) { CourtesyNameKey = p.CourtesyName.Length > 0 ? $"created.{state.Id}.courtesy" : null,
                 BiographyKey = p.Biography.Length > 0 ? $"created.{state.Id}.biography" : null, FlagGlyph = p.FlagGlyph });
