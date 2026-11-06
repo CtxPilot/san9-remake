@@ -12,9 +12,11 @@ public partial class FormationEditorPage : SharedDataEditorPage
     private ItemList _list = null!;
     private LineEdit _search = null!;
     private TabContainer _tabs = null!;
-    private Label _title = null!;
+    private LineEdit _title = null!;
+    private Label _changed = null!;
     private HSplitContainer _split = null!;
     private FormationEditorPreview _preview = null!;
+    private FormationEditorPreview? _positionEditor;
     private TextEdit? _json;
     private int? _current;
     private int _generation;
@@ -28,10 +30,8 @@ public partial class FormationEditorPage : SharedDataEditorPage
 
     public override void _Ready()
     {
-        _split = new HSplitContainer { SizeFlagsVertical = SizeFlags.ExpandFill, SplitOffsets = [222] }; AddChild(_split); _split.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var sidePanel = new PanelContainer { CustomMinimumSize = new(200, 0) };
-        sidePanel.AddThemeStyleboxOverride("panel", ContentEditorStyle.Surface("202833", "394758", 10)); _split.AddChild(sidePanel);
-        var sidebar = new VBoxContainer(); sidePanel.AddChild(sidebar);
+        _split = new HSplitContainer { SizeFlagsVertical = SizeFlags.ExpandFill, SplitOffsets = [230] }; AddChild(_split); _split.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        var sidebar = ContentEditorControls.Sidebar(_split);
         _search = new LineEdit { PlaceholderText = "搜索阵形", Name = "FormationSearch" }; sidebar.AddChild(_search);
         _search.TextChanged += _ => RefreshList();
         _list = new ItemList { SizeFlagsVertical = SizeFlags.ExpandFill, Name = "FormationList" }; sidebar.AddChild(_list);
@@ -40,10 +40,19 @@ public partial class FormationEditorPage : SharedDataEditorPage
         {
             if (_current is not int id || !CanProcess()) return;
             _rawDirty = false; Workspace.RestoreFormation(id); ShowCurrent(); RefreshList(); Status("已恢复，尚未保存。");
-        }, "RestoreFormation");
-        var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(550, 0) }; _split.AddChild(body);
-        var hero = new HBoxContainer(); body.AddChild(hero);
-        _title = new Label { Text = "选择一个阵形", SizeFlagsHorizontal = SizeFlags.ExpandFill }; _title.AddThemeFontSizeOverride("font_size", 23); hero.AddChild(_title);
+        }, "RestoreFormation").SizeFlagsHorizontal = SizeFlags.Fill;
+        var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(600, 0) }; body.AddThemeConstantOverride("separation", 12); _split.AddChild(body);
+        var hero = new HBoxContainer(); hero.AddThemeConstantOverride("separation", 12); body.AddChild(hero);
+        _title = new LineEdit { Name = "FormationName", PlaceholderText = "阵形名称", TooltipText = "名称",
+            SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        _title.AddThemeFontSizeOverride("font_size", 20); hero.AddChild(_title);
+        _title.TextChanged += value =>
+        {
+            if (_building || !CanProcess() || _current is not int id) return;
+            Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Name = value });
+            RefreshList(); UpdateHeading();
+        };
+        _changed = new Label { Text = "*", Visible = false }; hero.AddChild(_changed);
         _preview = new FormationEditorPreview { CustomMinimumSize = new(190, 100), MouseFilter = MouseFilterEnum.Ignore }; hero.AddChild(_preview);
         _tabs = new TabContainer { SizeFlagsVertical = SizeFlags.ExpandFill, Name = "FormationPages" }; body.AddChild(_tabs);
         _tabs.TabChanged += index =>
@@ -53,7 +62,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
             else ShowCurrent();
         };
         _current = Workspace.Formations.FirstOrDefault()?.Id;
-        if (_current is null) _title.Text = "该内容库没有阵形";
+        _title.Editable = _current is not null;
         RefreshList(); ShowCurrent();
     }
 
@@ -83,7 +92,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
     {
         if (_current is not int id) return;
         int tab = Math.Max(0, _tabs.CurrentTab);
-        _building = true; _generation++; _json = null;
+        _building = true; _generation++; _json = null; _positionEditor = null;
         foreach (Node child in _tabs.GetChildren()) { _tabs.RemoveChild(child); child.QueueFree(); }
         var rule = Workspace.GetFormation(id);
         BuildBasics(rule); BuildCombat(rule); BuildTactics(rule); BuildAdvanced(rule);
@@ -94,8 +103,14 @@ public partial class FormationEditorPage : SharedDataEditorPage
     {
         if (_current is not int id) return;
         var rule = Workspace.GetFormation(id);
-        _title.Text = Workspace.FormationNames.GetValueOrDefault(id, $"阵形 {id}") + (Workspace.IsFormationChanged(id) || _rawDirty ? " *" : "");
+        string name = Workspace.FormationNames.GetValueOrDefault(id, $"阵形 {id}");
+        if (_title.Text != name)
+        {
+            bool building = _building; _building = true; _title.Text = name; _building = building;
+        }
+        _changed.Visible = Workspace.IsFormationChanged(id) || _rawDirty;
         _preview.Rule = rule;
+        if (_positionEditor is not null) _positionEditor.Rule = rule;
     }
 
     private void Edit(int id, Func<FormationRule, FormationRule> change, bool rebuild = false)
@@ -116,6 +131,11 @@ public partial class FormationEditorPage : SharedDataEditorPage
         {
             var rule = JsonSerializer.Deserialize<FormationRule>(_json.Text, EditorJson) ?? throw new InvalidDataException("阵形数据为空。");
             if (rule.Id != id) throw new InvalidDataException("请保留当前阵形的身份 ID。");
+            var current = Workspace.GetFormation(id);
+            if (rule.Positions.Length != current.Positions.Length || rule.OfficerCapacity != current.OfficerCapacity)
+                throw new InvalidDataException("暂不支持修改阵位数量或武将上限。");
+            if (!rule.Positions.SequenceEqual(current.Positions) && rule.Positions.Any(p => p.Column is < 0 or > 2))
+                throw new InvalidDataException("阵位只能放在 3×3 范围内。");
             Workspace.SetFormation(rule); _rawDirty = false; RefreshList(); UpdateHeading(); return true;
         }
         catch (Exception error) { Status("完整数据尚未应用：" + error.Message, true); return false; }
@@ -127,11 +147,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
         return value => { if (!_building && CanProcess() && generation == _generation) action(value); };
     }
 
-    private static Button Button(Node parent, string title, Action action, string name = "")
-    {
-        var button = new Button { Text = title, CustomMinimumSize = new(0, 34) };
-        if (name.Length > 0) button.Name = name;
-        button.Pressed += action; parent.AddChild(button); return button;
-    }
+    private static Button Button(Node parent, string title, Action action, string name = "") =>
+        ContentEditorControls.ActionButton(parent, title, action, name);
 
 }

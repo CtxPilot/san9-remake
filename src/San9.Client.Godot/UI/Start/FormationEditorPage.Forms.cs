@@ -10,31 +10,21 @@ public partial class FormationEditorPage
     private VBoxContainer Page(string title)
     {
         var scroll = new ScrollContainer { Name = title, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; _tabs.AddChild(scroll);
-        var margin = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; scroll.AddChild(margin);
-        foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 14);
-        var box = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; box.AddThemeConstantOverride("separation", 12); margin.AddChild(box); return box;
+        return ContentEditorControls.PageBody(scroll);
     }
 
-    private static GridContainer Section(Node parent, string title)
-    {
-        var caption = new Label { Text = title }; caption.AddThemeColorOverride("font_color", ContentEditorStyle.Accent); parent.AddChild(caption);
-        var grid = new GridContainer { Columns = 4, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        grid.AddThemeConstantOverride("h_separation", 12); grid.AddThemeConstantOverride("v_separation", 9); parent.AddChild(grid); return grid;
-    }
+    private static GridContainer Section(Node parent, string title, string tooltip = "") =>
+        ContentEditorControls.ProfileGrid(parent, title, tooltip: tooltip);
 
     private void Number(Node parent, string title, double value, double min, double max, Action<double> changed, string name = "")
     {
-        parent.AddChild(new Label { Text = title, VerticalAlignment = VerticalAlignment.Center });
-        var input = new SpinBox { MinValue = min, MaxValue = max, Value = value, Step = 1, Rounded = true,
-            UpdateOnTextChanged = true, CustomMinimumSize = new(110, 34), SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        if (name.Length > 0) input.Name = name;
-        var apply = Guard(changed); input.ValueChanged += next => apply(next); parent.AddChild(input);
+        ContentEditorControls.Caption(parent, title);
+        ContentEditorControls.NumericInput(parent, value, min, max, Guard(changed), name);
     }
 
     private void Toggle(Node parent, string title, bool value, Action<bool> changed)
     {
-        var check = new CheckBox { Text = title, ButtonPressed = value, CustomMinimumSize = new(0, 32) };
-        var apply = Guard(changed); check.Toggled += next => apply(next); parent.AddChild(check);
+        ContentEditorControls.Toggle(parent, title, value, Guard(changed));
     }
 
     private void BuildBasics(FormationRule f)
@@ -42,21 +32,21 @@ public partial class FormationEditorPage
         int id = f.Id;
         var page = Page("基础");
         var catalog = Workspace.GetFormationCatalog(id);
-        ContentEditorControls.AddText(page, "名称", catalog.Name, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Name = v }); RefreshList(); UpdateHeading(); }));
         ContentEditorControls.AddText(page, "描述", catalog.Description, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Description = v }); RefreshList(); UpdateHeading(); }), true);
-        var grid = Section(page, "行军与编制");
+        var grid = Section(page, "行军与编制", "距离与占地以细单位计，5单位为1地图格；普通陆地每格基础消耗50移动力。");
         Number(grid, "每日移动力", f.MovementBudget, 1, int.MaxValue, v => Edit(id, p => p with { MovementBudget = (int)v }), "FormationMovement");
         Number(grid, "出征费用", f.DeploymentCost, 0, int.MaxValue, v => Edit(id, p => p with { DeploymentCost = (int)v }), "FormationCost");
         Number(grid, "兵力上限", f.SoldierCapacity, 1, uint.MaxValue, v => Edit(id, p => p with { SoldierCapacity = (uint)v }), "FormationSoldiers");
-        Number(grid, "武将上限", f.OfficerCapacity, 1, int.MaxValue, v => Edit(id, p => p with { OfficerCapacity = (int)v }), "FormationOfficers");
+        grid.AddChild(new Label { Text = "武将上限" });
+        grid.AddChild(new Label { Text = f.OfficerCapacity.ToString() });
         Number(grid, "基础占地宽", f.Footprint.Width, 1, int.MaxValue, v => Edit(id, p => p with { Footprint = p.Footprint with { Width = (int)v } }));
         Number(grid, "基础占地高", f.Footprint.Height, 1, int.MaxValue, v => Edit(id, p => p with { Footprint = p.Footprint with { Height = (int)v } }));
         grid.AddChild(new Label { Text = "行军方式" });
         var travel = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill }; travel.AddItem("陆上"); travel.AddItem("水上"); travel.Select((int)f.TravelMode);
         var choose = Guard<long>(v => Edit(id, p => p with { TravelMode = (TravelMode)v })); travel.ItemSelected += v => choose(v); grid.AddChild(travel);
-        Toggle(page, "通用阵形（仍需满足兵法等使用条件）", f.IsCommon, v => Edit(id, p => p with { IsCommon = v }));
-        page.AddChild(new Label { Text = "距离与占地以细单位计，5单位为1地图格；普通陆地每格基础消耗50移动力。", AutowrapMode = TextServer.AutowrapMode.WordSmart });
-        Toggle(page, "提供视野", f.Vision is not null, v => Edit(id, p => p with { Vision = v ? p.Vision ?? new(15, 180) : null }, true));
+        var flags = new HBoxContainer(); flags.AddThemeConstantOverride("separation", 16); page.AddChild(flags);
+        Toggle(flags, "通用阵形", f.IsCommon, v => Edit(id, p => p with { IsCommon = v }));
+        Toggle(flags, "提供视野", f.Vision is not null, v => Edit(id, p => p with { Vision = v ? p.Vision ?? new(15, 180) : null }, true));
         if (f.Vision is { } vision)
         {
             var view = Section(page, "视野");
@@ -85,7 +75,7 @@ public partial class FormationEditorPage
             Number(grid, "攻击距离", attack.Range, 1, int.MaxValue, v => Edit(id, p => p with { Attack = p.Attack! with { Range = (int)v } }));
             Number(grid, "每级高差加成", attack.ElevationBonusPerLevel, 0, int.MaxValue, v => Edit(id, p => p with { Attack = p.Attack! with { ElevationBonusPerLevel = (int)v } }));
             Number(grid, "高差加成上限", attack.MaximumElevationBonus, 0, int.MaxValue, v => Edit(id, p => p with { Attack = p.Attack! with { MaximumElevationBonus = (int)v } }));
-            var checks = new VBoxContainer(); page.AddChild(checks);
+            var checks = ContentEditorControls.ButtonGroup(page);
             Toggle(checks, "可以削减城墙耐久", attack.DamagesWalls, v => Edit(id, p => p with { Attack = p.Attack! with { DamagesWalls = v } }));
             Toggle(checks, "攻击要求水域接触", attack.RequiresWaterContact, v => Edit(id, p => p with { Attack = p.Attack! with { RequiresWaterContact = v } }));
             Toggle(checks, "远距攻城", attack.RangedSiege, v => Edit(id, p => p with { Attack = p.Attack! with { RangedSiege = v } }));
@@ -104,11 +94,23 @@ public partial class FormationEditorPage
             Number(grid, "联动倍率", tactics.LinkMultiplier, 1, int.MaxValue, v => Edit(id, p => p with { Tactics = p.Tactics! with { LinkMultiplier = (int)v } }));
             if (tactics.AutomaticOpportunityChance is int chance)
                 Number(grid, "自动兵法机会 %", chance, 0, 100, v => Edit(id, p => p with { Tactics = p.Tactics! with { AutomaticOpportunityChance = (int)v } }));
+            var favored = ContentEditorControls.ButtonGroup(page, "优势兵法类别");
+            var categories = TacticCategoryLabels.Names;
+            for (int category = 0; category < categories.Length; category++)
+            {
+                int selected = category;
+                if (!tactics.FavoredCategories.Contains(selected) &&
+                    !Workspace.Tactics.Any(t => t.Effect == TacticEffect.Martial && t.Category == selected)) continue;
+                Toggle(favored, categories[selected], tactics.FavoredCategories.Contains(selected), enabled => Edit(id, p => p with
+                { Tactics = p.Tactics! with { FavoredCategories = enabled
+                    ? p.Tactics.FavoredCategories.Add(selected).Distinct().Order().ToImmutableArray()
+                    : p.Tactics.FavoredCategories.Remove(selected) } }));
+            }
         }
         var resistance = Section(page, "抗性与狙击");
         Number(resistance, "混乱抵抗 %", f.ConfusionResistanceChance, 0, 100, v => Edit(id, p => p with { ConfusionResistanceChance = (int)v }));
         Number(resistance, "狙击机会加成", f.SnipingChanceBonus, 0, 100, v => Edit(id, p => p with { SnipingChanceBonus = (int)v }));
-        var flags = new VBoxContainer(); page.AddChild(flags);
+        var flags = ContentEditorControls.ButtonGroup(page, "阵形特性");
         Toggle(flags, "忽略被动反制", f.BypassesPassiveCounters, v => Edit(id, p => p with { BypassesPassiveCounters = v }));
         Toggle(flags, "俘获效果翻倍", f.DoublesCapture, v => Edit(id, p => p with { DoublesCapture = v }));
         Toggle(flags, "阻止兵法救援", f.PreventsTacticRescue, v => Edit(id, p => p with { PreventsTacticRescue = v }));
@@ -122,24 +124,27 @@ public partial class FormationEditorPage
     private void BuildAdvanced(FormationRule f)
     {
         int id = f.Id; var page = Page("阵位与完整数据");
-        page.AddChild(new Label { Text = "阵位顺序对应部队成员顺序。启用普通攻击时，阵位数量须等于武将上限。", AutowrapMode = TextServer.AutowrapMode.WordSmart });
-        var positions = new GridContainer { Columns = 4 }; positions.AddThemeConstantOverride("h_separation", 10); page.AddChild(positions);
-        for (int i = 0; i < f.Positions.Length; i++)
+        page.AddChild(new Label { Text = "拖动阵位调整位置" });
+        _positionEditor = new FormationEditorPreview
         {
-            int index = i;
-            Number(positions, $"阵位 {i + 1} 列", f.Positions[i].Column, 0, int.MaxValue,
-                v => Edit(id, p => p with { Positions = p.Positions.SetItem(index, p.Positions[index] with { Column = (int)v }) }));
-            var rank = new OptionButton(); foreach (string name in new[] { "前列", "中列", "后列" }) rank.AddItem(name); rank.Select((int)f.Positions[i].Rank);
-            var choose = Guard<long>(v => Edit(id, p => p with { Positions = p.Positions.SetItem(index, p.Positions[index] with { Rank = (BattleRank)v }) }));
-            rank.ItemSelected += value => choose(value); positions.AddChild(rank);
-            var remove = Guard<bool>(_ => Edit(id, p => p with { Positions = p.Positions.RemoveAt(index) }, true));
-            Button(positions, "移除", () => remove(true));
-        }
-        var add = Guard<bool>(_ => Edit(id, p => p with { Positions = p.Positions.Add(new(p.Positions.Select(s => s.Column).DefaultIfEmpty(-1).Max() + 1, BattleRank.Middle)) }, true));
-        Button(page, "添加阵位", () => add(true));
+            Name = "FormationPositionEditor", Editable = true, Rule = f,
+            CustomMinimumSize = new(0, 270), SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            PositionMoved = (index, destination) =>
+            {
+                if (_rawDirty && !CommitJson()) return;
+                Edit(id, p =>
+                {
+                    var positions = p.Positions;
+                    int occupied = positions.IndexOf(destination);
+                    if (occupied >= 0) positions = positions.SetItem(occupied, positions[index]);
+                    return p with { Positions = positions.SetItem(index, destination) };
+                });
+            }
+        };
+        page.AddChild(_positionEditor);
         page.AddChild(new Label { Text = "完整数据（JSON）" });
         _json = new TextEdit { Text = JsonSerializer.Serialize(f, EditorJson), CustomMinimumSize = new(0, 340), SizeFlagsHorizontal = SizeFlags.ExpandFill, Name = "FormationJson" };
-        var field = _json; field.TooltipText = "阵形 ID 不可修改。";
+        var field = _json; field.TooltipText = "阵形 ID、阵位数量和武将上限不可修改。";
         field.TextChanged += () => { if (!_building) { _rawDirty = true; UpdateHeading(); } }; page.AddChild(field);
         var apply = Guard<bool>(_ => { if (CommitJson()) { ShowCurrent(); Status("已应用，尚未保存。"); } });
         Button(page, "应用数据", () => apply(true));
