@@ -64,7 +64,7 @@ public static class NewGameComposer
             forces.Add(new(id, NameKey(ids[created.RulerId]), color, 100)
             {
                 BaseTrust = 100, LeaderId = ids[created.RulerId], FlagGlyph = people[created.RulerId].FlagGlyph,
-                RankId = source.Information.Ranks.OrderBy(r => r.Precedence).ThenBy(r => r.Id).Select(r => (int?)r.Id).FirstOrDefault()
+                RankId = source.Information.InitialRankId
             });
             var economy = new SettlementState(city.Id, id, city.Soldiers, city.Durability, city.MaxDurability, city.Morale,
                 city.PublicOrder, city.Commerce, city.MaxCommerce, city.Cultivation, city.MaxCultivation)

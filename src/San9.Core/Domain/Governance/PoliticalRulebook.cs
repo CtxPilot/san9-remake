@@ -8,7 +8,10 @@ public sealed record PoliticalEventsDefinition(
     [property: JsonRequired] int ProclamationTrust,
     [property: JsonRequired] PersistentEventKey CourtEndedConsumptionKey);
 
-public sealed record PeerageRule(int Id, int Precedence, int RequiredTrust, int LoyaltyBonus);
+public sealed record PeerageRule(int Id, int Precedence, int RequiredTrust, int LoyaltyBonus)
+{
+    public bool IsUnranked { get; init; }
+}
 
 public sealed record CountryTitleRule(
     [property: JsonRequired] int Id,
@@ -32,6 +35,8 @@ public sealed class PoliticalRulebook
         Titles = titles.ToImmutableDictionary(t => t.Id);
         ProvinceTitles = provinceTitles.ToImmutableDictionary();
         if (Ranks.Values.Any(r => r.Id < 0 || r.Precedence < 0 || r.RequiredTrust < 0 || r.LoyaltyBonus < 0) ||
+            Ranks.Values.Count(r => r.IsUnranked) > 1 ||
+            Ranks.Values.Any(r => r.IsUnranked && Ranks.Values.Any(other => !other.IsUnranked && other.Precedence <= r.Precedence)) ||
             Ranks.Values.Select(r => r.Precedence).Distinct().Count() != Ranks.Count ||
             Titles.Values.Any(t => t.Id < 0 || t.PreferredRulerIds.IsDefault || t.PreferredBloodlineIds.IsDefault ||
                 t.PreferredRulerIds.Any(id => id < 0) || t.PreferredBloodlineIds.Any(id => id < 0)) ||
@@ -39,10 +44,10 @@ public sealed class PoliticalRulebook
             Duplicate(Titles.Values.SelectMany(t => t.PreferredBloodlineIds)) ||
             ProvinceTitles.Any(p => p.Key < 0 || !Titles.ContainsKey(p.Value)))
             throw new ArgumentException("Invalid political rules.");
-        var ordered = Ranks.Values.OrderBy(r => r.Precedence).ToArray();
+        var ordered = Ranks.Values.Where(r => !r.IsUnranked).OrderBy(r => r.Precedence).ToArray();
         ImperialRankId = ordered.LastOrDefault()?.Id;
         ProclamationRankId = ordered.Length >= 2 ? ordered[^2].Id : null;
-        ProvinceEntryRankId = ordered.FirstOrDefault()?.Id;
+        InitialRankId = Ranks.Values.SingleOrDefault(r => r.IsUnranked)?.Id;
         if (events is { } e && (ordered.Length < 2 || e.ProclamationTrust < 0 || string.IsNullOrWhiteSpace(e.CourtEndedConsumptionKey.Value)))
             throw new ArgumentException("Invalid political event rank references.");
     }
@@ -50,12 +55,13 @@ public sealed class PoliticalRulebook
     public PoliticalEventsDefinition? Events { get; }
     public int? ImperialRankId { get; }
     public int? ProclamationRankId { get; }
-    public int? ProvinceEntryRankId { get; }
+    public int? InitialRankId { get; }
     public ImmutableDictionary<int, PeerageRule> Ranks { get; }
     public ImmutableDictionary<int, CountryTitleRule> Titles { get; }
     public ImmutableDictionary<int, int> ProvinceTitles { get; }
     public PeerageRule? NextRank(int? current) => current is int id && Ranks.TryGetValue(id, out var rank)
-        ? Ranks.Values.Where(r => r.Precedence > rank.Precedence).OrderBy(r => r.Precedence).FirstOrDefault() : null;
+        ? Ranks.Values.Where(r => !r.IsUnranked && (rank.IsUnranked || r.Precedence > rank.Precedence))
+            .OrderBy(r => r.Precedence).FirstOrDefault() : null;
 
     public ImmutableArray<int> ManualCandidates(IReadOnlySet<int> occupied) => Titles.Values
         .Where(t => t.ManualSelectionAllowed && !occupied.Contains(t.Id)).Select(t => t.Id).Order().ToImmutableArray();

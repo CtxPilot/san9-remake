@@ -70,7 +70,7 @@ internal static class PoliticalEvents
             if (!world.Simulation.ImperialCourtEnded && (force.IsBarbarian || force.RankId == rules.Politics.ProclamationRankId ||
                 force.CountryTitleId is int title && rules.Politics.Titles[title].PreventsInvestiture)) continue;
             var next = rules.Politics.NextRank(force.RankId);
-            if (next is null || (force.RankId == rules.Politics.ProvinceEntryRankId
+            if (next is null || (force.RankId == rules.Politics.InitialRankId
                 ? ControlledProvinces(world, rules.Personnel, force.Id).IsEmpty : force.Trust < next.RequiredTrust)) continue;
             Commit(world, rules, force.Id, next.Id, force.CountryTitleId,
                 world.Simulation.ImperialCourtEnded ? PeerageChangeKind.Promotion : PeerageChangeKind.Investiture, events);

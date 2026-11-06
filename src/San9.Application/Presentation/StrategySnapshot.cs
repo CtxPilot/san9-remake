@@ -226,7 +226,7 @@ public sealed class StrategySnapshot
             };
         }).ToArray());
         var officerLocations = world.Officers.ToDictionary(officer => officer.Id, officer => officer.SettlementId);
-        int? imperialRank = Information.Ranks.MaxBy(r => r.Precedence)?.Id;
+        int? imperialRank = Information.ImperialRankId;
         int? emperorOwner = EmperorCityId is int emperorCity ? settlements[emperorCity].OwnerId : null;
         Forces = Array.AsReadOnly(world.Forces.Where(f => !f.IsDormant).Select(f =>
         {
@@ -351,6 +351,7 @@ public sealed class StrategySnapshot
 
 public sealed class InformationCatalog(InformationDefinitions definitions)
 {
+    public int? ImperialRankId { get; } = definitions.ImperialRankId;
     public bool ShowOfficerAges { get; } = definitions.ShowOfficerAges;
     public IReadOnlySet<int> MapContextExcludedFacilityIds { get; } = definitions.MapContextExcludedFacilityIds.ToImmutableHashSet();
     public IReadOnlyList<CountryTitleDefinition> CountryTitles { get; } = Array.AsReadOnly(definitions.CountryTitles.ToArray());

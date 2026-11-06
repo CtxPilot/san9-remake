@@ -69,7 +69,8 @@ public sealed class ForceEmergenceTests
     {
         Personnel = new(Enumerable.Range(1, 4).Select(i => new PersonPlace(i, new(i * 5, 5))),
             new Dictionary<int, int> { [1] = 1, [2] = 2, [3] = 3, [4] = 2 }, edges.Length == 0 ? [new(1, 2)] : edges),
-        Governance = new([], new Dictionary<int, int> { [500] = 0, [2] = 1 })
+        Governance = new([], new Dictionary<int, int> { [500] = 0, [2] = 1 }),
+        Politics = new(null, [new(500, 0, 0, 0) { IsUnranked = true }, new(2, 1, 0, 0)], [], ImmutableDictionary<int, int>.Empty)
     };
 
     private static WorldMutation Due(WorldState state)

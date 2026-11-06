@@ -11,6 +11,23 @@ namespace San9.Application.Tests;
 
 public sealed class NewGameSetupTests
 {
+    [Theory]
+    [InlineData(true, 4)]
+    [InlineData(false, null)]
+    public void NewForceUsesTheUnrankedIdentityWithoutInferringAnInitialRank(bool marked, int? expected)
+    {
+        var source = Source();
+        source = source with { Information = source.Information with
+            { Ranks = source.Information.Ranks.Select(r => r with { IsUnranked = marked }).ToArray() } };
+        var setup = NewGameSetup.Empty with
+        {
+            Library = CreatedOfficerLibrary.Empty with { Officers = [First] },
+            Forces = [new(First.Id, 1)]
+        };
+        var composed = NewGameComposer.Compose(source, setup);
+        Assert.Equal(expected, composed.Scenario.Forces.Single(f => f.Id != 12).RankId);
+    }
+
     private static readonly CreatedOfficer First = new(Guid.Parse("10000000-0000-0000-0000-000000000000"), "甲")
         { Surname = "新", FlagGlyph = 42, BirthYear = 160, AppearanceYear = 180, Abilities = new(91, 92, 93, 94), PortraitKey = "portrait.42" };
     private static readonly CreatedOfficer Second = new(Guid.Parse("20000000-0000-0000-0000-000000000000"), "乙")

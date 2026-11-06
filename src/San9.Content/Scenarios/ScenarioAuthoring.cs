@@ -14,11 +14,12 @@ public sealed record ContentOverride<T>(T Value);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScenarioDefinitions
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     [JsonRequired] public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     [JsonRequired] public long NextFormationId { get; init; }
     [JsonRequired] public long NextTacticId { get; init; }
     [JsonRequired] public long NextOfficeId { get; init; }
+    [JsonRequired] public long NextRankId { get; init; }
     [JsonRequired] public required OfficerGrowthRules OfficerGrowth { get; init; }
     [JsonRequired] public required OriginalAiDefinition OriginalAi { get; init; }
     [JsonRequired] public required int FoodExchangeRate { get; init; }
@@ -51,6 +52,7 @@ public sealed record ScenarioDefinitions
         NextFormationId = (long)(scenario.Military?.Formations.Select(f => f.Id).DefaultIfEmpty(-1).Max() ?? -1) + 1,
         NextTacticId = (long)(scenario.Military?.Tactics.Select(t => t.Id).DefaultIfEmpty(-1).Max() ?? -1) + 1,
         NextOfficeId = (long)scenario.Information.Offices.Select(o => o.Id).DefaultIfEmpty(-1).Max() + 1,
+        NextRankId = (long)scenario.Information.Ranks.Select(r => r.Id).DefaultIfEmpty(-1).Max() + 1,
         OfficerGrowth = scenario.OfficerGrowth,
         OriginalAi = scenario.OriginalAi,
         FoodExchangeRate = scenario.FoodExchangeRate,

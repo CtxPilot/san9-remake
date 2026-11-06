@@ -49,11 +49,11 @@ public sealed class ForceEmergenceSessionTests
     }
 
     [Fact]
-    public void NewForceUsesLowestExplicitRankRatherThanLowestTrustThreshold()
+    public void NewForceUsesExplicitUnrankedIdentityRatherThanTrustThreshold()
     {
         var scenario = Scenario();
         scenario = scenario with { Information = scenario.Information with
-        { Ranks = [new(9000, "rank.low", 10000, 900, 0, 3), new(1, "rank.high", 30000, 100, 0, 20)] } };
+        { Ranks = [new(9000, "rank.low", 10000, 900, 0, 3) { IsUnranked = true }, new(1, "rank.high", 30000, 100, 0, 20)] } };
         var session = GameSession.Start(scenario, 17);
         for (int i = 0; i < 3; i++) session.AdvanceXun();
         Assert.Equal(9000, session.View.Forces.Single(f => f.Id == 81).RankId);
@@ -70,7 +70,7 @@ public sealed class ForceEmergenceSessionTests
             CityProvinceIds = new() { [1] = 101, [2] = 202 },
             Information = Scenario().Information with
             {
-                Ranks = [new(7000, "entry", 10000, 0, 0, 0), new(5, "king", 20000, 0, 3, 10), new(99, "emperor", 30000, 0, 5, 20)],
+                Ranks = [new(7000, "entry", 10000, 0, 0, 0) { IsUnranked = true }, new(5, "king", 20000, 0, 3, 10), new(99, "emperor", 30000, 0, 5, 20)],
                 CountryTitles = [new(new(5000, true, true, false, [], []), "title", 37)]
             }
         };

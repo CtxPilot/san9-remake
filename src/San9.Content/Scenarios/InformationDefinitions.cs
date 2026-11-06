@@ -10,6 +10,7 @@ public sealed record RankDefinition(int Id, string Name, uint CommandCapacity, i
     [JsonRequired] public bool PreferBalancedOfficeCandidates { get; init; }
     [JsonRequired] public bool IsUnranked { get; init; }
     [JsonRequired] public string Description { get; init; } = "";
+    public PeerageRule ToRule() => new(Id, Precedence, RequiredTrust, LoyaltyBonus) { IsUnranked = IsUnranked };
 }
 public sealed record TreasureDefinition(int Id, string NameKey, int Category, int AbilityBonus, int LoyaltyBonus, int? TacticId)
 {
@@ -56,6 +57,8 @@ public sealed record FormationCatalogDefinition(int Id, string Name) : MilitaryC
 public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefinition[] Offices, TreasureDefinition[] Treasures,
     CorpsState[] Corps, TreasureState[] TreasureStates)
 {
+    [JsonIgnore] public int? InitialRankId => Ranks.SingleOrDefault(r => r.IsUnranked)?.Id;
+    [JsonIgnore] public int? ImperialRankId => Ranks.Where(r => !r.IsUnranked).MaxBy(r => r.Precedence)?.Id;
     [JsonRequired] public bool ShowOfficerAges { get; init; } = true;
     [JsonRequired] public ImmutableArray<int> MapContextExcludedFacilityIds { get; init; } = [];
     [JsonRequired] public TacticCatalogDefinition[] Tactics { get; init; } = [];
@@ -103,7 +106,7 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
             throw new InvalidDataException("Invalid initial country title ownership.");
         try
         {
-            _ = new PoliticalRulebook(scenario.PoliticalEvents, Ranks.Select(r => new PeerageRule(r.Id, r.Precedence, r.RequiredTrust, r.LoyaltyBonus)),
+            _ = new PoliticalRulebook(scenario.PoliticalEvents, Ranks.Select(r => r.ToRule()),
                 CountryTitles.Select(t => t.Rule), scenario.ProvinceCountryTitleIds);
             if (CountryTitles.Any(t => t.Rule.PreferredRulerIds.Any(id => !scenario.Officers.Any(p => p.State.Id == id))) ||
                 scenario.ProvinceCountryTitleIds.Keys.Any(id => !scenario.CityProvinceIds.ContainsValue(id)))
@@ -126,7 +129,7 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
             Corps.Any(c => c.IsRoot != (scenario.Forces.SingleOrDefault(f => f.Id == c.OwnerId)?.LeaderId == c.LeaderId)))
             throw new InvalidDataException("Invalid rank, office or corps treasury reference.");
         if (Ranks.Count(r => r.IsUnranked) > 1)
-            throw new InvalidDataException("Invalid rank presentation metadata.");
+            throw new InvalidDataException("Invalid unranked identity.");
         if (Ranks.Select(r => r.Precedence).Distinct().Count() != Ranks.Length)
             throw new InvalidDataException("Rank precedence must be unique.");
         if (Ranks.Any(r => string.IsNullOrWhiteSpace(r.Name) || r.Description is null || r.RequiredTrust < 0 || r.LoyaltyBonus < 0 || r.Precedence < 0) ||

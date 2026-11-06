@@ -32,7 +32,7 @@ public sealed class PoliticalEventSessionTests
         Information = InformationDefinitions.Empty with
         {
             Corps = [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 2, new(10000, 10000)) { IsRoot = true }],
-            Ranks = [new(700, "rank.entry", 10000, 0, 0, 0), new(5, "rank.king", 20000, 500, 5, 50), new(99, "rank.emperor", 30000, 1000, 10, 100)],
+            Ranks = [new(700, "rank.entry", 10000, 0, 0, 0) { IsUnranked = true }, new(5, "rank.king", 20000, 500, 5, 50), new(99, "rank.emperor", 30000, 1000, 10, 100)],
             CountryTitles = [new(new(500, true, true, false, [], []), "title.a", 37), new(new(900, true, true, false, [], []), "title.b", 88)]
         }
     };

@@ -5,7 +5,7 @@ namespace San9.Application.Authoring;
 
 public sealed partial class SharedDataEditorWorkspace
 {
-    private enum DefinitionKind { Formation, Tactic, Office }
+    private enum DefinitionKind { Formation, Tactic, Office, Rank }
 
     private async Task<int> AllocateDefinitionIdentityAsync(DefinitionKind kind, CancellationToken token)
     {
@@ -16,6 +16,8 @@ public sealed partial class SharedDataEditorWorkspace
             DefinitionKind.Tactic => (definitions.Military?.Tactics ?? []).Select(t => t.Id)
                 .Concat(definitions.Information.Tactics.Select(t => t.Id)),
             DefinitionKind.Office => definitions.Information.Offices.Select(o => o.Id),
+            DefinitionKind.Rank => definitions.Information.Ranks.Select(r => r.Id)
+                .Concat(definitions.Information.Offices.Select(o => o.RequiredRankId).OfType<int>()),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         long Watermark(ScenarioDefinitions definitions) => kind switch
@@ -23,6 +25,7 @@ public sealed partial class SharedDataEditorWorkspace
             DefinitionKind.Formation => definitions.NextFormationId,
             DefinitionKind.Tactic => definitions.NextTacticId,
             DefinitionKind.Office => definitions.NextOfficeId,
+            DefinitionKind.Rank => definitions.NextRankId,
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         long next = Math.Max(Watermark(Definitions), Watermark(_baseDefinitions));
@@ -34,6 +37,8 @@ public sealed partial class SharedDataEditorWorkspace
             maximum = Math.Max(maximum, Ids(document.DefinitionOverrides.Apply(Definitions)).DefaultIfEmpty(-1).Max());
             if (kind == DefinitionKind.Office)
                 maximum = Math.Max(maximum, document.Officers.Select(o => o.OfficeId).OfType<int>().DefaultIfEmpty(-1).Max());
+            if (kind == DefinitionKind.Rank)
+                maximum = Math.Max(maximum, document.Forces.Select(f => f.RankId).OfType<int>().DefaultIfEmpty(-1).Max());
         }
         next = Math.Max(next, (long)maximum + 1);
         if (next > int.MaxValue) throw new InvalidDataException("无法分配新的共享资料身份。");

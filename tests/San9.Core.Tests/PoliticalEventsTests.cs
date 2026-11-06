@@ -8,6 +8,20 @@ namespace San9.Core.Tests;
 public sealed class PoliticalEventsTests
 {
     [Fact]
+    public void RankRolesUseTheTopFormalRanksAndTheExplicitUnrankedIdentity()
+    {
+        var rules = Politics();
+        Assert.Equal(99, rules.ImperialRankId);
+        Assert.Equal(5, rules.ProclamationRankId);
+        Assert.Equal(700, rules.InitialRankId);
+        Assert.Equal(300, rules.NextRank(700)!.Id);
+        var unmarked = new PoliticalRulebook(null, rules.Ranks.Values.Select(r => r with { IsUnranked = false }), [], ImmutableDictionary<int, int>.Empty);
+        Assert.Null(unmarked.InitialRankId);
+        Assert.Throws<ArgumentException>(() => new PoliticalRulebook(null,
+            rules.Ranks.Values.Select(r => r.Id == 700 ? r with { Precedence = 100 } : r), [], ImmutableDictionary<int, int>.Empty));
+    }
+
+    [Fact]
     public void NewIndependentForceDoesNotInvalidateSubsequentCountryTitleChoice()
     {
         var state = World(5, true);
@@ -43,7 +57,7 @@ public sealed class PoliticalEventsTests
          new(31, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Free }],
         controls: [new("player", 1, ControllerKind.Player), new("ai", 2, ControllerKind.Automatic)], imperialCourtEnded: ended, corps: [new San9.Core.Domain.CorpsState(1, 1, 11, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 21, new(10000, 10000)) { IsRoot = true }]);
     private static PoliticalRulebook Politics(CountryTitleRule[]? titles = null) => new(new(1000, new("court-ended")),
-        [new(700, 0, 0, 0), new(300, 10, 100, 4), new(5, 20, 400, 5), new(99, 30, 1000, 6)],
+        [new(700, 0, 0, 0) { IsUnranked = true }, new(300, 10, 100, 4), new(5, 20, 400, 5), new(99, 30, 1000, 6)],
         titles ?? [new(41, true, true, false, [], []), new(91, true, true, false, [], []), new(111, false, true, true, [], [])],
         ImmutableDictionary<int, int>.Empty);
     private static SimulationRules Rules(PoliticalRulebook? politics = null) => new()

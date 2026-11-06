@@ -35,7 +35,7 @@ internal sealed record BattleScenePreparation(BattleZoomDefinition Zoom, BattleZ
         if (!source.IsSettlement && !(occurrence.SourceFormationId is int selectedFormation && zoom.SourceFormations.ContainsKey(selectedFormation)) && source.ForceId is int sourceForce)
         {
             var force = before.World.Forces.Single(f => f.Id == sourceForce);
-            int? imperialRank = before.Information.Ranks.OrderBy(r => r.Precedence).LastOrDefault()?.Id;
+            int? imperialRank = before.Information.ImperialRankId;
             sourceBody = zoom.ImperialSource is { } imperial && force.RankId == imperialRank && imperialRank is not null ? imperial :
                 force.CountryTitleId is int country ? zoom.CountrySources.GetValueOrDefault(country, sourceBody) : sourceBody;
         }

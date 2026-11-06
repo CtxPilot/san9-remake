@@ -31,7 +31,7 @@ internal sealed class ScenarioRules
         Military = definition.Military is { } militaryDefinition ? new MilitaryRulebook(militaryDefinition) : null;
         MilitaryCities = new(definition.MilitaryCityConnections);
         Politics = new PoliticalRulebook(definition.PoliticalEvents,
-            definition.Information.Ranks.Select(r => new PeerageRule(r.Id, r.Precedence, r.RequiredTrust, r.LoyaltyBonus)),
+            definition.Information.Ranks.Select(r => r.ToRule()),
             definition.Information.CountryTitles.Select(t => t.Rule), definition.ProvinceCountryTitleIds);
         Abilities = new(Treasures, Governance, definition.OfficerGrowth);
         _simulation = new()

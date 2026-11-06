@@ -6,6 +6,8 @@ namespace San9.Client.Godot;
 public partial class CatalogOrderList : ItemList
 {
     public Func<bool> CanReorder { get; init; } = () => false;
+    public Func<int, bool> CanDragItem { get; init; } = _ => true;
+    public Func<int>? MaximumDropSlot { get; init; }
     public Action<int, int> Reorder { get; init; } = null!;
     private int _slot = -1;
 
@@ -13,7 +15,7 @@ public partial class CatalogOrderList : ItemList
     {
         if (!CanReorder() || !CanProcess()) return default;
         int row = GetItemAtPosition(atPosition, true);
-        if (row < 0) return default;
+        if (row < 0 || !CanDragItem(GetItemMetadata(row).AsInt32())) return default;
         SetDragPreview(new Label { Text = GetItemText(row), MouseFilter = MouseFilterEnum.Ignore });
         return new global::Godot.Collections.Dictionary { ["source"] = this, ["id"] = GetItemMetadata(row) };
     }
@@ -24,7 +26,8 @@ public partial class CatalogOrderList : ItemList
         var payload = data.AsGodotDictionary();
         if (!payload.TryGetValue("source", out var source) || source.VariantType != Variant.Type.Object || source.AsGodotObject() != this ||
             !payload.TryGetValue("id", out var id) || id.VariantType != Variant.Type.Int) return -1;
-        for (int i = 0; i < ItemCount; i++) if (GetItemMetadata(i).AsInt32() == id.AsInt32()) return i;
+        for (int i = 0; i < ItemCount; i++)
+            if (GetItemMetadata(i).AsInt32() == id.AsInt32()) return CanDragItem(id.AsInt32()) ? i : -1;
         return -1;
     }
 
@@ -33,7 +36,8 @@ public partial class CatalogOrderList : ItemList
         int row = GetItemAtPosition(position);
         if (row < 0) return 0;
         var rect = GetItemRect(row);
-        return row + (position.Y + GetVScrollBar().Value >= rect.GetCenter().Y ? 1 : 0);
+        int slot = row + (position.Y + GetVScrollBar().Value >= rect.GetCenter().Y ? 1 : 0);
+        return Math.Min(slot, MaximumDropSlot?.Invoke() ?? ItemCount);
     }
 
     public override bool _CanDropData(Vector2 atPosition, Variant data)

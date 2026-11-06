@@ -10,7 +10,6 @@ namespace San9.Application.Authoring;
 /// <summary>An editor visit over shared catalogs and person defaults, published as complete player documents.</summary>
 public sealed partial class SharedDataEditorWorkspace
 {
-    private readonly ScenarioDefinitions _opened;
     private readonly ScenarioDefinitions _baseDefinitions;
     private readonly Dictionary<int, OfficeDefinition> _officeBaselines;
     private Dictionary<int, int> _officeOrderBaseline;
@@ -48,7 +47,7 @@ public sealed partial class SharedDataEditorWorkspace
         byte[]? expectedOfficers, ScenarioReference[] scenarios, OfficerDefaultsCatalog baseOfficers, ScenarioDefinitions baseDefinitions)
     {
         DefinitionPath = path; ReferenceScenarioId = reference;
-        _opened = _saved = Definitions = definitions;
+        _saved = Definitions = definitions;
         OfficerPath = officerPath; OfficerCatalog = _savedOfficers = officers;
         _baseOfficerIds = baseOfficers.Officers.Select(p => p.Id).ToHashSet();
         _baseOfficerIdentityFloor = Math.Max(baseOfficers.NextOfficerId, (long)_baseOfficerIds.DefaultIfEmpty(-1).Max() + 1);
@@ -56,6 +55,8 @@ public sealed partial class SharedDataEditorWorkspace
         _baseDefinitions = baseDefinitions;
         _officeBaselines = Offices.ToDictionary(o => o.Id);
         _officeOrderBaseline = Offices.ToDictionary(o => o.Id, o => o.GovernorPriority);
+        _rankBaselines = Ranks.ToDictionary(r => r.Id);
+        _rankOrderBaseline = Ranks.ToDictionary(r => r.Id, r => r.Precedence);
         _formationBaselines = Formations.ToDictionary(f => f.Id, f => (f, GetFormationCatalog(f.Id)));
         _tacticBaselines = Tactics.ToDictionary(t => t.Id, t => (t, GetTacticCatalog(t.Id)));
         _expectedOfficers = expectedOfficers;
@@ -90,8 +91,8 @@ public sealed partial class SharedDataEditorWorkspace
         byte[]? expectedPlayer = activePath == path ? null : inputs[activePath];
         if (definitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion || baseDefinitions.SchemaVersion != ScenarioDefinitions.CurrentSchemaVersion)
             throw new InvalidDataException("共享定义版本不符，请先重建世界内容。");
-        if (definitions.NextFormationId < 0 || definitions.NextTacticId < 0 || definitions.NextOfficeId < 0 ||
-            baseDefinitions.NextFormationId < 0 || baseDefinitions.NextTacticId < 0 || baseDefinitions.NextOfficeId < 0)
+        if (definitions.NextFormationId < 0 || definitions.NextTacticId < 0 || definitions.NextOfficeId < 0 || definitions.NextRankId < 0 ||
+            baseDefinitions.NextFormationId < 0 || baseDefinitions.NextTacticId < 0 || baseDefinitions.NextOfficeId < 0 || baseDefinitions.NextRankId < 0)
             throw new InvalidDataException("共享资料身份分配记录无效。");
         string officerPath = PackageFiles.Resolve(selected.Root, selected.Manifest.OfficerDefaults);
         var baseOfficers = await files.ReadAsync<OfficerDefaultsCatalog>(officerPath, token);
@@ -111,21 +112,6 @@ public sealed partial class SharedDataEditorWorkspace
         return new SharedDataEditorWorkspace(path, reference.Id, definitions, officerPath, officers,
             files.Snapshots(), expectedPlayer, expectedOfficers, scenarios, baseOfficers, baseDefinitions);
     }
-
-    public RankDefinition GetRank(int id) => Definitions.Information.Ranks.Single(r => r.Id == id);
-    public bool IsRankChanged(int id) => !ContentComparison.Equal(GetRank(id), _saved.Information.Ranks.Single(r => r.Id == id));
-
-    public void SetRank(RankDefinition rank)
-    {
-        ContentStructure.Validate(rank);
-        var ranks = Definitions.Information.Ranks.ToArray();
-        int index = Array.FindIndex(ranks, r => r.Id == rank.Id);
-        if (index < 0) throw new InvalidDataException("只能修改现有爵位，不能改变爵位身份。");
-        ranks[index] = rank;
-        Definitions = Definitions with { Information = Definitions.Information with { Ranks = ranks } };
-    }
-
-    public void RestoreRank(int id) => SetRank(_opened.Information.Ranks.Single(r => r.Id == id));
 
     private async Task<ContentReadSession> ValidateDraftAsync(ScenarioDefinitions draft, CancellationToken token)
     {

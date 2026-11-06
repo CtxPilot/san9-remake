@@ -15,7 +15,7 @@ internal static class ForceCreation
         string reason = kind == ForceCreationKind.EmptyCityUprising ? "empty-city-uprising" : "city-independence";
         if ((kind == ForceCreationKind.EmptyCityUprising) != (predecessor is null))
             throw new ArgumentException("Force creation source does not match its kind.");
-        int? rank = rules.Governance.RankPrecedence.OrderBy(r => r.Value).ThenBy(r => r.Key).Select(r => (int?)r.Key).FirstOrDefault();
+        int? rank = rules.Politics.InitialRankId;
         var colorUsage = world.AllForces.Values.GroupBy(f => f.ColorCode).ToDictionary(g => g.Key, g => g.Count());
         int color = Enumerable.Range(0, 50).MinBy(code => colorUsage.GetValueOrDefault(code));
         world.AddForce(new(forceId, 100)
