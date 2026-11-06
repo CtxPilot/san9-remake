@@ -8,11 +8,6 @@ public partial class RankEditorPage : SharedCatalogEditorPage
     protected override IEnumerable<(int Id, string Name)> Entries => Workspace.Ranks.Select(r => (r.Id, r.Name));
     protected override bool Changed(int id) => Workspace.IsRankChanged(id);
     protected override void Restore(int id) => Workspace.RestoreRank(id);
-    protected override string Summary(int id)
-    {
-        var rank = Workspace.GetRank(id);
-        return $"带兵量 {rank.CommandCapacity:N0} · 所需信望 {rank.RequiredTrust} · 忠诚加成 {rank.LoyaltyBonus}";
-    }
     private void Edit(int id, Func<RankDefinition, RankDefinition> change) => Workspace.SetRank(change(Workspace.GetRank(id)));
     protected override void BuildForm(int id)
     {

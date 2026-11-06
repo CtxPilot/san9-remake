@@ -19,10 +19,12 @@ internal static class CompanionPanelStyle
         theme.SetStylebox("normal", "Button", Surface("2a333f", "465260", 6, 14, 8));
         theme.SetStylebox("hover", "Button", Surface("354151", "66778a", 6, 14, 8));
         theme.SetStylebox("pressed", "Button", Surface("202a35", "8093a7", 6, 14, 8));
+        theme.SetStylebox("hover_pressed", "Button", theme.GetStylebox("pressed", "Button"));
         theme.SetStylebox("disabled", "Button", Surface("222932", "343e4b", 6, 14, 8));
         theme.SetStylebox("focus", "Button", Focus());
         theme.SetColor("font_hover_color", "Button", Colors.White);
         theme.SetColor("font_pressed_color", "Button", Colors.White);
+        theme.SetColor("font_hover_pressed_color", "Button", Colors.White);
         theme.SetColor("font_disabled_color", "Button", new("738093"));
         theme.SetStylebox("normal", "LineEdit", Surface("202a35", "526174", 6, 10, 6));
         theme.SetStylebox("focus", "LineEdit", Focus());

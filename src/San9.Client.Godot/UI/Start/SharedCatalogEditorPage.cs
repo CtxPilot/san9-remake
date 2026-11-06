@@ -9,13 +9,12 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     protected int? Current;
     private ItemList _list = null!;
     private LineEdit _search = null!;
-    private Label _title = null!, _summary = null!;
+    private Label _title = null!;
     private readonly List<int> _visible = [];
     private bool _building;
     private int _generation;
     protected abstract string Subject { get; }
     protected abstract IEnumerable<(int Id, string Name)> Entries { get; }
-    protected virtual string Summary(int id) => "";
     protected abstract bool Changed(int id);
     protected abstract void Restore(int id);
     protected abstract void BuildForm(int id);
@@ -37,7 +36,6 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
         restore.Pressed += () => { if (Current is int id && CanProcess()) { Restore(id); RefreshAfterSave(); Status("已恢复，尚未保存。"); } };
         var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(550, 0) }; split.AddChild(body);
         _title = new Label(); _title.AddThemeFontSizeOverride("font_size", 23); body.AddChild(_title);
-        _summary = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart }; body.AddChild(_summary);
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; body.AddChild(scroll);
         Form = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; Form.AddThemeConstantOverride("separation", 12); scroll.AddChild(Form);
         Current = Entries.Select(e => (int?)e.Id).FirstOrDefault(); RefreshList(); ShowCurrent();
@@ -57,8 +55,6 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     private void UpdateHeading()
     {
         _title.Text = Current is int id ? Entries.First(e => e.Id == id).Name + (Changed(id) ? " *" : "") : "没有可编辑的" + Subject;
-        _summary.Text = Current is int selected ? Summary(selected) : "";
-        _summary.Visible = _summary.Text.Length > 0;
     }
     private void ShowCurrent()
     {

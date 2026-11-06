@@ -12,7 +12,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
     private ItemList _list = null!;
     private LineEdit _search = null!;
     private TabContainer _tabs = null!;
-    private Label _title = null!, _summary = null!;
+    private Label _title = null!;
     private HSplitContainer _split = null!;
     private FormationEditorPreview _preview = null!;
     private TextEdit? _json;
@@ -43,9 +43,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
         }, "RestoreFormation");
         var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(550, 0) }; _split.AddChild(body);
         var hero = new HBoxContainer(); body.AddChild(hero);
-        var labels = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; hero.AddChild(labels);
-        _title = new Label { Text = "选择一个阵形" }; _title.AddThemeFontSizeOverride("font_size", 23); labels.AddChild(_title);
-        _summary = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart }; labels.AddChild(_summary);
+        _title = new Label { Text = "选择一个阵形", SizeFlagsHorizontal = SizeFlags.ExpandFill }; _title.AddThemeFontSizeOverride("font_size", 23); hero.AddChild(_title);
         _preview = new FormationEditorPreview { CustomMinimumSize = new(190, 100), MouseFilter = MouseFilterEnum.Ignore }; hero.AddChild(_preview);
         _tabs = new TabContainer { SizeFlagsVertical = SizeFlags.ExpandFill, Name = "FormationPages" }; body.AddChild(_tabs);
         _tabs.TabChanged += index =>
@@ -97,7 +95,6 @@ public partial class FormationEditorPage : SharedDataEditorPage
         if (_current is not int id) return;
         var rule = Workspace.GetFormation(id);
         _title.Text = Workspace.FormationNames.GetValueOrDefault(id, $"阵形 {id}") + (Workspace.IsFormationChanged(id) || _rawDirty ? " *" : "");
-        _summary.Text = $"{(rule.TravelMode == TravelMode.Land ? "陆上" : "水上")} · 最多 {rule.OfficerCapacity} 名武将 · {rule.SoldierCapacity:N0} 兵\n每日移动力 {rule.MovementBudget} · 出征费 {rule.DeploymentCost} · 攻 {rule.Combat?.AgainstUnits ?? 0} / 防 {rule.Combat?.Defense ?? 0}";
         _preview.Rule = rule;
     }
 

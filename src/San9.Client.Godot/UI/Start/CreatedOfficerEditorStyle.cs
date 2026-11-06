@@ -25,9 +25,9 @@ internal static class CreatedOfficerEditorStyle
         theme.SetColor("font_color", "TextEdit", new("e8edf3"));
         theme.SetColor("caret_color", "TextEdit", Accent);
         theme.SetColor("selection_color", "TextEdit", new("465c74"));
-        foreach (string state in new[] { "normal", "hover", "pressed", "disabled", "focus" })
+        foreach (string state in new[] { "normal", "hover", "pressed", "hover_pressed", "disabled", "focus" })
             theme.SetStylebox(state, "OptionButton", theme.GetStylebox(state, "Button"));
-        foreach (string color in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_disabled_color" })
+        foreach (string color in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_disabled_color" })
             theme.SetColor(color, "OptionButton", theme.GetColor(color, "Button"));
         return theme;
     }
@@ -35,7 +35,7 @@ internal static class CreatedOfficerEditorStyle
     internal static void Compact(Button button)
     {
         button.AddThemeFontSizeOverride("font_size", 14); button.CustomMinimumSize = new(52, 28);
-        foreach (string state in new[] { "normal", "hover", "pressed", "disabled" })
+        foreach (string state in new[] { "normal", "hover", "pressed", "hover_pressed", "disabled" })
         {
             var style = (StyleBoxFlat)button.GetThemeStylebox(state).Duplicate();
             style.ContentMarginLeft = style.ContentMarginRight = 8;

@@ -8,11 +8,6 @@ public partial class OfficeEditorPage : SharedCatalogEditorPage
     protected override IEnumerable<(int Id, string Name)> Entries => Workspace.Offices.Select(o => (o.Id, o.Name));
     protected override bool Changed(int id) => Workspace.IsOfficeChanged(id);
     protected override void Restore(int id) => Workspace.RestoreOffice(id);
-    protected override string Summary(int id)
-    {
-        var office = Workspace.GetOffice(id);
-        return $"{(office.AppointmentGroup == OfficeAppointmentGroup.Military ? "武官" : "文官")} · 带兵量 {office.CommandCapacity:N0} · 每旬俸禄 {office.Salary}";
-    }
     private void Edit(int id, Func<OfficeDefinition, OfficeDefinition> change) => Workspace.SetOffice(change(Workspace.GetOffice(id)));
     protected override void BuildForm(int id)
     {
