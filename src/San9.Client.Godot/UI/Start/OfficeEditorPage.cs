@@ -6,13 +6,13 @@ public partial class OfficeEditorPage : SharedCatalogEditorPage
 {
     protected override string Subject => "官职";
     protected override IEnumerable<(int Id, string Name)> Entries => Workspace.Offices.Select(o => (o.Id, o.Name));
+    protected override Action<int, string> Rename => (id, value) => Edit(id, p => p with { Name = value });
     protected override bool Changed(int id) => Workspace.IsOfficeChanged(id);
     protected override void Restore(int id) => Workspace.RestoreOffice(id);
     private void Edit(int id, Func<OfficeDefinition, OfficeDefinition> change) => Workspace.SetOffice(change(Workspace.GetOffice(id)));
     protected override void BuildForm(int id)
     {
         var office = Workspace.GetOffice(id);
-        TextField("名称", office.Name, v => Edit(id, p => p with { Name = v }));
         TextField("描述", office.Description, v => Edit(id, p => p with { Description = v }), true);
         var basics = Section("基本参数");
         Number(basics, "带兵量", office.CommandCapacity, 0, uint.MaxValue, v => Edit(id, p => p with { CommandCapacity = (uint)v }), "OfficeCapacity");

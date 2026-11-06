@@ -13,7 +13,7 @@ public partial class FormationEditorPreview : Control
     public override void _ExitTree() => Resized -= Redraw;
     public override void _Draw()
     {
-        DrawStyleBox(CreatedOfficerEditorStyle.Surface("151c24", "394758", 8), new(Vector2.Zero, Size));
+        DrawStyleBox(ContentEditorStyle.Surface("151c24", "394758", 8), new(Vector2.Zero, Size));
         if (_rule is not { } rule) return;
         int columns = Math.Clamp(rule.Positions.Select(p => p.Column + 1).DefaultIfEmpty(3).Max(), 3, 12);
         var origin = new Vector2(10, 8); float width = (Size.X - 20) / columns, height = (Size.Y - 16) / 3;

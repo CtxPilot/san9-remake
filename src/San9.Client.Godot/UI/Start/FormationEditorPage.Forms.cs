@@ -17,7 +17,7 @@ public partial class FormationEditorPage
 
     private static GridContainer Section(Node parent, string title)
     {
-        var caption = new Label { Text = title }; caption.AddThemeColorOverride("font_color", CreatedOfficerEditorStyle.Accent); parent.AddChild(caption);
+        var caption = new Label { Text = title }; caption.AddThemeColorOverride("font_color", ContentEditorStyle.Accent); parent.AddChild(caption);
         var grid = new GridContainer { Columns = 4, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         grid.AddThemeConstantOverride("h_separation", 12); grid.AddThemeConstantOverride("v_separation", 9); parent.AddChild(grid); return grid;
     }
@@ -42,8 +42,8 @@ public partial class FormationEditorPage
         int id = f.Id;
         var page = Page("基础");
         var catalog = Workspace.GetFormationCatalog(id);
-        SharedEditorText.Add(page, "名称", catalog.Name, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Name = v }); RefreshList(); UpdateHeading(); }));
-        SharedEditorText.Add(page, "描述", catalog.Description, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Description = v }); RefreshList(); UpdateHeading(); }), true);
+        ContentEditorControls.AddText(page, "名称", catalog.Name, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Name = v }); RefreshList(); UpdateHeading(); }));
+        ContentEditorControls.AddText(page, "描述", catalog.Description, Guard<string>(v => { Workspace.SetFormationCatalog(Workspace.GetFormationCatalog(id) with { Description = v }); RefreshList(); UpdateHeading(); }), true);
         var grid = Section(page, "行军与编制");
         Number(grid, "每日移动力", f.MovementBudget, 1, int.MaxValue, v => Edit(id, p => p with { MovementBudget = (int)v }), "FormationMovement");
         Number(grid, "出征费用", f.DeploymentCost, 0, int.MaxValue, v => Edit(id, p => p with { DeploymentCost = (int)v }), "FormationCost");

@@ -42,7 +42,7 @@ public partial class CreatedOfficerEditor : ModalView
     {
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         MouseFilter = MouseFilterEnum.Stop;
-        Theme = CreatedOfficerEditorStyle.Create(GetThemeFont("font"));
+        Theme = ContentEditorStyle.Create(GetThemeFont("font"));
         _portraitService = Service;
         _previousAutoAcceptQuit = GetTree().AutoAcceptQuit;
         GetTree().AutoAcceptQuit = false;
@@ -76,13 +76,11 @@ public partial class CreatedOfficerEditor : ModalView
         save.TooltipText = "Ctrl+S"; CompanionPanelStyle.Primary(save);
         AddButton(header, "关闭", RequestClose, "CloseEditor");
         var split = new HSplitContainer { SizeFlagsVertical = SizeFlags.ExpandFill, SplitOffsets = [230] }; column.AddChild(split);
-        var sidebarPanel = new PanelContainer { CustomMinimumSize = new(210, 0) };
-        sidebarPanel.AddThemeStyleboxOverride("panel", CreatedOfficerEditorStyle.Surface("202833", "394758", 12)); split.AddChild(sidebarPanel);
-        var sidebar = new VBoxContainer(); sidebar.AddThemeConstantOverride("separation", 10); sidebarPanel.AddChild(sidebar);
+        var sidebar = ContentEditorControls.Sidebar(split);
         var listHeading = new HBoxContainer(); sidebar.AddChild(listHeading);
         listHeading.AddChild(new Label { Text = "人物库" });
         _count = new Label { SizeFlagsHorizontal = SizeFlags.ExpandFill, HorizontalAlignment = HorizontalAlignment.Right };
-        _count.AddThemeColorOverride("font_color", CreatedOfficerEditorStyle.Muted); listHeading.AddChild(_count);
+        _count.AddThemeColorOverride("font_color", ContentEditorStyle.Muted); listHeading.AddChild(_count);
         var actions = new HBoxContainer(); actions.AddThemeConstantOverride("separation", 6); sidebar.AddChild(actions);
         AddButton(actions, "新建", () => { FinishSurnameEdit(); _current = Workspace.Add().Id; Changed(true); }, "NewOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
         AddButton(actions, "复制", () => { FinishSurnameEdit(); if (_current is Guid id) { _current = Workspace.Duplicate(id).Id; Changed(true); } }, "CopyOfficer").SizeFlagsHorizontal = SizeFlags.ExpandFill;
@@ -281,15 +279,11 @@ public partial class CreatedOfficerEditor : ModalView
     private void Status(string message, bool error = false)
     {
         _statusTimer.Stop(); _status.Text = message; _status.Visible = !string.IsNullOrWhiteSpace(message);
-        _status.Modulate = error ? new Color("ffb4a8") : CreatedOfficerEditorStyle.Muted;
+        _status.Modulate = error ? new Color("ffb4a8") : ContentEditorStyle.Muted;
         if (_status.Visible && !error) _statusTimer.Start();
     }
-    private static Button AddButton(Node parent, string text, Action pressed, string name = "")
-    {
-        var button = new Button { Text = text, CustomMinimumSize = new(0, 34) };
-        if (name.Length > 0) button.Name = name;
-        button.Pressed += pressed; parent.AddChild(button); return button;
-    }
+    private static Button AddButton(Node parent, string text, Action pressed, string name = "") =>
+        ContentEditorControls.ActionButton(parent, text, pressed, name);
     public override void _UnhandledKeyInput(InputEvent input)
     {
         if (input is not InputEventKey { Pressed: true, Echo: false } key) return;

@@ -30,7 +30,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
     {
         _split = new HSplitContainer { SizeFlagsVertical = SizeFlags.ExpandFill, SplitOffsets = [222] }; AddChild(_split); _split.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var sidePanel = new PanelContainer { CustomMinimumSize = new(200, 0) };
-        sidePanel.AddThemeStyleboxOverride("panel", CreatedOfficerEditorStyle.Surface("202833", "394758", 10)); _split.AddChild(sidePanel);
+        sidePanel.AddThemeStyleboxOverride("panel", ContentEditorStyle.Surface("202833", "394758", 10)); _split.AddChild(sidePanel);
         var sidebar = new VBoxContainer(); sidePanel.AddChild(sidebar);
         _search = new LineEdit { PlaceholderText = "搜索阵形", Name = "FormationSearch" }; sidebar.AddChild(_search);
         _search.TextChanged += _ => RefreshList();

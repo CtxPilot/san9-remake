@@ -9,12 +9,15 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     protected int? Current;
     private ItemList _list = null!;
     private LineEdit _search = null!;
-    private Label _title = null!;
+    private Label? _title;
+    private LineEdit? _name;
+    private Label _changed = null!;
     private readonly List<int> _visible = [];
     private bool _building;
     private int _generation;
     protected abstract string Subject { get; }
     protected abstract IEnumerable<(int Id, string Name)> Entries { get; }
+    protected virtual Action<int, string>? Rename => null;
     protected abstract bool Changed(int id);
     protected abstract void Restore(int id);
     protected abstract void BuildForm(int id);
@@ -25,19 +28,35 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
 
     public override void _Ready()
     {
-        var split = new HSplitContainer { SplitOffsets = [235] }; AddChild(split);
+        var split = new HSplitContainer { SplitOffsets = [230] }; AddChild(split);
         split.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var side = new VBoxContainer { CustomMinimumSize = new(215, 0) }; split.AddChild(side);
+        var side = ContentEditorControls.Sidebar(split);
         _search = new LineEdit { PlaceholderText = "搜索" + Subject, Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "Search" }; side.AddChild(_search);
         _search.TextChanged += _ => RefreshList();
         _list = new ItemList { SizeFlagsVertical = SizeFlags.ExpandFill, Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "List" }; side.AddChild(_list);
         _list.ItemSelected += index => { if (!_building && CanProcess()) { Current = _visible[(int)index]; ShowCurrent(); } };
         var restore = new Button { Text = "恢复打开时的值", CustomMinimumSize = new(0, 34) }; side.AddChild(restore);
         restore.Pressed += () => { if (Current is int id && CanProcess()) { Restore(id); RefreshAfterSave(); Status("已恢复，尚未保存。"); } };
-        var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(550, 0) }; split.AddChild(body);
-        _title = new Label(); _title.AddThemeFontSizeOverride("font_size", 23); body.AddChild(_title);
+        var body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(600, 0) }; body.AddThemeConstantOverride("separation", 12); split.AddChild(body);
+        var heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); body.AddChild(heading);
+        if (Rename is { } rename)
+        {
+            _name = new LineEdit { Name = GetType().Name.Replace("EditorPage", "", StringComparison.Ordinal) + "Name",
+                PlaceholderText = "名称", TooltipText = "名称", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            _name.AddThemeFontSizeOverride("font_size", 20); heading.AddChild(_name);
+            _name.TextChanged += value =>
+            {
+                if (!_building && CanProcess() && Current is int id) { rename(id, value); RefreshCurrent(); }
+            };
+        }
+        else
+        {
+            _title = new Label { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            _title.AddThemeFontSizeOverride("font_size", 20); heading.AddChild(_title);
+        }
+        _changed = new Label { Text = "*", Visible = false }; heading.AddChild(_changed);
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; body.AddChild(scroll);
-        Form = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; Form.AddThemeConstantOverride("separation", 12); scroll.AddChild(Form);
+        Form = ContentEditorControls.PageBody(scroll);
         Current = Entries.Select(e => (int?)e.Id).FirstOrDefault(); RefreshList(); ShowCurrent();
     }
     private void RefreshList()
@@ -54,7 +73,17 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     }
     private void UpdateHeading()
     {
-        _title.Text = Current is int id ? Entries.First(e => e.Id == id).Name + (Changed(id) ? " *" : "") : "没有可编辑的" + Subject;
+        string name = Current is int id ? Entries.First(e => e.Id == id).Name : "";
+        _changed.Visible = Current is int selected && Changed(selected);
+        if (_name is not null)
+        {
+            _name.Editable = Current is not null;
+            if (_name.Text != name)
+            {
+                bool building = _building; _building = true; _name.Text = name; _building = building;
+            }
+        }
+        else _title!.Text = Current is not null ? name : "没有可编辑的" + Subject;
     }
     private void ShowCurrent()
     {
@@ -78,35 +107,23 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
         }
         UpdateHeading();
     }
-    protected GridContainer Section(string title)
-    {
-        var label = new Label { Text = title }; label.AddThemeColorOverride("font_color", CreatedOfficerEditorStyle.Accent); Form.AddChild(label);
-        var grid = new GridContainer { Columns = 4, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        grid.AddThemeConstantOverride("h_separation", 12); grid.AddThemeConstantOverride("v_separation", 9); Form.AddChild(grid); return grid;
-    }
-    protected void TextField(Node parent, string title, string value, Action<string> changed, string name) =>
-        SharedEditorText.Add(parent, title, value, Guard(changed), name: name, inline: true);
-
+    protected GridContainer Section(string title) => ContentEditorControls.ProfileGrid(Form, title);
+    protected HFlowContainer Options(string title) => ContentEditorControls.ButtonGroup(Form, title);
     protected void TextField(string title, string value, Action<string> changed, bool multiline = false, string name = "") =>
-        SharedEditorText.Add(Form, title, value, Guard(changed), multiline, name);
+        ContentEditorControls.AddText(Form, title, value, Guard(changed), multiline, name);
 
     protected void Number(Node parent, string title, double value, double min, double max, Action<double> changed, string name = "", string tooltip = "")
     {
-        parent.AddChild(new Label { Text = title });
-        var field = new SpinBox { Name = name, TooltipText = tooltip, MinValue = min, MaxValue = max, Value = value, Step = 1, Rounded = true, UpdateOnTextChanged = true,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill, CustomMinimumSize = new(110, 34) };
-        var apply = Guard(changed); field.ValueChanged += v => apply(v); parent.AddChild(field);
+        ContentEditorControls.Caption(parent, title);
+        ContentEditorControls.NumericInput(parent, value, min, max, Guard(changed), name, tooltip);
     }
     protected void Toggle(Node parent, string title, bool value, Action<bool> changed, string name = "", string tooltip = "")
     {
-        var field = new CheckBox { Name = name, TooltipText = tooltip, Text = title, ButtonPressed = value }; var apply = Guard(changed);
-        field.Toggled += v => apply(v); parent.AddChild(field);
+        ContentEditorControls.Toggle(parent, title, value, Guard(changed), name, tooltip);
     }
     protected void Choice(Node parent, string title, IReadOnlyList<string> labels, int selected, Action<int> changed)
     {
-        parent.AddChild(new Label { Text = title }); var field = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        foreach (string label in labels) field.AddItem(label); field.Select(selected);
-        var apply = Guard(changed); field.ItemSelected += v => apply((int)v); parent.AddChild(field);
+        ContentEditorControls.Choices(parent, title, labels, selected, Guard(changed));
     }
     protected void Rebuild() => ShowCurrent();
 }

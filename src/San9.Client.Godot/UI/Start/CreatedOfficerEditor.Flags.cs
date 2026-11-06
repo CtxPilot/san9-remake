@@ -74,7 +74,7 @@ public partial class CreatedOfficerEditor
             foreach (int glyph in glyphs.Skip(page * pageSize).Take(pageSize))
             {
                 var button = new Button { CustomMinimumSize = new(82, 68), TooltipText = FlagName(glyph) };
-                if (glyph == person.FlagGlyph) button.AddThemeStyleboxOverride("normal", CreatedOfficerEditorStyle.Surface("33495c", "b3a36c", 4));
+                if (glyph == person.FlagGlyph) button.AddThemeStyleboxOverride("normal", ContentEditorStyle.Surface("33495c", "b3a36c", 4));
                 button.AddChild(new FlagPreview { Service = service, Glyph = glyph, Position = new(7, 8) });
                 button.Pressed += () =>
                 {

@@ -2,7 +2,7 @@ using Godot;
 
 namespace San9.Client.Godot;
 
-internal static class CreatedOfficerEditorStyle
+internal static class ContentEditorStyle
 {
     internal static readonly Color Muted = new("aab6c5"), Accent = new("f0d3a3");
 

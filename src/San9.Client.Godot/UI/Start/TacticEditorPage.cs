@@ -6,26 +6,25 @@ namespace San9.Client.Godot;
 
 public partial class TacticEditorPage : SharedCatalogEditorPage
 {
-    private static readonly string[] Categories = ["步兵", "骑兵", "弓骑", "弩兵", "水军", "攻城", "智略", "谋略", "策略"];
     protected override string Subject => "兵法";
     protected override IEnumerable<(int Id, string Name)> Entries => Workspace.Tactics.Select(t => (t.Id, Workspace.GetTacticCatalog(t.Id).Name));
+    protected override Action<int, string> Rename => (id, value) => Workspace.SetTacticCatalog(Workspace.GetTacticCatalog(id) with { Name = value });
     protected override bool Changed(int id) => Workspace.IsTacticChanged(id);
     protected override void Restore(int id) => Workspace.RestoreTactic(id);
     private void Edit(int id, Func<TacticRule, TacticRule> change) => Workspace.SetTactic(change(Workspace.GetTactic(id)));
     protected override void BuildForm(int id)
     {
         var t = Workspace.GetTactic(id); var catalog = Workspace.GetTacticCatalog(id);
-        TextField("名称", catalog.Name, v => Workspace.SetTacticCatalog(Workspace.GetTacticCatalog(id) with { Name = v }));
         TextField("描述", catalog.Description, v => Workspace.SetTacticCatalog(Workspace.GetTacticCatalog(id) with { Description = v }), true);
         Form.AddChild(new Label { Text = "效果：" + EffectLabel(t.Effect) });
         var basics = Section("基本参数");
         if (t.Effect != TacticEffect.FacilityAttack)
-            Choice(basics, "熟练类别", Categories, t.Category ?? 0, v => Edit(id, x => x with { Category = v }));
+            Choice(basics, "熟练类别", TacticCategoryLabels.Names, t.Category ?? 0, v => Edit(id, x => x with { Category = v }));
         Number(basics, "威力／效果参数", t.Power, 0, MaximumPower(t.Effect), v => Edit(id, x => x with { Power = (int)v }));
         Number(basics, "最小发动间隔", t.MinimumInterval, 0, int.MaxValue, v => Edit(id, x => x with { MinimumInterval = (int)v }));
         Number(basics, "学习熟练度门槛", t.TrainingRequirement, 0, int.MaxValue, v => Edit(id, x => x with { TrainingRequirement = (int)v }));
         Number(basics, "作用半径", t.EffectRadius, 0, int.MaxValue, v => Edit(id, x => x with { EffectRadius = (int)v }));
-        var flags = Section("使用资格");
+        var flags = Options("使用资格");
         if (t.Effect is TacticEffect.Martial or TacticEffect.Confusion or TacticEffect.TrapSelection or TacticEffect.Defection or TacticEffect.Illusion or TacticEffect.Taunt or TacticEffect.Inspire or TacticEffect.Heal or TacticEffect.Sorcery or TacticEffect.CounterConfusion or TacticEffect.CounterTrap)
             Toggle(flags, "允许武将预选", t.Selectable, v => Edit(id, x => x with { Selectable = v }));
         Toggle(flags, "可作用于设施", t.AffectsFacilities, v => Edit(id, x => x with { AffectsFacilities = v }));
@@ -34,7 +33,7 @@ public partial class TacticEditorPage : SharedCatalogEditorPage
             Toggle(flags, "可解救俘虏", t.CanRescuePrisoners, v => Edit(id, x => x with { CanRescuePrisoners = v }));
             Toggle(flags, "限制近距发动", t.ContactRange is not null, v => { Edit(id, x => x with { ContactRange = v ? 5 : null }); Rebuild(); });
             if (t.ContactRange is int range) Number(basics, "近距范围", range, 1, int.MaxValue, v => Edit(id, x => x with { ContactRange = (int)v }));
-            Choice(basics, "狙击熟练类别", new[] { "不进行狙击" }.Concat(Categories).ToArray(), (t.SnipingProficiencyCategory ?? -1) + 1,
+            Choice(basics, "狙击熟练类别", new[] { "不进行狙击" }.Concat(TacticCategoryLabels.Names).ToArray(), (t.SnipingProficiencyCategory ?? -1) + 1,
                 v => Edit(id, x => x with { SnipingProficiencyCategory = v == 0 ? null : v - 1 }));
         }
         if (t.FacilityAttack is { } attack)
@@ -42,7 +41,7 @@ public partial class TacticEditorPage : SharedCatalogEditorPage
             Number(basics, "设施射程加成", attack.RangeBonus, 0, int.MaxValue, v => Edit(id, x => x with { FacilityAttack = x.FacilityAttack! with { RangeBonus = (int)v } }));
             Toggle(flags, "使用落石威力", attack.UsesRockfallPower, v => Edit(id, x => x with { FacilityAttack = x.FacilityAttack! with { UsesRockfallPower = v } }));
         }
-        var compatible = Section("适配阵形与船型");
+        var compatible = Options("适配阵形与船型");
         foreach (var formation in Workspace.Formations)
         {
             int f = formation.Id;

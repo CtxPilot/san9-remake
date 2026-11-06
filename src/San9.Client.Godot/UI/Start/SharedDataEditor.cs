@@ -13,7 +13,7 @@ public partial class SharedDataEditor : ModalView
     private readonly CancellationTokenSource _lifetime = new();
     private readonly List<SharedDataEditorPage> _editors = [];
     private TabContainer _pages = null!;
-    private Label _scope = null!, _status = null!;
+    private Label _title = null!, _status = null!;
     private Button _save = null!, _close = null!;
     private bool _busy, _previousAutoQuit;
     private bool HasChanges => _workspace?.HasChanges == true || _editors.Any(p => p.HasPendingChanges);
@@ -21,7 +21,7 @@ public partial class SharedDataEditor : ModalView
     public override void _Ready()
     {
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); MouseFilter = MouseFilterEnum.Stop;
-        Theme = CreatedOfficerEditorStyle.Create(GetThemeFont("font"));
+        Theme = ContentEditorStyle.Create(GetThemeFont("font"));
         _previousAutoQuit = GetTree().AutoAcceptQuit; GetTree().AutoAcceptQuit = false;
         GetWindow().CloseRequested += RequestClose;
         var surface = new PanelContainer(); surface.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -29,14 +29,13 @@ public partial class SharedDataEditor : ModalView
         var margin = new MarginContainer(); surface.AddChild(margin);
         foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 16);
         var layout = new VBoxContainer(); layout.AddThemeConstantOverride("separation", 10); margin.AddChild(layout);
-        var header = new HBoxContainer(); layout.AddChild(header);
-        var title = new Label { Text = "共享数据编辑器", SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        title.AddThemeFontSizeOverride("font_size", 24); header.AddChild(title);
+        var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 12); layout.AddChild(header);
+        _title = new Label { Text = "共享数据编辑器", SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            MouseFilter = MouseFilterEnum.Pass, TooltipText = "正在读取共享数据…" };
+        _title.AddThemeFontSizeOverride("font_size", 20); header.AddChild(_title);
         _save = AddButton(header, "保存全部修改", () => _ = Save(), "SaveSharedData");
         CompanionPanelStyle.Primary(_save); _save.TooltipText = "Ctrl+S"; _save.Disabled = true;
         _close = AddButton(header, "关闭", RequestClose, "CloseSharedDataEditor");
-        _scope = new Label { Text = "正在读取共享数据…", AutowrapMode = TextServer.AutowrapMode.WordSmart };
-        _scope.AddThemeColorOverride("font_color", CreatedOfficerEditorStyle.Muted); layout.AddChild(_scope);
         _pages = new TabContainer { SizeFlagsVertical = SizeFlags.ExpandFill, Name = "SharedDataPages" }; layout.AddChild(_pages);
         _status = new Label { Visible = false, Name = "SharedDataStatus",
             AutowrapMode = TextServer.AutowrapMode.WordSmart };
@@ -50,13 +49,13 @@ public partial class SharedDataEditor : ModalView
         {
             _workspace = await Task.Run(() => SharedDataEditorWorkspace.OpenAsync(ContentRoot, ReferenceScenarioId, _lifetime.Token), _lifetime.Token);
             _lifetime.Token.ThrowIfCancellationRequested();
-            AddPage(new FormationEditorPage { Name = "阵形", Workspace = _workspace, ReportStatus = Status });
-            AddPage(new OfficeEditorPage { Name = "官职", Workspace = _workspace, ReportStatus = Status });
             AddPage(new RankEditorPage { Name = "爵位", Workspace = _workspace, ReportStatus = Status });
+            AddPage(new OfficeEditorPage { Name = "官职", Workspace = _workspace, ReportStatus = Status });
             AddPage(new OfficerEditorPage { Name = "武将", Workspace = _workspace, ReportStatus = Status });
+            AddPage(new FormationEditorPage { Name = "阵形", Workspace = _workspace, ReportStatus = Status });
             AddPage(new TacticEditorPage { Name = "兵法", Workspace = _workspace, ReportStatus = Status });
             _pages.TabChanged += index => _editors[(int)index].Activate();
-            UpdateScope(); _save.Disabled = false;
+            UpdateTitleTooltip(); _save.Disabled = false;
             Status("");
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
@@ -65,11 +64,10 @@ public partial class SharedDataEditor : ModalView
 
     private void AddPage(SharedDataEditorPage page) { _editors.Add(page); _pages.AddChild(page); }
 
-    private void UpdateScope()
+    private void UpdateTitleTooltip()
     {
         if (_workspace is not { } workspace) return;
-        _scope.Text = $"{(workspace.HasPlayerCopy ? "玩家配置" : "基础配置")} · 阵形 {workspace.Formations.Length} 项 · 官职 {workspace.Offices.Count} 项 · 爵位 {workspace.Ranks.Count} 项 · 武将 {workspace.Officers.Count} 项 · 兵法 {workspace.Tactics.Length} 项";
-        _scope.TooltipText = $"基础：{workspace.DefinitionPath}\n玩家副本：{workspace.PlayerDefinitionPath}\n人物资料：{workspace.PlayerOfficerPath}";
+        _title.TooltipText = $"{(workspace.HasPlayerCopy ? "玩家配置" : "基础配置")}\n爵位 {workspace.Ranks.Count} 项 · 官职 {workspace.Offices.Count} 项 · 武将 {workspace.Officers.Count} 项 · 阵形 {workspace.Formations.Length} 项 · 兵法 {workspace.Tactics.Length} 项\n\n基础：{workspace.DefinitionPath}\n玩家副本：{workspace.PlayerDefinitionPath}\n人物资料：{workspace.PlayerOfficerPath}";
     }
 
     private async Task<bool> Save()
@@ -84,7 +82,7 @@ public partial class SharedDataEditor : ModalView
             await Task.Run(() => _workspace.SaveAsync(_lifetime.Token), _lifetime.Token);
             if (_lifetime.IsCancellationRequested) return false;
             foreach (var page in _editors) page.RefreshAfterSave();
-            UpdateScope(); Status("已保存，重新开局后生效。"); return true;
+            UpdateTitleTooltip(); Status("已保存，重新开局后生效。"); return true;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return false; }
         catch (Exception error) { Status("保存失败：" + error.Message, true); return false; }
@@ -111,14 +109,11 @@ public partial class SharedDataEditor : ModalView
     {
         _status.Text = message;
         _status.Visible = !string.IsNullOrEmpty(message);
-        _status.Modulate = error ? new Color("ffb4a8") : CreatedOfficerEditorStyle.Muted;
+        _status.Modulate = error ? new Color("ffb4a8") : ContentEditorStyle.Muted;
     }
 
-    private static Button AddButton(Node parent, string title, Action action, string name)
-    {
-        var button = new Button { Name = name, Text = title, CustomMinimumSize = new(0, 34) };
-        button.Pressed += action; parent.AddChild(button); return button;
-    }
+    private static Button AddButton(Node parent, string title, Action action, string name) =>
+        ContentEditorControls.ActionButton(parent, title, action, name);
 
     public override void _UnhandledKeyInput(InputEvent input)
     {
