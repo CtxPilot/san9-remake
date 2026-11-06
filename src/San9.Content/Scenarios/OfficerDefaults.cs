@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 using San9.Content.Packages;
+using San9.Content.Text;
 using San9.Core.Domain;
 using San9.Core.Simulation;
 
@@ -11,6 +12,10 @@ namespace San9.Content.Scenarios;
 public sealed record OfficerDefaults(int Id)
 {
     [JsonRequired] public required string NameKey { get; init; }
+    [JsonRequired] public required string Name { get; init; }
+    [JsonIgnore] public string GivenName => Name.StartsWith(Surname, StringComparison.Ordinal) ? Name[Surname.Length..] : Name;
+    [JsonRequired] public required string? CourtesyName { get; init; }
+    [JsonRequired] public required string? Biography { get; init; }
     [JsonRequired] public required int? AgeAtScenarioStart { get; init; }
     [JsonRequired] public required int FlagGlyph { get; init; }
     [JsonRequired] public required string? CourtesyNameKey { get; init; }
@@ -41,9 +46,12 @@ public sealed record OfficerDefaults(int Id)
     [JsonRequired] public required bool AutomaticSurrenderAllowed { get; init; }
     [JsonRequired] public required bool HasRecruitmentPoliticsBonus { get; init; }
 
-    public static OfficerDefaults From(OfficerInitialState value) => new(value.State.Id)
+    public static OfficerDefaults From(OfficerInitialState value, TextCatalog texts) => new(value.State.Id)
     {
         NameKey = value.NameKey,
+        Name = texts.Resolve(value.NameKey),
+        CourtesyName = value.CourtesyNameKey is { } courtesy ? texts.Resolve(courtesy) : null,
+        Biography = value.BiographyKey is { } biography ? texts.ResolveRich(biography) : null,
         AgeAtScenarioStart = value.AgeAtScenarioStart,
         FlagGlyph = value.FlagGlyph,
         CourtesyNameKey = value.CourtesyNameKey,
@@ -81,6 +89,9 @@ public sealed record OfficerDefaultsOverrides
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<string>? NameKey { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ContentOverride<string>? Name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ContentOverride<string?>? CourtesyName { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ContentOverride<string?>? Biography { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<int?>? AgeAtScenarioStart { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -143,6 +154,9 @@ public sealed record OfficerDefaultsOverrides
     public OfficerDefaults Apply(OfficerDefaults defaults) => defaults with
     {
         NameKey = NameKey is { } changeNameKey ? changeNameKey.Value : defaults.NameKey,
+        Name = Name is { } changeName ? changeName.Value : defaults.Name,
+        CourtesyName = CourtesyName is { } changeCourtesy ? changeCourtesy.Value : defaults.CourtesyName,
+        Biography = Biography is { } changeBiography ? changeBiography.Value : defaults.Biography,
         AgeAtScenarioStart = AgeAtScenarioStart is { } changeAgeAtScenarioStart ? changeAgeAtScenarioStart.Value : defaults.AgeAtScenarioStart,
         FlagGlyph = FlagGlyph is { } changeFlagGlyph ? changeFlagGlyph.Value : defaults.FlagGlyph,
         CourtesyNameKey = CourtesyNameKey is { } changeCourtesyNameKey ? changeCourtesyNameKey.Value : defaults.CourtesyNameKey,
@@ -177,6 +191,9 @@ public sealed record OfficerDefaultsOverrides
     public static OfficerDefaultsOverrides Between(OfficerDefaults defaults, OfficerDefaults value) => new()
     {
         NameKey = ContentComparison.Equal(defaults.NameKey, value.NameKey) ? null : new(value.NameKey),
+        Name = ContentComparison.Equal(defaults.Name, value.Name) ? null : new(value.Name),
+        CourtesyName = ContentComparison.Equal(defaults.CourtesyName, value.CourtesyName) ? null : new(value.CourtesyName),
+        Biography = ContentComparison.Equal(defaults.Biography, value.Biography) ? null : new(value.Biography),
         AgeAtScenarioStart = ContentComparison.Equal(defaults.AgeAtScenarioStart, value.AgeAtScenarioStart) ? null : new(value.AgeAtScenarioStart),
         FlagGlyph = ContentComparison.Equal(defaults.FlagGlyph, value.FlagGlyph) ? null : new(value.FlagGlyph),
         CourtesyNameKey = ContentComparison.Equal(defaults.CourtesyNameKey, value.CourtesyNameKey) ? null : new(value.CourtesyNameKey),
@@ -229,7 +246,7 @@ public sealed record ScenarioOfficerState(int Id)
     [JsonRequired] public required bool RewardedThisXun { get; init; }
     [JsonRequired] public required OfficerDefaultsOverrides Overrides { get; init; }
 
-    public static ScenarioOfficerState From(OfficerInitialState value, OfficerDefaults defaults) => new(value.State.Id)
+    public static ScenarioOfficerState From(OfficerInitialState value, OfficerDefaults defaults, TextCatalog texts) => new(value.State.Id)
     {
         OwnerId = value.State.OwnerId,
         SettlementId = value.State.SettlementId,
@@ -246,13 +263,14 @@ public sealed record ScenarioOfficerState(int Id)
         IsCommander = value.State.IsCommander,
         ForceLoyalties = value.State.ForceLoyalties,
         RewardedThisXun = value.State.RewardedThisXun,
-        Overrides = OfficerDefaultsOverrides.Between(defaults, OfficerDefaults.From(value)),
+        Overrides = OfficerDefaultsOverrides.Between(defaults, OfficerDefaults.From(value, texts)),
     };
 
     public OfficerInitialState Compile(OfficerDefaults defaults)
     {
         var profile = Overrides.Apply(defaults);
         ContentStructure.Validate(profile);
+        if (string.IsNullOrWhiteSpace(profile.Name)) throw new InvalidDataException("Officer name is required.");
         return new(profile.NameKey, new(Id, OwnerId, SettlementId, new(profile.War, profile.Intelligence, profile.Politics, profile.Leadership), Acted)
         {
             IsDormant = IsDormant,
@@ -292,8 +310,8 @@ public sealed record ScenarioOfficerState(int Id)
         {
             AgeAtScenarioStart = profile.AgeAtScenarioStart,
             FlagGlyph = profile.FlagGlyph,
-            CourtesyNameKey = profile.CourtesyNameKey,
-            BiographyKey = profile.BiographyKey,
+            CourtesyNameKey = profile.CourtesyName is null ? null : profile.CourtesyNameKey ?? $"officer-courtesy.{Id}",
+            BiographyKey = profile.Biography is null ? null : profile.BiographyKey ?? $"officer-biography.{Id}",
         };
     }
 }
@@ -302,16 +320,42 @@ public static class OfficerComposition
 {
     private static Dictionary<int, OfficerDefaults> Index(OfficerDefaults[] defaults)
     {
-        if (defaults.Any(p => p.Id < 0) || defaults.Select(p => p.Id).Distinct().Count() != defaults.Length)
+        if (defaults.Any(p => p.Id < 0 || string.IsNullOrWhiteSpace(p.Name) || string.IsNullOrWhiteSpace(p.NameKey)) || defaults.Select(p => p.Id).Distinct().Count() != defaults.Length)
             throw new InvalidDataException("Invalid or duplicate officer default identity.");
         return defaults.ToDictionary(p => p.Id);
     }
 
-    public static ScenarioOfficerState[] Split(OfficerInitialState[] officers, OfficerDefaults[] defaults)
+    public static ScenarioOfficerState[] Split(OfficerInitialState[] officers, OfficerDefaults[] defaults, TextCatalog texts)
     {
         var index = Index(defaults);
         return officers.Select(person => ScenarioOfficerState.From(person, index.TryGetValue(person.State.Id, out var profile)
-            ? profile : throw new InvalidDataException($"Missing officer defaults: {person.State.Id}."))).ToArray();
+            ? profile : throw new InvalidDataException($"Missing officer defaults: {person.State.Id}."), texts)).ToArray();
+    }
+
+    public static OfficerDefaults[] Profiles(ScenarioOfficerState[] placements, OfficerDefaults[] defaults)
+    {
+        var index = Index(defaults);
+        return placements.Select(p => p.Overrides.Apply(index.TryGetValue(p.Id, out var profile) ? profile
+            : throw new InvalidDataException($"Unknown officer defaults: {p.Id}."))).ToArray();
+    }
+
+    public static TextCatalog ProjectText(TextCatalog texts, IEnumerable<OfficerDefaults> profiles)
+    {
+        var entries = new Dictionary<string, string>(texts.Entries, StringComparer.Ordinal);
+        var people = new Dictionary<int, MessagePersonProfile>(texts.MessagePeople);
+        foreach (var p in profiles)
+        {
+            entries[p.NameKey] = MessageMarkup.Escape(p.Name);
+            if (p.CourtesyName is { } courtesy) entries[p.CourtesyNameKey ?? $"officer-courtesy.{p.Id}"] = MessageMarkup.Escape(courtesy);
+            if (p.Biography is { } biography) entries[p.BiographyKey ?? $"officer-biography.{p.Id}"] = biography;
+            string surname = $"officer-surname.{p.Id}", given = $"officer-given-name.{p.Id}";
+            string givenText = p.GivenName;
+            if (p.Surname.Length > 0) entries[surname] = MessageMarkup.Escape(p.Surname);
+            if (givenText.Length > 0) entries[given] = MessageMarkup.Escape(givenText);
+            people[p.Id] = new(p.Surname.Length > 0 ? surname : null, givenText.Length > 0 ? given : null,
+                people.GetValueOrDefault(p.Id)?.PortraitKey);
+        }
+        return texts with { Entries = entries, MessagePeople = people };
     }
 
     public static OfficerInitialState[] Compile(ScenarioOfficerState[] placements, OfficerDefaults[] defaults)

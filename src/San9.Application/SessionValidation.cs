@@ -159,6 +159,7 @@ internal static class SessionValidation
                     San9.Content.Text.MessageEntityKind.Person => snapshot.World.Officers.Any(p => p.Id == entity.Id),
                     San9.Content.Text.MessageEntityKind.Settlement => snapshot.World.Settlements.Any(p => p.Id == entity.Id),
                     San9.Content.Text.MessageEntityKind.Force => snapshot.World.Forces.Any(p => p.Id == entity.Id),
+                    San9.Content.Text.MessageEntityKind.Rank => definition.Content.Information.Ranks.Any(r => r.Id == entity.Id),
                     _ => false
                 })) throw new ArgumentException("Invalid chronicle reference.");
             }

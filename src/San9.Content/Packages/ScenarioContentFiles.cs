@@ -74,7 +74,7 @@ public static class ScenarioContentFiles
 
     /// <summary>Publishes shared inputs and rebuilt worlds together, preserving map and presentation resources.</summary>
     public static async Task WriteWorldsAsync(string resourceRoot, SharedScenarioData shared,
-        IReadOnlyList<(string Package, ScenarioInitialState Scenario)> worlds, CancellationToken token = default)
+        IReadOnlyList<(string Package, ScenarioInitialState Scenario, TextCatalog Text)> worlds, CancellationToken token = default)
     {
         shared.Validate();
         resourceRoot = Path.GetFullPath(resourceRoot);
@@ -83,7 +83,7 @@ public static class ScenarioContentFiles
         try
         {
             await ScenarioDataFiles.StageSharedAsync(resourceRoot, shared, files, token);
-            foreach (var (package, scenario) in worlds)
+            foreach (var (package, scenario, texts) in worlds)
             {
                 string root = PackageFiles.Resolve(resourceRoot, package);
                 // Read publication metadata only; the old world is never interpreted.
@@ -98,7 +98,7 @@ public static class ScenarioContentFiles
                     throw new InvalidDataException("Rebuilt scenario uses a different publication root.");
                 if (manifest.Preview is { } preview && (preview.Id != scenario.ScenarioId || preview.Year != scenario.Year || preview.Month != scenario.Month))
                     throw new InvalidDataException("Rebuilt world differs from scenario selection metadata.");
-                await ScenarioDataFiles.StageAsync(resourceRoot, manifest.Scenario, shared.Describe(scenario), files, DataJsonOptions, token);
+                await ScenarioDataFiles.StageAsync(resourceRoot, manifest.Scenario, shared.Describe(scenario, texts), files, DataJsonOptions, token);
                 manifests.Add((Path.GetRelativePath(resourceRoot, Path.Combine(root, "content.json")),
                     manifest with { SchemaVersion = ScenarioContent.CurrentSchemaVersion }));
             }
@@ -144,13 +144,13 @@ public static class ScenarioContentFiles
 
     private static async Task<ScenarioSelectionContent> ReadSelectionAsync(ScenarioContentManifest manifest, string resourceRoot, CancellationToken token)
     {
-        var scenario = await ScenarioDataFiles.LoadSelectionAsync(resourceRoot, manifest, token);
+        var (scenario, profiles) = await ScenarioDataFiles.LoadSelectionWithProfilesAsync(resourceRoot, manifest, token);
         if (scenario.SchemaVersion != ScenarioInitialState.CurrentSchemaVersion)
             throw new InvalidDataException("Unsupported scenario state version; reconvert the package.");
         var text = await ReadDataAsync<StaticTextContent>(resourceRoot, manifest.Text, token);
         var illustrations = await ReadDataAsync<Dictionary<string, string>>(resourceRoot, manifest.Illustrations, token);
-        return new(scenario, new(text.SchemaVersion, text.Entries)
-            { MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, illustrations);
+        return new(scenario, OfficerComposition.ProjectText(new(text.SchemaVersion, text.Entries)
+            { MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), illustrations);
     }
 
     public static async Task<ScenarioContent> LoadAsync(string root, CancellationToken token = default) =>
@@ -170,7 +170,7 @@ public static class ScenarioContentFiles
                 throw new InvalidDataException("Unsupported map definition version; reconvert the package.");
             return new MapInstance(definition, mapManifest.Buildings);
         }, token);
-        var scenarioTask = Task.Run(() => ScenarioDataFiles.LoadScenarioAsync(resourceRoot, manifest, token), token);
+        var scenarioTask = Task.Run(() => ScenarioDataFiles.LoadScenarioWithProfilesAsync(resourceRoot, manifest, token), token);
         var displayTask = Task.Run(async () =>
         {
             var text = await Read<StaticTextContent>(manifest.Text);
@@ -193,8 +193,10 @@ public static class ScenarioContentFiles
         await Task.WhenAll(mapTask, scenarioTask, displayTask, messagesTask);
         var display = await displayTask;
         var text = display.Text;
-        return new(ScenarioContent.CurrentSchemaVersion, manifest.Textures, await mapTask, await scenarioTask,
-            new(text.SchemaVersion, text.Entries) { Messages = await messagesTask, MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, display.Illustrations)
+        var (scenario, profiles) = await scenarioTask;
+        return new(ScenarioContent.CurrentSchemaVersion, manifest.Textures, await mapTask, scenario,
+            OfficerComposition.ProjectText(new(text.SchemaVersion, text.Entries) { Messages = await messagesTask,
+                MessagePeople = text.MessagePeople, MessageTags = text.MessageTags }, profiles), display.Illustrations)
             { Presentation = display.Presentation, ResourceRoot = resourceRoot, Preview = manifest.Preview };
     }
 
@@ -217,11 +219,11 @@ public static class ScenarioContentFiles
             throw new InvalidDataException("Scenario geography differs from its explicitly referenced shared map.");
         string mapDefinitionPath = sharedMap?.Path ?? ownPrefix + "map-definition.json";
         var scenarioData = sharedScenario ?? SharedScenarioData.From(content.Scenario, ownPrefix + "definitions.json",
-            ownPrefix + "officer-defaults.json", ownPrefix + "geography.json");
+            ownPrefix + "officer-defaults.json", ownPrefix + "geography.json", content.Text);
         var reusablePaths = scenarioData.ResolvePaths(resourceRoot).ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (reusablePaths.Contains(PackageFiles.Resolve(resourceRoot, mapDefinitionPath)))
             throw new InvalidDataException("Map display and scenario inputs must use distinct paths.");
-        var scenarioDocument = scenarioData.Describe(content.Scenario);
+        var scenarioDocument = scenarioData.Describe(content.Scenario, content.Text);
         var overrides = (messageOverrides ?? []).ToHashSet(StringComparer.Ordinal);
         var privateMessages = content.Text.Messages.Where(p => sharedMessages is null || !sharedMessages.Messages.ContainsKey(p.Key) || overrides.Contains(p.Key))
             .ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
@@ -297,7 +299,12 @@ public static class ScenarioContentFiles
                 await Stage(scenarioData.GeographyPath, scenarioData.Geography, DataJsonOptions);
             }
             await Stage(manifest.Scenario, scenarioDocument, DataJsonOptions);
-            await Stage(manifest.Text, new StaticTextContent(content.Text.SchemaVersion, content.Text.Entries)
+            var ownedPeople = OfficerComposition.Profiles(scenarioDocument.Officers,
+                [.. scenarioData.Officers.Officers, .. scenarioDocument.AdditionalOfficerDefaults]);
+            var ownedKeys = ownedPeople.SelectMany(p => new[] { p.NameKey, p.CourtesyNameKey, p.BiographyKey,
+                $"officer-surname.{p.Id}", $"officer-given-name.{p.Id}" }.OfType<string>()).ToHashSet(StringComparer.Ordinal);
+            await Stage(manifest.Text, new StaticTextContent(content.Text.SchemaVersion,
+                content.Text.Entries.Where(p => !ownedKeys.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value))
                 { MessagePeople = content.Text.MessagePeople, MessageTags = content.Text.MessageTags }, DataJsonOptions);
             foreach (var (path, messages) in messageFiles) await Stage(path, messages, MessageJsonOptions);
             await Stage(manifest.Illustrations, content.IllustrationRoles, DataJsonOptions);
@@ -397,7 +404,7 @@ public static class ScenarioContentFiles
         return category;
     }
 
-    private static Dictionary<string, MessageDefinition> ComposeMessages(IReadOnlyDictionary<string, MessageDefinition> shared,
+    public static Dictionary<string, MessageDefinition> ComposeMessages(IReadOnlyDictionary<string, MessageDefinition> shared,
         IReadOnlyDictionary<string, MessageDefinition> local, IReadOnlyCollection<string> overrides)
     {
         var declared = overrides.ToHashSet(StringComparer.Ordinal);

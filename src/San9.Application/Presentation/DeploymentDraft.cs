@@ -142,7 +142,7 @@ public sealed partial class DeploymentDraft
             var person = View.Officers.Single(o => o.Id == id);
             bool compatible = IsTacticCompatible(id);
             return new FormationMemberView(id, texts.Resolve(person.NameKey), Tactics[id] is int tactic
-                ? texts.Resolve(View.Information.Tactics.Single(t => t.Id == tactic).NameKey) : "—",
+                ? View.Information.Tactics.Single(t => t.Id == tactic).Name : "—",
                 Positions[id], id == CommanderId)
             {
                 TacticAvailable = Tactics[id] is null || compatible,

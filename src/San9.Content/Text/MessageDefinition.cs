@@ -20,7 +20,7 @@ public sealed record MessageExpression(string Operation, string? Binding = null,
 [JsonConverter(typeof(MessageDefinitionJsonConverter))]
 public sealed record MessageDefinition(MessageNode[] Nodes);
 
-public enum MessageEntityKind { Person, Force, Settlement, Unit, Treasure, Tactic, Region, Corps }
+public enum MessageEntityKind { Person, Force, Settlement, Unit, Treasure, Tactic, Region, Corps, Rank, Office, Formation }
 public sealed record MessageEntity(MessageEntityKind Kind, int Id);
 public sealed record MessagePersonProfile(string? SurnameKey, string? GivenNameKey, string? PortraitKey);
 

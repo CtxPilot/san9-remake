@@ -37,9 +37,9 @@ public static class ContentCatalogImporter
         {
             // TC101 explicitly chooses scenario 0 as its publication baseline. Every
             // other scenario retains its differences; no majority-value inference.
-            var (baseline, _) = ScenarioContentCompiler.Compile(exe, await File.ReadAllBytesAsync(source.File("D_Sce001.S9"), token),
+            var (baseline, baselineText) = ScenarioContentCompiler.Compile(exe, await File.ReadAllBytesAsync(source.File("D_Sce001.S9"), token),
                 messageBytes, await File.ReadAllBytesAsync(source.File("M_RtdnPK.s9"), token));
-            sharedScenario = SharedScenarioData.From(baseline, "shared/definitions.json", "shared/officer-defaults.json", "shared/maps/china/geography.json");
+            sharedScenario = SharedScenarioData.From(baseline, "shared/definitions.json", "shared/officer-defaults.json", "shared/maps/china/geography.json", baselineText);
             await ScenarioDataFiles.WriteSharedAsync(output, sharedScenario, token);
         }
         foreach (var preview in selection.Entries)

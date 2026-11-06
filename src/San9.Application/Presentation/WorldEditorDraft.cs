@@ -191,7 +191,7 @@ public sealed class WorldEditorDraft
             foreach (var tactic in _session.View.Information.Tactics.Where(t => learnable.Contains(t.Id)))
             {
                 int tacticId = tactic.Id;
-                Number<OfficerEdit>(_texts.Resolve(tactic.NameKey), 0, 1, p => p.LearnedTactics.Contains(tacticId) ? 1u : 0u,
+                Number<OfficerEdit>(tactic.Name, 0, 1, p => p.LearnedTactics.Contains(tacticId) ? 1u : 0u,
                     (p, v) => p with { LearnedTactics = v != 0 ? p.LearnedTactics.Add(tacticId) : p.LearnedTactics.Remove(tacticId) }, true, tacticId: tacticId);
             }
         }
@@ -227,8 +227,8 @@ public sealed class WorldEditorDraft
                 foreach (int tacticId in WorldEditing.CityTactics(_session.MilitaryRules, state))
                 {
                     var tactic = _session.MilitaryRules!.Tactics[tacticId];
-                    string name = _session.View.Information.Tactics.SingleOrDefault(t => t.Id == tacticId)?.NameKey ?? "";
-                    Number<SettlementEdit>("城防：" + _texts.Resolve(name), 0, 1, s => s.EnabledTacticIds.Contains(tacticId) ? 1u : 0u,
+                    string name = _session.View.Information.Tactics.SingleOrDefault(t => t.Id == tacticId)?.Name ?? "";
+                    Number<SettlementEdit>("城防：" + name, 0, 1, s => s.EnabledTacticIds.Contains(tacticId) ? 1u : 0u,
                         (s, v) => s with { EnabledTacticIds = v == 0 ? Toggle(s.EnabledTacticIds, tacticId, false) :
                             s.EnabledTacticIds.Where(other => (_session.MilitaryRules.Tactics[other].Effect == TacticEffect.FacilityAttack) !=
                                 (tactic.Effect == TacticEffect.FacilityAttack)).Append(tacticId).Order().ToImmutableArray() }, true, tacticId: tacticId);

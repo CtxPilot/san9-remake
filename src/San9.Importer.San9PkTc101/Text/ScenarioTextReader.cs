@@ -117,21 +117,20 @@ public sealed class ScenarioTextReader(byte[] messages, byte[] executable) : IDi
         var source = Text(1680 + 4 * code);
         return AddOptional(key, source);
     }
-    public string? Biography(int code, San9MessageTable biographies)
+    public string? Biography(string key, int code, San9MessageTable biographies)
     {
         if (code is >= 563 and <= 569) return null;
         int resource = code >= 570 ? code - 7 : code;
         var value = _converter.Convert(biographies.MultilineText(resource));
-        return string.IsNullOrWhiteSpace(value) ? null : $"biographies.{resource}";
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        _entries.TryAdd(key, value);
+        return key;
     }
     public string CountryTitle(string key, int id) => Add(key, Text(San9ScenarioCountryTitleArchive.GetNameMessageId(id)));
     // Rank 8 is the valid lowest rank, but its name resource 1668 is empty.
     // Reuse the source's explicit "none" label (5217) for this semantic state.
-    public string Rank(string key, int id)
-    {
-        if (id != 8) Add($"rank-description.{id}", Text(7761 + id));
-        return Add(key, Text(id == 8 ? 5217 : 1652 + 2 * id));
-    }
+    public string RankName(int id) => MessageMarkup.Plain(Text(id == 8 ? 5217 : 1652 + 2 * id));
+    public string RankDescription(int id) => id == 8 ? "" : MessageMarkup.Plain(Text(7761 + id));
     public string Province(int id) => Add($"province.{id}", Text(San9ScenarioAreaArchive.GetNameMessageId(id)));
     public string TreasureDescription(int id, int resourceId)
     {
@@ -139,12 +138,12 @@ public sealed class ScenarioTextReader(byte[] messages, byte[] executable) : IDi
         return Add(TreasureText.DescriptionKey(id), MultilineText(7641 + resourceId));
     }
     public string Treasure(string key, int id) => Add(key, Text(1392 + 2 * id));
-    public string Tactic(int id) => Add($"tactic.{id}", Text(1219 + 3 * id));
-    public string TacticDescription(int id) => Add($"tactic-description.{id}", Text(1221 + 3 * id));
-    public string Formation(int id) => Add($"formation.{id}", Text(5363 + 3 * id));
-    public string? FormationDescription(int id) => AddOptional($"formation-description.{id}", Text(5365 + 3 * id));
-    public string OfficeDescription(int id) => Add($"office-description.{id}", Text(7770 + id));
-    public string Office(string key, int id) => Add(key, Text(5065 + 2 * id));
+    public string Tactic(int id) => MessageMarkup.Plain(Text(1219 + 3 * id));
+    public string TacticDescription(int id) => MessageMarkup.Plain(Text(1221 + 3 * id));
+    public string Formation(int id) => MessageMarkup.Plain(Text(5363 + 3 * id));
+    public string FormationDescription(int id) => MessageMarkup.Plain(Text(5365 + 3 * id));
+    public string OfficeDescription(int id) => MessageMarkup.Plain(Text(7770 + id));
+    public string Office(int id) => MessageMarkup.Plain(Text(5065 + 2 * id));
     public string City(string key, int code) => Add(key, Text(721 + 2 * code));
     public string Region(string key, int code) => Add(key, Text(166 + 2 * code));
     public string? FacilitySuffix(string key, int type) => AddOptional(key, _converter.Convert(TypeSuffix(type)));

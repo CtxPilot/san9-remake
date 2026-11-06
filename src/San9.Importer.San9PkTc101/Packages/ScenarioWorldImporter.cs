@@ -26,18 +26,18 @@ public static class ScenarioWorldImporter
             string id = San9ScenarioArchive.ReadHeader(stream).ScenarioId.ToString(CultureInfo.InvariantCulture);
             if (!sources.TryAdd(id, path)) throw new InvalidDataException($"Duplicate source scenario identity: {id}.");
         }
-        List<(ScenarioCatalogEntry Entry, ScenarioInitialState Scenario)> worlds = [];
+        List<(ScenarioCatalogEntry Entry, ScenarioInitialState Scenario, San9.Content.Text.TextCatalog Text)> worlds = [];
         foreach (var entry in catalog.Scenarios)
         {
             token.ThrowIfCancellationRequested();
             if (!sources.TryGetValue(entry.Id, out var path)) throw new InvalidDataException($"Missing source scenario: {entry.Id}.");
             byte[] bytes = await File.ReadAllBytesAsync(path, token);
-            var (scenario, _) = ScenarioContentCompiler.Compile(exe, bytes, messages, biographies);
-            worlds.Add((entry, scenario));
+            var (scenario, texts) = ScenarioContentCompiler.Compile(exe, bytes, messages, biographies);
+            worlds.Add((entry, scenario, texts));
         }
         var baseline = worlds.Single(w => w.Entry.Id == "0").Scenario;
-        var shared = SharedScenarioData.From(baseline, "shared/definitions.json", "shared/officer-defaults.json", "shared/maps/china/geography.json");
-        await ScenarioContentFiles.WriteWorldsAsync(output, shared, worlds.Select(w => (w.Entry.Package, w.Scenario)).ToArray(), token);
-        foreach (var (entry, _) in worlds) progress?.Invoke($"Rebuilt scenario world: {entry.Id}.");
+        var shared = SharedScenarioData.From(baseline, "shared/definitions.json", "shared/officer-defaults.json", "shared/maps/china/geography.json", worlds.Single(w => w.Entry.Id == "0").Text);
+        await ScenarioContentFiles.WriteWorldsAsync(output, shared, worlds.Select(w => (w.Entry.Package, w.Scenario, w.Text)).ToArray(), token);
+        foreach (var (entry, _, _) in worlds) progress?.Invoke($"Rebuilt scenario world: {entry.Id}.");
     }
 }

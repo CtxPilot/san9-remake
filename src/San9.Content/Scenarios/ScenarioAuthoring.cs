@@ -14,7 +14,7 @@ public sealed record ContentOverride<T>(T Value);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScenarioDefinitions
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 3;
     [JsonRequired] public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     [JsonRequired] public required OfficerGrowthRules OfficerGrowth { get; init; }
     [JsonRequired] public required OriginalAiDefinition OriginalAi { get; init; }
@@ -369,7 +369,7 @@ public sealed record ScenarioGeography
 public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 3;
     [JsonRequired] public required GameClock? ThreeVisitsStarted { get; init; }
     [JsonRequired] public required bool UnitDefectionsEnabled { get; init; }
     [JsonRequired] public required bool SettlementDefectionsEnabled { get; init; }
@@ -392,10 +392,10 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
     [JsonRequired] public required ImmutableArray<BattlefieldPlace> MilitaryPlaces { get; init; }
     [JsonRequired] public required ScenarioDefinitionsOverrides DefinitionOverrides { get; init; }
 
-    public static ScenarioDocument From(ScenarioInitialState value, ScenarioDefinitions definitions, OfficerDefaults[] officers)
+    public static ScenarioDocument From(ScenarioInitialState value, ScenarioDefinitions definitions, OfficerDefaults[] officers, San9.Content.Text.TextCatalog texts)
     {
         var known = officers.Select(p => p.Id).ToHashSet();
-        var additional = value.Officers.Where(p => !known.Contains(p.State.Id)).Select(OfficerDefaults.From).ToArray();
+        var additional = value.Officers.Where(p => !known.Contains(p.State.Id)).Select(p => OfficerDefaults.From(p, texts)).ToArray();
         return new(CurrentSchemaVersion, value.ScenarioId, value.Year, value.Month, value.Day, value.PlayerForceId, value.Forces, value.Settlements)
         {
             ThreeVisitsStarted = value.ThreeVisitsStarted,
@@ -415,7 +415,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
             ImperialCourtEnded = value.ImperialCourtEnded,
             Units = value.Units,
             AdditionalOfficerDefaults = additional,
-            Officers = OfficerComposition.Split(value.Officers, [.. officers, .. additional]),
+            Officers = OfficerComposition.Split(value.Officers, [.. officers, .. additional], texts),
             Information = ScenarioInformationState.From(value.Information),
             MilitaryPlaces = value.Military?.Places ?? [],
             DefinitionOverrides = ScenarioDefinitionsOverrides.Between(definitions, ScenarioDefinitions.From(value)),

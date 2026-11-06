@@ -13,14 +13,15 @@ public sealed class San9MessageTableTests
     [InlineData(569, null)]
     [InlineData(570, "biographies.563")]
     [InlineData(685, "biographies.678")]
-    public void BiographyUsesItsExplicitSourceReferenceWithoutCopyingText(int code, string? expected)
+    public void BiographyMaterializesOwnedTextAtTheProvidedKey(int code, string? expected)
     {
         using var reader = new ScenarioTextReader(Archive(Table(Array.Empty<byte>())),
             File.ReadAllBytes(typeof(ScenarioTextReader).Assembly.Location));
         var biographies = new San9MessageTable(Archive(Table(Enumerable.Range(0, 679)
             .Select(i => System.Text.Encoding.ASCII.GetBytes($"Biography {i}")).ToArray())));
-        Assert.Equal(expected, reader.Biography(code, biographies));
-        Assert.Empty(reader.Catalog.Entries);
+        Assert.Equal(expected is null ? null : "person-biography", reader.Biography("person-biography", code, biographies));
+        if (expected is null) Assert.Empty(reader.Catalog.Entries);
+        else Assert.Equal(expected.Replace("biographies.", "Biography ", StringComparison.Ordinal), reader.Catalog.Resolve("person-biography"));
     }
 
     [Theory]

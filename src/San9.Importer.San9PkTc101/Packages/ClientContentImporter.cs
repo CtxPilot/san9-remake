@@ -60,6 +60,7 @@ public static class ClientContentImporter
             messages = new GameplayMessageCompiler(scenario, people).Compile(messages);
             text = text with { MessageTags = ScenarioMessageTags.For(header.ScenarioId, header.ScenarioModeCode) };
         }
+        CatalogTextCompiler.BindMessages(messages, scenario);
         messages = PublicationMessageCatalog.Compile(messages);
         San9.Content.Text.NameMessages.AddTo(messages);
         EventPresentationCompiler.AddMessages(messages);

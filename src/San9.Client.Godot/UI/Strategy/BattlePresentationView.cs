@@ -305,7 +305,7 @@ public partial class BattlePresentationView : Control
         void PanelText(string text, Vector2 topLeft) => DrawString(font, topLeft + new Vector2(0, font.GetAscent(24)), text, fontSize: 24);
         PanelText(Force(cue.Source), new(72, 676));
         PanelText(Name(cue.Source), new(72, 708));
-        PanelText(Texts.Resolve(_day.Before.Information.Tactics.Single(t => t.Id == cue.TacticId).NameKey), new(232, 692));
+        PanelText(_day.Before.Information.Tactics.Single(t => t.Id == cue.TacticId).Name, new(232, 692));
         PanelText(Force(cue.Target), new(816, 40));
         PanelText(Name(cue.Target), new(816, 72));
         DrawSceneControls();

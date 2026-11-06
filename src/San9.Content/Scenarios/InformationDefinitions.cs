@@ -4,12 +4,12 @@ using San9.Core.Domain;
 
 namespace San9.Content.Scenarios;
 
-public sealed record RankDefinition(int Id, string NameKey, uint CommandCapacity, int RequiredTrust, int LoyaltyBonus,
+public sealed record RankDefinition(int Id, string Name, uint CommandCapacity, int RequiredTrust, int LoyaltyBonus,
     [property: JsonRequired] int Precedence)
 {
     [JsonRequired] public bool PreferBalancedOfficeCandidates { get; init; }
     [JsonRequired] public bool IsUnranked { get; init; }
-    [JsonRequired] public string? DescriptionKey { get; init; }
+    [JsonRequired] public string Description { get; init; } = "";
 }
 public sealed record TreasureDefinition(int Id, string NameKey, int Category, int AbilityBonus, int LoyaltyBonus, int? TacticId)
 {
@@ -26,24 +26,24 @@ public sealed record TreasureDefinition(int Id, string NameKey, int Category, in
     };
 }
 public enum OfficeAppointmentGroup { Military, Civil }
-public sealed record OfficeDefinition(int Id, string NameKey, uint CommandCapacity, int Salary)
+public sealed record OfficeDefinition(int Id, string Name, uint CommandCapacity, int Salary)
 {
     [JsonRequired] public OfficeAppointmentGroup AppointmentGroup { get; init; }
     [JsonRequired] public bool FillBeforeOrdinaryOffices { get; init; }
-    [JsonRequired] public string? DescriptionKey { get; init; }
+    [JsonRequired] public string Description { get; init; } = "";
     [JsonRequired] public int GovernorPriority { get; init; }
     [JsonRequired] public OfficerAbilities AbilityBonuses { get; init; }
     [JsonRequired] public int? RequiredRankId { get; init; }
 }
-public record MilitaryCatalogDefinition(int Id, string NameKey)
+public record MilitaryCatalogDefinition(int Id, string Name)
 {
-    [JsonRequired] public string? DescriptionKey { get; init; }
+    [JsonRequired] public string Description { get; init; } = "";
 }
 
 public readonly record struct FormationSlot(int Column, int Row);
 public sealed record FormationPresentation(int Columns, int Rows, ImmutableArray<FormationSlot> Slots,
     int VisionRadius, int VisionAngleDegrees, string? BackgroundRole, string? AvailableRole);
-public sealed record FormationCatalogDefinition(int Id, string NameKey) : MilitaryCatalogDefinition(Id, NameKey)
+public sealed record FormationCatalogDefinition(int Id, string Name) : MilitaryCatalogDefinition(Id, Name)
 {
     [JsonRequired] public FormationPresentation? Presentation { get; init; }
 }
@@ -72,7 +72,7 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
         if (CountryTitles is null || CountryTitles.Any(t => t is null || t.Rule is null || string.IsNullOrWhiteSpace(t.NameKey) || t.FlagGlyph is < -1 or > 185))
             throw new InvalidDataException("Invalid country title definition.");
         Unique(CountryTitles.Select(t => t.Id));
-        if (Tactics is null || Formations is null || Tactics.Concat(Formations).Any(d => d is null || string.IsNullOrWhiteSpace(d.NameKey) || d.DescriptionKey is not null && string.IsNullOrWhiteSpace(d.DescriptionKey)))
+        if (Tactics is null || Formations is null || Tactics.Concat(Formations).Any(d => d is null || string.IsNullOrWhiteSpace(d.Name) || d.Description is null))
             throw new InvalidDataException("Invalid military catalog metadata.");
         foreach (var formation in Formations)
             if (formation.Presentation is { } p && (p.Columns <= 0 || p.Rows <= 0 || p.Slots.IsDefault ||
@@ -118,12 +118,12 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
             scenario.Officers.Any(o => o.State.OfficeId is int office && !Offices.Any(d => d.Id == office)) ||
             Corps.Any(c => c.IsRoot != (scenario.Forces.SingleOrDefault(f => f.Id == c.OwnerId)?.LeaderId == c.LeaderId)))
             throw new InvalidDataException("Invalid rank, office or corps treasury reference.");
-        if (Ranks.Count(r => r.IsUnranked) > 1 || Ranks.Any(r => r.DescriptionKey is not null && string.IsNullOrWhiteSpace(r.DescriptionKey)))
+        if (Ranks.Count(r => r.IsUnranked) > 1)
             throw new InvalidDataException("Invalid rank presentation metadata.");
         if (Ranks.Select(r => r.Precedence).Distinct().Count() != Ranks.Length)
             throw new InvalidDataException("Rank precedence must be unique.");
-        if (Ranks.Any(r => string.IsNullOrWhiteSpace(r.NameKey) || r.RequiredTrust < 0 || r.LoyaltyBonus < 0 || r.Precedence < 0) ||
-            Offices.Any(o => string.IsNullOrWhiteSpace(o.NameKey) || o.DescriptionKey is not null && string.IsNullOrWhiteSpace(o.DescriptionKey) || o.Salary < 0 || o.GovernorPriority < 0 ||
+        if (Ranks.Any(r => string.IsNullOrWhiteSpace(r.Name) || r.Description is null || r.RequiredTrust < 0 || r.LoyaltyBonus < 0 || r.Precedence < 0) ||
+            Offices.Any(o => string.IsNullOrWhiteSpace(o.Name) || o.Description is null || o.Salary < 0 || o.GovernorPriority < 0 ||
                 !Enum.IsDefined(o.AppointmentGroup) || !o.AbilityBonuses.IsNonnegative || o.RequiredRankId is int rank && !Ranks.Any(r => r.Id == rank)) ||
             Treasures.Any(t => string.IsNullOrWhiteSpace(t.NameKey) || t.Category is < 0 or > 12 || !Enum.IsDefined(t.RetentionGroup) || t.AbilityBonus < 0 || !t.AbilityBonuses.IsNonnegative || t.LoyaltyBonus < 0 ||
                 t.FavoredOwnerIds.IsDefault || t.FavoredOwnerIds.Distinct().Count() != t.FavoredOwnerIds.Length ||

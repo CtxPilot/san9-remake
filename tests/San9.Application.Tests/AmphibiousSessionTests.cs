@@ -62,7 +62,7 @@ public sealed class AmphibiousSessionTests
                 Tactics = [new(8000, "technology")]
             }
         };
-        var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, definition.Information.Formations.Select(f => f.NameKey).Append("technology")
+        var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, definition.Information.Formations.Select(f => f.Name).Append("technology")
             .ToDictionary(key => key, key => key));
         var session = GameSession.Start(definition, 42);
         var query = new InformationQuery(session, texts);
@@ -142,7 +142,7 @@ public sealed class AmphibiousSessionTests
                 .Select(f => new FormationCatalogDefinition(f.Id, $"formation.{f.Id}")).ToArray() }
         };
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, definition.Information.Formations
-            .ToDictionary(f => f.NameKey, f => f.NameKey));
+            .ToDictionary(f => f.Name, f => f.Name));
         var session = GameSession.Start(definition, 42);
         void CheckAvailability(GameSession current)
         {

@@ -89,9 +89,9 @@ public static class ScenarioContentCompiler
         var treasureDiplomacy = TreasureContentCompiler.DiplomacyPreferences(exe, persons, officers.Select(o => o.State.Id),
             items.Where(i => i.SerializedId < TreasureContentCompiler.BuiltInCount).Select(i => (int)i.SerializedId));
         var information = new InformationDefinitions(
-            RankContentCompiler.Compile(ranks, id => text.Rank($"rank.{id}", id)),
-            offices.Where(o => o.IsAssignable).Select(o => new OfficeDefinition(o.Id, text.Office($"office.{o.Id}", o.Id), o.CommandCapacity, o.Salary)
-                { DescriptionKey = text.OfficeDescription(o.Id), GovernorPriority = San9ScenarioOfficeArchive.RecordCount - o.Id,
+            RankContentCompiler.Compile(ranks, text.RankName, text.RankDescription),
+            offices.Where(o => o.IsAssignable).Select(o => new OfficeDefinition(o.Id, text.Office(o.Id), o.CommandCapacity, o.Salary)
+                { Description = text.OfficeDescription(o.Id), GovernorPriority = San9ScenarioOfficeArchive.RecordCount - o.Id,
                   AbilityBonuses = OfficerContentCompiler.OfficeBonuses(o),
                   AppointmentGroup = o.CommandCapacity >= 15000 ? OfficeAppointmentGroup.Military : OfficeAppointmentGroup.Civil,
                   FillBeforeOrdinaryOffices = o.Id < 4,
@@ -116,9 +116,9 @@ public static class ScenarioContentCompiler
             ShowOfficerAges = !header.IgnoresPersonAge,
             MapContextExcludedFacilityIds = ConstructionContentCompiler.MapContextExcludedFacilityIds,
             Tactics = Read(San9ScenarioTacticArchive.ReadKnownRecords)
-                .Select(t => new MilitaryCatalogDefinition(t.Id, text.Tactic(t.Id)) { DescriptionKey = text.TacticDescription(t.Id) }).ToArray(),
+                .Select(t => new MilitaryCatalogDefinition(t.Id, text.Tactic(t.Id)) { Description = text.TacticDescription(t.Id) }).ToArray(),
             Formations = formations
-                .Select(f => new FormationCatalogDefinition(f.Id, text.Formation(f.Id)) { DescriptionKey = text.FormationDescription(f.Id),
+                .Select(f => new FormationCatalogDefinition(f.Id, text.Formation(f.Id)) { Description = text.FormationDescription(f.Id),
                     Presentation = new(3, 3, Enumerable.Range(0, f.DeploymentSlotCodes.Count).Select(f.GetDeploymentSlotPosition)
                         .Where(p => p is not null).Select(p => new FormationSlot(p!.Value.Column, p.Value.Row)).ToImmutableArray(),
                         f.VisionRadius, f.VisionAngleDegrees, $"formation-diagram-{f.Id}", $"formation-available-{f.Id}") }).ToArray(),

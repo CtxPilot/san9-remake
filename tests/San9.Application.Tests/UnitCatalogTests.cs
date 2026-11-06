@@ -161,7 +161,7 @@ public sealed class UnitCatalogTests
             Military = new(4, 4, Enumerable.Repeat(0, 16).ToImmutableArray(), [new(0, 1, null)],
                 [new(100, 5, 0, 100000, 5, new(1, 1), TravelMode.Land) { Tactics = new(15, 2, [], []) }], [])
                 { Tactics = [new(2, 0, TacticEffect.Martial, 10, 9, 0, true, false, [100])] },
-            Information = definition.Information with { Tactics = [new(2, "tactic")] }
+            Information = definition.Information with { Tactics = [new(2, "奋迅")] }
         };
         world = world with
         {
@@ -175,7 +175,6 @@ public sealed class UnitCatalogTests
         var keys = definition.Officers.Select(o => o.NameKey).Concat(definition.Forces.Select(f => f.NameKey))
             .Concat(definition.Settlements.Select(s => s.NameKey));
         var entries = keys.ToDictionary(key => key, key => key);
-        entries["tactic"] = "奋迅";
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, entries);
         var row = Assert.Single(UnitCatalog.Read(view, null, texts, 4).Rows);
         var detail = UnitDetails.Read(view, view.MilitaryRules, texts, 77);

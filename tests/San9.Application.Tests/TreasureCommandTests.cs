@@ -61,7 +61,7 @@ public sealed class TreasureCommandTests
         definition = PresentationTacticFixture.WithInfantry(definition);
         var session = GameSession.Start(definition, 190);
         var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new[] { "treasure", "recipient", "ruler" }.ToDictionary(k => k, k => k));
-        PresentationTacticFixture.AddNames(texts);
+
         long Count(StrategySnapshot view, int id) => OfficerCatalog.Read(view, texts, 0, null, null, id).Rows.Single().Cells[5].Number!.Value;
         string[] Marks(StrategySnapshot view, int id) => OfficerCatalog.Read(view, texts, 4, null, null, id).Rows.Single().Cells.Skip(3).Select(c => c.Text).ToArray();
         var before = session.View;

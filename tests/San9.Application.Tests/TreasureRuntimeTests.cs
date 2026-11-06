@@ -24,7 +24,7 @@ public sealed class TreasureRuntimeTests
         definition = PresentationTacticFixture.WithInfantry(definition);
         var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new[] { "force", "region", "visible", "hidden", "buried", "owned" }
             .ToDictionary(key => key, key => key));
-        PresentationTacticFixture.AddNames(texts);
+
         foreach (int id in new[] { 0, 1 }) texts.Entries.Add(TreasureText.DescriptionKey(id), "Description");
         var initial = GameSession.Start(definition, 1).View;
         Assert.Equal(2, initial.World.Officers.Count);

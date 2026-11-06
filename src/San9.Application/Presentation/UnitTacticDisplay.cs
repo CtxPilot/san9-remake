@@ -15,7 +15,7 @@ internal static class UnitTacticDisplay
             return CatalogCell.Unavailable;
         if (officer.EquippedTacticId is not int equipped) return new("");
         var tactic = view.Information.Tactics.First(t => t.Id == equipped);
-        return new(texts.Resolve(tactic.NameKey),
+        return new(tactic.Name,
             IsUnavailable: !rules.Tactics[equipped].CompatibleFormations.Contains(formation.Id));
     }
 }

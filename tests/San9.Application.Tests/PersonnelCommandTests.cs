@@ -191,7 +191,7 @@ public sealed class PersonnelCommandTests
         var keys = view.Officers.Select(o => o.NameKey).Concat(view.Forces.Select(f => f.NameKey))
             .Concat(view.Settlements.Select(s => s.NameKey)).Concat(view.Settlements.Select(s => s.NameSuffixKey).OfType<string>())
             .Concat(view.RegionNameKeys.Values).Concat(view.ProvinceNameKeys.Values)
-            .Concat(view.Information.Offices.Select(o => o.NameKey));
+            .Concat(view.Information.Offices.Select(o => o.Name));
         return new(TextCatalog.CurrentSchemaVersion,San9.Tests.CommandTextFixture.Entries(keys.Distinct().ToDictionary(k => k,k => k)));
     }
     [Theory]

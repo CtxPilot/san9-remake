@@ -29,10 +29,11 @@ public sealed class WorldEditorTests
     [Fact]
     public void TacticIdentityDoesNotDependOnTranslatedLabels()
     {
-        var session = GameSession.Start(Fixture(), 190);
+        var source = Fixture();
+        source = source with { Information = source.Information with
+        { Tactics = source.Information.Tactics.Select(t => t with { Name = "武力" }).ToArray() } };
+        var session = GameSession.Start(source, 190);
         var texts = Texts();
-        texts.Entries["tactic"] = "武力";
-        texts.Entries["rockfall"] = "武力";
         var officers = new WorldEditorDraft(session, WorldEditorKind.Officers, texts);
         var field = Assert.Single(officers.OfficerTacticFields(1)).Field;
         Assert.Equal(7000, field.TacticId);
@@ -69,7 +70,7 @@ public sealed class WorldEditorTests
                 Tactics = [new(7000, 3, TacticEffect.Martial, 1, 3, 0, true, true, []),
                     new(7001, null, TacticEffect.FacilityAttack, 0, 0, 0, false, false, []) { FacilityAttack = new(true, 0) }]
             },
-            Information = source.Information with { Tactics = [new(7000, "tactic"), new(7001, "rockfall")] }
+            Information = source.Information with { Tactics = [new(7000, "连弩"), new(7001, "落石")] }
         };
     }
 

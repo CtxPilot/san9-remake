@@ -624,9 +624,7 @@ public sealed class BattlePresentationTests
         var (session, texts, content, occurrence) = Fixture();
         var basis = MissionScenario.Create();
         var definition = basis with { Information = basis.Information with
-        { Tactics = [new(99, "primary-tactic"), new(100, "linked-tactic")] } };
-        texts.Entries["primary-tactic"] = "奋迅";
-        texts.Entries["linked-tactic"] = "奋斗";
+        { Tactics = [new(99, "奋迅"), new(100, "奋斗")] } };
         foreach (string role in new[] { "action", "link", "link-0", "chain-confused", "hit-reaction" })
         {
             texts.Messages[role] = new([new MessageValue(new("property", "tactic.name", Arguments: [new("binding", "tactic.0")]))]);

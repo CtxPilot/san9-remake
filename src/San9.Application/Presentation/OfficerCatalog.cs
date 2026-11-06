@@ -28,7 +28,7 @@ public static class OfficerCatalog
         var groups = tactics.Where(t => personal.ContainsKey(t.Id)).OrderBy(t => t.Id).ToLookup(t => personal[t.Id].Category);
         return [.. CorePages, .. TacticCategories.Select((title, index) => P(title,
             [C($"mastery.{index}", "精通", 2), N($"proficiency.{index}", title + "熟练", 4),
-             .. groups[index].Select(t => C($"tactic.{t.Id}", texts.Resolve(t.NameKey), 2))]))];
+             .. groups[index].Select(t => C($"tactic.{t.Id}", t.Name, 2))]))];
     }
 
     public static InformationTable Read(StrategySnapshot view, TextCatalog texts, int page, int? force, int? settlement, int? officerId = null, int? corpsId = null, int? regionId = null, int? unitFilter = null)
@@ -63,7 +63,7 @@ public static class OfficerCatalog
                     OfficerStatus.Ruler => new("—", long.MaxValue),
                     OfficerStatus.Captive => new("—", -2),
                     OfficerStatus.Free => new("—", -3),
-                    _ => new(office is null ? "" : texts.Resolve(office.NameKey), office?.GovernorPriority ?? -1)
+                    _ => new(office is null ? "" : office.Name, office?.GovernorPriority ?? -1)
                 };
                 var treasures = treasuresByHolder[o.Id].ToArray();
                 var tactics = page == 0 || page >= 4 ? TacticAvailability.ForOfficer(person, owner, treasures, treasureRules) : null;

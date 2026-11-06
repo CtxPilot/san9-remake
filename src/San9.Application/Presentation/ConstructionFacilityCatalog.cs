@@ -21,7 +21,7 @@ public static class ConstructionFacilityCatalog
             string feature = f.InnateAttack is { UsesRockfallPower: true } ? "facility-rockfall" :
                 f.Reprisal is not null ? "facility-stone" : f.InnateAttack is { RangeBonus: > 0 } ? "facility-range" : "";
             string tactics = string.Join("‧", (f.Tactics?.TacticPriority ?? []).Select(id =>
-                texts.Resolve(draft.View.Information.Tactics.Single(t => t.Id == id).NameKey)));
+                draft.View.Information.Tactics.Single(t => t.Id == id).Name));
             return new CatalogRow(f.Id, [draft.FacilityName(f.Id, texts),
                 f.Footprint.Width == f.Footprint.Height ? "——" : f.Footprint.Width < f.Footprint.Height ? "南北" : "东西",
                 f.MaxDurability, f.WoundedRecovery, f.ConstructionCost, tactics,

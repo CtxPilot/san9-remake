@@ -29,5 +29,5 @@ public static class TreasureCatalog
     }
 
     private static CatalogCell Tactic(StrategySnapshot view, TextCatalog texts, int? id) => id is null ? new("") :
-        new(texts.Resolve(view.Information.Tactics.Single(t => t.Id == id).NameKey));
+        new(view.Information.Tactics.Single(t => t.Id == id).Name);
 }

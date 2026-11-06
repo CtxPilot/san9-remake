@@ -9,6 +9,29 @@ namespace San9.Application.Tests;
 public sealed class WorldMessageContextTests
 {
     [Fact]
+    public void RankTextComesFromCurrentDefinitionsAndIsEscapedOnlyWhenRendered()
+    {
+        var basis = G01ScenarioTests.Fixture();
+        var world = GameSession.Start(basis, 1).Snapshot;
+        var definition = basis with { Information = basis.Information with
+        {
+            Ranks = [new(9001, "新[爵位]", 10000, 0, 0, 1) { Description = "说明\n第二行" }]
+        } };
+        world = world with { Forces = world.Forces.Select(f => f with { RankId = 9001 }).ToArray() };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, []) { Messages = new()
+        {
+            ["rank"] = new([new MessageValue(new("property", "rank.name", Arguments: [new("entity", "Rank", 9001)])),
+                new MessageLiteral("："), new MessageValue(new("property", "rank.description", Arguments: [new("entity", "Rank", 9001)]))])
+        } };
+        var context = new WorldMessageContext(definition, world, texts);
+        Assert.Equal("新[爵位]", context.Query("rank.name", [MessageBinding.Reference(MessageEntityKind.Rank, 9001)]).Text);
+        Assert.Equal("新[爵位]", context.Query("force.rank-name", [MessageBinding.Reference(MessageEntityKind.Force, world.Forces[0].Id)]).Text);
+        Assert.Equal("新[lb]爵位]：说明\n第二行", context.Produce("rank", new Dictionary<string, MessageBinding>(), _ => 0).BbCode);
+        Assert.Throws<InvalidDataException>(() => context.Query("rank.name", [MessageBinding.Reference(MessageEntityKind.Rank, 0)]));
+        Assert.Throws<InvalidDataException>(() => context.Query("rank.name", [MessageBinding.Reference(MessageEntityKind.Person, 9001)]));
+    }
+
+    [Fact]
     public void SharedMessageSelectsTheScenarioDialogueAtRuntime()
     {
         var session = GameSession.Start(G01ScenarioTests.Fixture(), 17);

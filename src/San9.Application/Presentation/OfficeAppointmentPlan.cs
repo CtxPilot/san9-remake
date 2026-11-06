@@ -111,7 +111,7 @@ public sealed class OfficeAppointmentPlan
     {
         var office = Definition(assignments[person]); var a = Abilities(person);
         return column switch {
-            "office" => new(office is null ? "无" : texts.Resolve(office.NameKey), Priority(office?.Id)),
+            "office" => new(office is null ? "无" : office.Name, Priority(office?.Id)),
             "capacity" => (long)Capacity(person), "salary" => office?.Salary ?? 0,
             "leadership" => a.Leadership, "war" => a.War, "intelligence" => a.Intelligence, "politics" => a.Politics,
             _ => original };

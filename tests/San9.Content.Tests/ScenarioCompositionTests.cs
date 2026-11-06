@@ -25,13 +25,46 @@ public sealed class ScenarioCompositionTests : IDisposable
 
     private static ScenarioContent Content(ScenarioInitialState scenario) => new(ScenarioContent.CurrentSchemaVersion, new("../textures"),
         new(new(MapDefinition.CurrentSchemaVersion, "custom", 1, 1, 1, 1, [], [], [], [], [], [], [], [], []), []),
-        scenario, new(TextCatalog.CurrentSchemaVersion, []), []);
+        scenario, Texts(scenario), []);
 
     private static SharedScenarioData Shared(ScenarioInitialState scenario) => SharedScenarioData.From(scenario,
-        "shared/definitions.json", "shared/officer-defaults.json", "shared/geography.json");
+        "shared/definitions.json", "shared/officer-defaults.json", "shared/geography.json", Texts(scenario));
+
+    private static TextCatalog Texts(ScenarioInitialState scenario) => new(TextCatalog.CurrentSchemaVersion,
+        scenario.Officers.SelectMany(p => new[] { p.NameKey, p.CourtesyNameKey, p.BiographyKey }.OfType<string>())
+            .Distinct().ToDictionary(k => k, k => k));
+    private static ScenarioDocument Describe(SharedScenarioData shared, ScenarioInitialState scenario) => shared.Describe(scenario, Texts(scenario));
 
     private static void Same<T>(T expected, T actual) => Assert.True(JsonElement.DeepEquals(
         JsonSerializer.SerializeToElement(expected, Options), JsonSerializer.SerializeToElement(actual, Options)));
+
+    [Fact]
+    public void RankTextInheritsSharedDefinitionsUnlessTheScenarioExplicitlyOverridesIt()
+    {
+        var baseline = Scenario() with { Information = InformationDefinitions.Empty with
+        {
+            Ranks = [new(8000, "共享名", 10000, 0, 0, 1) { Description = "共享说明" }]
+        } };
+        var shared = Shared(baseline);
+        var inherited = Describe(shared, baseline);
+        var local = Describe(shared, baseline with { Information = baseline.Information with
+        {
+            Ranks = [baseline.Information.Ranks[0] with { Name = "剧本名", Description = "剧本说明" }]
+        } });
+        var updated = shared.Definitions with { Information = shared.Definitions.Information with
+        {
+            Ranks = [baseline.Information.Ranks[0] with { Name = "更新共享名", Description = "" }]
+        } };
+        var inheritedRank = Assert.Single(inherited.Compile(updated, shared.Officers.Officers, shared.Geography).Information.Ranks);
+        Assert.Equal("更新共享名", inheritedRank.Name);
+        Assert.Equal("", inheritedRank.Description);
+        var privateRank = Assert.Single(local.Compile(updated, shared.Officers.Officers, shared.Geography).Information.Ranks);
+        Assert.Equal("剧本名", privateRank.Name);
+        Assert.Equal("剧本说明", privateRank.Description);
+        var serialized = JsonSerializer.SerializeToNode(privateRank, Options)!.AsObject();
+        Assert.False(serialized.ContainsKey("nameKey"));
+        Assert.False(serialized.ContainsKey("descriptionKey"));
+    }
 
     [Fact]
     public void ScenarioOverridesInheritUntouchedFieldsAndCanExplicitlyClearNullableValues()
@@ -48,7 +81,7 @@ public sealed class ScenarioCompositionTests : IDisposable
             } }]
         };
         var shared = Shared(baseline);
-        var document = shared.Describe(late);
+        var document = Describe(shared, late);
         Same(late, document.Compile(shared.Definitions, shared.Officers.Officers, shared.Geography));
         var json = JsonSerializer.SerializeToNode(document, Options)!;
         var changes = json["officers"]![0]!["overrides"]!.AsObject();
@@ -62,7 +95,7 @@ public sealed class ScenarioCompositionTests : IDisposable
         Assert.Equal(new OfficerAbilities(95, 55, 50, 70), result.Officers[0].State.BaseAbilities);
         Assert.Null(result.Officers[0].State.ParentId);
         Assert.Null(result.ImperialSealId);
-        var unchanged = shared.Describe(baseline).Compile(shared.Definitions, updatedDefaults, shared.Geography);
+        var unchanged = Describe(shared, baseline).Compile(shared.Definitions, updatedDefaults, shared.Geography);
         Assert.Equal(60, unchanged.Officers[0].State.BaseAbilities.Intelligence);
         Assert.Equal(7, unchanged.ImperialSealId);
         Assert.Equal(45, shared.Officers.Officers[0].Intelligence);
@@ -74,7 +107,7 @@ public sealed class ScenarioCompositionTests : IDisposable
         var baseline = Scenario();
         var shared = Shared(baseline);
         var different = baseline with { Officers = [Person(9001)] };
-        var document = shared.Describe(different);
+        var document = Describe(shared, different);
         Assert.Equal(9001, Assert.Single(document.AdditionalOfficerDefaults).Id);
         var result = document.Compile(shared.Definitions, shared.Officers.Officers, shared.Geography);
         Assert.Equal(9001, Assert.Single(result.Officers).State.Id);
@@ -126,7 +159,7 @@ public sealed class ScenarioCompositionTests : IDisposable
         await ScenarioDataFiles.WriteSharedAsync(_root, shared);
         string package = Path.Combine(_root, "scenario");
         await ScenarioContentFiles.WriteAsync(package, Content(scenario), resourceRoot: _root, sharedScenario: shared);
-        var document = JsonSerializer.SerializeToNode(shared.Describe(scenario), Options)!;
+        var document = JsonSerializer.SerializeToNode(Describe(shared, scenario), Options)!;
         document["officers"]![0]!["overrides"]!["inteligence"] = new JsonObject { ["value"] = 60 };
         await File.WriteAllTextAsync(Path.Combine(package, "scenario.json"), document.ToJsonString());
         await Assert.ThrowsAsync<JsonException>(() => ScenarioContentFiles.LoadScenarioAsync(package));
@@ -176,10 +209,10 @@ public sealed class ScenarioCompositionTests : IDisposable
     {
         var scenario = Scenario();
         var shared = Shared(scenario);
-        Assert.Throws<InvalidDataException>(() => shared.Describe(scenario with { RegionCityIds = new() { [10] = 5 } }));
-        var document = shared.Describe(scenario) with { MilitaryPlaces = default };
+        Assert.Throws<InvalidDataException>(() => Describe(shared, scenario with { RegionCityIds = new() { [10] = 5 } }));
+        var document = Describe(shared, scenario) with { MilitaryPlaces = default };
         Assert.Throws<InvalidDataException>(() => ContentStructure.Validate(document));
-        Assert.Throws<InvalidDataException>(() => shared.Describe(scenario with
+        Assert.Throws<InvalidDataException>(() => Describe(shared, scenario with
         { Officers = [scenario.Officers[0] with { State = scenario.Officers[0].State with { TacticProficiencies = default } }] }));
     }
 
@@ -198,7 +231,7 @@ public sealed class ScenarioCompositionTests : IDisposable
         {
             var changed = first with { FoodExchangeRate = 2, Year = 191 };
             var failure = await Record.ExceptionAsync(() => ScenarioContentFiles.WriteWorldsAsync(_root, Shared(changed),
-                [("first", changed), ("second", changed with { ScenarioId = "second" })]));
+                [("first", changed, Texts(changed)), ("second", changed with { ScenarioId = "second" }, Texts(changed))]));
             Assert.True(failure is IOException or UnauthorizedAccessException, failure?.ToString());
         }
         Assert.Equal(before.Keys.Order(), Directory.GetFiles(_root, "*", SearchOption.AllDirectories).Order());

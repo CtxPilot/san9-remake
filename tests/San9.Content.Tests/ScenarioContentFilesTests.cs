@@ -410,7 +410,7 @@ public sealed class ScenarioContentFilesTests : IDisposable
     public async Task WorldRebuildUpdatesSharedInputsAndWorldWithoutChangingPresentation()
     {
         var content = Fixture();
-        var shared = SharedScenarioData.From(content.Scenario, "shared/definitions.json", "shared/officer-defaults.json", "shared/geography.json");
+        var shared = SharedScenarioData.From(content.Scenario, "shared/definitions.json", "shared/officer-defaults.json", "shared/geography.json", content.Text);
         await ScenarioDataFiles.WriteSharedAsync(_root, shared);
         string package = Path.Combine(_root, "scenario");
         await ScenarioContentFiles.WriteAsync(package, content, resourceRoot: _root, sharedScenario: shared);
@@ -421,7 +421,7 @@ public sealed class ScenarioContentFilesTests : IDisposable
         var resources = Directory.GetFiles(_root, "*", SearchOption.AllDirectories)
             .Where(path => path != worldPath && path != manifestPath).ToDictionary(path => path, File.ReadAllBytes);
 
-        await ScenarioContentFiles.WriteWorldsAsync(_root, shared, [("scenario", content.Scenario with { Year = 191, PlayerForceId = null })]);
+        await ScenarioContentFiles.WriteWorldsAsync(_root, shared, [("scenario", content.Scenario with { Year = 191, PlayerForceId = null }, content.Text)]);
 
         var rebuilt = await ScenarioContentFiles.LoadAsync(package);
         Assert.Equal(191, rebuilt.Scenario.Year);

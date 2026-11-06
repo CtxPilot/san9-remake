@@ -27,7 +27,7 @@ public sealed partial class OfficerCommandTests
             },
             RegionNameKeys = new() { [1] = "city.1", [2] = "city.2" },
             FacilityNameSuffixKeys = new() { [9000] = "fort" },
-            Information = basis.Information with { Treasures = [new(9000, "treasure", 1, 5, 10, null)], Tactics = [new(0, "tactic.0"), new(2, "tactic.2")] }
+            Information = basis.Information with { Treasures = [new(9000, "treasure", 1, 5, 10, null)], Tactics = [new(0, "奋战"), new(2, "奋迅")] }
         };
         texts = new(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new Dictionary<string, string>
         {
@@ -35,7 +35,6 @@ public sealed partial class OfficerCommandTests
             ["city.1"] = "甲城", ["city.2"] = "乙城",
             ["officer.1"] = "甲", ["officer.2"] = "乙", ["officer.3"] = "丙",
             ["officer.4"] = "丁", ["officer.5"] = "戊", ["officer.6"] = "己",
-            ["naval-tactic"] = "水战", ["tactic.0"] = "奋战", ["tactic.2"] = "奋迅",
             ["treasure"] = "宝刀", ["fort"] = "城塞"
         });
     }
@@ -270,7 +269,7 @@ public sealed partial class OfficerCommandTests
         };
         if (mode == "naval") world = world with { Units = world.Units.Select(u => u with { NavalFormationId = 901 }).ToArray() };
         var content = definition with { Military = military, Information = definition.Information with
-            { Tactics = [.. definition.Information.Tactics, new(3, "naval-tactic")] } };
+            { Tactics = [.. definition.Information.Tactics, new(3, "水战")] } };
         Assert.Equal(expected, Read(world, content: content)[5].Text);
         var detail = UnitDetails.Read(new(content, world), new(military), texts, 10);
         Assert.All(detail.Board.Members, member => Assert.Equal(expected, member.Tactic));
@@ -295,7 +294,7 @@ public sealed partial class OfficerCommandTests
                 new(3, 4, TacticEffect.Martial, 10, 9, 0, false, true, [901])]
         };
         var content = definition with { Military = military, Information = definition.Information with
-            { Tactics = [.. definition.Information.Tactics, new(3, "naval-tactic")] } };
+            { Tactics = [.. definition.Information.Tactics, new(3, "水战")] } };
         var world = Deployed();
         world = world with
         {

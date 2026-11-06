@@ -104,7 +104,7 @@ public partial class DeploymentPresetView : FixedPage
     }
     private string Person(int id) => Draft.View.Officers.FirstOrDefault(o => o.Id == id) is { } person ? Texts.Resolve(person.NameKey) : "未知武将";
     private string Formation(int? id) => Draft.View.Information.Formations.FirstOrDefault(f => f.Id == id) is { } formation
-        ? Texts.Resolve(formation.NameKey) : "无";
+        ? formation.Name : "无";
 
     private void Refresh()
     {
@@ -180,7 +180,7 @@ public partial class DeploymentPresetView : FixedPage
         {
             var missing = availability.MissingMembers.FirstOrDefault(m => m.OfficerId == member.OfficerId);
             string tactic = member.TacticId is int id && Draft.View.Information.Tactics.FirstOrDefault(t => t.Id == id) is { } info
-                ? Texts.Resolve(info.NameKey) : "无";
+                ? info.Name : "无";
             var line = new Panel { CustomMinimumSize = new(416, 32), MouseFilter = MouseFilterEnum.Ignore };
             line.AddThemeStyleboxOverride("panel", new StyleBoxFlat { BgColor = new(missing is null ? "1b2b3b" : "352b25") }); members.AddChild(line);
             Text(line, Person(member.OfficerId), new(12, 0, 148, 32), 16, missing is null ? Ink : Warning);

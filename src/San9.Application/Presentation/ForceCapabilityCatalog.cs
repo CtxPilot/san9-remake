@@ -45,7 +45,7 @@ public static class ForceCapabilityCatalog
         var treasures = view.Rules.Treasures;
         string Person(int id) => texts.Resolve(view.Officers.Single(o => o.Id == id).NameKey);
         bool HasTactic(int id) => TacticAvailability.HasForMembers(id, members, force, view.World.Treasures, treasures);
-        string Tactic(int? id) => id is int key ? texts.Resolve(view.Information.Tactics.Single(t => t.Id == key).NameKey) : "—";
+        string Tactic(int? id) => id is int key ? view.Information.Tactics.Single(t => t.Id == key).Name : "—";
         InformationRow Row(int id, params CatalogCell[] cells) => new(new(category, id), cells);
         IEnumerable<InformationRow> rows;
         if (category == InformationCategory.Offices)
@@ -53,8 +53,8 @@ public static class ForceCapabilityCatalog
             var rules = view.Rules.Governance;
             rows = view.Information.Offices.Where(o => rules.CanAppoint(force.RankId, rules.Offices[o.Id]))
                 .Select(o => pageIndex == 1
-                    ? Row(o.Id, new CatalogCell(texts.Resolve(o.NameKey), o.GovernorPriority), o.DescriptionKey is { } key ? texts.Resolve(key) : "")
-                    : Row(o.Id, new CatalogCell(texts.Resolve(o.NameKey), o.GovernorPriority), string.Join("、", members.Where(p => p.OfficeId == o.Id).Select(p => Person(p.Id))),
+                    ? Row(o.Id, new CatalogCell(o.Name, o.GovernorPriority), o.Description)
+                    : Row(o.Id, new CatalogCell(o.Name, o.GovernorPriority), string.Join("、", members.Where(p => p.OfficeId == o.Id).Select(p => Person(p.Id))),
                         (long)o.CommandCapacity, o.Salary, o.AbilityBonuses.Leadership, o.AbilityBonuses.War,
                         o.AbilityBonuses.Intelligence, o.AbilityBonuses.Politics, rules.Offices[o.Id].LoyaltyBonus));
         }
@@ -65,9 +65,9 @@ public static class ForceCapabilityCatalog
             rows = view.Information.Tactics.Where(t => military.Tactics[t.Id].Selectable && HasTactic(t.Id)).Select(t =>
             {
                 var rule = military.Tactics[t.Id];
-                if (pageIndex == 1) return Row(t.Id, texts.Resolve(t.NameKey), t.DescriptionKey is { } key ? texts.Resolve(key) : "");
+                if (pageIndex == 1) return Row(t.Id, t.Name, t.Description);
                 string Supports(TravelMode mode) => rule.CompatibleFormations.Any(id => military.Formations[id].TravelMode == mode) ? "○" : "";
-                return Row(t.Id, texts.Resolve(t.NameKey), rule.Category is int c ? categories[c] : "设施",
+                return Row(t.Id, t.Name, rule.Category is int c ? categories[c] : "设施",
                     rule.Effect == TacticEffect.Martial ? (CatalogCell)rule.Power : CatalogCell.Unavailable,
                     Supports(TravelMode.Land), Supports(TravelMode.Water), rule.AffectsFacilities ? "○" : "",
                     rule.TrainingRequirement, Interval(rule, military));
@@ -87,13 +87,13 @@ public static class ForceCapabilityCatalog
                 if (pageIndex == 1)
                 {
                     if (category == InformationCategory.Formations)
-                        return Row(f.Id, texts.Resolve(f.NameKey), FormationEffect(rule));
+                        return Row(f.Id, f.Name, FormationEffect(rule));
                     var tactics = military.AutomaticTacticIds(rule, session.Companion);
-                    return Row(f.Id, texts.Resolve(f.NameKey), tactics.Length == 0 ? "" :
+                    return Row(f.Id, f.Name, tactics.Length == 0 ? "" :
                         "可发动兵法" + string.Concat(tactics.Select(id => $"「{Tactic(id)}」")) + "。");
                 }
-                if (pageIndex == 2) return Row(f.Id, texts.Resolve(f.NameKey), f.DescriptionKey is { } key ? texts.Resolve(key) : "");
-                return Row(f.Id, texts.Resolve(f.NameKey), rule.Combat?.AgainstUnits ?? 0, rule.Combat?.AgainstGarrison ?? 0,
+                if (pageIndex == 2) return Row(f.Id, f.Name, f.Description);
+                return Row(f.Id, f.Name, rule.Combat?.AgainstUnits ?? 0, rule.Combat?.AgainstGarrison ?? 0,
                     rule.Combat?.AgainstWalls ?? 0, rule.Combat?.Defense ?? 0,
                     new CatalogCell(((decimal)rule.MovementBudget / MapCoordinates.UnitsPerCell).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), rule.MovementBudget),
                     rule.DeploymentCost);

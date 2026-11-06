@@ -18,7 +18,7 @@ internal static class ChronicleHistory
             {
                 var rank = view.Information.Ranks.SingleOrDefault(r => r.Id == force.RankId && !r.IsUnranked);
                 builder.Add(view.World.Clock, force.Id, rank is null ? "rule" : "rule-ranked", place: place,
-                    textKeys: rank is null ? null : new() { ["name"] = rank.NameKey });
+                    nameRank: rank?.Id);
             }
             if (force.AdviserId is int adviser)
                 builder.Add(view.World.Clock, force.Id, "adviser", actor: adviser);
@@ -196,16 +196,17 @@ internal static class ChronicleHistory
         internal int? PersonOwner(int person) => before.World.Officers.FirstOrDefault(p => p.Id == person)?.OwnerId ?? after.World.Officers.Single(p => p.Id == person).OwnerId;
         internal bool IsCity(int place) => (before.World.Settlements.FirstOrDefault(s => s.Id == place) ?? after.World.Settlements.Single(s => s.Id == place)).Kind == SettlementKind.City;
         internal void Add(GameClock clock, int owner, string role, int? actor = null, int? other = null, int? place = null,
-            int? nameForce = null, int? otherNameForce = null, Dictionary<string, string>? textKeys = null, int? colorForce = null)
+            int? nameForce = null, int? otherNameForce = null, Dictionary<string, string>? textKeys = null, int? colorForce = null, int? nameRank = null)
         {
             var values = ImmutableDictionary.CreateBuilder<string, MessageBinding>();
             void Person(string key, int? id) { if (id is int person) values[key] = MessageBinding.Reference(San9.Content.Text.MessageEntityKind.Person, person); }
             Person("ruler", Leader(owner)); Person("actor", actor); Person("other", other);
             if (place is int building) values["place"] = MessageBinding.Reference(San9.Content.Text.MessageEntityKind.Settlement, building);
+            if (nameRank is int rank) values["name"] = MessageBinding.Reference(San9.Content.Text.MessageEntityKind.Rank, rank);
             var keys = (textKeys ?? []).ToImmutableDictionary().ToBuilder();
             void Name(string roleName, int? forceId)
             {
-                if (keys.ContainsKey(roleName) || Force(forceId) is not { } force) return;
+                if (keys.ContainsKey(roleName) || values.ContainsKey(roleName) || Force(forceId) is not { } force) return;
                 if (force.CountryTitleId is int title) keys[roleName] = before.Information.CountryTitles.Single(t => t.Id == title).NameKey;
                 else Person(roleName, force.LeaderId);
             }
@@ -294,17 +295,17 @@ internal static class ChronicleHistory
             _changed[e.ForceId] = Force(e.ForceId)! with { RankId = e.RankId, CountryTitleId = e.CountryTitleId };
             if (e.Kind is PeerageChangeKind.ShanyangGong or PeerageChangeKind.HanzhongKing) return;
             var rank = before.Information.Ranks.Single(r => r.Id == e.RankId);
-            var keys = new Dictionary<string, string> { ["name"] = rank.NameKey };
+            var keys = new Dictionary<string, string>();
             bool emperor = e.Kind is PeerageChangeKind.Abdication or PeerageChangeKind.Proclamation;
             if (!emperor)
-                Add(e.Clock, e.ForceId, e.Kind == PeerageChangeKind.Investiture ? "rank-appointed" : "rank-proclaimed", textKeys: keys);
+                Add(e.Clock, e.ForceId, e.Kind == PeerageChangeKind.Investiture ? "rank-appointed" : "rank-proclaimed", nameRank: rank.Id);
             else
             {
                 string role = e.Kind == PeerageChangeKind.Abdication ? "emperor-abdication" : "emperor-proclamation";
                 if (e.CountryTitleId is int title) keys["name"] = before.Information.CountryTitles.Single(t => t.Id == title).NameKey;
                 else role += "-untitled";
                 foreach (var force in ActiveForces())
-                    Add(e.Clock, force.Id, role, actor: Leader(e.ForceId), textKeys: keys, colorForce: e.ForceId);
+                    Add(e.Clock, force.Id, role, actor: Leader(e.ForceId), textKeys: keys, colorForce: e.ForceId, nameRank: e.CountryTitleId is null ? rank.Id : null);
             }
         }
     }

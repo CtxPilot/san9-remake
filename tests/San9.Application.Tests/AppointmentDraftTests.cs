@@ -101,7 +101,7 @@ public sealed class AppointmentDraftTests
     private static TextCatalog CatalogTexts(ScenarioInitialState definition) => new(TextCatalog.CurrentSchemaVersion,
         CommandTextFixture.Entries(definition.Officers.Select(o => o.NameKey)
             .Concat(definition.Settlements.Select(s => s.NameKey)).Concat(definition.Forces.Select(f => f.NameKey))
-            .Concat(definition.Information.Offices.Select(o => o.NameKey)).Distinct().ToDictionary(k => k, k => k)));
+            .Concat(definition.Information.Offices.Select(o => o.Name)).Distinct().ToDictionary(k => k, k => k)));
 
     [Fact]
     public void ProhibitionRejectsAnExecutionPreparedBeforeTheSettingChanged()

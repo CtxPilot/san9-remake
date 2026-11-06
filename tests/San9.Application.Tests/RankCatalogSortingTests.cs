@@ -102,9 +102,9 @@ public sealed class RankCatalogSortingTests
         {
             Information = baseline.Information with
             {
-                Offices = [new(900, "low", 10000, 0) { GovernorPriority = 0 },
-                    new(3, "high", 10000, 0) { GovernorPriority = int.MaxValue }],
-                Ranks = [new(900, "low", 10000, 0, 0, 0), new(3, "high", 45000, 0, 0, 20)]
+                Offices = [new(900, "Z", 10000, 0) { GovernorPriority = 0 },
+                    new(3, "A", 10000, 0) { GovernorPriority = int.MaxValue }],
+                Ranks = [new(900, "Z", 10000, 0, 0, 0), new(3, "A", 45000, 0, 0, 20)]
             },
             Officers = baseline.Officers.Select(o => o with
             {
@@ -120,8 +120,6 @@ public sealed class RankCatalogSortingTests
         var entries = definition.Officers.Select(o => o.NameKey)
             .Concat(definition.Settlements.Select(s => s.NameKey))
             .Concat(definition.Forces.Select(f => f.NameKey)).Distinct().ToDictionary(k => k, k => k);
-        entries.Add("high", "A");
-        entries.Add("low", "Z");
         return (GameSession.Start(definition, 190), new TextCatalog(TextCatalog.CurrentSchemaVersion, entries), definition);
     }
 }

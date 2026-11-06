@@ -64,7 +64,7 @@ public partial class DeploymentView : FixedPage
         return button;
     }
     private string Person(int? id) => id is int person ? Texts.Resolve(Draft.View.Officers.Single(o => o.Id == person).NameKey) : "";
-    private string Formation(int? id) => id is int formation ? Texts.Resolve(Draft.View.Information.Formations.Single(f => f.Id == formation).NameKey) : "";
+    private string Formation(int? id) => id is int formation ? Draft.View.Information.Formations.Single(f => f.Id == formation).Name : "";
     private void Rebuild()
     {
         int presetScroll = _presetBar?.ScrollPosition ?? 0;

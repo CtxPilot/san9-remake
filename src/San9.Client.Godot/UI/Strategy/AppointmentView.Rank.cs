@@ -72,7 +72,7 @@ public partial class AppointmentView
             string name = AppointmentPresentation.Office(Draft,Texts,id);
             return new CatalogRow(index,page == 0
                 ? [name,Holder(id),(long)(office?.CommandCapacity ?? 10000),office?.Salary ?? 0,a.Leadership,a.War,a.Intelligence,a.Politics,(office?.Salary ?? 0)/2]
-                : [name,office?.DescriptionKey is string key ? Texts.Resolve(key) : ""]);
+                : [name,office?.Description ?? ""]);
         }).ToArray();
         ReplaceChild(new CatalogView { Title = CommandText.Resolve(Texts, "select.rank"), CloseTitle = CommandText.Resolve(Texts, "action.cancel"), Textures = Textures, Service = Service,
             HintText = RankHint("select-office"), InitialCurrentId = Array.IndexOf(choices,edited.OfficeFor(person)),

@@ -95,7 +95,7 @@ public sealed class InformationBrowserTests
                 Information = scenario.Information with { Offices = [new(900, "office", 10000, 0) { AbilityBonuses = new(3, 0, 0, 0) }] } };
         }
         var text = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new[] { "force", "city", "region", "ruler", "free", "rank", "treasure", "office" }.ToDictionary(s => s, s => s));
-        PresentationTacticFixture.AddNames(text);
+
         var session = GameSession.Start(scenario, 1);
         return (session, new(session, ChronicleTestContent.AddTo(text), ChronicleTestContent.Definition()));
     }
@@ -235,8 +235,8 @@ public sealed class InformationBrowserTests
         var texts = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion, new Dictionary<string, string>());
         // The fixture names are their own display strings.
         foreach (string key in session.View.Officers.Select(o => o.NameKey).Concat(session.View.RegionNameKeys.Values)
-            .Concat(session.View.Information.Offices.Select(o => o.NameKey))) texts.Entries[key] = key;
-        PresentationTacticFixture.AddNames(texts);
+            .Concat(session.View.Information.Offices.Select(o => o.Name))) texts.Entries[key] = key;
+
         long before = session.Snapshot.Revision;
         var detail = OfficerDetails.Read(session.View, texts, 1);
         Assert.Equal(new[] { 6, 4, 6, 6 }, detail.Fields.Select(c => c.Length));

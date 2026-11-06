@@ -32,7 +32,7 @@ public sealed record ChroniclePresentation(string RulerName, ChronicleLine[] Lin
                 : new(0, texts.Resolve(view.FacilityNameSuffixKeys[checked((int)facility.Number)]));
         foreach (string role in new[] { "name", "other-name" })
             if (values.TryGetValue(role, out var value) && value.Entity is { } entity)
-                values[role] = context.Query(entity.Kind switch { MessageEntityKind.Person => "person.name", MessageEntityKind.Force => "force.name", _ => "settlement.name" }, [value]);
+                values[role] = context.Query(entity.Kind switch { MessageEntityKind.Person => "person.name", MessageEntityKind.Force => "force.name", MessageEntityKind.Rank => "rank.name", _ => "settlement.name" }, [value]);
         var message = ProgressMessageProducer.Produce(definition.Messages[fact.Role], context.AtOccurrence(fact.Clock), texts, values, _ => 0).Message;
         return new(fact.Clock, message.BbCode, fact.ForceColorCode);
     }

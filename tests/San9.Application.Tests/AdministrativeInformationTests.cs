@@ -187,10 +187,10 @@ public sealed class AdministrativeInformationTests
             ProvinceNameKeys = new() { [99]="province" }, CityProvinceIds = new() { [15]=99,[16]=99,[17]=99 },
             Officers = [Person(1,15,OfficerStatus.Ruler),Person(2,16,OfficerStatus.Governor),Person(3,17,OfficerStatus.Governor),
                 new("free",new(4,null,null,new(20,20,20,20),false) { Status=OfficerStatus.Free,RegionId=50 })],
-            Information = new([new(20,"rank",10000,100,0,3) { DescriptionKey="rank-description" },new(80,"none",1000,0,0,0) { IsUnranked=true }], [], [],
+            Information = new([new(20,"rank",10000,100,0,3) { Description="rank-description" },new(80,"none",1000,0,0,0) { IsUnranked=true }], [], [],
                 [new(10,5,1,new(100, 200)) { IsRoot = true },new(11,5,2,new(300,400)) { Delegation=new DomesticDelegation() },new(12,5,3,new(500,600))], [])
         };
-        var keys = new[] { "force","city15","city16","city17","empty","province","person1","person2","person3","free","rank","none","rank-description" };
+        var keys = new[] { "force","city15","city16","city17","empty","province","person1","person2","person3","free" };
         var text = new TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion,keys.ToDictionary(k=>k,k=>k));
         return (GameSession.Start(definition,1),text,definition);
     }

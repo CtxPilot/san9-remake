@@ -158,7 +158,7 @@ public sealed class WorldMessageContext
                 "person.surname" => Text(ResolveOptional(Profile(p.Id).SurnameKey)),
                 "person.given-name" => Text(ResolveOptional(Profile(p.Id).GivenNameKey)),
                 "person.courtesy-name" => Text(ResolveOptional(_source.Officer(p.Id).CourtesyNameKey)),
-                "person.office-name" => Text(p.OfficeId is int office ? _texts.Resolve(_definition.Information.Offices.Single(o => o.Id == office).NameKey) : ""),
+                "person.office-name" => Text(p.OfficeId is int office ? _definition.Information.Offices.Single(o => o.Id == office).Name : ""),
                 "person.office-command-capacity" => new(p.OfficeId is int office ? _definition.Information.Offices.Single(o => o.Id == office).CommandCapacity : 0),
                 "person.location-name" => Text(p.SettlementId is int place ? PlaceName(place) : p.UnitId is int unit ? UnitLocation(_units[unit]) :
                     p.RegionId is int region ? _texts.Resolve(_definition.RegionNameKeys[region]) : ""),
@@ -192,7 +192,7 @@ public sealed class WorldMessageContext
                     f.LeaderId is int ruler ? PersonName(ruler) : ""),
                 "force.country-name" => Text(f.CountryTitleId is int title ? _texts.Resolve(_definition.Information.CountryTitles.Single(t => t.Id == title).NameKey) :
                     f.LeaderId is int ruler ? PersonName(ruler) : ""),
-                "force.rank-name" => Text(f.RankId is int rank ? _texts.Resolve(_definition.Information.Ranks.Single(r => r.Id == rank).NameKey) : ""),
+                "force.rank-name" => Text(f.RankId is int rank ? _definition.Information.Ranks.Single(r => r.Id == rank).Name : ""),
                 "force.rank-precedence" => new(f.RankId is int rank ? _definition.Information.Ranks.Single(r => r.Id == rank).Precedence : 0),
                 "force.is-alliance-leader" => Flag(_world.Simulation.Alliance?.LeaderForceId == f.Id),
                 "force.corps-count" => new(_world.Corps.Count(c => c.OwnerId == f.Id)),
@@ -207,9 +207,16 @@ public sealed class WorldMessageContext
             "settlement.owner-name" => Text(_places[Id(0, MessageEntityKind.Settlement)].OwnerId is int owner ?
                 _texts.Resolve(_view.Value.Forces.Single(f => f.Id == owner).NameKey) : ""),
             "settlement.type-name" => Text(SettlementType(Id(0, MessageEntityKind.Settlement))),
+            "office.name" => Text(_definition.Information.Offices.Single(o => o.Id == Id(0, MessageEntityKind.Office)).Name),
+            "office.description" => Text(_definition.Information.Offices.Single(o => o.Id == Id(0, MessageEntityKind.Office)).Description),
+            "formation.name" => Text(_definition.Information.Formations.Single(f => f.Id == Id(0, MessageEntityKind.Formation)).Name),
+            "formation.description" => Text(_definition.Information.Formations.Single(f => f.Id == Id(0, MessageEntityKind.Formation)).Description),
+            "tactic.description" => Text(_definition.Information.Tactics.Single(t => t.Id == Id(0, MessageEntityKind.Tactic)).Description),
+            "rank.name" => Text(_definition.Information.Ranks.Single(r => r.Id == Id(0, MessageEntityKind.Rank)).Name),
+            "rank.description" => Text(_definition.Information.Ranks.Single(r => r.Id == Id(0, MessageEntityKind.Rank)).Description),
             "treasure.name" => Text(_texts.Resolve(_definition.Information.Treasures.Single(t => t.Id == Id(0, MessageEntityKind.Treasure)).NameKey)),
             "treasure.category" => new(_definition.Information.Treasures.Single(t => t.Id == Id(0, MessageEntityKind.Treasure)).Category),
-            "tactic.name" => Text(_texts.Resolve(_definition.Information.Tactics.Single(t => t.Id == Id(0, MessageEntityKind.Tactic)).NameKey)),
+            "tactic.name" => Text(_definition.Information.Tactics.Single(t => t.Id == Id(0, MessageEntityKind.Tactic)).Name),
             "tactic.category-name" => Text(TacticCategory(Id(0, MessageEntityKind.Tactic))),
             "military-target.location-name" => Text(args[0].Entity?.Kind == MessageEntityKind.Settlement ?
                 PlaceName(Id(0, MessageEntityKind.Settlement)) : TargetLocation(Id(0, MessageEntityKind.Unit))),
@@ -271,6 +278,9 @@ public sealed class WorldMessageContext
             MessageEntityKind.Person => _people.ContainsKey(entity.Id), MessageEntityKind.Force => _forces.ContainsKey(entity.Id),
             MessageEntityKind.Settlement => _places.ContainsKey(entity.Id), MessageEntityKind.Unit => _units.ContainsKey(entity.Id) || _capturedUnits.ContainsKey(entity.Id),
             MessageEntityKind.Treasure => _world.Treasures.Any(t => t.Id == entity.Id),
+            MessageEntityKind.Office => _definition.Information.Offices.Any(o => o.Id == entity.Id),
+            MessageEntityKind.Formation => _definition.Information.Formations.Any(f => f.Id == entity.Id),
+            MessageEntityKind.Rank => _definition.Information.Ranks.Any(r => r.Id == entity.Id),
             MessageEntityKind.Tactic => _definition.Information.Tactics.Any(t => t.Id == entity.Id),
             MessageEntityKind.Region => _definition.RegionNameKeys.ContainsKey(entity.Id),
             MessageEntityKind.Corps => _world.Corps.Any(c => c.Id == entity.Id), _ => false

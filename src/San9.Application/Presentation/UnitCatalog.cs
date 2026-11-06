@@ -24,7 +24,7 @@ public static class UnitCatalog
         if ((uint)page >= Pages.Count) throw new ArgumentOutOfRangeException(nameof(page));
         string Person(int? id) => view.Officers.FirstOrDefault(o => o.Id == id) is { } person ? texts.Resolve(person.NameKey) : "无";
         string Force(int id) => view.Forces.FirstOrDefault(f => f.Id == id) is { } owner ? texts.Resolve(owner.NameKey) : "无";
-        string Formation(int? id) => view.Information.Formations.FirstOrDefault(f => f.Id == id) is { } formation ? texts.Resolve(formation.NameKey) : "—";
+        string Formation(int? id) => view.Information.Formations.FirstOrDefault(f => f.Id == id) is { } formation ? formation.Name : "—";
         var commands = new OfficerCommands(view, texts);
         var rows = view.World.Units.Where(u => IsListed(u) && (force is null || u.OwnerId == force) &&
             (corps is null || u.CorpsId == corps) && (region is null || view.RegionAt(u.Position) == region)).Select(unit =>

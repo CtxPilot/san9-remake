@@ -42,19 +42,19 @@ public sealed class ChronicleHistoryTests(Xunit.Abstractions.ITestOutputHelper o
             Forces = baseline.Forces.Select(f => f.Id == 1 ? f with { RankId = rankId } : f).ToArray(),
             Information = baseline.Information with
             {
-                Ranks = [new(9000, "unranked", 20000, 0, 0, 0) { IsUnranked = true },
-                    new(8, "rank", 25000, 0, 0, 1)]
+                Ranks = [new(9000, "无", 20000, 0, 0, 0) { IsUnranked = true },
+                    new(8, "州牧", 25000, 0, 0, 1)]
             }
         };
         var session = GameSession.Start(definition, 42);
         var texts = ChronicleTestContent.AddTo(MissionScenario.Texts(session.View));
-        texts.Entries.Add("unranked", "无");
-        texts.Entries.Add("rank", "州牧");
 
         var page = ChroniclePresentation.Read(session, texts, ChronicleTestContent.Definition());
 
         Assert.Equal(expected, Assert.Single(page.Lines).BbCode);
         Assert.Equal(rankId, session.Snapshot.Forces.Single(f => f.Id == 1).RankId);
+        var restored = SaveService.Decode(SaveService.Encode(session), definition);
+        Assert.Equal(page.Lines.Single().BbCode, ChroniclePresentation.Read(restored, texts, ChronicleTestContent.Definition()).Lines.Single().BbCode);
     }
 
     [Theory]

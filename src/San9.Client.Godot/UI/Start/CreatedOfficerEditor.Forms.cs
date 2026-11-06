@@ -198,7 +198,7 @@ public partial class CreatedOfficerEditor
             foreach (var (definition, _) in tactics.Where(t => t.Rule.Category == category))
             {
                 int id = definition.Id;
-                Toggle(choices, _context.Text.Resolve(definition.NameKey), person.LearnedTactics.Contains(id), enabled =>
+                Toggle(choices, definition.Name, person.LearnedTactics.Contains(id), enabled =>
                 {
                     Change(person.Id, p => p with { LearnedTactics = enabled ? p.LearnedTactics.Add(id) : p.LearnedTactics.Remove(id) });
                     RefreshActions();

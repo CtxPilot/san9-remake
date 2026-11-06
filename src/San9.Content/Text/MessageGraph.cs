@@ -40,6 +40,32 @@ public static class MessageGraph
         }
     }
 
+    public static void ValidateCatalogReferences(IReadOnlyDictionary<string, MessageDefinition> messages,
+        San9.Content.Scenarios.InformationDefinitions catalog)
+    {
+        var ids = new Dictionary<MessageEntityKind, HashSet<int>>
+        {
+            [MessageEntityKind.Rank] = catalog.Ranks.Select(r => r.Id).ToHashSet(),
+            [MessageEntityKind.Office] = catalog.Offices.Select(o => o.Id).ToHashSet(),
+            [MessageEntityKind.Formation] = catalog.Formations.Select(f => f.Id).ToHashSet(),
+            [MessageEntityKind.Tactic] = catalog.Tactics.Select(t => t.Id).ToHashSet()
+        };
+        void Check(MessageExpression e, string key)
+        {
+            if (e.Operation == "entity" && Enum.TryParse<MessageEntityKind>(e.Binding, out var kind) &&
+                ids.TryGetValue(kind, out var values) && (e.Number is not long id || id > int.MaxValue || !values.Contains((int)id)))
+                throw new InvalidDataException($"Message {key} references missing {kind} {e.Number}.");
+            foreach (var argument in e.Arguments ?? []) Check(argument, key);
+        }
+        foreach (var (key, message) in messages)
+        foreach (var node in Walk(message.Nodes))
+        {
+            var expression = node switch { MessageValue v => v.Expression, MessageConditional c => c.Predicate,
+                MessageChoice c => c.Index, _ => null };
+            if (expression is not null) Check(expression, key);
+        }
+    }
+
     private static void ValidateExpression(MessageExpression e, int depth)
     {
         if (depth >= 64) throw new InvalidDataException("Message expression too deep.");

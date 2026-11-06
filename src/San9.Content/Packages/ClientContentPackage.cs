@@ -65,7 +65,7 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
             .Select(m=>m.Illustration).OfType<string>().Where(r=>r.StartsWith("decision-",StringComparison.Ordinal)).Distinct())
             if(!Skin.Roles.ContainsKey(illustration)) throw new InvalidDataException($"Missing decision illustration: {illustration}.");
         foreach (string path in Presentation.Sounds.Values) _ = PackageFiles.Resolve(".", path);
-        Scenario.Validate(); Text.Validate(); Skin.Validate(); Textures.Validate();
+        Scenario.Validate(); Text.Validate(); MessageGraph.ValidateCatalogReferences(Text.Messages, Scenario.Information); Skin.Validate(); Textures.Validate();
         CommandText.Validate(Text);
         _ = Text.Resolve(TextCatalog.ScenarioTitleKey);
         if (Map.BuildingTypes.Any(t => !Skin.BuildingTargetOffsets.ContainsKey(t.Id) || !Skin.BuildingArrowOffsets.ContainsKey(t.Id)))
@@ -113,7 +113,7 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
         foreach (var s in Scenario.Settlements)
             if (s.X != buildings[s.Id].X || s.Y != buildings[s.Id].Y)
                 throw new InvalidDataException("Scenario and map coordinates differ.");
-        foreach (string key in Scenario.Information.Tactics.Concat(Scenario.Information.Formations).SelectMany(d => new[] { d.NameKey, d.DescriptionKey }.OfType<string>()).Concat(Scenario.Forces.Select(f => f.NameKey)).Concat(Scenario.Settlements.Select(s => s.NameKey)).Concat(Scenario.RegionNameKeys.Values).Concat(Scenario.ProvinceNameKeys.Values).Concat(Scenario.Information.Ranks.Select(r => r.DescriptionKey).OfType<string>()).Concat(Scenario.FacilityNameSuffixKeys.Values).Concat(Scenario.Officers.SelectMany(o => new[] { o.NameKey, o.CourtesyNameKey }.OfType<string>())).Concat(Scenario.Information.CountryTitles.Select(t => t.NameKey)).Concat(Scenario.Information.Ranks.Select(r => r.NameKey)).Concat(Scenario.Information.Offices.Select(o => o.NameKey)).Concat(Scenario.Information.Offices.Select(o => o.DescriptionKey).OfType<string>()).Concat(Scenario.Information.Treasures.Select(t => t.NameKey)))
+        foreach (string key in Scenario.Forces.Select(f => f.NameKey).Concat(Scenario.Settlements.Select(s => s.NameKey)).Concat(Scenario.RegionNameKeys.Values).Concat(Scenario.ProvinceNameKeys.Values).Concat(Scenario.FacilityNameSuffixKeys.Values).Concat(Scenario.Officers.SelectMany(o => new[] { o.NameKey, o.CourtesyNameKey }.OfType<string>())).Concat(Scenario.Information.CountryTitles.Select(t => t.NameKey)).Concat(Scenario.Information.Treasures.Select(t => t.NameKey)))
             _ = Text.Resolve(key);
     }
 }

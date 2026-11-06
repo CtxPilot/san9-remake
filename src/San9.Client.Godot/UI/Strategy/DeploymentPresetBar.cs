@@ -60,7 +60,7 @@ public partial class DeploymentPresetBar : Control
         string name = commander is int id ? Person(id) : "无可用主将";
         string soldiers = preset.SoldierMode == DeploymentSoldierMode.Maximum ? "当前最大兵力" : $"{preset.Soldiers}人";
         string formation = Draft.View.Information.Formations.FirstOrDefault(f => f.Id == preset.FormationId) is { } info
-            ? Texts.Resolve(info.NameKey) : "无";
+            ? info.Name : "无";
         string status = check.DescribeAvailability(preset, Draft.View, Texts);
         slot.TooltipText = $"{preset.Name}\n主将：{name}\n{preset.Members.Length - check.MissingMembers.Length}/{preset.Members.Length}将 · {formation} · {soldiers}\n{status}";
         if (modified) slot.TooltipText += "\n当前配置已修改；点击下方“更新”覆盖此编队。";
