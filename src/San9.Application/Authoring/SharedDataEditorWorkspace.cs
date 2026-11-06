@@ -104,7 +104,7 @@ public sealed class SharedDataEditorWorkspace
         for (int i = 0; i < formations.Length; i++) if (formations[i].Id == formation.Id) { index = i; break; }
         if (index < 0) throw new InvalidDataException("只能修改现有阵形，不能改变阵形身份。");
         Definitions = Definitions with { Military = Definitions.Military! with { Formations = formations.SetItem(index, formation) } };
-        Definitions = Project(Definitions, _opened);
+        Definitions = ProjectFormation(Definitions, _opened, formation);
     }
 
     public void RestoreFormation(int id)
@@ -309,27 +309,29 @@ public sealed class SharedDataEditorWorkspace
         public Dictionary<string, byte[]> Snapshots() => _entries.ToDictionary(e => e.Key, e => e.Value.Bytes, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static ScenarioDefinitions Project(ScenarioDefinitions definitions, ScenarioDefinitions opened)
+    private static ScenarioDefinitions ProjectFormation(ScenarioDefinitions definitions, ScenarioDefinitions opened, FormationRule rule)
     {
-        var rules = definitions.Military!.Formations.ToDictionary(f => f.Id);
-        var originals = opened.Military!.Formations.ToDictionary(f => f.Id);
-        var presentations = opened.Information.Formations.ToDictionary(f => f.Id, f => f.Presentation);
+        int index = Array.FindIndex(definitions.Information.Formations, f => f.Id == rule.Id);
+        if (index < 0 || opened.Information.Formations.Single(f => f.Id == rule.Id).Presentation is not { } presentation)
+            return definitions;
+        var original = opened.Military!.Formations.Single(f => f.Id == rule.Id);
+        bool changedPositions = !rule.Positions.SequenceEqual(original.Positions);
+        bool changedVision = rule.Vision != original.Vision;
+        int visionRadius = rule.Vision is { } vision
+            ? (int)Math.Min(int.MaxValue, ((long)vision.Radius + MapCoordinates.UnitsPerCell - 1) / MapCoordinates.UnitsPerCell) : 0;
+        var catalogs = definitions.Information.Formations.ToArray();
+        catalogs[index] = catalogs[index] with { Presentation = presentation with
+        {
+            Columns = changedPositions ? Math.Max(1, rule.Positions.Select(p => p.Column + 1).DefaultIfEmpty(1).Max()) : presentation.Columns,
+            Slots = changedPositions ? rule.Positions.Select(p => new FormationSlot(p.Column, p.Row)).ToImmutableArray() : presentation.Slots,
+            VisionRadius = changedVision ? visionRadius : presentation.VisionRadius,
+            VisionAngleDegrees = changedVision ? rule.Vision?.ArcDegrees ?? 0 : presentation.VisionAngleDegrees,
+            BackgroundRole = changedPositions ? null : presentation.BackgroundRole,
+            AvailableRole = changedPositions ? null : presentation.AvailableRole
+        } };
         return definitions with { Information = definitions.Information with
         {
-            Formations = definitions.Information.Formations.Select(catalog =>
-            {
-                if (presentations[catalog.Id] is not { } presentation || !rules.TryGetValue(catalog.Id, out var rule)) return catalog;
-                bool changedPositions = !rule.Positions.SequenceEqual(originals[rule.Id].Positions);
-                return catalog with { Presentation = presentation with
-                {
-                    Columns = changedPositions ? Math.Max(1, rule.Positions.Select(p => p.Column + 1).DefaultIfEmpty(1).Max()) : presentation.Columns,
-                    Slots = rule.Positions.Select(p => new FormationSlot(p.Column, p.Row)).ToImmutableArray(),
-                    VisionRadius = rule.Vision is { } vision ? (int)Math.Min(int.MaxValue, ((long)vision.Radius + MapCoordinates.UnitsPerCell - 1) / MapCoordinates.UnitsPerCell) : 0,
-                    VisionAngleDegrees = rule.Vision?.ArcDegrees ?? 0,
-                    BackgroundRole = changedPositions ? null : presentation.BackgroundRole,
-                    AvailableRole = changedPositions ? null : presentation.AvailableRole
-                } };
-            }).ToArray()
+            Formations = catalogs
         } };
     }
 
