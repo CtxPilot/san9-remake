@@ -7,11 +7,11 @@ namespace San9.Client.Godot;
 
 internal static class ClientImageFiles
 {
-    public static PngImage LoadFile(string root, ImageFile file, CancellationToken token = default)
+    public static PngImage LoadFile(string root, ImageFile file, CancellationToken token = default, IReadOnlyDictionary<string, string>? sources = null)
     {
         token.ThrowIfCancellationRequested();
         using var image = new Image();
-        var error = image.Load(PackageFiles.Resolve(root, file.Path));
+        var error = image.Load(sources is not null && sources.TryGetValue(file.Path, out var source) ? source : PackageFiles.Resolve(root, file.Path));
         if (error != Error.Ok)
             throw new InvalidDataException($"Image load failed ({error}): {file.Path}");
         token.ThrowIfCancellationRequested();

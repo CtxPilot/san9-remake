@@ -20,6 +20,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     public string ContentRoot { get; init; } = "";
     private CreatedOfficerEditor? _officerEditor;
     private SharedDataEditor? _sharedDataEditor;
+    private PortraitEditor? _portraitEditor;
     private TextureScope _textures = null!;
     private StartMenuArtwork _artwork = null!;
     private Label _hint = null!;
@@ -70,19 +71,19 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
         AddButton(Definition.Help, "").MouseEntered += RestorePrompt;
         var close = AddButton(Definition.Close, "");
         close.Name = "Close"; close.MouseEntered += RestorePrompt; close.Pressed += RequestQuit;
-        AddSharedDataEditorButton();
+        AddEditorButton("OpenSharedDataEditor", "编辑游戏资料", "game-data-editor.svg", new(32, 560), OpenSharedDataEditor);
+        AddEditorButton("OpenPortraitEditor", "编辑头像", "portrait-editor.svg", new(120, 560), OpenPortraitEditor);
         first?.GrabFocus();
         RestorePrompt();
     }
-    private void AddSharedDataEditorButton()
+    private void AddEditorButton(string name, string title, string icon, Vector2 position, Action open)
     {
-        const string title = "编辑游戏资料";
         var button = new Button
         {
-            Name = "OpenSharedDataEditor", AccessibilityName = title,
-            Icon = GD.Load<Texture2D>("res://assets/icons/game-data-editor.svg"),
+            Name = name, AccessibilityName = title,
+            Icon = GD.Load<Texture2D>("res://assets/icons/" + icon),
             IconAlignment = HorizontalAlignment.Center, ExpandIcon = true,
-            Position = new(32, 560), Size = new(80, 80),
+            Position = position, Size = new(80, 80),
             TextureFilter = TextureFilterEnum.LinearWithMipmaps
         };
         button.AddThemeConstantOverride("icon_max_width", 64);
@@ -100,7 +101,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
         button.FocusEntered += ShowHint;
         button.MouseExited += RestorePrompt;
         button.FocusExited += RestorePrompt;
-        button.Pressed += OpenSharedDataEditor; _controls.AddChild(button);
+        button.Pressed += open; _controls.AddChild(button);
     }
     private StartMenuButton AddButton(StartMenuSprite sprite, string title)
     {
@@ -114,7 +115,7 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     {
         if (_officerEditor is not null) return;
         _controls.Hide();
-        _officerEditor = new CreatedOfficerEditor { Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Preferences = Preferences, Closed = () =>
+        _officerEditor = new CreatedOfficerEditor { PortraitPackRoot = DataPaths.PortraitPack, Name = "CreatedOfficerEditor", Store = new(DataPaths.CreatedOfficers), ContentRoot = ContentRoot, Service = Service, Preferences = Preferences, Closed = () =>
         {
             _officerEditor!.QueueFree(); _officerEditor = null; _controls.Show();
             _controls.GetNode<StartMenuButton>("create-officer").GrabFocus();
@@ -125,12 +126,25 @@ public partial class StartMenuView : FixedPage, IModalInputRouter
     {
         if (_sharedDataEditor is not null) return;
         _controls.Hide();
-        _sharedDataEditor = new SharedDataEditor { Name = "SharedDataEditor", ContentRoot = ContentRoot, Service = Service, Closed = () =>
+        _sharedDataEditor = new SharedDataEditor { DataPaths = DataPaths, Name = "SharedDataEditor", ContentRoot = ContentRoot, Service = Service, Closed = () =>
         {
             _sharedDataEditor!.QueueFree(); _sharedDataEditor = null; _controls.Show();
             _controls.GetNode<Button>("OpenSharedDataEditor").GrabFocus();
         } };
         AddChild(_sharedDataEditor);
+    }
+    private void OpenPortraitEditor()
+    {
+        if (_portraitEditor is not null) return;
+        _controls.Hide();
+        _portraitEditor = new PortraitEditor { Name = "PortraitEditor", ContentRoot = ContentRoot,
+            PackRoot = DataPaths.PortraitPack, CreatedOfficerLibraryPath = DataPaths.CreatedOfficers,
+            Service = Service, Closed = () =>
+            {
+                _portraitEditor!.QueueFree(); _portraitEditor = null; _controls.Show();
+                _controls.GetNode<Button>("OpenPortraitEditor").GrabFocus();
+            } };
+        AddChild(_portraitEditor);
     }
     private void OpenScenarioSelection()
     {

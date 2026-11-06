@@ -22,9 +22,9 @@ internal static class OfficerPortraitPicker
         if (portraits.Length == 0) return;
         const int pageSize = 24;
         int page = Math.Max(0, Array.FindIndex(portraits, p => p.Image.Id == current)) / pageSize;
-        var dialog = new AcceptDialog { Title = "选择游戏内头像", OkButtonText = "取消", Exclusive = true };
+        var dialog = new AcceptDialog { Title = "选择头像", OkButtonText = "取消", Exclusive = true };
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); dialog.AddChild(column);
-        var filter = new LineEdit { PlaceholderText = "搜索头像编号", Name = "PortraitSearch" }; column.AddChild(filter);
+        var filter = new LineEdit { PlaceholderText = "搜索头像编号或名称", Name = "PortraitSearch" }; column.AddChild(filter);
         var scroll = new ScrollContainer { CustomMinimumSize = new(790, 430), SizeFlagsVertical = Control.SizeFlags.ExpandFill,
             HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; column.AddChild(scroll);
         var grid = new GridContainer { Columns = 8 }; grid.AddThemeConstantOverride("h_separation", 10);
@@ -45,7 +45,7 @@ internal static class OfficerPortraitPicker
         void Refresh()
         {
             foreach (var child in grid.GetChildren()) { grid.RemoveChild(child); child.QueueFree(); }
-            var matching = portraits.Where(p => p.Id.ToString().Contains(filter.Text.Trim(), StringComparison.Ordinal)).ToArray();
+            var matching = portraits.Where(p => (p.DisplayName ?? p.Id.ToString()).Contains(filter.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
             int pages = Math.Max(1, (matching.Length + pageSize - 1) / pageSize);
             page = Math.Clamp(page, 0, pages - 1);
             updatingPage = true;
@@ -54,7 +54,7 @@ internal static class OfficerPortraitPicker
             foreach (var portrait in matching.Skip(page * pageSize).Take(pageSize))
             {
                 var button = new Button { CustomMinimumSize = new(88, 136), ToggleMode = true,
-                    ButtonPressed = portrait.Image.Id == current, TooltipText = $"头像 {portrait.Id}" };
+                    ButtonPressed = portrait.Image.Id == current, TooltipText = portrait.DisplayName ?? portrait.Id.ToString() };
                 CompanionPanelStyle.Toggle(button);
                 grid.AddChild(button);
                 var content = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -62,7 +62,7 @@ internal static class OfficerPortraitPicker
                 content.OffsetLeft = content.OffsetTop = 4; content.OffsetRight = content.OffsetBottom = -4;
                 button.AddChild(content);
                 content.AddChild(Preview(service, portrait.Image.Id, new(80, 100), PortraitView.Face));
-                content.AddChild(new Label { Text = portrait.Id.ToString(), HorizontalAlignment = HorizontalAlignment.Center,
+                content.AddChild(new Label { Text = portrait.DisplayName ?? portrait.Id.ToString(), TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis, HorizontalAlignment = HorizontalAlignment.Center,
                     MouseFilter = Control.MouseFilterEnum.Ignore });
                 button.Pressed += () =>
                 {

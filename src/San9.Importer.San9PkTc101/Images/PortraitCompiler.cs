@@ -22,7 +22,8 @@ public static class PortraitCompiler
                 if (images[i].Width != 240 || images[i].Height != 240) throw new InvalidDataException("Invalid source portrait dimensions.");
                 int id = first + i;
                 var image = save(ImageId(id), $"portraits/{id}.png", IndexedImageArchive.Decode(images[i], palette, false, false));
-                var portrait = new PortraitDefinition(id, image, offsets[i * 2] / 240d, offsets[i * 2 + 1] / 240d);
+                var bust = new PortraitAnchor(offsets[i * 2] / 240d, offsets[i * 2 + 1] / 240d);
+                var portrait = new PortraitDefinition(id, image, bust, PortraitGeometry.FaceFromBust(bust));
                 portrait.Validate(); portraits.Add(portrait);
             }
         }

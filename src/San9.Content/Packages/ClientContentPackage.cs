@@ -13,6 +13,8 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
 
     [System.Text.Json.Serialization.JsonIgnore] public San9.Content.Images.PortraitDefinition[] Portraits { get; init; } = [];
 
+    [System.Text.Json.Serialization.JsonIgnore] public IReadOnlyDictionary<string, string> PortraitImageSources { get; init; } = new Dictionary<string, string>();
+
     public CommandPresentation Presentation { get; init; } = CommandPresentation.Empty;
     [System.Text.Json.Serialization.JsonIgnore] public string ContentRoot { get; init; } = "";
 
@@ -120,12 +122,12 @@ public sealed record ClientContentPackage(int SchemaVersion, MapPackage Map, Sce
 
 public static class ClientContentFiles
 {
-    public static async Task<ClientContentPackage> LoadAsync(string root, CancellationToken token = default)
+    public static async Task<ClientContentPackage> LoadAsync(string root, CancellationToken token = default, string? portraitPackRoot = null)
     {
         var manifest = await ScenarioContentFiles.ReadManifestAsync(root, token);
         string textureRoot = Path.GetFullPath(Path.Combine(root, manifest.Textures.Path));
         var scenarioTask = ScenarioContentFiles.LoadAsync(root, manifest, token);
-        var texturesTask = Task.Run(() => TexturePackageFiles.LoadAsync(textureRoot, token), token);
+        var texturesTask = Task.Run(() => TexturePackageFiles.LoadAsync(textureRoot, token, portraitPackRoot), token);
         await Task.WhenAll(scenarioTask, texturesTask);
         var instance = await scenarioTask;
         var content = Resolve(instance, await texturesTask, textureRoot) with { ContentRoot = instance.ResourceRoot };
@@ -143,7 +145,7 @@ public static class ClientContentFiles
         var skin = textures.Skin with { Roles = roles, Assets = textures.Skin.Assets.Concat(textures.Library.Assets).Concat(textures.Portraits.Select(p => p.Image)).ToArray() };
         var content = new ClientContentPackage(ScenarioContent.CurrentSchemaVersion, instance.Map.Resolve(textures.Map, instance.Scenario), instance.Scenario,
             instance.Text, skin, textures.Library)
-        { TextureRoot = textureRoot, Portraits = textures.Portraits, Presentation = instance.Presentation };
+        { TextureRoot = textureRoot, Portraits = textures.Portraits, PortraitImageSources = textures.PortraitImageSources, Presentation = instance.Presentation };
         content.ValidateLinks();
         MapPackageFiles.Validate(content.Map);
         return content;

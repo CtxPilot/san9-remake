@@ -9,7 +9,7 @@ public sealed class TextureCacheTests
     public void MixedResolutionPortraitViewsShareOneTexturePerMotherImage()
     {
         var portraits = new[] { 240, 512, 1024 }.Select((size, id) =>
-            new PortraitDefinition(id, new($"portrait/{id}", $"{id}.png", size, size, 3), 38d / 240, 0)).ToArray();
+            new PortraitDefinition(id, new($"portrait/{id}", $"{id}.png", size, size, 3), new(38d / 240, 0), new(70d / 240, 30d / 240))).ToArray();
         var loads = new System.Collections.Concurrent.ConcurrentDictionary<ImageFile, int>();
         var uploads = new Dictionary<ImageFile, int>();
         using var cache = new TextureCache<Gpu>((file, _) =>

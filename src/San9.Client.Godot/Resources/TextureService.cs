@@ -9,6 +9,7 @@ namespace San9.Client.Godot;
 public partial class TextureService : Node
 {
     private Dictionary<string, PortraitDefinition> _portraits = [];
+    private IReadOnlyDictionary<string, string> _portraitImageSources = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, PortraitDefinition> Portraits => _portraits;
     private TextureCache<ImageTexture> _cache = null!;
     private readonly Dictionary<ImageAsset, AlphaMask> _masks = [];
@@ -34,14 +35,27 @@ public partial class TextureService : Node
     public ImageTexture MinimapTerrain { get; private set; } = null!;
     public void Initialize(ClientContentPackage package, string root)
     {
-        Initialize(package, (file, token) => ClientImageFiles.LoadFile(root, file, token));
+        _portraitImageSources = package.PortraitImageSources;
+        Initialize(package, (file, token) => ClientImageFiles.LoadFile(root, file, token, _portraitImageSources));
         var map = package.Map;
         OverviewMap = new(map.Width, map.Height, map.Squares, package.Scenario.RegionCityIds);
         MinimapTerrain = CreateTexture(MinimapRenderer.Compile(map.Width, map.Height, map.Squares, map.MinimapColors));
     }
-    public void Initialize(TexturePackage package, string root) => Initialize(package.Portraits, package.Map.Assets,
-        package.Library, package.Map.Clips, package.Skin, package.Map.Units,
-        (file, token) => ClientImageFiles.LoadFile(root, file, token));
+    public void Initialize(TexturePackage package, string root)
+    {
+        _portraitImageSources = package.PortraitImageSources;
+        Initialize(package.Portraits, package.Map.Assets, package.Library, package.Map.Clips, package.Skin, package.Map.Units,
+            (file, token) => ClientImageFiles.LoadFile(root, file, token, _portraitImageSources));
+    }
+
+    public void UpdatePortraitCatalog(PortraitCatalog catalog)
+    {
+        _portraits = catalog.Portraits.ToDictionary(p => p.Image.Id);
+        _portraitImageSources = catalog.ImageSources;
+        var roles = Roles.Where(p => !p.Key.StartsWith("user/", StringComparison.Ordinal)).ToDictionary();
+        foreach (var portrait in catalog.Portraits) roles[portrait.Image.Id] = portrait.Image;
+        Roles = roles;
+    }
 
     internal void Initialize(ClientContentPackage package, Func<ImageFile, CancellationToken, PngImage> load) =>
         Initialize(package.Portraits, package.Map.Assets, package.Textures, package.Map.Animations.Clips, package.Skin, package.Map.Units, load);

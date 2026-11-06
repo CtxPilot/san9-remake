@@ -60,13 +60,13 @@ public partial class Main : Node
             if (options.SharedDataEditor)
             {
                 GetWindow().Title = "San9R · 游戏资料编辑器";
-                ui.AddChild(new SharedDataEditor { ContentRoot = options.ContentRoot, ReferenceScenarioId = options.ScenarioId,
+                ui.AddChild(new SharedDataEditor { DataPaths = DataPaths, ContentRoot = options.ContentRoot, ReferenceScenarioId = options.ScenarioId,
                     Closed = () => GetTree().Quit() });
                 return;
             }
             if (options.OfficerEditor)
             {
-                ui.AddChild(new CreatedOfficerEditor { Store = new(DataPaths.CreatedOfficers), ContentRoot = options.ContentRoot,
+                ui.AddChild(new CreatedOfficerEditor { PortraitPackRoot = DataPaths.PortraitPack, Store = new(DataPaths.CreatedOfficers), ContentRoot = options.ContentRoot,
                     Preferences = _preferences, Closed = () => GetTree().Quit() });
                 return;
             }
@@ -218,7 +218,7 @@ public partial class Main : Node
                 (await ContentCatalogFiles.LoadAsync(options.ContentRoot, token)).RequireScenario(options.ScenarioId!).Package);
             var loaded = await Task.Run(async () =>
             {
-                var package = await ClientContentFiles.LoadAsync(packageRoot, token);
+                var package = await ClientContentFiles.LoadAsync(packageRoot, token, DataPaths.PortraitPack);
                 double validationMs = startup.Elapsed.TotalMilliseconds;
                 token.ThrowIfCancellationRequested();
                 if (options.ScenarioId is { } scenarioId && package.Scenario.ScenarioId != scenarioId)

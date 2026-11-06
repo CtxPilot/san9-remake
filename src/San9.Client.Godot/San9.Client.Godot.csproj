@@ -21,6 +21,7 @@
     <TrimmerRootAssembly Include="System.Collections.Immutable" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Cdd.FaceDetection" Version="0.1.0-preview.4" />
     <InternalsVisibleTo Include="San9.Client.Godot.Tests" />
     <ProjectReference Include="../San9.Application/San9.Application.csproj" />
     <ProjectReference Include="../San9.Core/San9.Core.csproj" />

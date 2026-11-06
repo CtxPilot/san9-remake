@@ -4,11 +4,11 @@
 
 ## 内容契约与独立构建
 
-纹理包由 `import-textures` 独立生成，输入只有已登记 EXE、原版数据目录和转换规则，不接受剧本。默认目录为 `local/generated/content/textures-san9pk-tc101`，`textures.json` 为 schema6；完整转换版本65。包拥有界面定义、地图资源定义、完整已确认图片目录和全部物理 PNG。
+纹理包由 `import-textures` 独立生成，输入只有已登记 EXE、原版数据目录和转换规则，不接受剧本。默认目录为 `local/generated/content/textures-san9pk-tc101`，`textures.json` 为 schema7；完整转换版本65。包拥有界面定义、地图资源定义、完整已确认图片目录和全部物理 PNG。
 
-剧本包 `content.json` 为 schema141，只保存来源、共享纹理目录和数据文件相对路径。`map.json`、`scenario.json`、`text.json`、`messages/*.json`、`illustrations.json` 分别保存地图实例、剧本初始状态、静态词条、统一消息和插图角色映射。地图实例保存地形、建筑位置、水面位置等，不保存图片文件或图集定义。`ClientContentFiles` 解析依赖后在内存装配显示内容；客户端图片路径相对纹理包根目录。重新导入剧本不会生成或修改共享纹理。旧包重新转换，不提供兼容读取。
+剧本包 `content.json` 为 schema141，只保存来源、共享纹理目录和数据文件相对路径。`map.json`、`scenario.json`、`text.json`、`messages/*.json`、`illustrations.json` 分别保存地图实例、剧本初始状态、静态词条、统一消息和插图角色映射。地图实例保存地形、建筑位置、水面位置等，不保存图片文件或图集定义。`ClientContentFiles` 解析依赖后在内存装配显示内容；客户端图片路径相对纹理包根目录。重新导入剧本不会生成或修改共享纹理。旧包不提供兼容读取；本次schema6→7仅头像锚点元数据变化，可通过[显式升级命令](../specs/behavior/BEH-RENDER-0004-shared-portrait-views.md#格式升级)保留图片和原取景，无需重转资源。
 
-头像通过独立 `portraits` 目录引用统一ID0..835，每项只含一张正常色大图和归一化裁剪锚点；图片按统一头像ID命名为 `images/portraits/{id}.png`（0..835），不导出中图、小图或调色板1变体。同一头像可被多个武将和剧本共享。小地图底图根据当前方格和共享的八类地形颜色在客户端生成，GPU 对象随控件释放，不再导出某个剧本专用的 PNG。
+头像通过独立 `portraits` 目录引用统一ID0..835，每项只含一张正常色大图和独立归一化半身／面部裁剪锚点；图片按统一头像ID命名为 `images/portraits/{id}.png`（0..835），不导出中图、小图或调色板1变体。同一头像可被多个武将和剧本共享。小地图底图根据当前方格和共享的八类地形颜色在客户端生成，GPU 对象随控件释放，不再导出某个剧本专用的 PNG。
 
 运行时`ImageAsset`保存稳定逻辑ID、区域和已解析的`ImageFile`；后者保存相对路径、物理尺寸和通道数。磁盘上的`textures.json`把物理描述集中到顶层`files`数组，所有分类的图片通过整数`file`索引引用，保留`id/x/y/width/height`。数组按相对路径排序，索引仅在当前文档内有效，不是持久资源身份；加载时解析为共享的`ImageFile`对象，绘制和GPU缓存不查询磁盘索引。相同路径的尺寸／通道数必须一致；文件表拒绝重复路径、无效描述和越界引用，图片区域仍须落在文件边界内。
 
@@ -27,7 +27,7 @@
 
 头像完整覆盖786+50张大图及两张锚点表；原始中／小图由同一母图的96×120相对区域分别缩放呈现。另有43个已确认非头像 `G_*` 档案、4,577个颜色变体（包括三张BMP），涵盖去除宝物小图后的183+14张插图及界面、地图、开场、结局、外交、单挑、动态特效。文件来源只用于追踪，产品分类不按基础版／PK分两套。
 
-头像裁剪详见[单份头像规格](../specs/behavior/BEH-RENDER-0004-shared-portrait-views.md)。完整、160×180和96×120三类视图按实际母图尺寸换算，同源GPU纹理按需建立区域视图，64×80和32×40共用96×120取景。死亡控件通过shader从正常色生成灰度，不新增物理纹理、CPU像素副本或调色板变体。
+头像裁剪详见[单份头像规格](../specs/behavior/BEH-RENDER-0004-shared-portrait-views.md)。完整、160×180和96×120三类视图按实际母图尺寸换算，两个锚点独立保存，同源GPU纹理按需建立区域视图，64×80和32×40共用96×120取景。死亡控件通过shader从正常色生成灰度，不新增物理纹理、CPU像素副本或调色板变体。
 
 运行包不保留原始索引 PNG 或调色板字节。IDA 已确认当前繁中 PK 1.0.1.0 主程序不加载 `G_LNMASK` 640张和 `G_LNUKI` 32张；基础版 `G_Title` 4张由显式加载的 `G_TitlPK` 替代。它们不是已确认消费者下的转换遗漏，转换器不伪造最终纹理；来源结构、调用闭合证据和仍未确认的跨版本语义见 [RE-0169](../research/findings/RE-SAN9PK-0169.md)。`F_Font/P_Font` 属于独立字体管线。转换覆盖不等于所有场景和玩法都已接入。
 
@@ -47,7 +47,7 @@ dotnet run --project src/San9.Tools -- verify-client --content-package local/gen
 python research/scripts/verify_texture_library.py --package local/generated/content/textures-san9pk-tc101 --source private/游戏文件
 ```
 
-验证入口供显式调用，不在游戏启动时扫描所有 PNG。当前用户负责画面检查，不自动启动游戏。
+验证入口供显式调用，不在游戏启动时扫描所有 PNG。Python 脚本用于转换器或源格式研究时，将转换包与原版索引像素、调色板及锚点独立对照；它不属于头像编辑器日常验证，不是产品运行依赖。仅在修改该脚本或对应纹理转换行为时运行相关检查。当前用户负责画面检查，不自动启动游戏。
 
 ## 所有权与预算
 

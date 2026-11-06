@@ -31,12 +31,12 @@ public partial class StartMenuPreview : Node
             string root = Path.GetFullPath(Path.Combine(ProjectSettings.GlobalizePath("res://"), ContentRoot));
             var catalog = await ContentCatalogFiles.LoadAsync(root, token);
             var opening = await ContentCatalogFiles.LoadOpeningAsync(root, catalog, token);
-            var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(PackageFiles.Resolve(root, catalog.Textures), token), token);
+            var paths = DataPaths ?? ClientDirectories.Resolve(OS.HasFeature("template"), OS.GetName(),
+                OS.GetExecutablePath(), ProjectSettings.GlobalizePath("res://"), ProjectSettings.GlobalizePath("user://"), OS.GetSystemDir(OS.SystemDir.Documents)).UserData;
+            var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(PackageFiles.Resolve(root, catalog.Textures), token, paths.PortraitPack), token);
             token.ThrowIfCancellationRequested();
             opening.Menu.Validate(textures.Assets); opening.Selection.Validate(textures.Assets);
             var service = new TextureService(); service.Initialize(textures, PackageFiles.Resolve(root, catalog.Textures)); AddChild(service);
-            var paths = DataPaths ?? ClientDirectories.Resolve(OS.HasFeature("template"), OS.GetName(),
-                OS.GetExecutablePath(), ProjectSettings.GlobalizePath("res://"), ProjectSettings.GlobalizePath("user://"), OS.GetSystemDir(OS.SystemDir.Documents)).UserData;
             var settings = new UserSettingsSession(new UserSettingsStore(paths.Settings));
             try { settings.Load(); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or System.Text.DecoderFallbackException or InvalidDataException) { }

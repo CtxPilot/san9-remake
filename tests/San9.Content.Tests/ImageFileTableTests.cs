@@ -18,8 +18,8 @@ public sealed class ImageFileTableTests
             new([], [first, second], [], [], [], new int[288], new int[16], [], new byte[32]),
             new(InterfaceSkin.CurrentSchemaVersion, [separate], [], [], []),
             new(3, [new("alias", "interface", [new(0, 0, first)])]),
-            [new(0, new("portrait/0", "images/portraits/0.png", 240, 240, 3), 0, 0),
-             new(1, new("portrait/1", "images/portraits/1.png", 512, 512, 4), 0, 0)]);
+            [new(0, new("portrait/0", "images/portraits/0.png", 240, 240, 3), new(0, 0), new(32d / 240, 30d / 240)),
+             new(1, new("portrait/1", "images/portraits/1.png", 512, 512, 4), new(0, 0), new(32d / 240, 30d / 240))]);
     }
 
     private static JsonObject Document(TexturePackage? package = null) =>
@@ -90,7 +90,7 @@ public sealed class ImageFileTableTests
     public async Task ConcurrentDocumentsResolveOnlyTheirOwnFileTables()
     {
         var first = Package();
-        var second = first with { Portraits = [new(9, new("portrait/9", "other.png", 1024, 1024, 4), 0, 0)] };
+        var second = first with { Portraits = [new(9, new("portrait/9", "other.png", 1024, 1024, 4), new(0, 0), new(32d / 240, 30d / 240))] };
         string[] documents = [Document(first).ToJsonString(), Document(second).ToJsonString()];
         var results = await Task.WhenAll(documents.Select(json => Task.Run(() => JsonSerializer.Deserialize<TexturePackage>(json, PackageFiles.JsonOptions)!)));
         Assert.Equal(first.Portraits, results[0].Portraits);

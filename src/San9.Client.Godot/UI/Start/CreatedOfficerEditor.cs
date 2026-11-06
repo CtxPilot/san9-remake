@@ -12,6 +12,7 @@ namespace San9.Client.Godot;
 public partial class CreatedOfficerEditor : ModalView
 {
     public CreatedOfficerStore Store { get; init; } = null!;
+    public string? PortraitPackRoot { get; init; }
     public string ContentRoot { get; init; } = "";
     public TextureService? Service { get; init; }
     public Settings.UiPreferencesSession Preferences { get; init; } = new();
@@ -118,7 +119,7 @@ public partial class CreatedOfficerEditor : ModalView
                 if (_portraitService is null)
                 {
                     string textureRoot = PackageFiles.Resolve(ContentRoot, catalog.Textures);
-                    var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(textureRoot, token), token);
+                    var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(textureRoot, token, PortraitPackRoot), token);
                     token.ThrowIfCancellationRequested();
                     var service = new TextureService(); service.Initialize(textures, textureRoot); AddChild(service);
                     _portraitService = service; ShowCurrent();

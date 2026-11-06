@@ -10,6 +10,7 @@ internal static class ContentEditorStyle
     {
         var theme = CompanionPanelStyle.Create(font);
         Dialogs(theme);
+        Tables(theme);
         theme.SetStylebox("panel", "TabContainer", Surface("202833", "394758"));
         theme.SetStylebox("panel", "ItemList", Surface("151c24", "394758", 6));
         theme.SetStylebox("selected", "ItemList", Surface("294f4b", "60958b", 8));
@@ -31,6 +32,41 @@ internal static class ContentEditorStyle
         foreach (string color in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_disabled_color" })
             theme.SetColor(color, "OptionButton", theme.GetColor(color, "Button"));
         return theme;
+    }
+
+    private static void Tables(Theme theme)
+    {
+        theme.SetStylebox("panel", "Tree", Surface("151c24", "394758", 6));
+        foreach (string state in new[] { "focus", "cursor", "cursor_unfocused" })
+            theme.SetStylebox(state, "Tree", new StyleBoxEmpty());
+        theme.SetStylebox("selected", "Tree", Surface("294f4b", "60958b", 0));
+        theme.SetStylebox("selected_focus", "Tree", Surface("335f59", "85b5a9", 0));
+        foreach (string state in new[] { "hovered", "hovered_dimmed" })
+            theme.SetStylebox(state, "Tree", Surface("263442", "3b495b", 0));
+        theme.SetStylebox("hovered_selected", "Tree", Surface("335f59", "60958b", 0));
+        theme.SetStylebox("hovered_selected_focus", "Tree", Surface("3b6b64", "85b5a9", 0));
+        foreach (var (state, background) in new[] { ("normal", "263240"), ("hover", "303e4e"), ("pressed", "202a35") })
+        {
+            var header = Surface(background, "465260", 8);
+            header.SetCornerRadiusAll(0); header.SetBorderWidthAll(0); header.BorderWidthBottom = 1;
+            header.ContentMarginLeft = header.ContentMarginRight = 10;
+            theme.SetStylebox("title_button_" + state, "Tree", header);
+        }
+        theme.SetColor("title_button_color", "Tree", Accent);
+        foreach (string color in new[] { "font_color", "font_hovered_color", "font_hovered_dimmed_color" })
+            theme.SetColor(color, "Tree", new("e8edf3"));
+        foreach (string color in new[] { "font_selected_color", "font_hovered_selected_color" })
+            theme.SetColor(color, "Tree", new("e6fff4"));
+        theme.SetColor("font_outline_color", "Tree", Colors.Transparent);
+        theme.SetConstant("outline_size", "Tree", 0);
+        theme.SetConstant("draw_guides", "Tree", 0);
+        theme.SetConstant("draw_relationship_lines", "Tree", 0);
+        theme.SetConstant("h_separation", "Tree", 0);
+        theme.SetConstant("v_separation", "Tree", 6);
+        theme.SetConstant("inner_item_margin_left", "Tree", 10);
+        theme.SetConstant("inner_item_margin_right", "Tree", 10);
+        theme.SetConstant("inner_item_margin_top", "Tree", 4);
+        theme.SetConstant("inner_item_margin_bottom", "Tree", 4);
     }
 
     private static void Dialogs(Theme theme)

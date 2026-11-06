@@ -8,6 +8,7 @@ public sealed class ClientDataPaths
     public string UiPreferences => Path.Combine(Root, "ui-preferences.json");
     public string CompanionSettings => Path.Combine(Root, "companion-settings.json");
     public string Profile => Path.Combine(Root, "profile.json");
+    public string PortraitPack => Path.Combine(Root, "portrait-packs", "my-portraits");
     public string CreatedOfficers => Path.Combine(Root, "created-officers.json");
     public string QuickSave => Path.Combine(Root, "saves", "quick.save.json");
     public string SaveSlots => Path.Combine(Root, "saves", "slots");

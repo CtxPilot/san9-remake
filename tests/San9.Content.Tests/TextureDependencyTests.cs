@@ -17,7 +17,7 @@ public sealed class TextureDependencyTests
         var textures = new TexturePackage(TexturePackage.CurrentSchemaVersion, 7, "source",
             [new("G_FaceL.s9", 123, new DateTime(2026, 9, 12, 0, 0, 0, DateTimeKind.Utc))],
             resources, new(InterfaceSkin.CurrentSchemaVersion, [], [], [], []), new(3, [new("portrait", "portraits", [new(0, 0, image)])]),
-            [new(0, image, 0, 0)]);
+            [new(0, image, new(0, 0), new(32d / 240, 30d / 240))]);
         string json = JsonSerializer.Serialize(textures, PackageFiles.JsonOptions);
         Assert.DoesNotContain("sha256", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fingerprint", json, StringComparison.OrdinalIgnoreCase);

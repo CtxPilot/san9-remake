@@ -30,6 +30,11 @@ internal static class OfficerEditorForm
         var portrait = new PanelContainer();
         portrait.AddThemeStyleboxOverride("panel", ContentEditorStyle.Surface("151c24", "465260", 6)); avatar.AddChild(portrait);
         portrait.AddChild(OfficerPortraitPicker.Preview(textures, p.PortraitKey, new(148, 148)));
+        if (p.PortraitKey is { } portraitKey && textures is not null &&
+            textures.Portraits.TryGetValue(portraitKey, out var selectedPortrait) && selectedPortrait.DisplayName is { } portraitName)
+            avatar.AddChild(new Label { Text = portraitName, TooltipText = portraitName,
+                TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+                HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore });
         var actions = new HBoxContainer(); actions.AddThemeConstantOverride("separation", 6); avatar.AddChild(actions);
         var choose = ContentEditorControls.ActionButton(actions, "选择", () =>
         {

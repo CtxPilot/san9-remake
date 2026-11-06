@@ -34,6 +34,7 @@ def source_images(data):
 
 def verify(package, source):
     manifest = json.loads((package / "textures.json").read_text(encoding="utf-8"))
+    assert manifest["schemaVersion"] == 7, "Expected texture schema7; upgrade portrait anchors"
 
     @lru_cache(maxsize=8)
     def page(path):
@@ -42,7 +43,7 @@ def verify(package, source):
 
     def region(asset):
         x, y, w, h = (asset[k] for k in ("x", "y", "width", "height"))
-        return page(asset["file"]["path"]).crop((x, y, x + w, y + h))
+        return page(manifest["files"][asset["file"]]["path"]).crop((x, y, x + w, y + h))
 
     originals = {p.stem.lower(): p for p in source.glob("G_*.s9")}
     excluded = {"g_lnmask", "g_lnuki", "g_title", "g_facel", "g_faces", "g_facet", "g_faclpk", "g_facspk", "g_factpk"}
@@ -98,8 +99,10 @@ def verify(package, source):
             offsets = (source / anchor_file).read_bytes()
             for i, indexed in enumerate(images):
                 portrait = next(p for p in portraits if p["id"] == first + i)
-                assert abs(portrait["anchorX"] - offsets[i * 2] / 240) < 1e-12
-                assert abs(portrait["anchorY"] - offsets[i * 2 + 1] / 240) < 1e-12
+                assert abs(portrait["bustAnchor"]["x"] - offsets[i * 2] / 240) < 1e-12
+                assert abs(portrait["bustAnchor"]["y"] - offsets[i * 2 + 1] / 240) < 1e-12
+                assert abs(portrait["faceAnchor"]["x"] - (offsets[i * 2] + 32) / 240) < 1e-12
+                assert abs(portrait["faceAnchor"]["y"] - (offsets[i * 2 + 1] + 30) / 240) < 1e-12
                 indexed.putpalette(b"".join(palette[n:n + 3] for n in range(0, 1024, 4)))
                 assert region(portrait["image"]).convert("RGB").tobytes() == indexed.convert("RGB").tobytes()
     return counts

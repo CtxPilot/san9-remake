@@ -22,7 +22,9 @@ public sealed record MapResources(MapSeason[] Seasons, ImageAsset[] Assets, MapM
 public sealed record TexturePackage(int SchemaVersion, int ConversionVersion, string SourceBuild, TextureSourceStamp[] Sources,
     MapResources Map, InterfaceSkin Skin, TextureLibrary Library, PortraitDefinition[] Portraits)
 {
-    public const int CurrentSchemaVersion = 6;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyDictionary<string, string> PortraitImageSources { get; init; } = new Dictionary<string, string>();
+    public const int CurrentSchemaVersion = 7;
     [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<ImageAsset> Assets => Map.Assets.Concat(Map.Seasons.SelectMany(s => s.Textures))
         .Concat(Skin.Assets).Concat(Library.Assets).Concat(Portraits.Select(p => p.Image));
@@ -66,9 +68,17 @@ public static class TexturePackageFiles
             ?? throw new InvalidDataException("Empty texture package.");
     }
 
-    public static async Task<TexturePackage> LoadAsync(string root, CancellationToken token = default)
+    public static async Task<TexturePackage> LoadAsync(string root, CancellationToken token = default, string? portraitPackRoot = null)
     {
         var package = await PackageFiles.ReadAsync<TexturePackage>(Path.Combine(root, "textures.json"), token);
-        package.Validate(); return package;
+        package.Validate();
+        if (portraitPackRoot is not null)
+        {
+            var pack = await PortraitPackFiles.LoadAsync(portraitPackRoot, token);
+            var resolved = pack.Resolve(package.Portraits, portraitPackRoot);
+            package = package with { Portraits = resolved.Portraits, PortraitImageSources = resolved.ImageSources };
+            package.Validate();
+        }
+        return package;
     }
 }

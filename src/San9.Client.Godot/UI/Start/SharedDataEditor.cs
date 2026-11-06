@@ -8,6 +8,7 @@ namespace San9.Client.Godot;
 /// <summary>Owns the shared draft and the single save transaction for every content subpage.</summary>
 public partial class SharedDataEditor : ModalView
 {
+    public Persistence.ClientDataPaths DataPaths { get; init; } = null!;
     public TextureService? Service { get; init; }
     private TextureService? _appearanceService;
     private OfficerFlagCatalog? _flags;
@@ -78,7 +79,7 @@ public partial class SharedDataEditor : ModalView
             if (_appearanceService is null)
             {
                 string root = PackageFiles.Resolve(ContentRoot, catalog.Textures);
-                var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(root, _lifetime.Token), _lifetime.Token);
+                var textures = await Task.Run(() => TexturePackageFiles.LoadAsync(root, _lifetime.Token, DataPaths?.PortraitPack), _lifetime.Token);
                 _lifetime.Token.ThrowIfCancellationRequested();
                 _appearanceService = new TextureService(); _appearanceService.Initialize(textures, root); AddChild(_appearanceService);
             }

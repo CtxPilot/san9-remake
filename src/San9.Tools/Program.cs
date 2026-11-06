@@ -8,15 +8,23 @@ using San9.Rendering;
 
 try
 {
-    if(args.Length==0)throw new ArgumentException("Commands: import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|map/formation-appearance|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
+    if(args.Length==0)throw new ArgumentException("Commands: upgrade-portrait-anchors --texture-package PATH | --portrait-pack PATH; import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|map/formation-appearance|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
     Dictionary<string,string> options=[];
     for(int i=1;i<args.Length;i+=2)
         if(i+1>=args.Length||!args[i].StartsWith("--",StringComparison.Ordinal)||!options.TryAdd(args[i],args[i+1]))throw new ArgumentException("Invalid or duplicate option.");
-    string[] allowed=args[0] == "import-content" ? ["--game-dir", "--output", "--rebuild"] : args[0] == "verify-content" ? ["--content-root"] : args[0] == "import-textures" ? ["--game-dir","--output","--rebuild"] : args[0] == "verify-textures" ? ["--texture-package"] : args[0] == "verify-client" ? ["--content-package"] : args[0] == "import-text" ? ["--game-dir","--output","--exe-evidence"] : args[0] == "import-client"?["--game-dir","--scenario","--texture-package","--output","--message-reports"]:["--content-package","--season","--output","--x","--y","--width","--height","--terrain-only"];
+    string[] allowed=args[0] == "upgrade-portrait-anchors" ? ["--texture-package", "--portrait-pack"] : args[0] == "import-content" ? ["--game-dir", "--output", "--rebuild"] : args[0] == "verify-content" ? ["--content-root"] : args[0] == "import-textures" ? ["--game-dir","--output","--rebuild"] : args[0] == "verify-textures" ? ["--texture-package"] : args[0] == "verify-client" ? ["--content-package"] : args[0] == "import-text" ? ["--game-dir","--output","--exe-evidence"] : args[0] == "import-client"?["--game-dir","--scenario","--texture-package","--output","--message-reports"]:["--content-package","--season","--output","--x","--y","--width","--height","--terrain-only"];
     if(options.Keys.Any(k=>!allowed.Contains(k)))throw new ArgumentException("Unknown option.");
     string Required(string key)=>options.TryGetValue(key,out var value)?value:throw new ArgumentException($"Missing {key}.");
     var watch=Stopwatch.StartNew();
-    if (args[0] == "import-content")
+    if (args[0] == "upgrade-portrait-anchors")
+    {
+        if (options.Count != 1) throw new ArgumentException("Specify exactly one of --texture-package or --portrait-pack.");
+        if (options.TryGetValue("--texture-package", out var textureRoot))
+            San9.Application.Authoring.PortraitAnchorUpgrade.TexturePackage(textureRoot);
+        else San9.Application.Authoring.PortraitAnchorUpgrade.UserPack(Required("--portrait-pack"));
+        Console.WriteLine("Upgraded portrait anchors; image files and rendered crop regions are unchanged.");
+    }
+    else if (args[0] == "import-content")
     {
         if (options.TryGetValue("--rebuild", out var unit) && unit is not ("opening" or "worlds"))
             throw new ArgumentException("Content rebuild unit must be opening or worlds.");

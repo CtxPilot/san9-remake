@@ -21,9 +21,9 @@ class TextureLibraryVerificationTests(unittest.TestCase):
         Image.frombytes("RGBA", (2, 1), bytes([40, 50, 60, 0, 40, 50, 60, 255])).save(package / "rgb.png")
 
         def asset(path):
-            return {"id": path, "file": {"path": path}, "x": 0, "y": 0, "width": 2, "height": 1}
+            return {"id": path, "file": 0, "x": 0, "y": 0, "width": 2, "height": 1}
 
-        manifest = {"library": {"archives": [{"id": "g_test", "category": "interface/test",
+        manifest = {"schemaVersion": 7, "files": [{"path": "rgb.png", "width": 2, "height": 1, "channels": 4}], "library": {"archives": [{"id": "g_test", "category": "interface/test",
                     "variants": [{"imageIndex": 0, "paletteIndex": 0, "image": asset("rgb.png")}]}]}}
         (package / "textures.json").write_text(json.dumps(manifest), encoding="utf-8")
         return source, package
