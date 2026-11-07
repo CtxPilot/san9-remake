@@ -42,7 +42,7 @@ public partial class MilitaryPolicyView : FixedPage
                 (Selection.IsDeployment ? "出征时期可设为0至9日后。\n" : "") +
                 "到达预定按当前目标、中继点及阻挡预测行军时间。") };
         AddChild(_window);
-        string facility = Selection.Source.IsUnit
+        string facility = Selection is UnitGroupCommandTargets group ? $"命令部队　{group.Units.Length} 队" : Selection.Source.IsUnit
             ? "命令部队　" + UnitMapInteraction.Hover(Selection.View, Texts, Selection.Source.Id, MapInformationContext.Strategy)?.Name
             : "命令设施　" + Selection.View.Settlements.Single(s => s.Id == Selection.Source.Id).ResolveName(Texts);
         (facility, _facilityWidth) = CommandPanelArt.SourcePlate(facility);
@@ -56,19 +56,22 @@ public partial class MilitaryPolicyView : FixedPage
         Label("目标", new(0, 88, 96, 32)); Label(info?.Name ?? "—", new(104, 88, 160, 32));
         Label("势力", new(272, 92, 48, 24)); Label(info?.Force is { } force ? Texts.Resolve(force.NameKey) : "—", new(328, 92, 80, 24));
         Choice("敌接近时", "攻击", "无视", 128, Selection.Policies.AttackApproachingEnemies,
-            (p, value) => p with { AttackApproachingEnemies = value });
+            (p, value) => p with { AttackApproachingEnemies = value }, UnitPolicyField.AttackApproachingEnemies);
         Choice("自主撤退", "许可", "不许可", 168, Selection.Policies.AutonomousRetreat,
-            (p, value) => p with { AutonomousRetreat = value });
+            (p, value) => p with { AutonomousRetreat = value }, UnitPolicyField.AutonomousRetreat);
         Choice("追击", "许可", "不许可", 208, Selection.Policies.Pursue,
-            (p, value) => p with { Pursue = value });
+            (p, value) => p with { Pursue = value }, UnitPolicyField.Pursue);
         Choice("事后命令", "攻击", "撤退", 248, Selection.Policies.AttackAfterAction,
-            (p, value) => p with { AttackAfterAction = value });
+            (p, value) => p with { AttackAfterAction = value }, UnitPolicyField.AttackAfterAction);
         if (Selection.IsDeployment)
         {
             _window.ActionButton("出征时期", "edit", new(0, 288, 104, 40), SelectDelay);
             _delay = Label($"{Selection.DepartureDelayDays}日后", new(104, 288, 64, 32));
         }
-        _message = new GameMessageBar { Textures = Textures, Text = Selection.Waypoint is { } via
+        if (Selection is UnitGroupCommandTargets)
+            _window.ActionButton("部队明细", "edit", new(0, 288, 104, 40), ShowGroupSummary);
+        _message = new GameMessageBar { Textures = Textures, Text = Selection is UnitGroupCommandTargets
+            ? "整组共同下令，各队独立行军。“保持各队”保留原方针；可查看部队明细。" : Selection.Waypoint is { } via
             ? $"决定部队行动方针。中继点：({via.X}, {via.Y})。" : "决定部队行动方针。" };
         AddChild(_message);
     }
@@ -102,9 +105,24 @@ public partial class MilitaryPolicyView : FixedPage
             MouseFilter = MouseFilterEnum.Ignore, ClipText = true };
         AddChild(label); _text.Apply(label, GameTextStyles.CatalogRow); return label;
     }
-    private void Choice(string caption, string yes, string no, int y, bool selected, Func<UnitPolicies, bool, UnitPolicies> change)
+    private void Choice(string caption, string yes, string no, int y, bool selected, Func<UnitPolicies, bool, UnitPolicies> change, UnitPolicyField? field = null)
     {
         Label(caption, new(0, y, 96, 32));
+        if (Selection is UnitGroupCommandTargets batch)
+        {
+            var policyField = field ?? throw new InvalidOperationException("A group policy requires an explicit field.");
+            bool? current = batch.Overrides.Get(policyField);
+            var choices = new ButtonGroup { AllowUnpress = false };
+            foreach (var (value, title, x) in new (bool?, string, int)[] { (null, "保持各队", 104), (true, yes, 192), (false, no, 280) })
+            {
+                var button = new CommandChoiceButton { Title = title, Textures = Textures,
+                    Position = Origin + new Vector2(x, y), Size = new(80, 32), ToggleMode = true,
+                    ButtonGroup = choices, ButtonPressed = current == value };
+                button.Pressed += () => { batch.SetPolicy(policyField, value); _confirmAttack = false; RefreshArrival(); };
+                AddChild(button);
+            }
+            return;
+        }
         var group = new ButtonGroup { AllowUnpress = false };
         foreach (bool value in new[] { true, false })
         {
@@ -125,6 +143,12 @@ public partial class MilitaryPolicyView : FixedPage
             ArrivalEstimateStatus.Incomplete => "未能估算",
             _ => "—"
         };
+        if (Selection is UnitGroupCommandTargets group && group.ArrivalEstimates() is { Count: > 0 } estimates &&
+            estimates.All(e => e.Status == ArrivalEstimateStatus.Known))
+        {
+            int? min = estimates.Min(e => e.Days), max = estimates.Max(e => e.Days);
+            value = min == max ? $"{max}日" : $"{min}～{max}日";
+        }
         _arrival.Text = $"到达预定　{value}";
     }
     private void AddArrival()
@@ -134,10 +158,28 @@ public partial class MilitaryPolicyView : FixedPage
     }
     private void Execute()
     {
+        if (!Selection.Reachable)
+        { _message.SetMessage(Selection.Error ?? "存在无法到达目标的部队，整组尚未下令。", true); return; }
         var rejection = Submit(_confirmAttack);
         if (rejection == CommandRejection.None) return;
         _confirmAttack = rejection == CommandRejection.AttackConfirmationRequired;
-        _message.SetMessage(_confirmAttack ? "攻击该目标将影响外交关系。再次点击执行确认命令。" : "命令条件已变化，请返回重新选择。", true);
+        _message.SetMessage(_confirmAttack ? "攻击该目标将影响外交关系。再次点击执行确认命令。" : rejection == CommandRejection.NotStable && Selection is UnitGroupCommandTargets
+            ? "局势已变化，整组尚未下令。请中止后重新选择部队。" : "命令条件已变化，请返回重新选择。", true);
+    }
+    private void ShowGroupSummary()
+    {
+        if (Selection is not UnitGroupCommandTargets group) return;
+        var estimates = group.ArrivalEstimates();
+        var rows = group.Units.Select((unit, i) =>
+        {
+            string name = UnitMapInteraction.Hover(group.View, Texts, unit.Id, MapInformationContext.Strategy)?.Name ?? $"部队 {unit.Id}";
+            var policies = group.Overrides.Apply(unit.Policies);
+            string days = estimates[i].Status == ArrivalEstimateStatus.Known ? $"{estimates[i].Days}日" : "未能估算";
+            return $"{name}　兵力 {unit.Soldiers}　到达 {days}\n" +
+                $"敌接近：{(policies.AttackApproachingEnemies ? "攻击" : "无视")}　自主撤退：{(policies.AutonomousRetreat ? "许可" : "不许可")}\n" +
+                $"追击：{(policies.Pursue ? "许可" : "不许可")}　事后：{(policies.AttackAfterAction ? "攻击" : "撤退")}";
+        });
+        Notice(string.Join("\n\n", rows));
     }
     private void SelectDelay()
     {

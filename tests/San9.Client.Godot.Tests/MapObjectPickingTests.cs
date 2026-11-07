@@ -51,4 +51,27 @@ public sealed class MapObjectPickingTests
         Assert.False(request.TrySelect(target));
         Assert.Equal(0, issued);
     }
+    [Fact]
+    public void MultipleSelectionIsTemporaryUntilConfirmedAndKeepsCandidateOrder()
+    {
+        MapObjectTarget a = new(1, true), b = new(2, true), c = new(3, true);
+        IReadOnlyList<MapObjectTarget>? selected = null;
+        var request = new MapObjectPickRequest([a, b, c], _ => true, () => true, [a], ids => selected = ids);
+        Assert.True(request.Toggle(c)); Assert.True(request.Toggle(a)); Assert.True(request.Toggle(b));
+        Assert.Null(selected); Assert.False(request.TrySelect(a));
+        Assert.True(request.Confirm()); Assert.Equal(new[] { b, c }, selected);
+        Assert.False(request.Confirm()); Assert.False(request.Toggle(a));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CancellationOrWorldChangeDiscardsTemporaryMultiSelection(bool cancel)
+    {
+        MapObjectTarget a = new(1, true); bool current = true, committed = false;
+        var request = new MapObjectPickRequest([a], _ => true, () => current, [], _ => committed = true);
+        request.Toggle(a);
+        if (cancel) request.Cancel(); else current = false;
+        Assert.False(request.Confirm()); Assert.False(committed);
+    }
 }

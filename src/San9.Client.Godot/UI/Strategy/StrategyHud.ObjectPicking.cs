@@ -24,9 +24,16 @@ public partial class StrategyHud
 
     private void ShowObjectChoices(MapObjectPickRequest request, Vector2 point)
     {
+        var choices = ReadObjectChoices(request.Candidates);
+        _hoverCard.ShowInfo(null, point); _hoverTarget = null;
+        _objectPicker.Open(request, choices, point);
+    }
+
+    private IReadOnlyList<MapObjectChoice> ReadObjectChoices(IEnumerable<MapObjectTarget> targets)
+    {
         var view = Scenario;
         List<MapObjectChoice> choices = [];
-        foreach (var target in request.Candidates)
+        foreach (var target in targets)
         {
             string name;
             int? owner;
@@ -45,7 +52,6 @@ public partial class StrategyHud
             int color = view.Forces.FirstOrDefault(f => f.Id == owner)?.ColorCode ?? 50;
             choices.Add(new(target, name, new Color(Skin.Colors[$"overview-force-{color}"])));
         }
-        _hoverCard.ShowInfo(null, point); _hoverTarget = null;
-        _objectPicker.Open(request, choices, point);
+        return choices;
     }
 }

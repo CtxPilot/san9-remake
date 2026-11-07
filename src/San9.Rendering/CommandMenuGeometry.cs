@@ -8,6 +8,15 @@ public static class CommandMenuGeometry
         (Math.Clamp(clickX - 13, Math.Min(268, Math.Max(0, width - PrimaryWidth)), Math.Max(0, width - PrimaryWidth)),
          Math.Clamp(clickY - 18, 0, Math.Max(0, height - Math.Max(278, 32 + count * ButtonHeight))));
 
+    public static OverlayBounds PlacePrimary(float clickX, float clickY, int count, float width, float height,
+        IReadOnlyList<OverlayBounds> occupied)
+    {
+        var (x, y) = Primary(clickX, clickY, count, width, height);
+        return OverlayLayout.Place(new(x, y, PrimaryWidth, 32 + count * ButtonHeight),
+            new(Math.Min(268, Math.Max(0, width - PrimaryWidth)), 0,
+                Math.Max(PrimaryWidth, width - 268), height), occupied);
+    }
+
     public static (float X, float Y) Secondary(float buttonX, float buttonY, int count, float viewportWidth, float viewportHeight)
     {
         int height = count * ButtonHeight;

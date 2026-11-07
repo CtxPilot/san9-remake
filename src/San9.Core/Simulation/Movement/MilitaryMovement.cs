@@ -29,6 +29,17 @@ public sealed record OrderUnitCommand(Guid CommandId, int IssuerId, long Sequenc
     [JsonRequired] public UnitPolicies? Policies { get; init; }
     [JsonRequired] public WorldPosition? Waypoint { get; init; }
 }
+public sealed record UnitOrderRequest(int UnitId, UnitPolicies? Policies = null, WorldPosition? Waypoint = null);
+
+/// <summary>One atomic intention for independently moving units sharing a target.</summary>
+public sealed record OrderUnitsCommand(Guid CommandId, int IssuerId, long Sequence,
+    ImmutableArray<UnitOrderRequest> Units, MilitaryOrder Order) : GameCommand(CommandId, IssuerId, Sequence)
+{
+    [JsonRequired] public bool ConfirmAttack { get; init; }
+    public OrderUnitCommand ForUnit(UnitOrderRequest unit) => new(CommandId, IssuerId, Sequence, unit.UnitId, Order)
+        { Policies = unit.Policies, Waypoint = unit.Waypoint, ConfirmAttack = ConfirmAttack };
+}
+
 public sealed record UnitDeployedEvent(GameClock Clock, int UnitId, int SettlementId, ImmutableArray<int> OfficerIds) : DomainEvent;
 public sealed record UnitOrderChangedEvent(GameClock Clock, int UnitId, MilitaryOrder? Order, string Reason) : DomainEvent
 {
@@ -244,13 +255,39 @@ internal static class MilitaryMovement
     {
         var rejection = OrderEligibility(world, command, rules);
         if (rejection != CommandRejection.None) return rejection;
+        ApplyOrder(world, command, events);
+        return CommandRejection.None;
+    }
+
+    internal static CommandRejection OrdersEligibility(WorldMutation world, OrderUnitsCommand command, MilitaryRulebook? rules)
+    {
+        if (command.Units.IsDefaultOrEmpty || command.Units.Any(u => u is null) ||
+            command.Units.Select(u => u.UnitId).Distinct().Count() != command.Units.Length)
+            return CommandRejection.InvalidTask;
+        foreach (var unit in command.Units)
+        {
+            var rejection = OrderEligibility(world, command.ForUnit(unit), rules);
+            if (rejection != CommandRejection.None) return rejection;
+        }
+        return CommandRejection.None;
+    }
+
+    internal static CommandRejection Orders(WorldMutation world, OrderUnitsCommand command, MilitaryRulebook? rules, List<DomainEvent> events)
+    {
+        var rejection = OrdersEligibility(world, command, rules);
+        if (rejection != CommandRejection.None) return rejection;
+        foreach (var unit in command.Units.OrderBy(u => u.UnitId)) ApplyOrder(world, command.ForUnit(unit), events);
+        return CommandRejection.None;
+    }
+
+    private static void ApplyOrder(WorldMutation world, OrderUnitCommand command, List<DomainEvent> events)
+    {
         var unit = world.Units[command.UnitId];
         var policies = command.Policies ?? unit.Policies;
         FacilityConstruction.Cancel(world, unit.Id, events);
         world.AssignMilitaryOrder(unit.Id, command.Order, policies, command.Waypoint);
         UnitOrderChanges.Report(world, unit.Id, command.Order, "ordered", events);
         if (policies != unit.Policies) events.Add(new UnitPoliciesChangedEvent(world.Clock, unit.Id, policies));
-        return CommandRejection.None;
     }
 
     internal static bool ValidOrder(IWorldQuery world, int owner, MilitaryOrder? order, FormationRule formation, MilitaryRulebook rules, int? navalFormationId = null, uint soldiers = 1)

@@ -34,7 +34,7 @@ public partial class MilitaryCommandFlow : Node
     public override void _Process(double delta)
     {
         var view = Targets?.View ?? _preparation?.Draft.View ?? _specialPreparation?.Draft.View;
-        if (view is not null && view.World.Revision != Session.Snapshot.Revision) CloseCommand();
+        if (Targets is not UnitGroupCommandTargets && view is not null && view.World.Revision != Session.Snapshot.Revision) CloseCommand();
     }
     public void OpenSpecial(int settlementId, SpecialDeploymentKind kind)
     {
@@ -85,6 +85,18 @@ public partial class MilitaryCommandFlow : Node
         Textures.RequestPrefixes("deployment-", "catalog-", "information-", "roster-", "message-", "narration-", "dialog-");
         Source = new(unitId, true);
         Targets = new UnitCommandTargets(view, unitId, kind);
+        BindTargets();
+    }
+
+    public void OpenUnits(IEnumerable<int> unitIds, UnitCommandKind kind)
+    {
+        if (IsActive) return;
+        var ids = unitIds.Distinct().Order().ToArray();
+        if (ids.Length == 0 || ids.Any(id => !MapCommandMenu.Unit(Session.View, id)
+            .Any(e => e.Id == UnitCommandTargets.CommandId(kind) && e.Enabled))) return;
+        Textures.RequestPrefixes("deployment-", "catalog-", "information-", "roster-", "message-", "narration-", "dialog-");
+        Targets = new UnitGroupCommandTargets(Session.View, ids, kind);
+        Source = new(ids[0], true);
         BindTargets();
     }
 

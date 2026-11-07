@@ -24,7 +24,7 @@ public partial class StrategyMinimap : Control
     private readonly Node2D _recordPulse = new();
     private readonly List<(MapCell Cell,double Time)> _recordLocations = [];
     private static readonly int[] PulseFrames = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 3, 2, 1];
-    private MapObjectTarget? _commandSource;
+    private IReadOnlyList<MapObjectTarget> _commandSources = [];
     private double _pulseTime;
     private int _pulseFrame;
     private (Vector2 Position, float Zoom, Vector2 Size) _view;
@@ -101,7 +101,7 @@ public partial class StrategyMinimap : Control
         var mapFrame = World.Display?.Presented?.Region.Scene.MapFrame;
         if (!ReferenceEquals(_state, Scenario) || !ReferenceEquals(_mapFrame, mapFrame))
         { _state = Scenario; _mapFrame = mapFrame; _markers.QueueRedraw(); _commandPulse.QueueRedraw(); }
-        if (_commandSource is not null)
+        if (_commandSources.Count > 0)
         {
             _pulseTime = (_pulseTime + delta) % 1.7;
             int frame = PulseFrames[(int)(_pulseTime / 0.1)];
@@ -119,16 +119,20 @@ public partial class StrategyMinimap : Control
         _viewport.QueueRedraw();
         _commandPulse.QueueRedraw();
     }
-    public void SetCommandSource(MapObjectTarget? source)
+    public void SetCommandSources(IReadOnlyList<MapObjectTarget> sources)
     {
-        if (_commandSource == source) return;
-        _commandSource = source;
+        if (_commandSources.SequenceEqual(sources)) return;
+        _commandSources = sources.ToArray();
         _pulseTime = 0; _pulseFrame = 0;
         _commandPulse.QueueRedraw();
     }
     private void DrawCommandPulse()
     {
-        if (_commandSource is not { } source || _pulseFrame == 0) return;
+        if (_pulseFrame == 0) return;
+        foreach (var source in _commandSources) DrawCommandPulse(source);
+    }
+    private void DrawCommandPulse(MapObjectTarget source)
+    {
         double x, y;
         if (source.IsUnit)
         {

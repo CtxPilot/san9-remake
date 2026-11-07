@@ -43,6 +43,7 @@ public partial class StrategyHud
 
     private void PresentMilitaryCommand(StrategySnapshot before, GameCommand command, IReadOnlyList<DomainEvent> events)
     {
+        if (command is OrderUnitsCommand) _unitGroup.Clear();
         var after = Session.View;
         var sequence = MilitaryCommandPresentation.Create(before, after, Session.Messages(Texts),
             CommandPresentation, command, events, Random.Shared.Next);

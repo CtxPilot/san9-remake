@@ -600,6 +600,10 @@ public sealed partial class SimulationEngine
                     var constructionRejection = FacilityConstruction.Start(mutation, construct, _rules, events);
                     if (constructionRejection != CommandRejection.None) return Reject(constructionRejection);
                     break;
+                case OrderUnitsCommand orders:
+                    var ordersRejection = MilitaryMovement.Orders(mutation, orders, _rules.Military, events);
+                    if (ordersRejection != CommandRejection.None) return Reject(ordersRejection);
+                    break;
                 case OrderUnitCommand order:
                     var orderRejection = MilitaryMovement.Order(mutation, order, _rules.Military, events);
                     if (orderRejection != CommandRejection.None) return Reject(orderRejection);

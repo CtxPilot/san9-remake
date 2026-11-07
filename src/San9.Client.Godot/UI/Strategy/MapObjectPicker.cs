@@ -17,6 +17,7 @@ public partial class MapObjectPicker : ModalView
     private int _count;
     private float _rowWidth = 96;
     private bool _rightPressed;
+    private InformationActionButton? _confirm;
     public MapObjectTarget? PreviewTarget { get; private set; }
 
     public override void _Ready()
@@ -31,7 +32,7 @@ public partial class MapObjectPicker : ModalView
         Close();
         _request = request; _anchor = point; _count = choices.Count;
         var font = GetThemeFont("font");
-        _rowWidth = Math.Max(96, choices.Max(choice => font.GetStringSize(choice.Name, fontSize: 16).X + 16));
+        _rowWidth = Math.Max(96, choices.Max(choice => font.GetStringSize(choice.Name, fontSize: 16).X + (request.Multiple ? 36 : 16)));
         _scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
             VerticalScrollMode = ScrollContainer.ScrollMode.Auto };
         var rows = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
@@ -39,17 +40,23 @@ public partial class MapObjectPicker : ModalView
         _scroll.AddChild(rows); AddChild(_scroll);
         foreach (var choice in choices)
         {
-            var row = new InformationMenuButton { Textures = Textures, Title = choice.Name, ClipTitle = true,
-                SkinPrefix = "map-object-row", TextAlignment = HorizontalAlignment.Left,
-                TextInsets = new(16, 0, 0, 0), CustomMinimumSize = new(_rowWidth, 20),
-                SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            row.Pressed += () => { Close(cancel: false); request.TrySelect(choice.Target); };
+            var row = MapObjectRow.Create(choice, Textures, _rowWidth, request.Multiple, request.IsSelected(choice.Target));
+            row.Pressed += () =>
+            {
+                if (request.Multiple) { request.Toggle(choice.Target); row.Selected = request.IsSelected(choice.Target); }
+                else { Close(cancel: false); request.TrySelect(choice.Target); }
+            };
             row.MouseEntered += () => SetPreview(choice.Target);
             row.MouseExited += () => { if (PreviewTarget == choice.Target) SetPreview(null); };
             rows.AddChild(row);
-            var marker = new ColorRect { Color = new("080808"), Position = new(2, 4), Size = new(12, 12), MouseFilter = MouseFilterEnum.Ignore };
-            marker.AddChild(new ColorRect { Color = choice.Color, Position = Vector2.One, Size = new(10, 10), MouseFilter = MouseFilterEnum.Ignore });
-            row.AddChild(marker);
+
+        }
+        if (request.Multiple)
+        {
+            _confirm = new InformationActionButton { Title = "决定", SkinPrefix = "catalog-accept-", FontSize = 16, Textures = Textures, CustomMinimumSize = new(80, 28) };
+            Textures.RequestPrefixes("catalog-accept-");
+            _confirm.Pressed += () => { Close(cancel: false); request.Confirm(); };
+            AddChild(_confirm);
         }
         Relayout(); Show();
     }
@@ -60,11 +67,12 @@ public partial class MapObjectPicker : ModalView
     private void Relayout()
     {
         Size = GetViewportRect().Size;
-        float height = Math.Min(_count * 20, Math.Max(20, Size.Y - 56));
+        float height = Math.Min(_count * 20, Math.Max(20, Size.Y - (_confirm is null ? 56 : 88)));
         float scrollbar = _count * 20 > height ? _scroll!.GetVScrollBar().GetCombinedMinimumSize().X : 0;
         float width = Math.Min(_rowWidth + scrollbar + 24, Size.X);
         _panel = new(new(Math.Clamp(_anchor.X, 0, Math.Max(0, Size.X - width)),
-            Math.Clamp(_anchor.Y, 0, Math.Max(0, Size.Y - 32 - height - 24))), new(width, height + 24));
+            Math.Clamp(_anchor.Y, 0, Math.Max(0, Size.Y - 32 - height - 24))), new(width, height + (_confirm is null ? 24 : 56)));
+        if (_confirm is not null) { _confirm.Position = _panel.Position + new Vector2(12, height + 18); _confirm.Size = new(width-24, 28); }
         if (_scroll is not null)
         {
             _scroll.Position = _panel.Position + new Vector2(12, 12); _scroll.Size = new(width - 24, height);
@@ -78,6 +86,7 @@ public partial class MapObjectPicker : ModalView
     {
         Hide();
         if (cancel) _request?.Cancel();
+        if (_confirm is not null) { RemoveChild(_confirm); _confirm.QueueFree(); _confirm = null; }
         _request = null; _count = 0; _rightPressed = false; SetPreview(null);
         if (_scroll is not null) { RemoveChild(_scroll); _scroll.QueueFree(); _scroll = null; }
     }

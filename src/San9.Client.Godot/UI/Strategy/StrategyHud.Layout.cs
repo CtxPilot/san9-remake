@@ -24,7 +24,9 @@ public partial class StrategyHud
     private Vector2 GroupPosition(Control group) => GetGlobalTransform().AffineInverse() * group.GlobalPosition;
     private Rect2 HudRect(Control control) => new(GroupPosition(control), control.Size);
 
-    private IReadOnlyList<OverlayBounds> MapObstacles()
+    private IReadOnlyList<OverlayBounds> MapObstacles() => MapObstacles(includeUnitGroup: true);
+
+    private IReadOnlyList<OverlayBounds> MapObstacles(bool includeUnitGroup)
     {
         var result = new List<OverlayBounds>();
         void Add(Rect2 rect)
@@ -40,6 +42,8 @@ public partial class StrategyHud
             Add(rect);
         }
         foreach (var button in _hudButtons.Where(button => button.IsVisibleInTree())) Add(HudRect(button));
+        if (includeUnitGroup && _unitGroupMenu?.Visible == true) Add(HudRect(_unitGroupMenu));
+        if (includeUnitGroup && _unitGroupList?.Visible == true) Add(HudRect(_unitGroupList));
         Add(HudRect(_minimap!));
         if (_rosterList.IsVisibleInTree()) Add(HudRect(_rosterList));
         foreach (var rect in _executionPanels.OccupiedAreas()) Add(rect);

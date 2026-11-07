@@ -28,6 +28,12 @@ public partial class WorkflowLifecycleVerification : Node
                 GetTree().Quit();
                 return;
             }
+            if (System.Environment.GetEnvironmentVariable("SAN9_UNIT_GROUP_CONTENT") is { Length: > 0 } groupRoot)
+            {
+                await CheckUnitGroupList(groupRoot);
+                GetTree().Quit();
+                return;
+            }
             CheckWindows();
             CheckMapInputs();
             await CheckModals();

@@ -12,6 +12,9 @@ public static class MilitaryCommandPresentation
         WorldMessageContext context, CommandPresentation content, GameCommand command,
         IReadOnlyList<DomainEvent> events, Func<int, int> random)
     {
+        if (command is OrderUnitsCommand batch)
+            return batch.Units.OrderBy(u => u.UnitId).SelectMany(u =>
+                Create(before, after, context, content, batch.ForUnit(u), events, random)).ToArray();
         UnitState unit;
         MilitaryOrder order;
         string role;

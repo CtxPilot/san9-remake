@@ -122,6 +122,7 @@ public sealed partial class SimulationEngine
                 ? CommandRejection.NotActiveController
                 : DomesticDevelopmentHandler.Prepare(world, develop.Development, _rules.Military).Accepted
                     ? CommandRejection.None : CommandRejection.DevelopmentFailed,
+            OrderUnitsCommand orders => MilitaryMovement.OrdersEligibility(world, orders, _rules.Military),
             OrderUnitCommand order => MilitaryMovement.OrderEligibility(world, order, _rules.Military),
             SelectTacticCommand tactic => MilitaryTactics.Eligibility(world, tactic, _rules),
             SetUnitPoliciesCommand policies => MilitaryPolicies.Eligibility(world, policies),

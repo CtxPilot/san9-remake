@@ -184,6 +184,67 @@ public sealed class MilitaryMovementTests
         StateAssert.Equal(before, engine.Snapshot);
     }
 
+    private static SimulationEngine GroupOrderEngine(bool confused = false, bool delegated = false)
+    {
+        var world = World();
+        var mutation = world.BeginMutation();
+        mutation.AddUnit(new(0, 1, new(12, 7), 100) { FormationId = 7, Policies = new(Pursue: true) });
+        mutation.AddUnit(new(1, 1, new(22, 7), 100) { FormationId = 7, Policies = new(AutonomousRetreat: true),
+            Condition = confused ? UnitCondition.Confused : UnitCondition.Normal, CorpsId = delegated ? 2 : null });
+        if (delegated) mutation.AddCorps(new CorpsState(2, 1, null, new(0, 0)) { ControlMode = CorpsControlMode.Automatic });
+        mutation.SetSimulation(mutation.Simulation with { NextUnitId = 2 });
+        world.Commit(mutation);
+        return Engine(world, Rules());
+    }
+
+    [Fact]
+    public void GroupOrderCommitsOnceInStableUnitOrderAndPreservesPerUnitPolicies()
+    {
+        var engine = GroupOrderEngine();
+        GameCommand command = new OrderUnitsCommand(Guid.NewGuid(), 1, 0, [new(1), new(0, new(Pursue: true, AttackAfterAction: true))],
+            new(MilitaryOrderKind.Return, null, 2));
+        var json = System.Text.Json.JsonSerializer.Serialize(command, CanonicalJson.Options);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<GameCommand>(json, CanonicalJson.Options)!;
+        var result = engine.Execute(Player, restored);
+        Assert.True(result.Submission.Accepted, result.Submission.Rejection.ToString());
+        Assert.Equal(new[] { 0, 1 }, result.Events.OfType<UnitOrderChangedEvent>().Select(e => e.UnitId));
+        Assert.Single(result.Events.OfType<CommandResolvedEvent>());
+        Assert.Equal(1, engine.Snapshot.Simulation.NextSequence);
+        Assert.Equal(new(Pursue: true, AttackAfterAction: true), engine.Snapshot.Units.Single(u => u.Id == 0).Policies);
+        Assert.Equal(new(AutonomousRetreat: true), engine.Snapshot.Units.Single(u => u.Id == 1).Policies);
+        Assert.All(engine.Snapshot.Units, unit => Assert.Equal(new(MilitaryOrderKind.Return, null, 2), unit.Order));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void UnavailableOrDelegatedMemberRejectsTheWholeGroupWithoutAnyMutation(bool confused, bool delegated)
+    {
+        var engine = GroupOrderEngine(confused, delegated);
+        var before = engine.Snapshot;
+        var command = new OrderUnitsCommand(Guid.NewGuid(), 1, 0, [new(0, new(AttackAfterAction: true)), new(1)],
+            new(MilitaryOrderKind.Return, null, 2));
+        var result = engine.Execute(Player, command);
+        Assert.False(result.Submission.Accepted);
+        Assert.Empty(result.Events);
+        StateAssert.Equal(before, engine.Snapshot);
+    }
+
+    [Fact]
+    public void DuplicateMembersAndInvalidWaypointCannotPartiallyCommit()
+    {
+        var engine = GroupOrderEngine();
+        var before = engine.Snapshot;
+        foreach (System.Collections.Immutable.ImmutableArray<UnitOrderRequest> members in new[] {
+            System.Collections.Immutable.ImmutableArray.Create(new UnitOrderRequest(0), new UnitOrderRequest(0)),
+            System.Collections.Immutable.ImmutableArray.Create(new UnitOrderRequest(0), new UnitOrderRequest(1, Waypoint: new(-1, -1))) })
+        {
+            var result = engine.Execute(Player, new OrderUnitsCommand(Guid.NewGuid(), 1, 0, members, new(MilitaryOrderKind.Return, null, 2)));
+            Assert.False(result.Submission.Accepted); Assert.Empty(result.Events);
+            StateAssert.Equal(before, engine.Snapshot);
+        }
+    }
+
     private static readonly CommandContext Player = new("player");
     private static MilitaryRulebook Rules(int speed = 1) => new(new(8, 3,
         Enumerable.Repeat(0, 24).ToImmutableArray(), [new(0, 1, null)],

@@ -292,4 +292,20 @@ public sealed class MilitaryDiplomacyTests
         EventAssert.Equal(expected.Events, actual.Events);
         Assert.Single(expected.Events.OfType<WarDeclaredEvent>());
     }
+    [Fact]
+    public void GroupAttackConfirmationRejectsAllMembersUntilExplicitlyConfirmed()
+    {
+        var world = World(70, true);
+        var mutation = world.BeginMutation();
+        mutation.AddUnit(mutation.Units[0] with { Id = 2, Position = new(12, 7), MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty });
+        mutation.SetSimulation(mutation.Simulation with { NextUnitId = 3 });
+        world.Commit(mutation);
+        var engine = new SimulationEngine(world, new SimulationRules { Military = Military() });
+        var command = new OrderUnitsCommand(Guid.NewGuid(), 1, 0, [new(0), new(2)], new(MilitaryOrderKind.AttackSettlement, null, 2));
+        var before = engine.Snapshot;
+        Assert.Equal(CommandRejection.AttackConfirmationRequired, engine.Execute(new("player"), command).Submission.Rejection);
+        StateAssert.Equal(before, engine.Snapshot);
+        Assert.True(engine.Execute(new("player"), command with { ConfirmAttack = true }).Submission.Accepted);
+        Assert.Equal(2, engine.Snapshot.Units.Count(u => u.OwnerId == 1 && u.Order == command.Order));
+    }
 }

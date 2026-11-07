@@ -85,7 +85,7 @@ public partial class StrategyHud
         }
         Overview.Close();
         _mapContext.Close(); _commandMenu.Close(); _objectPicker.Close();
-        Selection.Clear(); World.HoverObject(null);
+        Selection.Clear(); _unitGroup.Clear(); World.HoverObject(null);
         _hoverCard.ShowInfo(null, Vector2.Zero);
         UpdateTurnControls();
     }

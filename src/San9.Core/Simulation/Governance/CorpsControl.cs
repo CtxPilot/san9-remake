@@ -89,6 +89,7 @@ public static class CorpsControl
             SetUnitPoliciesCommand policies => ControlsUnit(policies.UnitId),
             DemolishFacilityCommand demolish => ControlsPlace(demolish.SettlementId),
             ConstructFacilityCommand construct => ControlsPlace(construct.SettlementId),
+            OrderUnitsCommand orders => !orders.Units.IsDefaultOrEmpty && orders.Units.All(u => u is not null && ControlsUnit(u.UnitId)),
             OrderUnitCommand order => ControlsUnit(order.UnitId),
             ReformUnitCommand reform => ControlsUnit(reform.UnitId),
             FoodTradeCommand trade => ControlsPlace(trade.SettlementId),

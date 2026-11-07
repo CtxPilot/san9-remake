@@ -17,7 +17,7 @@ public partial class MapWorld
         GetWindow().HasFocus() && CanNavigate?.Invoke() != false;
 
     private bool EdgeInputAvailable => NavigationAvailable && !_mapDrag.IsHeld &&
-        !Input.IsMouseButtonPressed(MouseButton.Middle) && IsNavigationBlocked?.Invoke(_pointer) != true;
+        !Input.IsMouseButtonPressed(MouseButton.Middle) && _selectionGesture.Start is null && IsNavigationBlocked?.Invoke(_pointer) != true;
 
     private CanvasPoint PointerPoint => new(_pointer.X, _pointer.Y);
     private CanvasPoint ViewportExtent => new(ViewportSize.X, ViewportSize.Y);
@@ -26,6 +26,7 @@ public partial class MapWorld
     {
         _pointer = new(-1, -1);
         _mapDrag.Cancel();
+        _selectionGesture.Cancel(); _selectionRightCancel = false;
         _edgeScroll.ReleaseLeft();
         _edgeCursor.Show(default, false);
     }
@@ -33,6 +34,7 @@ public partial class MapWorld
     public override void _Input(InputEvent input)
     {
         if (input is InputEventMouseMotion motion) _pointer = motion.Position;
+        if (HandleSelectionGesture(input)) return;
         if (input is not InputEventMouseButton button) return;
         _pointer = button.Position;
         if (button.ButtonIndex == MouseButton.Middle && !button.Pressed) _mapDrag.Cancel();

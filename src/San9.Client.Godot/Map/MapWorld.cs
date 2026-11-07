@@ -196,6 +196,9 @@ public partial class MapWorld : Node2D
                     _display.PersonnelHoverPlace = search.PlaceAt(_map, new(x, y));
             }
         }
+        if (_selectionGesture.Start is not null && (!NavigationAvailable || TargetPicked is not null ||
+            CanIssueOrders?.Invoke() == false || Input.IsMouseButtonPressed(MouseButton.Middle) ||
+            !Input.IsMouseButtonPressed(MouseButton.Left))) _selectionGesture.Cancel();
         _animationMilliseconds += delta * 1000;
         _unitPositionClock.Advance(delta, Day);
         long start = Stopwatch.GetTimestamp();
@@ -417,8 +420,7 @@ public partial class MapWorld : Node2D
             }
             else if (button.Pressed && button.ButtonIndex == MouseButton.Left)
             {
-                PickObject(button.Position, ObjectsAtViewport(button.Position), CommandSourceAllowed,
-                    () => TargetPicked is null, target => CommandMenuRequested?.Invoke(target, button.Position));
+                _selectionGesture.Press(new(button.Position.X, button.Position.Y), button.ShiftPressed);
                 GetViewport().SetInputAsHandled();
             }
         }

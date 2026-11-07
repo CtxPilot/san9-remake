@@ -135,4 +135,21 @@ public sealed class MilitaryCommandPresentationTests
         Assert.Equal(2, message.SpeakerId);
         Assert.Equal("order", message.SoundRole);
     }
+    [Fact]
+    public void GroupOrderProducesOneResponsePerCommanderInStableUnitOrder()
+    {
+        var definition = Definition();
+        var session = GameSession.Start(definition, 42);
+        var world = session.Snapshot with
+        {
+            Units = [new(10, 1, new(17, 7), 100) { FormationId = 7, CommanderId = 2 },
+                     new(11, 1, new(22, 7), 100) { FormationId = 7, CommanderId = 3 }]
+        };
+        var view = new StrategySnapshot(definition, world);
+        var command = new OrderUnitsCommand(Guid.NewGuid(), 1, 0, [new(11), new(10)], new(MilitaryOrderKind.Return, null, 1));
+        var (content, texts) = Presentation();
+        var messages = MilitaryCommandPresentation.Create(view, view, new(definition, world, texts), content, command, [], _ => 0);
+        Assert.Equal(new int?[] { 2, 3 }, messages.Select(message => message.SpeakerId));
+        Assert.All(messages, message => Assert.Equal("march", message.Message.Key));
+    }
 }

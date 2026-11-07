@@ -14,7 +14,9 @@ public partial class MapCommandPopup : ModalView
     public TextureScope Textures { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
     public Action<string>? Activated { get; init; }
-    private readonly List<(InformationMenuButton Button, MapCommandEntry Entry)> _primary = [], _secondary = [];
+    private MapCommandList? _primaryMenu;
+    private IReadOnlyList<(InformationMenuButton Button, MapCommandEntry Entry)> _primary => _primaryMenu?.Items ?? [];
+    private readonly List<(InformationMenuButton Button, MapCommandEntry Entry)> _secondary = [];
     private Rect2 _menu;
     private Rect2? _submenu;
     private Vector2 _art;
@@ -41,12 +43,11 @@ public partial class MapCommandPopup : ModalView
         Size = GetViewportRect().Size;
         _lastObstacles = Obstacles();
         if (_primary.Count == 0) return;
-        var (x, y) = CommandMenuGeometry.Primary(_anchor.X, _anchor.Y, _primary.Count, Size.X, Size.Y);
-        _menu = new(new(x, y), new(CommandMenuGeometry.PrimaryWidth, 32 + _primary.Count * 28));
-        var fitted = OverlayLayout.Place(new(x, y, _menu.Size.X, _menu.Size.Y), new(268, 0, Math.Max(0, Size.X - 268), Size.Y), _lastObstacles);
-        x = (float)fitted.X; y = (float)fitted.Y; _menu.Position = new(x, y);
+        var fitted = CommandMenuGeometry.PlacePrimary(_anchor.X, _anchor.Y, _primary.Count, Size.X, Size.Y, _lastObstacles);
+        float x = (float)fitted.X, y = (float)fitted.Y;
+        _menu = new(new(x, y), new((float)fitted.Width, (float)fitted.Height));
         var (artX, artY) = CommandMenuGeometry.Illustration(x, y, Size.X); _art = new(artX, artY);
-        for (int i = 0; i < _primary.Count; i++) _primary[i].Button.Position = new(x + 11, y + 16 + 28 * i);
+        _primaryMenu!.Position = _menu.Position;
         if (_expandedButton is not null) LayoutSubmenu();
         var occupied = _lastObstacles.Concat(new[] { new OverlayBounds(_menu.Position.X, _menu.Position.Y, _menu.Size.X, _menu.Size.Y) }).ToList();
         if (_submenu is { } sub) occupied.Add(new(sub.Position.X, sub.Position.Y, sub.Size.X, sub.Size.Y));
@@ -57,7 +58,7 @@ public partial class MapCommandPopup : ModalView
 
     private void LayoutSubmenu()
     {
-        var (x, y) = CommandMenuGeometry.Secondary(_expandedButton!.Position.X, _expandedButton.Position.Y,
+        var (x, y) = CommandMenuGeometry.Secondary(_expandedButton!.GlobalPosition.X - GlobalPosition.X, _expandedButton.GlobalPosition.Y - GlobalPosition.Y,
             _secondary.Count, Size.X, Size.Y);
         var fitted = OverlayLayout.Place(new(x, y, 68, _secondary.Count * 28), new(0, 0, Size.X, Size.Y),
             _lastObstacles.Concat(new[] { new OverlayBounds(_menu.Position.X, _menu.Position.Y, _menu.Size.X, _menu.Size.Y) }).ToArray());
@@ -72,20 +73,20 @@ public partial class MapCommandPopup : ModalView
         if (entries.Count == 0) return;
         _summary = summary;
         _anchor = point;
-        for (int i = 0; i < entries.Count; i++)
+        _primaryMenu = new MapCommandList { Textures = Textures, Texts = Texts, Activated = (entry, button) =>
         {
-            var entry = entries[i];
-            var button = AddButton(entry, Vector2.Zero, false);
-            _primary.Add((button, entry));
-        }
+            if (entry.Children.Count > 0) Expand(entry, button);
+            else Activated?.Invoke(entry.Id);
+        } };
+        AddChild(_primaryMenu); _primaryMenu.SetEntries(entries);
         Relayout(); Show();
     }
 
-    private InformationMenuButton AddButton(MapCommandEntry entry, Vector2 point, bool secondary)
+    private InformationMenuButton AddSecondaryButton(MapCommandEntry entry, Vector2 point)
     {
         var button = new InformationMenuButton {
             Title = CommandText.Resolve(Texts, "title." + entry.Id), Disabled = !entry.Enabled, Textures = Textures, Position = point, Size = new(68, 28),
-            SkinPrefix = $"command-{(secondary ? "secondary" : "primary")}-{entry.Tone.ToString().ToLowerInvariant()}"
+            SkinPrefix = $"command-secondary-{entry.Tone.ToString().ToLowerInvariant()}"
         };
         button.Pressed += () =>
         {
@@ -105,7 +106,7 @@ public partial class MapCommandPopup : ModalView
         for (int i = 0; i < entry.Children.Count; i++)
         {
             var child = entry.Children[i];
-            var button = AddButton(child, Vector2.Zero, true);
+            var button = AddSecondaryButton(child, Vector2.Zero);
             _secondary.Add((button, child));
         }
         Relayout();
@@ -115,7 +116,7 @@ public partial class MapCommandPopup : ModalView
     {
         Hide();
         foreach (Node child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
-        _primary.Clear(); _secondary.Clear(); _submenu = null; _summary = null; _expandedButton = null;
+        _primaryMenu = null; _secondary.Clear(); _submenu = null; _summary = null; _expandedButton = null;
         _hovered = _illustrated = null; _hoverTime = 0; _conditionVisible = false;
     }
 
@@ -123,8 +124,7 @@ public partial class MapCommandPopup : ModalView
     {
         if (!Visible) return;
         if (!_lastObstacles.SequenceEqual(Obstacles())) Relayout();
-        var point = GetLocalMousePosition();
-        var hovered = _secondary.Concat(_primary).FirstOrDefault(item => item.Button.GetRect().HasPoint(point)).Entry;
+        var hovered = _secondary.Concat(_primary).FirstOrDefault(item => item.Button.GetGlobalRect().HasPoint(GetGlobalMousePosition())).Entry;
         if (_hovered != hovered)
         {
             _hovered = hovered; _hoverTime = 0; _conditionVisible = false;
@@ -180,9 +180,6 @@ public partial class MapCommandPopup : ModalView
             Text(row.Label, new(48, row.Y), 64);
             Text(row.Value, new(148, row.Y), 85, alignment: row.Numeric ? HorizontalAlignment.Right : HorizontalAlignment.Center);
         }
-        DrawTexture(Textures.Get("command-top", this), _menu.Position);
-        for (int i = 0; i < _primary.Count; i++) DrawTexture(Textures.Get("command-middle", this), _menu.Position + new Vector2(0, 16 + i * 28));
-        DrawTexture(Textures.Get("command-bottom", this), _menu.Position + new Vector2(0, _menu.Size.Y - 16));
         if (_illustrated is {} entry)
         {
             DrawTexture(Textures.Get("command-illustration-frame", this), _art);

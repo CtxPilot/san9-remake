@@ -55,6 +55,8 @@ godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/Wor
 Remove-Item Env:SAN9_MODAL_CONTENT
 ```
 
+设置`SAN9_UNIT_GROUP_CONTENT`为已有转换包目录，运行`WorkflowLifecycleVerification.tscn`可单独检查多选常驻名单：实际鼠标点击刘备行后保留其余行对象，检查名单／滚动视口／条目的边界、独立选择状态、隐藏恢复及重复刷新，并通过原有皮肤的“决定”按钮提交重叠名单临时选择。成功输出`UNIT_GROUP_LIST_OK`；有图形设备时同时保存`local/generated/verification/unit-group-list.png`，无图形设备时仅检查布局与输入。该检查不覆盖完整战略地图下令流程。
+
 ## 运行入口
 
 设置`SAN9_UI_PREFERENCES_CONTENT`为已有转换包目录后，运行上面的`WorkflowLifecycleVerification.tscn`入口，可检查真实存读档页鼠标翻页／中止共享、情报与都市编辑的地图／一览互通、地图起始时详情候选初始化及仅关闭时统一保存。成功输出`UI_PREFERENCES_OK`；该模式只做本功能的引擎交互检查，不代表画面验收，不读写用户偏好文件。

@@ -337,9 +337,10 @@ public partial class MapSceneView : Node2D
             DrawPersonnelRecommendations(Add);
             if (Targets is { } route)
             {
-                for (int i = 0; i < route.Route.Length; i++)
+                foreach (var cells in route.Routes)
+                for (int i = 0; i < cells.Length; i++)
                 {
-                    var p = RoutePreviewGeometry.Glow(frame.Region.Scene.Map, route.Route[i]);
+                    var p = RoutePreviewGeometry.Glow(frame.Region.Scene.Map, cells[i]);
                     string role = $"target-route-{RoutePreviewGeometry.Frame(AnimationTime(), i)}";
                     if (_ui.TryGetReadyResource(role, out var glow)) Add(glow, new(p.X, p.Y), _routeMaterial);
                 }

@@ -241,6 +241,7 @@ public partial class StrategyHud : Control
         BuildTargetControls();
         BuildCommandFlows();
         BuildObjectPicker();
+        BuildUnitGroup();
         BuildSessionPresentation();
         // Adding controls can trigger hit testing before the HUD is fully constructed.
         _execution = new(Turn, World, _battle, _feedback, _executionPanels, _presentation, _textures,
@@ -348,7 +349,9 @@ public partial class StrategyHud : Control
     public bool IsNavigationBlocked(Vector2 point) => !CanNavigateMap || IsInteractivePoint(point);
 
     private bool IsInteractivePoint(Vector2 point) => _built &&
-        ((_rosterList.Visible && HudRect(_rosterList).HasPoint(point)) || HudRect(_minimap!).HasPoint(point) ||
+        ((_unitGroupMenu?.Visible == true && HudRect(_unitGroupMenu).HasPoint(point)) ||
+        (_unitGroupList?.Visible == true && HudRect(_unitGroupList).HasPoint(point)) ||
+        (_rosterList.Visible && HudRect(_rosterList).HasPoint(point)) || HudRect(_minimap!).HasPoint(point) ||
         _hudButtons.Any(button => button.IsVisibleInTree() && HudRect(button).HasPoint(point)));
 
     public bool IsBlockedPoint(Vector2 point)
@@ -382,6 +385,7 @@ public partial class StrategyHud : Control
         if (!CanIssueOrders) return;
         var entries = target.IsUnit ? MapCommandMenu.Unit(Scenario, target.Id) : MapCommandMenu.Settlement(Scenario, target.Id);
         if (entries.Count == 0) return;
+        _unitGroup.Clear();
         _contextTarget = null;
         _commandTarget = target;
         _contextRevision = Session.Snapshot.Revision;
@@ -518,6 +522,14 @@ public partial class StrategyHud : Control
             _message.SetMessage(_targets.Selected is null ? initial : "点击空地设置中继点，点击其他目标切换，再次点击当前目标设定方针。",true);
             return;
         }
+        if (_unitGroup.UnitIds.Count > 0 && !Overview.IsOpen)
+        {
+            var commands = _unitGroup.Commands(Scenario);
+            _message.SetMessage($"已选 {_unitGroup.UnitIds.Count} 队。" + (commands.Count == 0
+                ? "没有共同可用的攻击／进军命令，可点击已选名单中的部队将其移除；右键退出多选。"
+                : "Shift＋单击增减，拖动框选，Shift＋框选追加；右键退出多选。"), commands.Count > 0);
+            return;
+        }
         var button = _hudButtons.FirstOrDefault(b => b.Visible && b.IsHovered())
             ?? (Overview.IsOpen ? _overviewPanel.HoverButton : null);
         _message.SetMessage(button?.HintText ?? (Overview.IsOpen ? "" : "请选择命令起点。"), button is null || !button.Disabled);
@@ -542,6 +554,7 @@ public partial class StrategyHud : Control
     }
     public override void _Input(InputEvent @event)
     {
+        if (_built && HandleUnitGroupCancel(@event)) return;
         if (@event is InputEventKey { Keycode: Key.Space,
                 ShiftPressed: false, CtrlPressed: false, AltPressed: false, MetaPressed: false } space &&
             _built && Interaction.CanAdvance && GetWindow().HasFocus() &&
@@ -590,6 +603,8 @@ public partial class StrategyHud : Control
                 { UpdateRegion(x, y); visible = true; }
             }
         }
+        if (_unitGroupList?.Visible == true && HudRect(_unitGroupList).HasPoint(mouse))
+            hovered = _unitGroupList.PreviewTarget;
         World.HoverObject(_commandMenu?.Visible == true ? _commandTarget : hovered);
         if (_built && (_hoverTarget != hovered || !ReferenceEquals(_hoverView, view) || _hoverContext != context))
         {
@@ -605,7 +620,7 @@ public partial class StrategyHud : Control
     public override void _Process(double delta)
     {
         if (!_built && World.IsVisibleReady) Build();
-        if (_built) UpdateTurn(delta);
+        if (_built) { UpdateTurn(delta); UpdateUnitGroup(); }
         if (_commandMenu?.Visible == true && _contextRevision != Session.Snapshot.Revision) _commandMenu.Close();
         if (_mapContext?.Visible == true && _contextRevision != Session.Snapshot.Revision) _mapContext.Close();
         if (World.LoadError is not null) _message.Text = "地图加载失败 · F3 查看详情";
@@ -619,7 +634,9 @@ public partial class StrategyHud : Control
         }
         if (_built)
         {
-            _minimap!.SetCommandSource(_flow.Source ?? _patrolFlow.Source ?? _facilityFlow.Source ?? _demolitionFlow.Source ?? _appointmentFlow.Source ?? _personnelFlow.Source ?? (_commandMenu!.Visible ? _commandTarget : null));
+            var source = _flow.Source ?? _patrolFlow.Source ?? _facilityFlow.Source ?? _demolitionFlow.Source ?? _appointmentFlow.Source ?? _personnelFlow.Source ?? (_commandMenu!.Visible ? _commandTarget : null);
+            _minimap!.SetCommandSources(_flow.Targets?.Sources.Select(t => new MapObjectTarget(t.Id, t.IsUnit)).ToArray() ?? (source is { } single ? [single] :
+                _unitGroup.UnitIds.Select(id => new MapObjectTarget(id, true)).ToArray()));
             UpdateSidebar(delta);
         }
         UpdateHover(_pointerOutsideWindow ? new Vector2(-1, -1) : GetGlobalMousePosition());
@@ -657,6 +674,8 @@ public partial class StrategyHud : Control
         World.EmptyContextRequested -= ShowShortcutMenu;
         World.CommandMenuRequested -= ShowCommandMenu;
         World.ObjectChoiceRequested -= ShowObjectChoices;
+        World.UnitsBoxSelected -= SelectUnitBox;
+        World.UnitGroupPickRequested -= PickUnitGroup;
         if (World.CommandSourceAllowed == IsCommandSource) World.CommandSourceAllowed = null;
         if (World.ContextAllowed == HasObjectContext) World.ContextAllowed = null;
         GetWindow().MouseExited -= ClearHover;
