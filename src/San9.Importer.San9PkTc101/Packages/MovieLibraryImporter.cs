@@ -7,6 +7,12 @@ public enum MovieLibraryGroup { Events, Scenarios, Startup, All }
 /// <summary>Converts original TC101 clips directly into the optional movie library.</summary>
 public static class MovieLibraryImporter
 {
+    internal static string ScenarioOpeningRole(int scenarioId)
+    {
+        if (scenarioId is < 0 or >= 20) throw new ArgumentOutOfRangeException(nameof(scenarioId));
+        return "scenario-opening-" + scenarioId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     public static async Task<bool> ImportAsync(string gameDirectory, string output,
         MovieLibraryGroup group = MovieLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default)
     {
@@ -47,9 +53,8 @@ public static class MovieLibraryImporter
         if (group is MovieLibraryGroup.Scenarios or MovieLibraryGroup.All)
             for (int index = 0; index < 20; index++)
             {
-                string id = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 string source = index < 10 ? $"Sop_h{index:D2}.mpg" : $"Sop_v{index - 10:D2}.mpg";
-                sources.Add(MovieCatalog.ScenarioOpeningRole(id), source);
+                sources.Add(ScenarioOpeningRole(index), source);
             }
         var existing = await MovieCatalogFiles.LoadAsync(output, token);
         var movies = new Dictionary<string, string>(existing.Movies);

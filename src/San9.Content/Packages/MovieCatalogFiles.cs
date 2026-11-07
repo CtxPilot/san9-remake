@@ -9,12 +9,6 @@ public sealed record MovieCatalog(int SchemaVersion, Dictionary<string, string> 
     public const string StartupOpeningRole = "startup-opening";
     public static MovieCatalog Empty => new(CurrentSchemaVersion, []);
 
-    public static string ScenarioOpeningRole(string scenarioId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(scenarioId);
-        return "scenario-opening-" + scenarioId;
-    }
-
     public void Validate()
     {
         if (SchemaVersion != CurrentSchemaVersion || Movies is null)

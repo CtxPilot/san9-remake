@@ -42,6 +42,31 @@ public sealed class ScenarioContentFilesTests : IDisposable
         Assert.Equal(71, world.RootElement.GetProperty("definitionOverrides").GetProperty("defaultLoyalty").GetProperty("value").GetInt32());
     }
 
+    [Theory]
+    [InlineData("shared-prologue")]
+    [InlineData(null)]
+    public async Task OpeningMovieIsAuthoredIndependentlyOfScenarioIdentityAndLoadsBeforeWorld(string? role)
+    {
+        var content = Fixture() with
+        {
+            Presentation = San9.Content.Interface.CommandPresentation.Empty with { OpeningMovie = role }
+        };
+        await ScenarioContentFiles.WriteAsync(_root, content);
+        if (role is null)
+        {
+            string path = PublishedPath("presentation.json");
+            var authored = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(path))!.AsObject();
+            authored.Remove("openingMovie");
+            await File.WriteAllTextAsync(path, authored.ToJsonString(), System.Text.Encoding.UTF8);
+        }
+        Assert.Equal(role, (await ScenarioContentFiles.LoadAsync(_root)).Presentation.OpeningMovie);
+        var manifest = await ScenarioContentFiles.ReadManifestAsync(_root);
+        foreach (string name in new[] { "scenario.json", "map.json", "definitions.json", "text.json" })
+            File.Delete(PublishedPath(name));
+        var presentation = await ScenarioContentFiles.LoadPresentationAsync(_root, manifest);
+        Assert.Equal(role, presentation.OpeningMovie);
+    }
+
     [Fact]
     public async Task ManifestPreviewRoundTripsAndRefreshesWithoutReadingOrChangingWorldData()
     {

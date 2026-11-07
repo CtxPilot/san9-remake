@@ -32,7 +32,7 @@ public sealed class MovieLibraryImporterTests
                     await File.WriteAllBytesAsync(Path.Combine(prepared, $"Sop_{family}{index:D2}.mpg"), header);
                 }
             await File.WriteAllBytesAsync(Path.Combine(output, "retained.ogv"), header);
-            string authored = MovieCatalog.ScenarioOpeningRole("my-custom-world");
+            string authored = "my-authored-opening";
             await MovieCatalogFiles.WriteAsync(output, new(1, new()
             { ["three-visits-first"] = "retained.ogv", [authored] = "retained.ogv" }));
             await MovieLibraryImporter.ImportAsync(root, output, MovieLibraryGroup.Scenarios, new CopyEncoder());
@@ -42,7 +42,7 @@ public sealed class MovieLibraryImporterTests
             Assert.Equal("retained.ogv", catalog.Movies[authored]);
             foreach (var (id, source) in new[] { ("0", "Sop_h00"), ("4", "Sop_h04"), ("9", "Sop_h09"), ("10", "Sop_v00"), ("19", "Sop_v09") })
                 Assert.Equal(await File.ReadAllBytesAsync(Path.Combine(prepared, source + ".mpg")),
-                    await File.ReadAllBytesAsync(PackageFiles.Resolve(output, catalog.Movies[MovieCatalog.ScenarioOpeningRole(id)])));
+                    await File.ReadAllBytesAsync(PackageFiles.Resolve(output, catalog.Movies[MovieLibraryImporter.ScenarioOpeningRole(int.Parse(id, System.Globalization.CultureInfo.InvariantCulture))])));
 
             for (int index = 0; index < 14; index++)
             {

@@ -24,6 +24,9 @@ public sealed record PersonnelPresentationDefinition(Dictionary<string, Decision
 /// <summary>Authored presentation bindings. Source indices and file names are importer concerns.</summary>
 public sealed record CommandPresentation(Dictionary<string, string> Sounds, PatrolPresentationDefinition? Patrol)
 {
+    /// <summary>Optional opening movie role, independent of scenario identity.</summary>
+    public string? OpeningMovie { get; init; }
+
     [System.Text.Json.Serialization.JsonRequired]
     public EndingPresentationDefinition? Ending { get; init; }
     [System.Text.Json.Serialization.JsonRequired]

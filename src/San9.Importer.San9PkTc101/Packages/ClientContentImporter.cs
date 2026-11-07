@@ -55,6 +55,7 @@ public static class ClientContentImporter
             var people = San9ScenarioPersonArchive.ReadKnownRecords(source);
             presentation = CommandPresentationCompiler.Compile(people, audioFiles) with
             {
+                OpeningMovie = MovieLibraryImporter.ScenarioOpeningRole(header.ScenarioId),
                 Notices = new() { ["scroll-hover"] = "messages.8427", ["scroll-click"] = "messages.8428" }
             };
             messages = new GameplayMessageCompiler(scenario, people).Compile(messages);

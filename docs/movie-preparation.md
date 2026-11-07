@@ -25,7 +25,9 @@
 | Sop_h00.mpg～Sop_h09.mpg | scenario-opening-0～scenario-opening-9 | 对应史实剧本新游戏开场 |
 | Sop_v00.mpg～Sop_v09.mpg | scenario-opening-10～scenario-opening-19 | 对应虚拟剧本新游戏开场 |
 
-通用开局角色约定为`scenario-opening-<剧本ID>`，支持自制剧本的任意非空身份；文件路径仍由电影资源表明确声明，同一文件可供多个角色引用。TC101编号到h／v文件族的换算仅存在于Importer，不进入客户端或领域规则。
+剧本在自己的`presentation.json`中用可选字段`openingMovie`显式引用电影角色，例如`"openingMovie": "scenario-opening-4"`。未配置或为null时不播放开场；客户端不根据剧本ID、日期或分类推导引用。任意剧本可引用同一角色，也可单独更换或取消影片，改剧本ID不改变已有引用。电影资源表仍只负责角色到文件路径的映射，同一文件可供多个角色引用。
+
+TC101 Importer负责把原版剧本0～19的h／v视频对应关系写入各剧本表现数据；`scenario-opening-0`～`scenario-opening-19`只是本批资源命名，不是通用客户端约定。修改某个剧本的开场只需编辑该剧本的`openingMovie`；新增或更换物理视频时才更新电影资源表及文件。
 
 当前采用原分辨率640×480、30 fps、Theora Q4与立体声Vorbis Q5。导出只做轻度去块、时空降噪和微量锐化，不做AI修复或预先放大；客户端以视频固有尺寸作为逻辑尺寸居中显示，随整个游戏界面一起缩放，不单独拉伸至铺满窗口；视口不足时等比缩小，使用线性过滤。
 

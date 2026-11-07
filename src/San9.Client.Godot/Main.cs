@@ -133,16 +133,14 @@ public partial class Main : Node
         var token = _startup.Token;
         var settings = ReadMovieSettings();
         if (!settings.MoviesEnabled) return null;
-        string root = options.ContentRoot;
-        string? id = options.ScenarioId;
-        if (options.PackageRoot is { } packageRoot)
-        {
-            var manifest = await ScenarioContentFiles.ReadManifestAsync(packageRoot, token);
-            root = ScenarioContentFiles.ResolveResourceRoot(packageRoot, manifest.ResourceRoot);
-            id = manifest.Preview?.Id ?? (await ScenarioContentFiles.LoadScenarioAsync(packageRoot, token)).ScenarioId;
-        }
+        string packageRoot = options.PackageRoot ?? PackageFiles.Resolve(options.ContentRoot,
+            (await ContentCatalogFiles.LoadAsync(options.ContentRoot, token)).RequireScenario(options.ScenarioId!).Package);
+        var manifest = await ScenarioContentFiles.ReadManifestAsync(packageRoot, token);
+        var presentation = await ScenarioContentFiles.LoadPresentationAsync(packageRoot, manifest, token);
+        if (presentation.OpeningMovie is not { } role) return null;
+        string root = ScenarioContentFiles.ResolveResourceRoot(packageRoot, manifest.ResourceRoot);
         var catalog = await MovieCatalogFiles.LoadAsync(root, token);
-        return id is null ? null : CreateMovieLayer(root, catalog, MovieCatalog.ScenarioOpeningRole(id), settings);
+        return CreateMovieLayer(root, catalog, role, settings);
     }
 
     private UserSettings ReadMovieSettings()

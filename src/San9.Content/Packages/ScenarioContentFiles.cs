@@ -142,6 +142,11 @@ public static class ScenarioContentFiles
         return value;
     }
 
+    /// <summary>Reads presentation bindings without loading world, map or texture dependencies.</summary>
+    public static Task<CommandPresentation> LoadPresentationAsync(string root, ScenarioContentManifest manifest,
+        CancellationToken token = default) => ReadDataAsync<CommandPresentation>(
+            ResolveResourceRoot(root, manifest.ResourceRoot), manifest.Presentation, token);
+
     private static async Task<ScenarioSelectionContent> ReadSelectionAsync(ScenarioContentManifest manifest, string resourceRoot, CancellationToken token)
     {
         var (scenario, profiles) = await ScenarioDataFiles.LoadSelectionWithProfilesAsync(resourceRoot, manifest, token);
@@ -175,7 +180,7 @@ public static class ScenarioContentFiles
         {
             var text = await Read<StaticTextContent>(manifest.Text);
             var illustrations = await Read<Dictionary<string, string>>(manifest.Illustrations);
-            var presentation = await Read<CommandPresentation>(manifest.Presentation);
+            var presentation = await LoadPresentationAsync(root, manifest, token);
             return (Text: text, Illustrations: illustrations, Presentation: presentation);
         }, token);
         var messagesTask = Task.Run(async () =>
