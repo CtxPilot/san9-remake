@@ -58,7 +58,7 @@ public sealed class AudioAssetCompilerTests
         var study = sources.Single(s => s.Role == "decision-study");
         var departure = sources.Single(s => s.Role == "mission-departure");
         Assert.Equal(AudioAssetCompiler.Path(study.File), AudioAssetCompiler.Path(departure.File));
-        Assert.StartsWith("audio/sound-effects/", AudioAssetCompiler.Path(study.File));
+        Assert.StartsWith("shared/sound-effects/", AudioAssetCompiler.Path(study.File));
     }
 
     [Fact]
@@ -67,15 +67,16 @@ public sealed class AudioAssetCompilerTests
         Assert.All(MapAudioCompiler.MusicSources, source =>
         {
             Assert.Empty(System.IO.Path.GetExtension(source.File));
-            Assert.StartsWith("audio/music/", AudioAssetCompiler.Path(source.File));
+            Assert.StartsWith("shared/music/", AudioAssetCompiler.Path(source.File));
         });
-        Assert.Equal("audio/music/title.ogg", AudioAssetCompiler.Path("BGM/BGM_01.ogg"));
-        Assert.Equal("audio/sound-effects/se_custom.wav", AudioAssetCompiler.Path("SE/SE_CUSTOM.WAV"));
+        Assert.Equal("shared/music/bgm_custom.ogg", AudioAssetCompiler.Path("BGM/BGM_CUSTOM.WMA"));
+        Assert.Equal("shared/music/title.ogg", AudioAssetCompiler.Path("BGM/BGM_01.ogg"));
+        Assert.Equal("shared/sound-effects/se_custom.wav", AudioAssetCompiler.Path("SE/SE_CUSTOM.WAV"));
         Assert.Equal(AudioAssetCompiler.Path("SE/SE_G011.WAV"), AudioAssetCompiler.Path("se/se_g011.wav"));
     }
 
     [Fact]
-    public void ReplacingFormatChangesExportExtensionWithoutChangingSemanticName()
+    public void OriginalMusicBindsConvertedOggAndPreparedOnlyMusicRetainsItsFormat()
     {
         string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "san9-audio-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(System.IO.Path.Combine(root, "BGM"));
@@ -85,11 +86,14 @@ public sealed class AudioAssetCompilerTests
             string ogg = System.IO.Path.Combine(root, "BGM", "BGM_04.ogg");
             File.WriteAllBytes(ogg, []);
             File.WriteAllBytes(System.IO.Path.Combine(root, "BGM", "BGM_04.WMA"), []);
-            Assert.Equal("audio/music/map-spring.ogg", AudioAssetCompiler.Path(
+            Assert.Equal("shared/music/map-spring.ogg", AudioAssetCompiler.Path(
                 AudioAssetCompiler.Resolve(AudioAssetCompiler.Discover(root), "BGM/BGM_04")));
             File.Delete(ogg);
+            Assert.Equal("shared/music/map-spring.ogg", AudioAssetCompiler.Path(
+                AudioAssetCompiler.Resolve(AudioAssetCompiler.Discover(root), "BGM/BGM_04")));
+            File.Delete(System.IO.Path.Combine(root, "BGM", "BGM_04.WMA"));
             File.WriteAllBytes(System.IO.Path.Combine(root, "BGM", "BGM_04.MP3"), []);
-            Assert.Equal("audio/music/map-spring.mp3", AudioAssetCompiler.Path(
+            Assert.Equal("shared/music/map-spring.mp3", AudioAssetCompiler.Path(
                 AudioAssetCompiler.Resolve(AudioAssetCompiler.Discover(root), "BGM/BGM_04")));
             File.WriteAllBytes(ogg, []);
             Assert.Throws<InvalidDataException>(() => AudioAssetCompiler.Discover(root));
@@ -98,7 +102,7 @@ public sealed class AudioAssetCompilerTests
     }
 
     [Fact]
-    public void MissingPreparedMusicDoesNotFallBackToTranscodingSource()
+    public void MissingMusicSourceIsRejectedWithoutInventingABinding()
     {
         Assert.Throws<InvalidDataException>(() => AudioAssetCompiler.Resolve(new Dictionary<string, string>(), "BGM/BGM_04"));
     }

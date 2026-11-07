@@ -8,15 +8,50 @@ using San9.Rendering;
 
 try
 {
-    if(args.Length==0)throw new ArgumentException("Commands: upgrade-portrait-anchors --texture-package PATH | --portrait-pack PATH; import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|map/formation-appearance|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
+    if(args.Length==0)throw new ArgumentException("Commands: import-audio --game-dir PATH --output PATH [--group bgm|effects|all]; import-movies --game-dir PATH --output PATH [--group events|scenarios|startup|all]; upgrade-portrait-anchors --texture-package PATH | --portrait-pack PATH; import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|map/formation-appearance|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
     Dictionary<string,string> options=[];
     for(int i=1;i<args.Length;i+=2)
         if(i+1>=args.Length||!args[i].StartsWith("--",StringComparison.Ordinal)||!options.TryAdd(args[i],args[i+1]))throw new ArgumentException("Invalid or duplicate option.");
-    string[] allowed=args[0] == "upgrade-portrait-anchors" ? ["--texture-package", "--portrait-pack"] : args[0] == "import-content" ? ["--game-dir", "--output", "--rebuild"] : args[0] == "verify-content" ? ["--content-root"] : args[0] == "import-textures" ? ["--game-dir","--output","--rebuild"] : args[0] == "verify-textures" ? ["--texture-package"] : args[0] == "verify-client" ? ["--content-package"] : args[0] == "import-text" ? ["--game-dir","--output","--exe-evidence"] : args[0] == "import-client"?["--game-dir","--scenario","--texture-package","--output","--message-reports"]:["--content-package","--season","--output","--x","--y","--width","--height","--terrain-only"];
+    string[] allowed = args[0] switch
+    {
+        "import-audio" or "import-movies" => ["--game-dir", "--output", "--group"],
+        "upgrade-portrait-anchors" => ["--texture-package", "--portrait-pack"],
+        "import-content" or "import-textures" => ["--game-dir", "--output", "--rebuild"],
+        "verify-content" => ["--content-root"],
+        "verify-textures" => ["--texture-package"],
+        "verify-client" => ["--content-package"],
+        "import-text" => ["--game-dir", "--output", "--exe-evidence"],
+        "import-client" => ["--game-dir", "--scenario", "--texture-package", "--output", "--message-reports"],
+        "render-map" => ["--content-package", "--season", "--output", "--x", "--y", "--width", "--height", "--terrain-only"],
+        _ => throw new ArgumentException("Unknown command.")
+    };
     if(options.Keys.Any(k=>!allowed.Contains(k)))throw new ArgumentException("Unknown option.");
     string Required(string key)=>options.TryGetValue(key,out var value)?value:throw new ArgumentException($"Missing {key}.");
     var watch=Stopwatch.StartNew();
-    if (args[0] == "upgrade-portrait-anchors")
+    if (args[0] == "import-audio")
+    {
+        var group = options.GetValueOrDefault("--group", "all") switch
+        {
+            "bgm" => AudioLibraryGroup.Bgm,
+            "effects" => AudioLibraryGroup.Effects,
+            "all" => AudioLibraryGroup.All,
+            _ => throw new ArgumentException("Audio group must be bgm, effects or all.")
+        };
+        await AudioLibraryImporter.ImportAsync(Required("--game-dir"), Required("--output"), group, Console.WriteLine);
+    }
+    else if (args[0] == "import-movies")
+    {
+        var group = options.GetValueOrDefault("--group", "all") switch
+        {
+            "events" => MovieLibraryGroup.Events,
+            "scenarios" => MovieLibraryGroup.Scenarios,
+            "startup" => MovieLibraryGroup.Startup,
+            "all" => MovieLibraryGroup.All,
+            _ => throw new ArgumentException("Movie group must be events, scenarios, startup or all.")
+        };
+        await MovieLibraryImporter.ImportAsync(Required("--game-dir"), Required("--output"), group, Console.WriteLine);
+    }
+    else if (args[0] == "upgrade-portrait-anchors")
     {
         if (options.Count != 1) throw new ArgumentException("Specify exactly one of --texture-package or --portrait-pack.");
         if (options.TryGetValue("--texture-package", out var textureRoot))
@@ -37,6 +72,7 @@ try
     {
         string root = Required("--content-root");
         var catalog = await ContentCatalogFiles.LoadAsync(root);
+        _ = await MovieCatalogFiles.LoadAsync(root);
         var textures = await TexturePackageFiles.LoadAsync(PackageFiles.Resolve(root, catalog.Textures));
         var flags = await ContentCatalogFiles.LoadOfficerFlagsAsync(root, catalog);
         flags.ValidateReferences(textures.Map.Clips.Select(c => c.Id).ToHashSet());

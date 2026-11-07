@@ -66,15 +66,12 @@ public static class ContentCatalogImporter
         foreach (var (role, file) in new[] { ("setup", "BGM/BGM_02"), ("game-start", "SE/SE_S001") })
         {
             string original = AudioAssetCompiler.Resolve(preparedAudio, file);
-            string path = "shared/" + AudioAssetCompiler.Path(original)["audio/".Length..];
-            string target = PackageFiles.Resolve(output, path);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(Path.Combine(source.Root, original), target, true);
+            string path = AudioAssetCompiler.Path(original);
             sounds.Add(role, path);
         }
         var opening = new OpeningContent(StartMenuPresentationCompiler.Compile(textures.Library, text), selection with { Entries = [] })
             { Audio = new("setup", "game-start", sounds) };
-        opening.Audio.Validate(output);
+        opening.Audio.Validate(output, requireFiles: false);
         await Publish("shared/opening.json", opening);
         using (var peopleSource = File.OpenRead(source.File("D_Sce001.S9")))
         using (var names = new ScenarioTextReader(messageBytes, exe))

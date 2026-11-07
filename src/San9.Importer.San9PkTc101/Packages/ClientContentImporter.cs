@@ -74,17 +74,7 @@ public static class ClientContentImporter
             Diplomacy = DiplomacyPresentationCompiler.Compile(textures.Library), Ending = EndingPresentationCompiler.Compile(textures.Library) };
         foreach (var source in mapAudio.Sources.Concat(MapAudioCompiler.MusicSources).Concat(battle.Sources))
             presentation.Sounds.Add(source.Role, AudioAssetCompiler.Path(AudioAssetCompiler.Resolve(audioFiles, source.File)));
-        Dictionary<string, byte[]> sounds = new(StringComparer.Ordinal);
-        foreach (string file in audioFiles.Values)
-            sounds.Add(AudioAssetCompiler.Path(file), Read(Path.Combine(sourceDirectory.Root, file)));
-        foreach (string path in presentation.Sounds.Values.Distinct())
-            if (!sounds.ContainsKey(path)) throw new InvalidDataException("Missing prepared audio asset: " + path);
         resourceRoot = Path.GetFullPath(resourceRoot ?? output);
-        bool shared = resourceRoot != output;
-        string audioPrefix = shared ? "shared/" : "";
-        string PublishedAudio(string path) => audioPrefix + path["audio/".Length..];
-        presentation = presentation with { Sounds = presentation.Sounds.ToDictionary(p => p.Key, p => PublishedAudio(p.Value), StringComparer.Ordinal) };
-        sounds = sounds.ToDictionary(p => PublishedAudio(p.Key), p => p.Value, StringComparer.Ordinal);
         var content = new ScenarioContent(ScenarioContent.CurrentSchemaVersion,
             dependency, MapInstance.From(map), scenario, text, roles)
         { Presentation = presentation, Preview = preview };
@@ -92,13 +82,6 @@ public static class ClientContentImporter
         foreach (string key in messages.Keys)
             if (!San9.Content.Text.MessageGraph.ReferencesValid(key, messages))
                 throw new InvalidDataException($"Invalid or cyclic message references: {key}.");
-        foreach (var (path, bytes) in sounds)
-        {
-            string target = PackageFiles.Resolve(resourceRoot, path);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            if (!File.Exists(target) || !File.ReadAllBytes(target).AsSpan().SequenceEqual(bytes))
-                await File.WriteAllBytesAsync(target, bytes, token);
-        }
         if (publishSharedMessages)
         {
             if (resourceRoot is null) throw new InvalidDataException("Publishing shared messages requires a content root.");
@@ -109,10 +92,6 @@ public static class ClientContentImporter
             sharedMap = await MapDefinitionFiles.WriteAsync(resourceRoot, "shared/maps/china/map.json", content.Map.Definition, token);
         await ScenarioContentFiles.WriteAsync(output, content, token, PublicationMessageCatalog.Groups, resourceRoot, sharedMessages,
             sharedMap: sharedMap, sharedScenario: sharedScenario);
-        var currentAudio = sounds.Keys.Select(path => PackageFiles.Resolve(resourceRoot, path)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (string path in shared ? [] : new[] { "music", "sound-effects" }.SelectMany(directory =>
-            Directory.EnumerateFiles(Path.Combine(output, directory), "*", SearchOption.AllDirectories)))
-            if (San9.Content.Interface.AudioFileFormats.Identify(path) is not null && !currentAudio.Contains(path)) File.Delete(path);
         File.Delete(Path.Combine(output, "message-id-map.json"));
         if (messageReports)
         {
