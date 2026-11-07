@@ -124,7 +124,9 @@ public sealed class TurnPresentationTests
         turn.Update(10);
         Assert.Equal(TurnScreen.Strategy, turn.Screen);
         Assert.Null(turn.CommandMarkForceId);
+        Assert.False(turn.CanStopAtStrategyBoundary);
         turn.StopAtStrategyBoundary();
+        Assert.False(turn.StopAtBoundaryRequested);
         long started = session.Snapshot.Clock.DayNumber;
         Assert.True(turn.ContinueAutomaticControls());
         Assert.False(turn.ContinueAutomaticControls());
@@ -135,12 +137,17 @@ public sealed class TurnPresentationTests
         { Ready(turn); turn.Update(2); }
         Assert.True(session.Snapshot.Clock.DayNumber >= started + 11);
         Assert.Null(session.View.PlayerForceId);
+        Assert.True(turn.CanStopAtStrategyBoundary);
+        turn.StopAtStrategyBoundary();
+        Assert.True(turn.StopAtBoundaryRequested);
         turn.StopAtStrategyBoundary();
         Finish(turn);
         Assert.Equal(TurnScreen.Strategy, turn.Screen);
         Assert.Equal(started + 20, session.Snapshot.Clock.DayNumber);
         Assert.True(session.Snapshot.Simulation.CanPersist);
         Assert.True(turn.CanAdvance);
+        Assert.False(turn.CanStopAtStrategyBoundary);
+        Assert.False(turn.StopAtBoundaryRequested);
     }
 
     [Theory]

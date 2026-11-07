@@ -11,7 +11,7 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-public enum SessionReplacementKind { Startup, Load, ControlDelegation }
+public enum SessionReplacementKind { Startup, Load, ControlChange }
 
 /// <summary>Owns session UI replacement while retaining its last complete presentation.</summary>
 public partial class SessionUiHost : Node
@@ -43,6 +43,7 @@ public partial class SessionUiHost : Node
     private CompanionSettingsStore _companionStore = null!;
     private CompanionConfiguration _companionSettings = CompanionConfiguration.Default;
     private WindowDisplay _windowDisplay = null!;
+    private DebugPanel? _debugPanel;
     private bool _bound;
     private AutoSaveQueue _autoSaves = null!;
     private readonly CancellationTokenSource _lifetime = new();
@@ -156,13 +157,14 @@ public partial class SessionUiHost : Node
         Hud = new StrategyHud
         {
             IntroduceNewGame = _pendingKind == SessionReplacementKind.Startup,
+            ResumeStrategy = _pendingKind == SessionReplacementKind.ControlChange,
             CommandPresentation = Content.Presentation, ContentRoot = Content.ContentRoot,
             SaveStore = SaveStore,
             StrategyReady = SavePendingCheckpoint,
             SaveSummary = note => SaveSlotSummaryFactory.Create(Session, Definition, Content.Text, Content.Skin.Roles, note),
             ActivateSession = next => Activate(next, SessionReplacementKind.Load),
             ReturnToOpening = ReturnToOpening, LoadGame = LoadSlot,
-            ControlDelegated = () => Activate(Session, SessionReplacementKind.ControlDelegation),
+            ControlDelegated = () => Activate(Session, SessionReplacementKind.ControlChange),
             StartNewGame = OpenNewGame,
             Music = Music, OverlayHost = overlayHost, SceneMedia = media,
             ReadSettings = () => _settings.Current,
@@ -191,8 +193,13 @@ public partial class SessionUiHost : Node
         overlayHost.AddBackground(Hud);
         _sessionUi.AddChild(Hud);
         _sessionUi.MoveChild(overlayHost, _sessionUi.GetChildCount() - 1);
-        var debug = new DebugPanel { World = World, Host = this };
-        _sessionUi.AddChild(debug);
+        if (_debugPanel is null)
+        {
+            _debugPanel = new DebugPanel { World = World, Host = this };
+            AddChild(_debugPanel);
+        }
+        var debug = _debugPanel;
+        MoveChild(debug, GetChildCount() - 1);
         World.IsInspectionBlocked = p => IsSwitching || (debug.Visible && debug.GetRect().HasPoint(p));
         World.IsInputBlocked = p => IsSwitching || Hud.Overview.IsOpen ||
             (debug.Visible && debug.GetRect().HasPoint(p)) || Hud.IsBlockedPoint(p) || Hud.IsSpeechPoint(p);
@@ -203,9 +210,9 @@ public partial class SessionUiHost : Node
         _pending = null;
         _autoSaveNotice.Hide();
         SavePendingCheckpoint();
-        if (!Session.RulesVersionWarnings.IsEmpty)
+        if (_pendingKind is (SessionReplacementKind.Startup or SessionReplacementKind.Load) && !Session.RulesVersionWarnings.IsEmpty)
             Hud.SystemMenu.ShowLoadWarning(string.Join("\n", Session.RulesVersionWarnings.Select(w => w.Message)));
-        if (_pendingKind == SessionReplacementKind.ControlDelegation)
+        if (_pendingKind == SessionReplacementKind.ControlChange)
             Hud.Turn.ContinueAutomaticControls();
     }
 

@@ -12,9 +12,11 @@ public sealed class StrategyEntrancePublication
     private (int? Force, GameClock? Clock) contextPresented;
     private long? entrancePresented;
 
-    public StrategyEntrancePublication(GameSession session)
+    public StrategyEntrancePublication(GameSession session, long? resumedEntrance = null)
     {
         this.session = session;
+        // Rebinding a live strategy screen has no new entrance or initial feedback to publish.
+        entrancePresented = resumedEntrance;
         contextPresented = (session.View.PlayerForceId, session.StrategicContext.Clock);
     }
 

@@ -70,6 +70,9 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
     private bool _executionStarted;
     private bool _presentationFailed;
     private bool _stopAtBoundary;
+    public bool StopAtBoundaryRequested => _stopAtBoundary;
+    public bool CanStopAtStrategyBoundary => _advancing &&
+        Screen is not (TurnScreen.Strategy or TurnScreen.Returning or TurnScreen.Terminal);
     private sealed record FeedbackFrame(ResolutionPhase Phase, StrategySnapshot Before, StrategySnapshot After, int Start, int End);
     private readonly Queue<FeedbackFrame> _frames = new();
     private StrategySnapshot _operationBefore = session.View;
@@ -77,7 +80,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
     private bool _frameEmitted;
     public void StopAtStrategyBoundary()
     {
-        if (_advancing && Screen is not (TurnScreen.Strategy or TurnScreen.Returning or TurnScreen.Terminal))
+        if (CanStopAtStrategyBoundary)
             _stopAtBoundary = true;
     }
 

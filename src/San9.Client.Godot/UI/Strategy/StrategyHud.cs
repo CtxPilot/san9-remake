@@ -20,6 +20,7 @@ public partial class StrategyHud : Control
     public TextureService Textures { get; init; } = null!;
     public ISceneMedia SceneMedia { get; init; } = new SilentSceneMedia();
     public bool IntroduceNewGame { get; init; }
+    public bool ResumeStrategy { get; init; }
     public Action? StartNewGame { get; init; }
     private TextureScope _textures = null!;
     public SceneMusicPlayer Music { get; init; } = null!;

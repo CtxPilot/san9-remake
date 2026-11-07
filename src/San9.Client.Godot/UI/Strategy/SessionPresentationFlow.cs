@@ -24,6 +24,7 @@ public partial class SessionPresentationFlow : Node
     public Func<Settings.UserSettings> ReadSettings { get; init; } = null!;
     private bool SoundEnabled => ReadSettings().SoundEnabled;
     public bool IntroduceNewGame { get; init; }
+    public bool ResumeStrategy { get; init; }
     public Action? StartNewGame { get; init; }
     public Action LoadGame { get; init; } = null!;
     public Func<MapMessageRecord, bool> PresentMapRecord { get; init; } = null!;
@@ -39,7 +40,7 @@ public partial class SessionPresentationFlow : Node
     public long Publication => _executionPublication;
     private StrategyEntrancePublication _strategyEntrance = null!;
     public Action FocusIncomingPlayer { get; init; } = null!;
-    public override void _Ready() => _strategyEntrance = new(Session);
+    public override void _Ready() => _strategyEntrance = new(Session, resumedEntrance: ResumeStrategy ? Turn.StrategyEntrance : null);
     private GameDialog? _failure;
     public void Update()
     {

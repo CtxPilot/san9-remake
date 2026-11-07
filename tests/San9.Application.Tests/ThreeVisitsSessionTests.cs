@@ -50,6 +50,13 @@ public sealed class ThreeVisitsSessionTests
         var restored = GameSession.Restore(definition, before);
         var restoredOutput = new StrategyEntrancePublication(restored).Read(1, texts, content, introduceNewGame: false)!;
         Assert.Equal("order", Assert.Single(restoredOutput.Messages).Message.Key);
+
+        var rebound = new StrategyEntrancePublication(session, resumedEntrance: 1);
+        Assert.Null(rebound.Read(1, texts, content, introduceNewGame: false));
+        // A genuine subsequent entrance still prompts, without replaying initial recommendations.
+        var nextEntrance = rebound.Read(2, texts, content, introduceNewGame: false)!;
+        Assert.Equal("order", Assert.Single(nextEntrance.Messages).Message.Key);
+        StateAssert.Equal(before, session.Capture());
     }
 
     private static ScenarioInitialState Definition() => new(ScenarioInitialState.CurrentSchemaVersion, "visits", 190, 2, 1, 1,
