@@ -12,7 +12,7 @@ public sealed class NaturalMortalitySessionTests
     public void QuarterlyDeathUpdatesVisibilityAndRoundTripsSave()
     {
         var fixture = G01ScenarioTests.Fixture();
-        var scenario = fixture with { Year = 190, Month = 1, Day = 1,
+        var scenario = fixture with { OfficeRequestsEnabled = false, Year = 190, Month = 1, Day = 1,
             Officers = fixture.Officers.Append(new OfficerInitialState("elder", new(9000, null,
                 fixture.Settlements[0].Id, new(50, 50, 50, 50), false)
                 { BirthYear = 90, Status = OfficerStatus.Free })).ToArray() };

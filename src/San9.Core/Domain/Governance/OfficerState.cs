@@ -46,7 +46,13 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     [JsonRequired] public string Surname { get; init; } = "";
     public int? OfficeId { get; init; }
     [JsonRequired] public bool IsCommander { get; init; }
-    [JsonRequired] public ImmutableDictionary<int, int> ForceLoyalties { get; init; } = ImmutableDictionary<int, int>.Empty;
+    private LoyaltyMap _loyalties = LoyaltyMap.Empty;
+    // The wire contract contains only overrides. Keep incoming entries until the content baseline is bound.
+    [JsonRequired] public ImmutableDictionary<int, int> ForceLoyalties
+    {
+        get => _loyalties.Overrides;
+        init => _loyalties = _loyalties with { Overrides = value };
+    }
     [JsonRequired] public int Righteousness { get; init; }
     [JsonRequired] public int Ambition { get; init; }
     [JsonRequired] public int ForceFounderPriority { get; init; }
@@ -54,16 +60,21 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     [JsonRequired] public bool AutomaticSurrenderAllowed { get; init; } = true;
     [JsonRequired] public bool RewardedThisXun { get; init; }
     [JsonRequired] public bool HasRecruitmentPoliticsBonus { get; init; }
-    [System.Text.Json.Serialization.JsonIgnore] public int Loyalty => OwnerId is int owner ? LoyaltyTo(owner) : 0;
+    /// <summary>Binds content rule context on creation or load and removes redundant overrides.</summary>
+    public OfficerState WithLoyaltyDefault(int defaultLoyalty)
+    {
+        var loyalties = _loyalties.Bind(defaultLoyalty);
+        return ReferenceEquals(loyalties, _loyalties) ? this : this with { _loyalties = loyalties };
+    }
 
-    public int LoyaltyTo(int forceId) => ForceLoyalties.GetValueOrDefault(forceId);
+    [JsonIgnore] public int Loyalty => OwnerId is int owner ? LoyaltyTo(owner) : 0;
+
+    public int LoyaltyTo(int forceId) => _loyalties.Get(forceId);
 
     public OfficerState WithLoyalty(int forceId, int value)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(forceId);
-        ArgumentOutOfRangeException.ThrowIfNegative(value);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 255);
-        return this with { ForceLoyalties = ForceLoyalties.SetItem(forceId, value) };
+        var loyalties = _loyalties.Set(forceId, value);
+        return ReferenceEquals(loyalties, _loyalties) ? this : this with { _loyalties = loyalties };
     }
     public bool IsValid()
     {

@@ -213,7 +213,7 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
         return Report(used >= limit && work != OriginalAiWork.Reward ? OriginalAiWorkEnd.AttemptsExhausted : OriginalAiWorkEnd.NoCandidates);
     }
 
-    internal static long RewardScore(OfficerState p) => 255L * p.Loyalty + PersonnelRewardMath.Gain(p.Loyalty, p.Righteousness);
+    internal long RewardScore(OfficerState p) => 255L * p.Loyalty + PersonnelRewardMath.Gain(p.Loyalty, p.Righteousness);
     internal static int Maximum(OfficerAbilities a) => Math.Max(Math.Max(a.War, a.Intelligence), Math.Max(a.Politics, a.Leadership));
     private static long Sum(OfficerAbilities a) => (long)a.War + a.Intelligence + a.Politics + a.Leadership;
 

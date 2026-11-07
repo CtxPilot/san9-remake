@@ -96,8 +96,7 @@ public static class NewGameComposer
                 ? historical[original].State.BloodlineId ?? original : checked(++bloodline);
             return bloodlines[p.Id] = family;
         }
-        var officers = source.Officers.Select(o => o with { State = o.State with
-            { ForceLoyalties = rulerForces.Values.Aggregate(o.State.ForceLoyalties, (values, id) => values.Add(id, 50)) } }).ToList();
+        var officers = source.Officers.ToList();
         foreach (var p in setup.Library.Officers.Where(p => included.Contains(p.Id)).OrderBy(p => p.Id))
         {
             if (p.LearnedTactics.Any(t => source.Military?.Tactics.Any(rule => rule.Id == t) != true))
@@ -106,7 +105,8 @@ public static class NewGameComposer
             bool ruler = rulerForces.TryGetValue(p.Id, out int ownForce);
             int? owner = ruler ? ownForce : placements.TryGetValue(p.Id, out var placement) && placement.JoinForce ? cities[placement.CityId].OwnerId : null;
             bool future = source.NaturalDeathsEnabled && !ruler && p.AppearanceYear > source.Year;
-            var loyalty = forces.ToImmutableDictionary(f => f.Id, f => ruler && f.Id == owner ? 100 : 50);
+            var loyalty = ruler && source.DefaultLoyalty != 100
+                ? ImmutableDictionary<int, int>.Empty.Add(ownForce, 100) : ImmutableDictionary<int, int>.Empty;
             var state = new OfficerState(ids[p.Id], future ? null : owner, cityId, p.Abilities, false)
             {
                 IsDormant = cityId is null, Status = cityId is null ? OfficerStatus.Undiscovered : ruler ? OfficerStatus.Ruler :

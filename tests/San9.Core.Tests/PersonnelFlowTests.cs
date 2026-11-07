@@ -76,16 +76,16 @@ public sealed class PersonnelFlowTests
     }
 
     [Fact]
-    public void MissingLiveForceLoyaltyStillRecoversTowardFifty()
+    public void MissingLiveForceLoyaltyAlreadyUsesTheDefault()
     {
         var world = World();
         PersonnelLoyaltyCycle.Apply(world, []);
-        Assert.Equal(1, world.Officers[11].LoyaltyTo(1));
+        Assert.Equal(50, world.Officers[11].LoyaltyTo(1));
     }
 
     [Theory]
     [InlineData(3, 10)]
-    [InlineData(4, 0)]
+    [InlineData(4, 50)]
     public void InactiveForceLoyaltiesDoNotRecover(int forceId, int loyalty)
     {
         var world = World();

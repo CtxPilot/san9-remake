@@ -44,10 +44,11 @@ public sealed record SettlementInitialState(int Id, string NameKey, int? OwnerId
 public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements, Dictionary<int, string> RegionNameKeys, Dictionary<int, int> RegionCityIds)
 {
-    public const int CurrentSchemaVersion = 157;
+    public const int CurrentSchemaVersion = 158;
     [JsonRequired] public San9.Core.Domain.OfficerGrowthRules OfficerGrowth { get; init; } = San9.Core.Domain.OfficerGrowthRules.Default;
     [JsonRequired] public int[] FictionalOfficerPlaceIds { get; init; } = [];
     [JsonRequired] public OriginalAiDefinition OriginalAi { get; init; } = OriginalAiDefinition.Default;
+    [JsonRequired] public int DefaultLoyalty { get; init; } = 50;
     [JsonRequired] public int FoodExchangeRate { get; init; } = 1;
     [JsonRequired] public San9.Core.Domain.FoodMarketDefinition? FoodMarket { get; init; }
     [JsonRequired] public San9.Core.Domain.HanzhongKingDefinition? HanzhongKing { get; init; }
@@ -97,6 +98,7 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
 
     public void Validate(ScenarioValidationContext? context)
     {
+        if (DefaultLoyalty is < 0 or > 255) throw new InvalidDataException("Invalid default loyalty.");
         if (OfficerGrowth is null || OfficerGrowth.MaximumBaseAbility < San9.Core.Domain.OfficerGrowthRules.MinimumEditableAbility || OfficerGrowth.TacticProficiencyCap <= 0)
             throw new InvalidDataException("Invalid officer growth rules.");
         // The operation context validates the large shared military/geography graph once per snapshot.

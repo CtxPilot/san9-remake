@@ -61,7 +61,7 @@ public sealed partial class SharedDataEditorWorkspaceTests : IDisposable
             var document = JsonSerializer.Deserialize<ScenarioDocument>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
             await File.WriteAllTextAsync(path, JsonSerializer.Serialize(document with
             {
-                Officers = [ScenarioOfficerState.From(person, profile, texts)],
+                Officers = [ScenarioOfficerState.From(person, profile, texts, definitions.DefaultLoyalty)],
                 DefinitionOverrides = document.DefinitionOverrides.Military is { Value: { } privateMilitary }
                     ? document.DefinitionOverrides with { Military = new(privateMilitary with { Tactics = definitions.Military!.Tactics }) }
                     : document.DefinitionOverrides

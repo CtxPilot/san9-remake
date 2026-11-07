@@ -12,7 +12,7 @@ public static class OfficerContentCompiler
         office.HasPoliticsBonus ? office.AbilityBonus : 0, office.HasLeadershipBonus ? office.AbilityBonus : 0);
     public static OfficerInitialState[] Compile(IReadOnlyList<San9ScenarioPersonRecord> people,
         IReadOnlyList<SettlementInitialState> settlements, IReadOnlyList<ForceInitialState> forces,
-        ScenarioTextReader text, San9MessageTable biographies)
+        ScenarioTextReader text, San9MessageTable biographies, int defaultLoyalty = 50)
     {
         var locations = settlements.ToDictionary(s => s.Id);
         List<OfficerInitialState> result = [];
@@ -51,7 +51,7 @@ public static class OfficerContentCompiler
                 IsCommander = person.IsOwnerLeader,
                 RegionId = settlement is null ? person.LocationId : null, Injury = person.Health, Status = (OfficerStatus)person.StatusCode,
                 BirthYear = StartingAge(person.BiographyResourceCode) is null ? person.BirthYear : 0, OfficeId = person.OfficeRankId,
-                ForceLoyalties = forces.ToImmutableDictionary(f => f.Id, f => (int)person.GetForceLoyalty(f.Id)),
+                ForceLoyalties = forces.Where(f => person.GetForceLoyalty(f.Id) != defaultLoyalty).ToImmutableDictionary(f => f.Id, f => (int)person.GetForceLoyalty(f.Id)),
                 Righteousness = person.Righteousness,
                 Ambition = person.Ambition,
                 ForceFounderPriority = FounderPriority(person.BiographyResourceCode),

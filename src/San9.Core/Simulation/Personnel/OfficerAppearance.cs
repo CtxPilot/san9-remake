@@ -52,8 +52,8 @@ internal static class OfficerAppearance
         {
             int loyalty = person.OwnerId == force.Id
                 ? 75 + (50 - PersonnelRulebook.AffinityDistance(person, world.Officers[force.LeaderId!.Value])) / 2
-                : 50;
-            if (!person.ForceLoyalties.ContainsKey(force.Id) || person.LoyaltyTo(force.Id) != loyalty)
+                : world.DefaultLoyalty;
+            if (person.LoyaltyTo(force.Id) != loyalty)
                 RecruitmentRules.SetLoyalty(world, personId, force.Id, loyalty, "officer-appeared", events);
         }
     }

@@ -12,6 +12,7 @@ public sealed partial class SharedDataEditorWorkspace
         if (_changedOfficers.Count != 0 || OfficerCatalog.NextOfficerId != _savedOfficers.NextOfficerId) return true;
         ScenarioDefinitions Dependencies(ScenarioDefinitions value) => value with
         {
+            DefaultLoyalty = _saved.DefaultLoyalty,
             OfficerGrowth = _saved.OfficerGrowth,
             Information = value.Information with
             {
@@ -39,6 +40,7 @@ public sealed partial class SharedDataEditorWorkspace
 
     private static void ValidateLocalRules(ScenarioDefinitions draft)
     {
+        if (draft.DefaultLoyalty is < 0 or > 255) throw new InvalidDataException("默认忠诚必须介于0与255之间。");
         draft.OfficerGrowth.Validate();
         if (draft.Information.Ranks.Any(r => string.IsNullOrWhiteSpace(r.Name)) ||
             draft.Information.Offices.Any(o => string.IsNullOrWhiteSpace(o.Name)) ||

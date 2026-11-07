@@ -15,6 +15,48 @@ namespace San9.Application.Tests;
 public sealed class PersistenceTests : IDisposable
 {
     [Fact]
+    public void SaveOmitsGlobalLoyaltyDefaultAndRestoresSparseOverridesUsingContent()
+    {
+        var source = Fixture();
+        var definition = source with
+        {
+            DefaultLoyalty = 63,
+            Officers = source.Officers.Select(o => o with { State = o.State with
+            {
+                ForceLoyalties = o.State.Id == 2
+                    ? ImmutableDictionary<int, int>.Empty.Add(1, 0).Add(2, 98)
+                    : ImmutableDictionary<int, int>.Empty.Add(1, 63)
+            } }).ToArray()
+        };
+        var session = GameSession.Start(definition, 190);
+        byte[] bytes = SaveService.Encode(session);
+        using var json = JsonDocument.Parse(bytes);
+        var world = json.RootElement.GetProperty("session").GetProperty("world");
+        Assert.DoesNotContain("defaultLoyalty", Encoding.UTF8.GetString(bytes));
+        Assert.All(world.GetProperty("officers").EnumerateArray(), person =>
+        {
+            Assert.False(person.TryGetProperty("defaultLoyalty", out _));
+            Assert.DoesNotContain(person.GetProperty("forceLoyalties").EnumerateObject(), p => p.Value.GetInt32() == 63);
+        });
+        var restored = SaveService.Decode(bytes, definition);
+        Assert.Equal(63, restored.Snapshot.DefaultLoyalty);
+        var person = restored.Snapshot.Officers.Single(o => o.Id == 2);
+        Assert.Equal(0, person.LoyaltyTo(1));
+        Assert.Equal(98, person.LoyaltyTo(2));
+        Assert.Equal(63, restored.Snapshot.Officers.Single(o => o.Id == 3).LoyaltyTo(1));
+        var changedRules = SaveService.Decode(bytes, definition with { DefaultLoyalty = 91 });
+        Assert.Equal(91, changedRules.Snapshot.DefaultLoyalty);
+        Assert.Equal(91, changedRules.Snapshot.Officers.Single(o => o.Id == 3).LoyaltyTo(1));
+        Assert.Equal(0, changedRules.Snapshot.Officers.Single(o => o.Id == 2).LoyaltyTo(1));
+        var playerLoad = SaveService.Load(bytes, definition with { DefaultLoyalty = 91 });
+        Assert.Equal(91, playerLoad.Snapshot.DefaultLoyalty);
+        StateAssert.Equal(session.Capture(), restored.Capture());
+        var request = session.Request(new AdvanceOperation());
+        Equal(session.Apply(request), restored.Apply(request));
+        Assert.Equal(SaveService.Encode(session), SaveService.Encode(restored));
+    }
+
+    [Fact]
     public void SessionsDoNotPrepareAutomaticCheckpointsUnlessTheClientOptsIn()
     {
         var session = GameSession.Start(Fixture(), 190);

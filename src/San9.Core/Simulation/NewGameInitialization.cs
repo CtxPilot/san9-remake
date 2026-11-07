@@ -73,7 +73,7 @@ internal static class NewGameInitialization
         if (settings.Mode != GameMode.Fictional) return;
         var places = officerPlaces.Distinct().Order().ToArray();
         int Pick(int count) => (int)(world.NextRandom("new-game") % (ulong)count);
-        var loyalties = world.AllForces.Keys.ToImmutableDictionary(id => id, _ => 50);
+        var loyalties = ImmutableDictionary<int, int>.Empty;
         foreach (var person in world.AllOfficers.Values.OrderBy(p => p.Id).ToArray())
         {
             if (person.Status == OfficerStatus.Dead || createdOfficerIds.Contains(person.Id)) continue;
@@ -81,8 +81,9 @@ internal static class NewGameInitialization
             {
                 Righteousness = Pick(16), Ambition = Pick(16), Personality = Pick(4), LifespanTier = Pick(8),
                 Affinity = Pick(150), ParentId = null, BloodlineId = person.Id,
-                ForceLoyalties = person.OwnerId is int owner ? loyalties.SetItem(owner, 80 + Pick(21)) : loyalties
+                ForceLoyalties = loyalties
             };
+            if (person.OwnerId is int owner) updated = updated.WithLoyalty(owner, 80 + Pick(21));
             if (!person.IsDormant && person.Status is OfficerStatus.Free or OfficerStatus.Undiscovered or OfficerStatus.NotAppeared)
             {
                 if (places.Length == 0) throw new ArgumentException("Fictional mode requires officer starting places.");

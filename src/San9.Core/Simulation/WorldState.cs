@@ -48,17 +48,19 @@ public sealed class WorldState
 
     public GameClock Clock { get; private set; }
 
+    public int DefaultLoyalty { get; private set; } = 50;
+
     public SimulationState Simulation { get; private set; }
 
     public static WorldState Create(GameClock clock, ulong seed) => Create(clock, seed, [], [], []);
 
     public static WorldState Create(GameClock clock, ulong seed, IEnumerable<ForceState> forces,
-        IEnumerable<SettlementState> settlements, IEnumerable<OfficerState> officers, IEnumerable<UnitState>? units = null, IEnumerable<CorpsState>? corps = null, IEnumerable<TreasureState>? treasures = null, IEnumerable<ForceRelation>? relations = null, IEnumerable<ControlSeat>? controls = null, int computerDamageBonusPercent = 0, AllianceState? alliance = null, IEnumerable<AttackRequestState>? attackRequests = null, bool annualAppearancesEnabled = true, bool naturalDeathsEnabled = true, bool freeOfficerMigrationEnabled = true, bool battleDeathsEnabled = false, bool officeRequestsEnabled = true, IEnumerable<PersistentEventKey>? consumedEventKeys = null, bool forceConsolidationEnabled = true, bool forceEmergenceEnabled = true, bool cityIndependenceEnabled = true, bool imperialCourtEnded = false, GameClock? threeVisitsStarted = null, int foodExchangeRate = 1, bool settlementDefectionsEnabled = true, bool unitDefectionsEnabled = true, NewGameSettings? newGame = null, IReadOnlyList<int>? officerStartingPlaces = null, IReadOnlySet<int>? initialPlayerForces = null, IReadOnlySet<int>? foundedForceIds = null, IReadOnlySet<int>? createdOfficerIds = null)
+        IEnumerable<SettlementState> settlements, IEnumerable<OfficerState> officers, IEnumerable<UnitState>? units = null, IEnumerable<CorpsState>? corps = null, IEnumerable<TreasureState>? treasures = null, IEnumerable<ForceRelation>? relations = null, IEnumerable<ControlSeat>? controls = null, int computerDamageBonusPercent = 0, AllianceState? alliance = null, IEnumerable<AttackRequestState>? attackRequests = null, bool annualAppearancesEnabled = true, bool naturalDeathsEnabled = true, bool freeOfficerMigrationEnabled = true, bool battleDeathsEnabled = false, bool officeRequestsEnabled = true, IEnumerable<PersistentEventKey>? consumedEventKeys = null, bool forceConsolidationEnabled = true, bool forceEmergenceEnabled = true, bool cityIndependenceEnabled = true, bool imperialCourtEnded = false, GameClock? threeVisitsStarted = null, int foodExchangeRate = 1, bool settlementDefectionsEnabled = true, bool unitDefectionsEnabled = true, NewGameSettings? newGame = null, IReadOnlyList<int>? officerStartingPlaces = null, IReadOnlySet<int>? initialPlayerForces = null, IReadOnlySet<int>? foundedForceIds = null, IReadOnlySet<int>? createdOfficerIds = null, int defaultLoyalty = 50)
     {
-        var world = new WorldState(clock, seed);
+        var world = new WorldState(clock, seed) { DefaultLoyalty = defaultLoyalty };
         world._forces = IndexUnique(forces, value => value.Id);
         world._settlements = IndexUnique(settlements, value => value.Id);
-        world._officers = IndexUnique(officers, value => value.Id);
+        world._officers = IndexUnique(officers.Select(p => p.WithLoyaltyDefault(defaultLoyalty)), value => value.Id);
         var declaredUnits = (units ?? []).ToArray();
         world._units = IndexUnique(declaredUnits, value => value.Id);
         world._unitOrder = declaredUnits.Select(u => u.Id).ToImmutableArray();
@@ -91,7 +93,9 @@ public sealed class WorldState
     }
 
     /// <summary>Clones committed runtime state, including pending interactions; save validation belongs to Application.</summary>
-    public static WorldState Restore(WorldSnapshot snapshot)
+    public static WorldState Restore(WorldSnapshot snapshot) => Restore(snapshot, snapshot.DefaultLoyalty);
+
+    public static WorldState Restore(WorldSnapshot snapshot, int defaultLoyalty)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (snapshot.Simulation.Boundary is not (SimulationBoundary.Stable or SimulationBoundary.Terminal or SimulationBoundary.AwaitingDecision or SimulationBoundary.Advancing))
@@ -101,12 +105,13 @@ public sealed class WorldState
         {
             _forces = IndexUnique(snapshot.Forces, value => value.Id),
             _settlements = IndexUnique(snapshot.Settlements, value => value.Id),
-            _officers = IndexUnique(snapshot.Officers, value => value.Id),
+            _officers = IndexUnique(snapshot.Officers.Select(p => p.WithLoyaltyDefault(defaultLoyalty)), value => value.Id),
             _units = IndexUnique(snapshot.Units, value => value.Id),
             _unitOrder = snapshot.Units.Select(u => u.Id).ToImmutableArray(),
             _corps = IndexUnique(snapshot.Corps, value => value.Id),
             _treasures = IndexUnique(snapshot.Treasures, value => value.Id),
             _relations = IndexUnique(snapshot.Relations, value => (value.FirstId, value.SecondId)),
+            DefaultLoyalty = defaultLoyalty,
             Simulation = snapshot.Simulation,
             Revision = snapshot.Revision,
         };
@@ -124,7 +129,7 @@ public sealed class WorldState
             _forces = _forces, _settlements = _settlements, _officers = _officers, _units = _units, _unitOrder = _unitOrder,
             _corps = _corps, _treasures = _treasures, _relations = _relations,
             _activeRecords = _activeRecords,
-            Simulation = Simulation, Revision = Revision, _snapshot = _snapshot, LeadershipConsistent = LeadershipConsistent,
+            DefaultLoyalty = DefaultLoyalty, Simulation = Simulation, Revision = Revision, _snapshot = _snapshot, LeadershipConsistent = LeadershipConsistent,
             GovernanceConsistent = GovernanceConsistent,
             EngagementCache = EngagementCache,
             _publishedForces = _publishedForces,
@@ -208,7 +213,7 @@ public sealed class WorldState
         var relations = _publishedRelations ??= Array.AsReadOnly(_relations.Values.OrderBy(r => r.FirstId).ThenBy(r => r.SecondId).ToArray());
         var treasures = _publishedTreasures ??= Array.AsReadOnly(_treasures.Values.OrderBy(t => t.Id).ToArray());
         var units = _publishedUnits ??= Array.AsReadOnly(_unitOrder.Select(id => _units[id]).ToArray());
-        return _snapshot = new WorldSnapshot(Clock, SnapshotSimulation()) { Forces = forces, Settlements = settlements, Officers = officers, Units = units, Corps = corps, Treasures = treasures, Relations = relations, Revision = Revision };
+        return _snapshot = new WorldSnapshot(Clock, SnapshotSimulation()) { DefaultLoyalty = DefaultLoyalty, Forces = forces, Settlements = settlements, Officers = officers, Units = units, Corps = corps, Treasures = treasures, Relations = relations, Revision = Revision };
     }
 
     private SimulationState SnapshotSimulation() => Simulation with
@@ -222,6 +227,8 @@ public sealed record WorldSnapshot(
     GameClock Clock,
     SimulationState Simulation)
 {
+    /// <summary>Rule context supplied by content on load, excluded from saves and state hashes.</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public int DefaultLoyalty { get; init; } = 50;
     public IReadOnlyList<ForceState> Forces { get; init; } = [];
     public IReadOnlyList<SettlementState> Settlements { get; init; } = [];
     public IReadOnlyList<OfficerState> Officers { get; init; } = [];

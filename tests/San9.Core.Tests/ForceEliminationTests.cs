@@ -42,7 +42,7 @@ public sealed class ForceEliminationTests
         Assert.Null(person.OwnerId);
         Assert.Null(person.OfficeId);
         Assert.Equal(0, person.TacticCooldown);
-        Assert.Equal(0, person.LoyaltyTo(1));
+        Assert.Equal(50, person.LoyaltyTo(1));
         Assert.Equal(190, person.StatusStartYear);
         Assert.Single(events.OfType<PersonAffiliationChangedEvent>(), e => e.OfficerId == 11);
         Assert.Equal(neighbors, world.Simulation.RandomStreams.Any(s => s.Name == "battle-personnel-placement"));
@@ -93,11 +93,11 @@ public sealed class ForceEliminationTests
     }
 
     [Theory]
-    [InlineData(OfficerStatus.Serving, 0)]
-    [InlineData(OfficerStatus.Undiscovered, 0)]
-    [InlineData(OfficerStatus.NotAppeared, 0)]
-    [InlineData(OfficerStatus.Dead, 0)]
-    [InlineData(OfficerStatus.Special, 0)]
+    [InlineData(OfficerStatus.Serving, 50)]
+    [InlineData(OfficerStatus.Undiscovered, 50)]
+    [InlineData(OfficerStatus.NotAppeared, 50)]
+    [InlineData(OfficerStatus.Dead, 50)]
+    [InlineData(OfficerStatus.Special, 50)]
     public void RetirementRemovesTheOldLoyaltyRelationshipRegardlessOfStatus(OfficerStatus status, int loyalty)
     {
         var world = World();
@@ -107,7 +107,7 @@ public sealed class ForceEliminationTests
         Eliminate(world);
         Assert.Equal(loyalty, world.Officers[30].LoyaltyTo(1));
         Assert.All(world.AllOfficers.Values, p => Assert.False(p.ForceLoyalties.ContainsKey(1)));
-        Assert.Equal(0, world.Officers[2].LoyaltyTo(1));
+        Assert.Equal(50, world.Officers[2].LoyaltyTo(1));
         Assert.Equal(status, world.Officers[30].Status);
     }
 

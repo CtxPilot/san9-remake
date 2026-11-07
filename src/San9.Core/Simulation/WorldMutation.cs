@@ -185,8 +185,10 @@ internal sealed partial class WorldMutation : IWorldQuery
         Corps = AllCorps.Values.OrderBy(x => x.Id).ToImmutableArray(),
         Treasures = AllTreasures.Values.OrderBy(x => x.Id).ToImmutableArray(),
         Relations = AllRelations.Values.OrderBy(x => x.FirstId).ThenBy(x => x.SecondId).ToImmutableArray(),
+        DefaultLoyalty = DefaultLoyalty,
         Revision = _expectedRevision,
     };
+    internal int DefaultLoyalty => _owner.DefaultLoyalty;
     internal SimulationState Simulation { get; private set; }
     internal ImmutableDictionary<int, ForceState> AllForces { get; private set; }
     internal ImmutableDictionary<int, SettlementState> AllSettlements { get; private set; }
@@ -354,6 +356,7 @@ internal sealed partial class WorldMutation : IWorldQuery
     }
     internal void Replace(OfficerState value)
     {
+        value = value.WithLoyaltyDefault(DefaultLoyalty);
         var previous = AllOfficers[value.Id];
         if (previous.IsServing != value.IsServing || (previous.IsServing || value.IsServing) &&
             (previous.IsDormant != value.IsDormant || previous.OwnerId != value.OwnerId ||

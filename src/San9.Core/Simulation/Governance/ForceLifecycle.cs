@@ -16,8 +16,8 @@ internal static class ForceLifecycle
         foreach (var person in world.AllOfficers.Values.Where(p => p.ForceLoyalties.ContainsKey(forceId)).OrderBy(p => p.Id).ToArray())
         {
             world.Replace(person with { ForceLoyalties = person.ForceLoyalties.Remove(forceId) });
-            if (person.LoyaltyTo(forceId) != 0)
-                events.Add(new OfficerLoyaltyChangedEvent(world.Clock, person.Id, forceId, person.LoyaltyTo(forceId), 0, "force-retired"));
+            if (person.LoyaltyTo(forceId) != world.DefaultLoyalty)
+                events.Add(new OfficerLoyaltyChangedEvent(world.Clock, person.Id, forceId, person.LoyaltyTo(forceId), world.DefaultLoyalty, "force-retired"));
         }
         AllianceDiplomacy.ForceEliminated(world, forceId, events);
         foreach (var relation in world.Relations.Values.Where(r => r.FirstId == forceId || r.SecondId == forceId).ToArray()) world.Replace(relation with { Value = 0 });

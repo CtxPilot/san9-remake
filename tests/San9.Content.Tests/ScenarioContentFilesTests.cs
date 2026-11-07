@@ -27,6 +27,22 @@ public sealed class ScenarioContentFilesTests : IDisposable
         }, new() { ["portrait"] = "portrait/0" });
 
     [Fact]
+    public async Task GlobalLoyaltyDefaultRoundTripsThroughSharedRulesAndScenarioOverrides()
+    {
+        var content = Fixture();
+        var defaults = content.Scenario with { DefaultLoyalty = 63 };
+        var shared = SharedScenarioData.From(defaults, "shared/definitions.json", "shared/officers.json", "shared/geography.json", content.Text);
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared);
+        await ScenarioContentFiles.WriteAsync(_root, content with { Scenario = defaults with { DefaultLoyalty = 71 } }, sharedScenario: shared);
+        var loaded = await ScenarioContentFiles.LoadAsync(_root);
+        Assert.Equal(71, loaded.Scenario.DefaultLoyalty);
+        using var rules = JsonDocument.Parse(await File.ReadAllTextAsync(PublishedPath("definitions.json")));
+        Assert.Equal(63, rules.RootElement.GetProperty("defaultLoyalty").GetInt32());
+        using var world = JsonDocument.Parse(await File.ReadAllTextAsync(PublishedPath("scenario.json")));
+        Assert.Equal(71, world.RootElement.GetProperty("definitionOverrides").GetProperty("defaultLoyalty").GetProperty("value").GetInt32());
+    }
+
+    [Fact]
     public async Task ManifestPreviewRoundTripsAndRefreshesWithoutReadingOrChangingWorldData()
     {
         var preview = new San9.Content.Interface.ScenarioPreviewEntry("custom", "custom-category", 281, 1, "标题", "简介", []);

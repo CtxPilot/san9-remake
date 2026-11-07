@@ -14,7 +14,7 @@ public sealed record ContentOverride<T>(T Value);
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScenarioDefinitions
 {
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
     [JsonRequired] public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     [JsonRequired] public long NextFormationId { get; init; }
     [JsonRequired] public long NextTacticId { get; init; }
@@ -22,6 +22,7 @@ public sealed record ScenarioDefinitions
     [JsonRequired] public long NextRankId { get; init; }
     [JsonRequired] public required OfficerGrowthRules OfficerGrowth { get; init; }
     [JsonRequired] public required OriginalAiDefinition OriginalAi { get; init; }
+    [JsonRequired] public required int DefaultLoyalty { get; init; }
     [JsonRequired] public required int FoodExchangeRate { get; init; }
     [JsonRequired] public required FoodMarketDefinition? FoodMarket { get; init; }
     [JsonRequired] public required HanzhongKingDefinition? HanzhongKing { get; init; }
@@ -55,6 +56,7 @@ public sealed record ScenarioDefinitions
         NextRankId = (long)scenario.Information.Ranks.Select(r => r.Id).DefaultIfEmpty(-1).Max() + 1,
         OfficerGrowth = scenario.OfficerGrowth,
         OriginalAi = scenario.OriginalAi,
+        DefaultLoyalty = scenario.DefaultLoyalty,
         FoodExchangeRate = scenario.FoodExchangeRate,
         FoodMarket = scenario.FoodMarket,
         HanzhongKing = scenario.HanzhongKing,
@@ -90,6 +92,7 @@ public sealed record ScenarioDefinitionsOverrides
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<OriginalAiDefinition>? OriginalAi { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentOverride<int>? DefaultLoyalty { get; init; }
     public ContentOverride<int>? FoodExchangeRate { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<FoodMarketDefinition?>? FoodMarket { get; init; }
@@ -142,6 +145,7 @@ public sealed record ScenarioDefinitionsOverrides
     {
         OfficerGrowth = OfficerGrowth is { } changeOfficerGrowth ? changeOfficerGrowth.Value : defaults.OfficerGrowth,
         OriginalAi = OriginalAi is { } changeOriginalAi ? changeOriginalAi.Value : defaults.OriginalAi,
+        DefaultLoyalty = DefaultLoyalty is { } changeDefaultLoyalty ? changeDefaultLoyalty.Value : defaults.DefaultLoyalty,
         FoodExchangeRate = FoodExchangeRate is { } changeFoodExchangeRate ? changeFoodExchangeRate.Value : defaults.FoodExchangeRate,
         FoodMarket = FoodMarket is { } changeFoodMarket ? changeFoodMarket.Value : defaults.FoodMarket,
         HanzhongKing = HanzhongKing is { } changeHanzhongKing ? changeHanzhongKing.Value : defaults.HanzhongKing,
@@ -172,6 +176,7 @@ public sealed record ScenarioDefinitionsOverrides
     {
         OfficerGrowth = ContentComparison.Equal(defaults.OfficerGrowth, value.OfficerGrowth) ? null : new(value.OfficerGrowth),
         OriginalAi = ContentComparison.Equal(defaults.OriginalAi, value.OriginalAi) ? null : new(value.OriginalAi),
+        DefaultLoyalty = ContentComparison.Equal(defaults.DefaultLoyalty, value.DefaultLoyalty) ? null : new(value.DefaultLoyalty),
         FoodExchangeRate = ContentComparison.Equal(defaults.FoodExchangeRate, value.FoodExchangeRate) ? null : new(value.FoodExchangeRate),
         FoodMarket = ContentComparison.Equal(defaults.FoodMarket, value.FoodMarket) ? null : new(value.FoodMarket),
         HanzhongKing = ContentComparison.Equal(defaults.HanzhongKing, value.HanzhongKing) ? null : new(value.HanzhongKing),
@@ -377,7 +382,7 @@ public sealed record ScenarioGeography
 public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements)
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     [JsonRequired] public required GameClock? ThreeVisitsStarted { get; init; }
     [JsonRequired] public required bool UnitDefectionsEnabled { get; init; }
     [JsonRequired] public required bool SettlementDefectionsEnabled { get; init; }
@@ -423,7 +428,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
             ImperialCourtEnded = value.ImperialCourtEnded,
             Units = value.Units,
             AdditionalOfficerDefaults = additional,
-            Officers = OfficerComposition.Split(value.Officers, [.. officers, .. additional], texts),
+            Officers = OfficerComposition.Split(value.Officers, [.. officers, .. additional], texts, value.DefaultLoyalty),
             Information = ScenarioInformationState.From(value.Information),
             MilitaryPlaces = value.Military?.Places ?? [],
             DefinitionOverrides = ScenarioDefinitionsOverrides.Between(definitions, ScenarioDefinitions.From(value)),
@@ -460,6 +465,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
             Units = Units,
             OfficerGrowth = definitions.OfficerGrowth,
             OriginalAi = definitions.OriginalAi,
+            DefaultLoyalty = definitions.DefaultLoyalty,
             FoodExchangeRate = definitions.FoodExchangeRate,
             FoodMarket = definitions.FoodMarket,
             HanzhongKing = definitions.HanzhongKing,

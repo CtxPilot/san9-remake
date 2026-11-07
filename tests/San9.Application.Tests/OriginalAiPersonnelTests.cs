@@ -456,7 +456,7 @@ public sealed partial class OriginalAiPersonnelTests
     {
         var content = Fixture();
         content = content with { Officers = content.Officers.Append(new OfficerInitialState("prisoner", new(900, null, 1,
-            new(50, 50, 50, 50), false) { Status = OfficerStatus.Captive })).ToArray() };
+            new(50, 50, 50, 50), false) { Status = OfficerStatus.Captive, ForceLoyalties = ImmutableDictionary<int, int>.Empty.Add(1, 0) })).ToArray() };
         var h = new Harness(content, _ => roll);
         var progress = h.Personnel.PreparePrisoners();
         Assert.Equal(new[] { 900 }, progress.Release);

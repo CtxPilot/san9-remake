@@ -49,7 +49,7 @@ public sealed class FreeOfficerMigrationSessionTests
     [Fact]
     public void DisabledMigrationIsIndependentOfAppearance()
     {
-        var scenario = Scenario() with { FreeOfficerMigrationEnabled = false };
+        var scenario = Scenario() with { FreeOfficerMigrationEnabled = false, OfficeRequestsEnabled = false };
         var session = GameSession.Start(scenario, 190);
         for (int i = 0; i < 6; i++) Assert.Empty(session.AdvanceXun().Events.OfType<FreeOfficerMigratedEvent>());
         Assert.True(session.Snapshot.Simulation.AnnualAppearancesEnabled);

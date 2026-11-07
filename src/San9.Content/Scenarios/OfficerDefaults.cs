@@ -263,7 +263,7 @@ public sealed record ScenarioOfficerState(int Id)
     [JsonRequired] public required bool RewardedThisXun { get; init; }
     [JsonRequired] public required OfficerDefaultsOverrides Overrides { get; init; }
 
-    public static ScenarioOfficerState From(OfficerInitialState value, OfficerDefaults defaults, TextCatalog texts) => new(value.State.Id)
+    public static ScenarioOfficerState From(OfficerInitialState value, OfficerDefaults defaults, TextCatalog texts, int defaultLoyalty) => new(value.State.Id)
     {
         OwnerId = value.State.OwnerId,
         SettlementId = value.State.SettlementId,
@@ -278,7 +278,7 @@ public sealed record ScenarioOfficerState(int Id)
         RegionId = value.State.RegionId,
         OfficeId = value.State.OfficeId,
         IsCommander = value.State.IsCommander,
-        ForceLoyalties = value.State.ForceLoyalties,
+        ForceLoyalties = value.State.WithLoyaltyDefault(defaultLoyalty).ForceLoyalties,
         RewardedThisXun = value.State.RewardedThisXun,
         Overrides = OfficerDefaultsOverrides.Between(defaults, OfficerDefaults.From(value, texts)),
     };
@@ -342,11 +342,11 @@ public static class OfficerComposition
         return defaults.ToDictionary(p => p.Id);
     }
 
-    public static ScenarioOfficerState[] Split(OfficerInitialState[] officers, OfficerDefaults[] defaults, TextCatalog texts)
+    public static ScenarioOfficerState[] Split(OfficerInitialState[] officers, OfficerDefaults[] defaults, TextCatalog texts, int defaultLoyalty)
     {
         var index = Index(defaults);
         return officers.Select(person => ScenarioOfficerState.From(person, index.TryGetValue(person.State.Id, out var profile)
-            ? profile : throw new InvalidDataException($"Missing officer defaults: {person.State.Id}."), texts)).ToArray();
+            ? profile : throw new InvalidDataException($"Missing officer defaults: {person.State.Id}."), texts, defaultLoyalty)).ToArray();
     }
 
     public static OfficerDefaults[] Profiles(ScenarioOfficerState[] placements, OfficerDefaults[] defaults)

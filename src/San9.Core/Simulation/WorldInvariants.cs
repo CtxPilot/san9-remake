@@ -151,6 +151,7 @@ internal static class WorldInvariants
         var sim = state.Simulation;
         if (sim.NewGame is null) throw new ArgumentException("Missing new-game settings.");
         sim.NewGame.Validate();
+        if (state.DefaultLoyalty is < 0 or > 255) throw new ArgumentException("Invalid default loyalty.");
         if (sim.FoodExchangeRate <= 0) throw new ArgumentException("Invalid food exchange rate.");
         sim.Alliance?.Validate(state.Forces.Values.Where(f => !f.IsEliminated && (!f.IsBarbarian ||
             sim.Controls.Any(c => c.ForceId == f.Id && c.Kind == ControllerKind.Player))).Select(f => f.Id).ToHashSet());
