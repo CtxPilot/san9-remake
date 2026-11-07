@@ -78,7 +78,7 @@ public partial class StrategyHud : Control
         _textures = Textures.CreateScope();
         _textures.RequestPrefixes("button-", "top-", "radar-", "sidebar-", "ruler-", "field-", "region-",
             "season-", "turn-", "target-", "hover-", "icon-", "minimap-",
-            "roster-", "scroll-", "message-", "dialog-", "narration-", "command-", "information-menu-", "shortcut-");
+            "roster-", "scroll-", "message-", "dialog-", "narration-", "command-", "information-menu-", "shortcut-", "map-object-");
         Name = "StrategyHud"; SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); MouseFilter = MouseFilterEnum.Stop;
         BuildLayout();
         World.MapReady += Build;

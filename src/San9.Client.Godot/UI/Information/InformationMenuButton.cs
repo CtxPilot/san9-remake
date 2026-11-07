@@ -7,6 +7,7 @@ public partial class InformationMenuButton : BaseButton
 {
     public string SkinPrefix { get; init; } = "information-menu-button";
     public Vector4 TextInsets { get; init; }
+    public HorizontalAlignment TextAlignment { get; init; } = HorizontalAlignment.Center;
     private string _title = "";
     public string Title
     {
@@ -38,7 +39,7 @@ public partial class InformationMenuButton : BaseButton
         {
             _label = new Label { Text = Title, Size = Size, ClipText = ClipTitle,
                 TextOverrunBehavior = ClipTitle ? TextServer.OverrunBehavior.TrimEllipsis : TextServer.OverrunBehavior.NoTrimming,
-                HorizontalAlignment = HorizontalAlignment.Center,
+                HorizontalAlignment = TextAlignment,
                 VerticalAlignment = VerticalAlignment.Center, MouseFilter = MouseFilterEnum.Ignore };
             AddChild(_label);
             _label.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);

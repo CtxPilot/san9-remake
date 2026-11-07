@@ -109,7 +109,7 @@ public partial class WorkflowLifecycleVerification : Node
         var picker = new MapObjectPicker { Preview = target => preview = target };
         AddChild(picker);
         var choices = Enumerable.Range(1, 8).Select(id =>
-            new MapObjectChoice(new(id, true), $"Unit {id}", 1000, Colors.Blue)).ToArray();
+            new MapObjectChoice(new(id, true), $"Unit {id}", Colors.Blue)).ToArray();
         MapObjectPickRequest Request() => new(choices.Select(row => row.Target), _ => true,
             () => world.TargetPicked == targetInput, target =>
             {

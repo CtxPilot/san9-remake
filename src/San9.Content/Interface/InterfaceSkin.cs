@@ -5,7 +5,7 @@ namespace San9.Content.Interface;
 public sealed record InterfaceSkin(int SchemaVersion, ImageAsset[] Assets, Dictionary<string,string> Roles, Dictionary<string,string> Colors,
     Dictionary<string, CursorDefinition> Cursors)
 {
-    public const int CurrentSchemaVersion = 63;
+    public const int CurrentSchemaVersion = 64;
     [System.Text.Json.Serialization.JsonRequired]
     public Dictionary<int, TargetMarkerOffset> BuildingTargetOffsets { get; init; } = [];
     [System.Text.Json.Serialization.JsonRequired]
@@ -39,6 +39,9 @@ public sealed record InterfaceSkin(int SchemaVersion, ImageAsset[] Assets, Dicti
         .Concat(new[] { "advance", "submenu" }.SelectMany(kind => new[] { "left", "middle", "right" }
             .SelectMany(part => Enumerable.Range(0, 4).Select(frame => $"shortcut-{kind}-{part}" + (frame == 0 ? "" : $"-{frame}")))))
         .Concat(new[] { "shortcut-separator" })
+        .Concat(new[] { "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right" }.Select(p => "map-object-picker-" + p))
+        .Concat(new[] { "left", "middle", "right" }.SelectMany(p => Enumerable.Range(0, 4)
+            .Select(frame => "map-object-row-" + p + (frame == 0 ? "" : $"-{frame}"))))
         .Concat(new[] { "top-left", "top", "top-right", "left", "right", "bottom-left", "bottom", "bottom-right", "ornament" }.Select(p => "information-frame-" + p))
         .Concat(new[] { "left", "middle", "right" }.SelectMany(p => new[] { "information-title-" + p, "information-footer-" + p }))
         .Concat(Enumerable.Range(0, 51).SelectMany(c => Enumerable.Range(0, 4).Select(f => $"information-map-force-{c}" + (f == 0 ? "" : $"-{f}"))))

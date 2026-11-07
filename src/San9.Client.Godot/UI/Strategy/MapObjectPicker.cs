@@ -3,7 +3,7 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-public sealed record MapObjectChoice(MapObjectTarget Target, string Name, uint Soldiers, Color Color);
+public sealed record MapObjectChoice(MapObjectTarget Target, string Name, Color Color);
 
 /// <summary>Dismissal consumes input and leaves the underlying command selection active.</summary>
 public partial class MapObjectPicker : ModalView
@@ -15,8 +15,8 @@ public partial class MapObjectPicker : ModalView
     private Rect2 _panel;
     private Vector2 _anchor;
     private int _count;
+    private float _rowWidth = 96;
     private bool _rightPressed;
-    private readonly GameTextPresenter _text = new();
     public MapObjectTarget? PreviewTarget { get; private set; }
 
     public override void _Ready()
@@ -30,6 +30,8 @@ public partial class MapObjectPicker : ModalView
     {
         Close();
         _request = request; _anchor = point; _count = choices.Count;
+        var font = GetThemeFont("font");
+        _rowWidth = Math.Max(96, choices.Max(choice => font.GetStringSize(choice.Name, fontSize: 16).X + 16));
         _scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
             VerticalScrollMode = ScrollContainer.ScrollMode.Auto };
         var rows = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
@@ -38,22 +40,16 @@ public partial class MapObjectPicker : ModalView
         foreach (var choice in choices)
         {
             var row = new InformationMenuButton { Textures = Textures, Title = choice.Name, ClipTitle = true,
-                TextInsets = new(24, 0, 88, 0), CustomMinimumSize = new(288, 24),
+                SkinPrefix = "map-object-row", TextAlignment = HorizontalAlignment.Left,
+                TextInsets = new(16, 0, 0, 0), CustomMinimumSize = new(_rowWidth, 20),
                 SizeFlagsHorizontal = SizeFlags.ExpandFill };
             row.Pressed += () => { Close(cancel: false); request.TrySelect(choice.Target); };
             row.MouseEntered += () => SetPreview(choice.Target);
             row.MouseExited += () => { if (PreviewTarget == choice.Target) SetPreview(null); };
             rows.AddChild(row);
-            row.AddChild(new ColorRect { Color = choice.Color, Position = new(6, 6), Size = new(12, 12),
-                MouseFilter = MouseFilterEnum.Ignore });
-            var soldiers = new Label { Text = choice.Soldiers.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
-                MouseFilter = MouseFilterEnum.Ignore };
-            row.AddChild(soldiers);
-            soldiers.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-            soldiers.AnchorLeft = 1;
-            soldiers.OffsetLeft = -80; soldiers.OffsetRight = -8;
-            _text.Apply(soldiers, GameTextStyles.Building(false));
+            var marker = new ColorRect { Color = new("080808"), Position = new(2, 4), Size = new(12, 12), MouseFilter = MouseFilterEnum.Ignore };
+            marker.AddChild(new ColorRect { Color = choice.Color, Position = Vector2.One, Size = new(10, 10), MouseFilter = MouseFilterEnum.Ignore });
+            row.AddChild(marker);
         }
         Relayout(); Show();
     }
@@ -64,10 +60,17 @@ public partial class MapObjectPicker : ModalView
     private void Relayout()
     {
         Size = GetViewportRect().Size;
-        float height = Math.Min(_count * 24, Math.Max(24, Size.Y - 96));
-        _panel = new(new(Math.Clamp(_anchor.X - 18, 0, Math.Max(0, Size.X - 352)),
-            Math.Clamp(_anchor.Y - 18, 0, Math.Max(0, Size.Y - 32 - height - 32))), new(352, height + 32));
-        if (_scroll is not null) { _scroll.Position = _panel.Position + new Vector2(16, 16); _scroll.Size = new(320, height); }
+        float height = Math.Min(_count * 20, Math.Max(20, Size.Y - 56));
+        float scrollbar = _count * 20 > height ? _scroll!.GetVScrollBar().GetCombinedMinimumSize().X : 0;
+        float width = Math.Min(_rowWidth + scrollbar + 24, Size.X);
+        _panel = new(new(Math.Clamp(_anchor.X, 0, Math.Max(0, Size.X - width)),
+            Math.Clamp(_anchor.Y, 0, Math.Max(0, Size.Y - 32 - height - 24))), new(width, height + 24));
+        if (_scroll is not null)
+        {
+            _scroll.Position = _panel.Position + new Vector2(12, 12); _scroll.Size = new(width - 24, height);
+            foreach (var row in _scroll.GetChild<VBoxContainer>(0).GetChildren().OfType<Control>())
+                row.CustomMinimumSize = new(Math.Max(0, width - 24 - scrollbar), 20);
+        }
         QueueRedraw();
     }
 
@@ -75,7 +78,7 @@ public partial class MapObjectPicker : ModalView
     {
         Hide();
         if (cancel) _request?.Cancel();
-        _request = null; _rightPressed = false; SetPreview(null);
+        _request = null; _count = 0; _rightPressed = false; SetPreview(null);
         if (_scroll is not null) { RemoveChild(_scroll); _scroll.QueueFree(); _scroll = null; }
     }
 
@@ -102,7 +105,7 @@ public partial class MapObjectPicker : ModalView
         AcceptEvent();
     }
 
-    public override void _Draw() => SkinPainter.InformationMenu(this, Textures, _panel);
+    public override void _Draw() => SkinPainter.MapObjectPicker(this, Textures, _panel);
     public override void _ExitTree()
-    { GetViewport().SizeChanged -= Relayout; _request?.Cancel(); Preview?.Invoke(null); _text.Dispose(); }
+    { GetViewport().SizeChanged -= Relayout; _request?.Cancel(); Preview?.Invoke(null); }
 }

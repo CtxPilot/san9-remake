@@ -5,6 +5,25 @@ namespace San9.Importer.San9PkTc101.Interface;
 
 public static partial class InterfaceSkinCompiler
 {
+    private static void CompileMapObjectPicker(SkinSources sources)
+    {
+        string[] parts = ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"];
+        for (int i = 0; i < parts.Length; i++) sources.Export("map-object-picker-" + parts[i], 475 + i, 65, true);
+        foreach (var (part, resource) in new[] { ("left", 484), ("middle", 485), ("right", 486) })
+        {
+            if (sources.Bindings[resource] != 265) throw new InvalidDataException("Unconfirmed map-object row palette.");
+            for (int frame = 0; frame < 4; frame++)
+            {
+                string role = "map-object-row-" + part + (frame == 0 ? "" : $"-{frame}");
+                string id = "ui-" + role;
+                var image = IndexedImageArchive.Frame(sources.Common.Images[resource], 4, 1, frame, 0);
+                sources.Assets.Add(sources.Save(id, TextureSourcePath.Image("G_Common", resource, 65, true, true, columns: 4, frame: frame),
+                    IndexedImageArchive.Decode(image, sources.Common.Palettes[65], true, true)));
+                sources.Roles.Add(role, id);
+            }
+        }
+    }
+
     private sealed record SkinSources((byte[][] Palettes, IndexedImage[] Images) Common,
         (byte[][] Palettes, IndexedImage[] Images) Marker, Dictionary<int, int> Bindings,
         List<ImageAsset> Assets, Dictionary<string, string> Roles, Func<string, string, PngImage, ImageAsset> Save)

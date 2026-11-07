@@ -406,6 +406,7 @@ public static partial class InterfaceSkinCompiler
         CompileDeployment(sources);
         CompileSaveLoad(sources);
         CompileEnvironment(sources);
+        CompileMapObjectPicker(sources);
         // RE-0178: external display types, independent of settlement identities and domain rules.
         TargetMarkerOffset[] offsets = [new(-16,-58), new(-20,-38), new(-4,-34), new(-30,-34), new(2,-52),
             new(-33,-52), new(-16,-22), new(-16,-32), new(-16,-28), new(-16,-41), new(-16,-30),

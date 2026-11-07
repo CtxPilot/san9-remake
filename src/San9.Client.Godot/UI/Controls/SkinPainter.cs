@@ -4,6 +4,42 @@ namespace San9.Client.Godot;
 
 internal static class SkinPainter
 {
+    public static void MapObjectPicker(CanvasItem canvas, TextureScope textures, Rect2 bounds)
+    {
+        var p = bounds.Position;
+        var size = bounds.Size;
+        // Disjoint regions reproduce indexed overwrites without blending translucent edges twice.
+        void Part(string part, Vector2 offset, Vector2 extent, Vector2 phase) =>
+            TilePhased(canvas, textures.Get("map-object-picker-" + part, canvas), new(p + offset, extent), phase);
+        Part("center", new(12, 12), size - new Vector2(24, 24), new(12, 12));
+        Part("top", new(12, 0), new(size.X - 24, 12), new(12, 0));
+        Part("bottom", new(12, size.Y - 12), new(size.X - 24, 12), new(12, 0));
+        Part("left", new(0, 12), new(12, size.Y - 24), new(0, 12));
+        Part("right", new(size.X - 12, 12), new(12, size.Y - 24), new(0, 12));
+        Part("top-left", Vector2.Zero, new(12, 12), Vector2.Zero);
+        Part("top-right", new(size.X - 12, 0), new(12, 12), Vector2.Zero);
+        Part("bottom-left", new(0, size.Y - 12), new(12, 12), Vector2.Zero);
+        Part("bottom-right", size - new Vector2(12, 12), new(12, 12), Vector2.Zero);
+    }
+
+    private static void TilePhased(CanvasItem canvas, Texture2D texture, Rect2 rect, Vector2 phase)
+    {
+        for (float y = 0; y < rect.Size.Y;)
+        {
+            float sy = (phase.Y + y) % texture.GetHeight();
+            float height = Math.Min(texture.GetHeight() - sy, rect.Size.Y - y);
+            for (float x = 0; x < rect.Size.X;)
+            {
+                float sx = (phase.X + x) % texture.GetWidth();
+                float width = Math.Min(texture.GetWidth() - sx, rect.Size.X - x);
+                canvas.DrawTextureRectRegion(texture, new(rect.Position + new Vector2(x, y), new(width, height)),
+                    new(new(sx, sy), new(width, height)));
+                x += width;
+            }
+            y += height;
+        }
+    }
+
     public static void InformationMenu(CanvasItem canvas, TextureScope textures, Rect2 bounds)
     {
         var p = bounds.Position;
