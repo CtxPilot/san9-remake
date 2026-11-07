@@ -135,6 +135,7 @@ public partial class ForceSelectionView : ModalView
             Skin = Definition.Forces.MapSkin,
             InitialSelection = _selected, Closed = CloseMap, Confirmed = selected =>
             {
+                _draft!.SetPlayerForces(selected);
                 _selected = selected.ToHashSet();
                 RefreshDraft();
                 CloseMap();
@@ -173,6 +174,7 @@ public partial class ForceSelectionView : ModalView
         {
             var scenario = _draft.Selection();
             _selected.IntersectWith(scenario.Forces.Select(f => f.Id));
+            _draft.SetPlayerForces(_selected);
             forces = scenario.Forces.Where(f => _selected.Contains(f.Id)).ToArray();
         }
         GetNode<StartMenuButton>("Confirm").Disabled = _selected.Count == 0;

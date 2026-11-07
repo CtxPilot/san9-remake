@@ -40,7 +40,7 @@ public sealed partial class GameSession
     internal static GameSession Start(ScenarioInitialState definition, ulong seed, Func<WorldState, SimulationEngine>? factory, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false, ControllerKind playerForceController = ControllerKind.Player, bool enableXunStartCheckpoints = false, NewGameSettings? settings = null, IReadOnlyCollection<int>? playerForceIds = null, CompanionSettings? companionSettings = null, San9.Content.Authoring.NewGameSetup? setup = null)
     {
         var input = setup ?? San9.Content.Authoring.NewGameSetup.Empty;
-        var composition = Authoring.NewGameComposer.Compose(definition, input);
+        var composition = Authoring.NewGameComposer.Compose(definition, input, playerForceIds);
         var owned = new ScenarioSessionDefinition(composition.Scenario, playerForceIds, composition.Definitions);
         var simulation = (factory ?? owned.Rules.CreateEngine)(owned.CreateWorld(seed, computerDamageBonusPercent, battleDeathsEnabled, playerForceController, settings));
         if (companionSettings is not null) simulation.ConfigureCompanion(companionSettings);

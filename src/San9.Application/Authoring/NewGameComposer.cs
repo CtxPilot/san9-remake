@@ -33,9 +33,11 @@ public static class NewGameComposer
         return included;
     }
 
-    public static NewGameComposition Compose(ScenarioInitialState source, NewGameSetup setup)
+    public static NewGameComposition Compose(ScenarioInitialState source, NewGameSetup setup, IReadOnlyCollection<int>? playerForceIds = null)
     {
         setup.Validate();
+        source = ScenarioSessionDefinition.ActivatePlayerForces(source,
+            playerForceIds ?? (source.PlayerForceId is int player ? [player] : []));
         var included = Participants(setup);
         if (included.Count == 0) return new(source, SessionDefinitions.Empty);
         var ids = OfficerIds(source, setup);

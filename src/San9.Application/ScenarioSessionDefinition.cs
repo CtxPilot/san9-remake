@@ -20,8 +20,7 @@ internal sealed class ScenarioSessionDefinition
             playerForceIds is not null && _playerForces.Count != playerForceIds.Count)
             throw new ArgumentException("Invalid player force selection.");
         InitialPlayerForceIds = _playerForces.Order().ToImmutableArray();
-        foreach (int id in InitialPlayerForceIds)
-            definition = InitializePlayerActivation(definition with { PlayerForceId = id });
+        definition = ActivatePlayerForces(definition, InitialPlayerForceIds);
         if (_playerForces.Any(id => definition.Forces.Any(f => f.Id == id && f.IsDormant)))
             throw new ArgumentException("Selected force cannot be activated.");
         definition = definition with { PlayerForceId = InitialPlayerForceIds.IsEmpty ? null : InitialPlayerForceIds[0] };
@@ -42,10 +41,16 @@ internal sealed class ScenarioSessionDefinition
     internal SessionDefinitions Definitions { get; }
     internal ImmutableArray<int> InitialPlayerForceIds { get; }
 
-    private static ScenarioInitialState InitializePlayerActivation(ScenarioInitialState definition)
+    internal static ScenarioInitialState ActivatePlayerForces(ScenarioInitialState definition, IReadOnlyCollection<int> playerForceIds)
+    {
+        foreach (int id in playerForceIds) definition = ActivatePlayerForce(definition, id);
+        return definition;
+    }
+
+    private static ScenarioInitialState ActivatePlayerForce(ScenarioInitialState definition, int forceId)
     {
         var activation = definition.SearchEvents.OfType<ForceActivationSearchEventDefinition>()
-            .SingleOrDefault(d => d.ForceId == definition.PlayerForceId);
+            .SingleOrDefault(d => d.ForceId == forceId);
         if (activation is null || !definition.Forces.Any(f => f.Id == activation.ForceId && f.IsDormant)) return definition;
         // Selecting a reserved force starts with its authored resources, without the exploration reward.
         return definition with

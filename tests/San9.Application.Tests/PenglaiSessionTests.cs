@@ -1,5 +1,7 @@
 using San9.Tests;
 using System.Collections.Immutable;
+using San9.Application.Authoring;
+using San9.Content.Authoring;
 using San9.Application.Persistence;
 using San9.Application.Presentation;
 using San9.Content.Scenarios;
@@ -97,6 +99,46 @@ public sealed class PenglaiSessionTests
         Assert.Equal(100000u, session.Snapshot.Settlements.Single(s => s.Id == 3).Soldiers);
         Assert.Contains(new PersistentEventKey("penglai"), session.Snapshot.Simulation.ConsumedEventKeys);
         StateAssert.Equal(session.Capture(), SaveService.Decode(SaveService.Encode(session), d).Capture());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReservedCityDeploymentFollowsPlayerSelectionThroughDraftAndSession(bool joinForce)
+    {
+        var source = Definition();
+        var person = new CreatedOfficer(Guid.Parse("10000000-0000-0000-0000-000000000000"), "甲");
+        var library = CreatedOfficerLibrary.Empty with { Officers = [person] };
+        var draft = new NewGameDraft(source, new(TextCatalog.CurrentSchemaVersion, new()), new Dictionary<string, string>(), library);
+        Assert.True(draft.Compose().Settlements.Single(s => s.Id == 3).IsDormant);
+        Assert.Throws<InvalidDataException>(() => draft.Deploy([person.Id], 3, joinForce));
+
+        draft.SetPlayerForces([1, 2]);
+        Assert.False(draft.Compose().Settlements.Single(s => s.Id == 3).IsDormant);
+        Assert.False(draft.Compose().Settlements.Single(s => s.Id == 4).IsDormant);
+        draft.Deploy([person.Id], 3, joinForce);
+        int id = NewGameComposer.OfficerIds(source, draft.Setup)[person.Id];
+        var preview = draft.Preview();
+        Assert.Contains(preview.Settlements, s => s.Id == 3);
+        Assert.Equal(joinForce ? (int?)2 : null, preview.World.Officers.Single(p => p.Id == id).OwnerId);
+        var session = GameSession.Start(source, 17, playerForceIds: draft.PlayerForceIds, setup: draft.Setup);
+        var deployed = session.Snapshot.Officers.Single(p => p.Id == id);
+        Assert.Equal(3, deployed.SettlementId);
+        Assert.Equal(joinForce ? OfficerStatus.Serving : OfficerStatus.Free, deployed.Status);
+        Assert.False(deployed.IsDormant);
+        Assert.Equal(100000u, session.Snapshot.Settlements.Single(s => s.Id == 3).Soldiers);
+        StateAssert.Equal(session.Capture(), SaveService.Decode(SaveService.Encode(session), source).Capture());
+        Assert.Throws<InvalidDataException>(() => GameSession.Start(source, 17, playerForceIds: [1], setup: draft.Setup));
+
+        draft.SetPlayerForces([1]);
+        Assert.Empty(draft.Setup.Placements);
+        Assert.True(draft.Compose().Settlements.Single(s => s.Id == 3).IsDormant);
+        draft.SetPlayerForces([2]);
+        draft.Deploy([person.Id], 3, joinForce);
+        Assert.Single(draft.Setup.Placements);
+        Assert.True(source.Forces.Single(f => f.Id == 2).IsDormant);
+        Assert.True(source.Settlements.Single(s => s.Id == 3).IsDormant);
+        Assert.DoesNotContain(source.Officers, p => p.State.Id == id);
     }
 
     [Fact]

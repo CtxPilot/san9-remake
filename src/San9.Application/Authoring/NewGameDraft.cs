@@ -12,14 +12,28 @@ public sealed class NewGameDraft(ScenarioInitialState source, TextCatalog text,
     public ScenarioInitialState Source { get; } = source;
     public TextCatalog Text { get; } = text;
     public NewGameSetup Setup { get; private set; } = new() { Library = library };
-    // Source and the library snapshot are fixed for this visit. Only Change publishes a
-    // new setup, together with its validated projection, so queries reuse the same result.
+    public ImmutableArray<int> PlayerForceIds { get; private set; } = [];
+    // Source and the library snapshot are fixed for this visit. Startup edits publish
+    // their validated projection together, so queries reuse the same result.
     private NewGameComposition? _composition;
-    public NewGameComposition Composition => _composition ??= NewGameComposer.Compose(Source, Setup);
+    public NewGameComposition Composition => _composition ??= NewGameComposer.Compose(Source, Setup, PlayerForceIds);
     public ScenarioInitialState Compose() => Composition.Scenario;
     public StrategySnapshot Preview() => new ScenarioSessionDefinition(Compose() with { PlayerForceId = null }, []).CreatePreview();
     public ScenarioForceSelection Selection() => ScenarioForceSelection.Read(Compose(),
         Composition.Definitions.AddText(Text), Composition.Definitions.AddPortraits(portraits));
+
+    public void SetPlayerForces(IEnumerable<int> forceIds)
+    {
+        var selected = forceIds.Distinct().Order().ToImmutableArray();
+        if (PlayerForceIds.SequenceEqual(selected)) return;
+        var activated = ScenarioSessionDefinition.ActivatePlayerForces(Source, selected);
+        var available = activated.Settlements.Where(s => !s.IsDormant).Select(s => s.Id).ToHashSet();
+        var next = Setup with { Placements = Setup.Placements.Where(p => available.Contains(p.CityId)).ToImmutableArray() };
+        var composition = NewGameComposer.Compose(Source, next, selected);
+        PlayerForceIds = selected;
+        Setup = next;
+        _composition = composition;
+    }
 
     public void Deploy(IEnumerable<Guid> people, int cityId, bool joinForce)
     {
@@ -45,7 +59,7 @@ public sealed class NewGameDraft(ScenarioInitialState source, TextCatalog text,
 
     private void Change(NewGameSetup next)
     {
-        var composition = NewGameComposer.Compose(Source, next);
+        var composition = NewGameComposer.Compose(Source, next, PlayerForceIds);
         Setup = next;
         _composition = composition;
     }
