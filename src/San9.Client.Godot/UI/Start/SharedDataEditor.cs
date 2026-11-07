@@ -110,7 +110,7 @@ public partial class SharedDataEditor : ModalView
         {
             await Task.Run(() => _workspace.SaveAsync(_lifetime.Token), _lifetime.Token);
             if (_lifetime.IsCancellationRequested) return false;
-            foreach (var page in _editors) page.RefreshAfterSave();
+            foreach (var page in _editors) page.Saved();
             UpdateTitleTooltip(); Status("已保存，重新开局后生效。"); return true;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return false; }

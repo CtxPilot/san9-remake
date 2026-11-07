@@ -3,18 +3,28 @@ using System.Collections.Immutable;
 namespace San9.Core.Domain;
 
 /// <summary>Authored relationships, independent of affinity and live parent references.</summary>
-public sealed record TacticLinkPair(int FirstId, int SecondId, int Bonus, bool SuppressesSiblingBonus);
+public sealed record TacticLinkPair(int FirstId, int SecondId, int Bonus, bool SuppressesSiblingBonus)
+{
+    public void Validate()
+    {
+        if (FirstId < 0 || SecondId <= FirstId) throw new ArgumentException("Invalid tactic link pair identities.");
+        ArgumentOutOfRangeException.ThrowIfNegative(Bonus);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(Bonus, 100);
+    }
+}
 
 public sealed record TacticLinkRules(bool RelationshipsEnabled, int KinshipBonus, ImmutableArray<TacticLinkPair> Pairs)
 {
     public static TacticLinkRules Empty { get; } = new(false, 0, []);
 
-    internal void Validate()
+    public void Validate()
     {
-        if (KinshipBonus is < 0 or > 100 || Pairs.IsDefault ||
-            Pairs.Any(p => p.FirstId < 0 || p.SecondId <= p.FirstId || p.Bonus is < 0 or > 100) ||
+        ArgumentOutOfRangeException.ThrowIfNegative(KinshipBonus);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(KinshipBonus, 100);
+        if (Pairs.IsDefault ||
             Pairs.Select(p => (p.FirstId, p.SecondId)).Distinct().Count() != Pairs.Length)
             throw new ArgumentException("Invalid tactic link relationships.");
+        foreach (var pair in Pairs) pair.Validate();
     }
 
     public int Chance(OfficerState source, OfficerState partner, FormationTactics formation, bool historical = true) => Chance(source, partner, formation.LinkMultiplier, historical);

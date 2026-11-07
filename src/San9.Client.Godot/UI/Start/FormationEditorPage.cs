@@ -26,6 +26,7 @@ public partial class FormationEditorPage : SharedDataEditorPage
     public override bool HasPendingChanges => _rawDirty || _actions.Busy;
     public override bool CommitPending() => !_actions.Busy && CommitJson();
     public override void RefreshAfterSave() { RefreshList(); ShowCurrent(); }
+    public override void Saved() { if (IsVisibleInTree()) { RefreshList(); UpdateHeading(); } }
     private static readonly JsonSerializerOptions EditorJson = new(ScenarioContentFiles.DataJsonOptions)
     { WriteIndented = true, UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
 

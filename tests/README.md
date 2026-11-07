@@ -21,6 +21,14 @@ Rendering 的测试目前与客户端测试放在一起。仅为目录对称而�
 
 Godot 历史画面验收脚本也不属于默认测试集，后续开发默认不执行；只有当前任务明确要求复现对应场景时才运行。脚本分类与入口见[Godot 历史画面验收](../docs/ui/client-verification.md)。
 
+资料编辑器保存刷新可用无资源引擎检查验证，覆盖保存不重建当前表单／不丢失控件输入，以及隐藏页切回时刷新；不代表画面验收：
+
+```powershell
+godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/SharedEditorRefreshVerification.tscn
+```
+
+成功输出`SHARED_EDITOR_REFRESH_OK`并退出。
+
 联携关系表检查设置`SAN9_TACTIC_LINK_CONTENT`为现有内容根目录，运行`godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/TacticLinkEditorVerification.tscn`，可验证联携关系表的初次显示、按人物筛选、选中修改、删除及搜索选人后添加。仅改变内存草稿，不发布玩家资料；成功输出`TACTIC_LINK_EDITOR_OK`，不代表画面验收。
 
 涉及工作流窗口或地图回调生命周期时，可在客户端编译后运行无资源依赖的引擎检查（将 `godot` 替换为本机 Godot .NET 可执行文件）：

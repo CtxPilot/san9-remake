@@ -7,8 +7,7 @@ namespace San9.Application.Tests;
 
 public sealed partial class SharedDataEditorWorkspaceTests
 {
-    [Fact]
-    public async Task PairEditingIsSymmetricAndRoundTripsToRuntimeWithoutChangingOtherLinkRules()
+    private async Task CreateTacticLinkPeople()
     {
         await CreatePeopleAndTactics();
         string path = Path.Combine(_root, "shared/officers.json");
@@ -26,6 +25,12 @@ public sealed partial class SharedDataEditorWorkspaceTests
         var definitions = JsonSerializer.Deserialize<ScenarioDefinitions>(await File.ReadAllTextAsync(path), ScenarioContentFiles.DataJsonOptions)!;
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(definitions with { Military = definitions.Military! with
         { LinkRules = definitions.Military.LinkRules with { RelationshipsEnabled = true } } }, ScenarioContentFiles.DataJsonOptions));
+    }
+
+    [Fact]
+    public async Task PairEditingIsSymmetricAndRoundTripsToRuntimeWithoutChangingOtherLinkRules()
+    {
+        await CreateTacticLinkPeople();
         var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
         var original = workspace.Definitions.Military!.LinkRules;
         Assert.Throws<InvalidDataException>(() => workspace.AddTacticLinkPair(9001, 9001, 20));
@@ -48,6 +53,26 @@ public sealed partial class SharedDataEditorWorkspaceTests
         reopened.RemoveTacticLinkPair(9002, 9001);
         await reopened.SaveAsync();
         Assert.Empty((await SharedDataEditorWorkspace.OpenAsync(_root)).TacticLinkPairs);
+    }
+
+    [Fact]
+    public async Task PairValuesSaveLocallyButRemovingAReferenceStillReadsCurrentWorlds()
+    {
+        await CreateTacticLinkPeople();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        workspace.AddTacticLinkPair(9001, 9002, 20);
+        await workspace.SaveAsync();
+        workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        await File.WriteAllTextAsync(Path.Combine(_root, "a/scenario.json"), "unrelated world");
+        await File.WriteAllTextAsync(Path.Combine(_root, "shared/geography.json"), "unrelated geography");
+        workspace.SetTacticLinkPair(workspace.TacticLinkPairs[0] with { Bonus = 55, SuppressesSiblingBonus = true });
+        await workspace.SaveAsync();
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal(55, reopened.TacticLinkPairs[0].Bonus);
+        Assert.True(reopened.TacticLinkPairs[0].SuppressesSiblingBonus);
+        reopened.RemoveTacticLinkPair(9001, 9002);
+        await Assert.ThrowsAsync<JsonException>(() => reopened.SaveAsync());
+        Assert.True(reopened.HasChanges);
     }
 
     [Fact]

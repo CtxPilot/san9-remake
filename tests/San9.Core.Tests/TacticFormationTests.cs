@@ -28,7 +28,7 @@ public sealed class TacticFormationTests
     [InlineData(101)]
     public void GlobalDefensiveChanceRejectsInvalidPercent(int chance)
     {
-        Assert.Throws<ArgumentException>(() => new MilitaryRulebook(Definition(false, true) with { DefensiveTacticChance = chance }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MilitaryRulebook(Definition(false, true) with { DefensiveTacticChance = chance }));
     }
 
     [Theory]

@@ -11,6 +11,7 @@ public abstract partial class SharedDataEditorPage : Control
     public abstract bool HasPendingChanges { get; }
     public abstract bool CommitPending();
     public abstract void RefreshAfterSave();
+    public virtual void Saved() { if (IsVisibleInTree()) RefreshAfterSave(); }
     public virtual void Activate() { }
     protected void Status(string message, bool error = false) => ReportStatus(message, error);
 }

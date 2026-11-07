@@ -114,6 +114,7 @@ public sealed partial class SharedDataEditorWorkspace
     private async Task<ContentReadSession> ValidateDraftAsync(ScenarioDefinitions draft, CancellationToken token)
     {
         ContentStructure.Validate(draft);
+        ValidateLocalRules(draft);
         ValidateProfiles(draft, Officers, "共享武将");
         foreach (var formation in draft.Military?.Formations ?? [])
             if ((!formation.Positions.IsEmpty || formation.Attack is not null) && formation.Positions.Length != formation.OfficerCapacity)
@@ -124,7 +125,9 @@ public sealed partial class SharedDataEditorWorkspace
         // Each validation owns a fresh read session. Shared geography and person defaults are
         // parsed once for this operation, even when many scenarios reference them.
         var files = new ContentReadSession();
-        var validatedGeographies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!RequiresScenarioValidation(draft)) return files;
+        var validation = new ScenarioValidationContext();
+        bool validateMessages = CatalogIdentitiesChanged(draft);
         foreach (var entry in _scenarios)
         {
             token.ThrowIfCancellationRequested();
@@ -148,16 +151,19 @@ public sealed partial class SharedDataEditorWorkspace
                 foreach (var person in scenario.Officers)
                     if (person.State.OfficeId is int office && !scenario.Information.Offices.Any(o => o.Id == office))
                         throw new InvalidDataException($"武将 {person.State.Id} 的初始官职引用不存在的官职 {office}。");
-                scenario.Validate();
+                scenario.Validate(validation);
                 var profiles = OfficerComposition.Profiles(document.Officers, [.. officers.Officers, .. document.AdditionalOfficerDefaults]);
                 ValidateProfiles(effectiveDefinitions, profiles, $"剧本 {entry.Id}");
                 if (scenario.Forces.Any(f => f.ProvidedTactics.Any(id => scenario.Military?.Tactics.Any(t => t.Id == id) != true)))
                     throw new InvalidDataException("势力授予兵法引用不存在的兵法。");
                 if (definitionsPath.Equals(DefinitionPath, StringComparison.OrdinalIgnoreCase) && draft.Military is { } military &&
-                    validatedGeographies.Add(geographyPath))
-                    _ = new MilitaryRulebook(military.Compile(geography.Military!, []));
-                var messages = await ReadMessagesAsync(entry, files, token);
-                MessageGraph.ValidateCatalogReferences(messages, scenario.Information);
+                    geography.Military is { } militaryGeography)
+                    validation.ValidateMilitary(military.Compile(militaryGeography, []));
+                if (validateMessages)
+                {
+                    var messages = await ReadMessagesAsync(entry, files, token);
+                    MessageGraph.ValidateCatalogReferences(messages, scenario.Information);
+                }
             }
             catch (Exception error) when (error is ArgumentException or InvalidDataException or OverflowException)
             { throw new InvalidDataException($"剧本 {entry.Id} 的共享数据校验失败：{error.Message}", error); }

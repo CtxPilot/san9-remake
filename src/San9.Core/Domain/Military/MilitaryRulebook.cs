@@ -122,8 +122,7 @@ public sealed partial class MilitaryRulebook
     public CompanionTacticPresets? CompanionTactics { get; }
     public MilitaryRulebook(MilitaryDefinition definition)
     {
-        if (definition.DefensiveTacticChance is < 0 or > 100)
-            throw new ArgumentException("Invalid defensive tactic chance.");
+        ValidateDefensiveTacticChance(definition.DefensiveTacticChance);
         DefensiveTacticChance = definition.DefensiveTacticChance;
         BattleDeathsAllowed = definition.BattleDeathsAllowed;
         DuelCapturesAllowed = definition.DuelCapturesAllowed;
@@ -152,8 +151,8 @@ public sealed partial class MilitaryRulebook
         CityInfluence = definition.CityInfluence;
         Geography = definition.Geography ?? throw new ArgumentException("Missing battlefield geography.");
         Rockfall = definition.Rockfall;
-        if (CityInfluence is { } influence && (influence.RadiusCells < 0 || influence.LandTacticBonus is < 0 or > 100) ||
-            Geography.FootprintScale <= 0 || Geography.BlockedCells.IsDefault ||
+        CityInfluence?.Validate();
+        if (Geography.FootprintScale <= 0 || Geography.BlockedCells.IsDefault ||
             Geography.BlockedCells.Distinct().Count() != Geography.BlockedCells.Length || Geography.BlockedCells.Any(c =>
                 c.X < 0 || c.Y < 0 || c.X >= Map.Width || c.Y >= Map.Height))
             throw new ArgumentException("Invalid battlefield geography.");
@@ -244,38 +243,61 @@ public sealed partial class MilitaryRulebook
         if (Formations.Values.Any(f => f.Positions.IsDefault || f.Positions.Any(p => !p.IsValid) ||
             (!f.Positions.IsEmpty || f.Attack is not null) && f.Positions.Length != f.OfficerCapacity))
             throw new ArgumentException("Invalid formation positions.");
-        Places = definition.Places.ToImmutableDictionary(p => p.Id);
-        if (Places.Values.Select(p => p.Footprint).Concat(Facilities.Values.Select(f => f.Footprint))
-            .Any(shape => (long)shape.Width * Geography.FootprintScale > int.MaxValue || (long)shape.Height * Geography.FootprintScale > int.MaxValue))
+        if (Facilities.Values.Any(p => (long)p.Footprint.Width * Geography.FootprintScale > int.MaxValue ||
+            (long)p.Footprint.Height * Geography.FootprintScale > int.MaxValue))
             throw new ArgumentException("City influence footprint exceeds coordinate capacity.");
-        if (Places.Values.Any(p => p.EnabledTacticIds.IsDefault || p.EnabledTacticIds.Distinct().Count() != p.EnabledTacticIds.Length ||
-            p.EnabledTacticIds.Any(id => !Tactics.ContainsKey(id)))) throw new ArgumentException("Invalid enabled settlement tactics.");
-        if (Places.Values.Any(p => p.FacilityTypeId is int id && !Facilities.ContainsKey(id) ||
-            !Facilities.IsEmpty && p.FacilityTypeId is null)) throw new ArgumentException("Unknown facility type reference.");
-        foreach (var place in Places.Values) place.Combat?.Validate();
-        var attacks = Formations.Values.Select(f => f.Attack).Concat(Places.Values.Select(p => p.Attack))
-            .Concat(Facilities.Values.Select(f => f.Attack)).OfType<OrdinaryAttack>().ToArray();
-        if (attacks.Any(a => a.ElevationBonusPerLevel < 0 || a.MaximumElevationBonus < 0 ||
-            (a.ElevationBonusPerLevel == 0) != (a.MaximumElevationBonus == 0) ||
-            (long)a.Range + a.MaximumElevationBonus > int.MaxValue) ||
-            attacks.Any(a => a.ElevationBonusPerLevel > 0) && elevations.Length != terrainIds.Length)
-            throw new ArgumentException("Invalid attack elevation rules.");
-        if (Places.Values.Any(p => p.WoundedRecovery is < 0)) throw new ArgumentException("Invalid wounded recovery definition.");
+        ValidateAttacks(Formations.Values.Select(f => f.Attack).Concat(Facilities.Values.Select(f => f.Attack)));
         if (Formations.Values.Any(f => f.AutomaticTacticLearningId is int id &&
             (!Tactics.TryGetValue(id, out var tactic) || tactic.Category is null)))
             throw new ArgumentException("Invalid automatic tactic learning reference.");
         if (Formations.Values.Any(f => f.CaptureTacticLearningId is int id &&
             (!Tactics.TryGetValue(id, out var tactic) || tactic.Category is null)))
             throw new ArgumentException("Invalid capture tactic learning reference.");
-        if (Formations.Values.Any(f => f.Attack is { Range: <= 0 } || f.Attack is not null && f.Combat is null) ||
-            Places.Values.Any(p => p.Attack is { Range: <= 0 } || p.Attack is not null && p.Combat is null))
+        if (Formations.Values.Any(f => f.Attack is { Range: <= 0 } || f.Attack is not null && f.Combat is null))
             throw new ArgumentException("Invalid ordinary attack definition.");
         if (Formations.Values.Any(f => f.Id < 0 || f.RequiredTacticId < 0 || f.MovementBudget <= 0 || (long)f.MovementBudget + Map.MaximumStepCost(f.TravelMode) - 1 > int.MaxValue || f.DeploymentCost < 0 || f.SoldierCapacity == 0 ||
-                f.OfficerCapacity <= 0 || !f.Footprint.IsValid || !Enum.IsDefined(f.TravelMode)) ||
-            Places.Values.Any(p => p.Id < 0 || !p.Footprint.IsValid || BuildingArea(p) is var area &&
-                (area.Left < 0 || area.Top < 0 || area.Right > Map.FineWidth || area.Bottom > Map.FineHeight)))
+                f.OfficerCapacity <= 0 || !f.Footprint.IsValid || !Enum.IsDefined(f.TravelMode)))
             throw new ArgumentException("Invalid military formation or place.");
+        Places = ValidatePlaces(definition.Places);
         ValidateFixedFormations();
+    }
+
+    public static void ValidateDefensiveTacticChance(int value)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(value);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 100);
+    }
+
+    /// <summary>Validates scenario-owned placements against these already validated rules and geography.</summary>
+    public ImmutableDictionary<int, BattlefieldPlace> ValidatePlaces(ImmutableArray<BattlefieldPlace> places)
+    {
+        if (places.IsDefault) throw new ArgumentException("Missing military places.");
+        var result = places.ToImmutableDictionary(p => p.Id);
+        if (result.Values.Any(p => (long)p.Footprint.Width * Geography.FootprintScale > int.MaxValue ||
+            (long)p.Footprint.Height * Geography.FootprintScale > int.MaxValue))
+            throw new ArgumentException("City influence footprint exceeds coordinate capacity.");
+        if (result.Values.Any(p => p.EnabledTacticIds.IsDefault || p.EnabledTacticIds.Distinct().Count() != p.EnabledTacticIds.Length ||
+            p.EnabledTacticIds.Any(id => !Tactics.ContainsKey(id)))) throw new ArgumentException("Invalid enabled settlement tactics.");
+        if (result.Values.Any(p => p.FacilityTypeId is int id && !Facilities.ContainsKey(id) ||
+            !Facilities.IsEmpty && p.FacilityTypeId is null)) throw new ArgumentException("Unknown facility type reference.");
+        foreach (var place in result.Values) place.Combat?.Validate();
+        ValidateAttacks(result.Values.Select(p => p.Attack));
+        if (result.Values.Any(p => p.WoundedRecovery is < 0)) throw new ArgumentException("Invalid wounded recovery definition.");
+        if (result.Values.Any(p => p.Attack is { Range: <= 0 } || p.Attack is not null && p.Combat is null))
+            throw new ArgumentException("Invalid ordinary attack definition.");
+        if (result.Values.Any(p => p.Id < 0 || !p.Footprint.IsValid || BuildingArea(p) is var area &&
+            (area.Left < 0 || area.Top < 0 || area.Right > Map.FineWidth || area.Bottom > Map.FineHeight)))
+            throw new ArgumentException("Invalid military place.");
+        return result;
+    }
+
+    private void ValidateAttacks(IEnumerable<OrdinaryAttack?> attacks)
+    {
+        if (attacks.OfType<OrdinaryAttack>().Any(a => a.ElevationBonusPerLevel < 0 || a.MaximumElevationBonus < 0 ||
+            (a.ElevationBonusPerLevel == 0) != (a.MaximumElevationBonus == 0) ||
+            (long)a.Range + a.MaximumElevationBonus > int.MaxValue ||
+            a.ElevationBonusPerLevel > 0 && elevations.Length != terrainIds.Length))
+            throw new ArgumentException("Invalid attack elevation rules.");
     }
 
     public int? BasicNavalFormationId { get; }

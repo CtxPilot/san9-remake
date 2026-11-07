@@ -93,11 +93,14 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
     [JsonRequired] public OfficerInitialState[] Officers { get; init; } = [];
     [JsonRequired] public San9.Core.Domain.UnitState[] Units { get; init; } = [];
     [JsonRequired] public InformationDefinitions Information { get; init; } = InformationDefinitions.Empty;
-    public void Validate()
+    public void Validate() => Validate(null);
+
+    public void Validate(ScenarioValidationContext? context)
     {
         if (OfficerGrowth is null || OfficerGrowth.MaximumBaseAbility < San9.Core.Domain.OfficerGrowthRules.MinimumEditableAbility || OfficerGrowth.TacticProficiencyCap <= 0)
             throw new InvalidDataException("Invalid officer growth rules.");
-        San9.Content.Packages.ContentStructure.Validate(this);
+        // The operation context validates the large shared military/geography graph once per snapshot.
+        San9.Content.Packages.ContentStructure.Validate(context is null ? this : this with { Military = null });
         if (OriginalAi is null) throw new InvalidDataException("Missing original AI policy.");
         OriginalAi.Validate(Officers.Select(p => p.State.Id).ToHashSet(), Military);
         if (OriginalAi.Military is null) throw new InvalidDataException("Missing AI military policy.");
@@ -123,7 +126,9 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
             throw new InvalidDataException("Invalid force formation grants.");
         if (Military is { } military)
         {
-            var rules = new San9.Core.Domain.MilitaryRulebook(military);
+            var rules = context is null ? new San9.Core.Domain.MilitaryRulebook(military) : context.ValidateMilitary(military);
+            if (context is not null) San9.Content.Packages.ContentStructure.Validate(military.Places);
+            var places = context is null ? rules.Places : rules.ValidatePlaces(military.Places);
             if (Units.Any(u => u.FormationId is int id && !rules.ValidFormationPair(id, u.NavalFormationId)))
                 throw new InvalidDataException("Invalid initial unit formation pair.");
             var personIds = Officers.Select(o => o.State.Id).ToHashSet();
@@ -135,8 +140,8 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
                 throw new InvalidDataException("Unknown construction region.");
             if (Officers.Any(o => o.State.EquippedTacticId is int id && !rules.Tactics.ContainsKey(id)))
                 throw new InvalidDataException("Unknown equipped tactic reference.");
-            if (!rules.Places.Keys.Order().SequenceEqual(Settlements.Select(s => s.Id).Order()) ||
-                Settlements.Any(s => rules.Places[s.Id].Position != s.Position))
+            if (!places.Keys.Order().SequenceEqual(Settlements.Select(s => s.Id).Order()) ||
+                Settlements.Any(s => places[s.Id].Position != s.Position))
                 throw new InvalidDataException("Military place identities or positions differ from settlements.");
         }
         if (CityConnections.IsDefault || UnbuiltPlaces.IsDefault || UnbuiltPlaces.Any(p => p is null || !RegionNameKeys.ContainsKey(p.Id) || Settlements.Any(s => s.Id == p.Id)))

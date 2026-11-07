@@ -31,9 +31,9 @@ public sealed partial class SharedDataEditorWorkspace
         if (firstId == secondId) throw new InvalidDataException("请选择两名不同武将。");
         if (!Officers.Any(o => o.Id == firstId) || !Officers.Any(o => o.Id == secondId))
             throw new InvalidDataException("联携关系必须引用共享人物目录中的武将。");
-        ArgumentOutOfRangeException.ThrowIfNegative(bonus);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(bonus, 100);
-        return new(Math.Min(firstId, secondId), Math.Max(firstId, secondId), bonus, suppressesSiblingBonus);
+        var pair = new TacticLinkPair(Math.Min(firstId, secondId), Math.Max(firstId, secondId), bonus, suppressesSiblingBonus);
+        pair.Validate();
+        return pair;
     }
 
     private void ReplaceTacticLinkPairs(IEnumerable<TacticLinkPair> pairs)
@@ -52,25 +52,22 @@ public sealed partial class SharedDataEditorWorkspace
 
     public void SetDefensiveTacticChance(int value)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(value);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 100);
+        MilitaryRulebook.ValidateDefensiveTacticChance(value);
         var military = Definitions.Military ?? throw new InvalidOperationException("内容库没有军事规则。");
         Definitions = Definitions with { Military = military with { DefensiveTacticChance = value } };
     }
 
     public void SetKinshipLinkBonus(int value)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(value);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(value, 100);
         var military = Definitions.Military ?? throw new InvalidOperationException("内容库没有军事规则。");
-        Definitions = Definitions with { Military = military with { LinkRules = military.LinkRules with { KinshipBonus = value } } };
+        var links = military.LinkRules with { KinshipBonus = value };
+        links.Validate();
+        Definitions = Definitions with { Military = military with { LinkRules = links } };
     }
 
     public void SetCityInfluence(CityInfluenceRule value)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(value.RadiusCells);
-        ArgumentOutOfRangeException.ThrowIfNegative(value.LandTacticBonus);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(value.LandTacticBonus, 100);
+        value.Validate();
         var military = Definitions.Military ?? throw new InvalidOperationException("内容库没有军事规则。");
         Definitions = Definitions with { Military = military with { CityInfluence = value } };
     }

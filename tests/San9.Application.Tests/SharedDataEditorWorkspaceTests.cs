@@ -297,7 +297,7 @@ public sealed partial class SharedDataEditorWorkspaceTests : IDisposable
     }
 
     [Fact]
-    public async Task InvalidMessageReferencePreventsPublishingBothPlayerDocuments()
+    public async Task CatalogIdentityChangesCheckMessagesBeforePublishingBothPlayerDocuments()
     {
         await CreatePeopleAndTactics();
         Dictionary<string, MessageDefinition> messages = new()
@@ -308,9 +308,29 @@ public sealed partial class SharedDataEditorWorkspaceTests : IDisposable
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(manifest with { SharedMessages = library.Path }, ScenarioContentFiles.DataJsonOptions));
         var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
         workspace.SetRank(workspace.GetRank(8000) with { Name = "改名" });
+        await workspace.CreateTacticAsync(6000);
         var error = await Assert.ThrowsAsync<InvalidDataException>(() => workspace.SaveAsync());
         Assert.Contains("12345", error.Message);
         Assert.False(File.Exists(workspace.PlayerDefinitionPath)); Assert.False(File.Exists(workspace.PlayerOfficerPath));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LocalRuleAndDisplayChangesDoNotDependOnWorldGeographyOrMessages(bool displayOnly)
+    {
+        await Create();
+        await File.WriteAllTextAsync(Path.Combine(_root, "a/scenario.json"), "unrelated world");
+        await File.WriteAllTextAsync(Path.Combine(_root, "shared/geography.json"), "unrelated geography");
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        if (displayOnly) workspace.SetRank(workspace.GetRank(8000) with { Name = "新名称", Description = "新说明" });
+        else workspace.SetTacticProficiencyCap(1500);
+        await workspace.SaveAsync();
+        Assert.False(workspace.HasChanges);
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal(displayOnly ? 1000 : 1500, reopened.Definitions.OfficerGrowth.TacticProficiencyCap);
+        Assert.Equal(displayOnly ? "新名称" : "自制爵位", reopened.GetRank(8000).Name);
+        Assert.Equal("unrelated world", await File.ReadAllTextAsync(Path.Combine(_root, "a/scenario.json")));
     }
 
     [Fact]

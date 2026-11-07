@@ -7,5 +7,13 @@ public sealed record BattlefieldGeography(int FootprintScale, ImmutableArray<Map
 {
     public static BattlefieldGeography Empty { get; } = new(1, []);
 }
-public sealed record CityInfluenceRule(int RadiusCells, int LandTacticBonus);
+public sealed record CityInfluenceRule(int RadiusCells, int LandTacticBonus)
+{
+    public void Validate()
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(RadiusCells);
+        ArgumentOutOfRangeException.ThrowIfNegative(LandTacticBonus);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(LandTacticBonus, 100);
+    }
+}
 public sealed record RockfallRule(int PropagationSteps, int AttackRange);

@@ -31,6 +31,7 @@ public abstract partial class SharedCatalogEditorPage : SharedDataEditorPage
     public override bool HasPendingChanges => false;
     public override bool CommitPending() => true;
     public override void RefreshAfterSave() { RefreshList(); ShowCurrent(); }
+    public override void Saved() { if (IsVisibleInTree()) RefreshList(); }
     public override void Activate() { if (IsNodeReady()) { RefreshList(); ShowCurrent(); } }
 
     public override void _Ready()

@@ -71,7 +71,7 @@ public sealed class CityInfluenceTests
         Assert.False(Rules(radius: 0).HasCityInfluence(1, MapCoordinates.Center(new(13, 12)), [City()]));
         var rules = new MilitaryRulebook(new(1, 1, [0], [new(0, 1, null)], [], []));
         Assert.False(rules.HasCityInfluence(1, new(2, 2), []));
-        Assert.Throws<ArgumentException>(() => Rules(radius: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Rules(radius: -1));
         Assert.Throws<ArgumentException>(() => Rules([new(30, 0)]));
     }
 

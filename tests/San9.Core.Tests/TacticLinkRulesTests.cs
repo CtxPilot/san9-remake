@@ -52,7 +52,7 @@ public sealed class TacticLinkRulesTests
             new(true, -1, []), new(true, 20, [new(9002, 9001, 20, false)]),
             new(true, 20, [new(9001, 9001, 20, false)]), new(true, 20, [new(9001, 9002, 101, false)]),
             new(true, 20, [new(9001, 9002, 20, false), new(9001, 9002, 45, true)]) })
-            Assert.Throws<ArgumentException>(() => new MilitaryRulebook(definition with { LinkRules = rules }));
+            Assert.ThrowsAny<ArgumentException>(() => new MilitaryRulebook(definition with { LinkRules = rules }));
         Assert.False((First with { TacticLinkBonus = -1 }).IsValid());
         var formation = new FormationRule(9000, 1, 0, 1000, 1, new(1, 1), TravelMode.Land);
         foreach (var categories in new int[][] { [-1], [9], [0, 0] })
