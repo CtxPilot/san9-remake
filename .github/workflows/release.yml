@@ -55,8 +55,25 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "commit=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-  build:
+  validate:
     needs: prepare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test content contracts, importer and consumers
+        run: dotnet test San9Remake.slnx --configuration Release
+      - name: Test command-line and process protocols
+        run: dotnet test tests/San9.Headless.Tests/San9.Headless.Tests.csproj --configuration Release
+
+  build:
+    needs: [prepare, validate]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     strategy:
@@ -96,7 +113,7 @@ jobs:
           $project = Get-Content -LiteralPath $path -Raw -Encoding utf8
           $project = $project -replace '(?m)^\[application\]\r?$', "[application]`n`nconfig/version=`"$numericVersion`""
           [IO.File]::WriteAllText((Join-Path $PWD $path), $project, [Text.UTF8Encoding]::new($false))
-      - name: Export release
+      - name: Export release with integrated importer
         env:
           GODOT_PATH: ${{ steps.tools.outputs.godot-path }}
         run: ./tools/export-client.ps1 -Platform $env:EXPORT_PLATFORM -GodotPath $env:GODOT_PATH
@@ -107,21 +124,22 @@ jobs:
           $assets = Join-Path $PWD 'local/generated/release-assets'
           New-Item -ItemType Directory -Path $assets -Force | Out-Null
           Copy-Item -LiteralPath 'src/San9.Client.Godot/assets/OFL.txt' -Destination $output
+          Copy-Item -LiteralPath 'docs/release-content-setup.txt' -Destination "$output/README.txt"
           Copy-Item -Path 'local/generated/release-tools/licenses/*.txt' -Destination $output
           $name = "San9R-$env:RELEASE_VERSION-$env:EXPORT_TARGET"
           switch ($env:EXPORT_PLATFORM) {
             windows {
-              Compress-Archive -Path "$output/San9R.exe", "$output/OFL.txt", "$output/GODOT-LICENSE.txt", "$output/GODOT-COPYRIGHT.txt" -DestinationPath "$assets/$name.zip"
+              Compress-Archive -Path "$output/San9R.exe", "$output/README.txt", "$output/OFL.txt", "$output/GODOT-LICENSE.txt", "$output/GODOT-COPYRIGHT.txt" -DestinationPath "$assets/$name.zip"
             }
             linux {
               & chmod +x "$output/San9R.x86_64"
               if ($LASTEXITCODE -ne 0) { throw 'Setting game executable permission failed.' }
-              & tar -czf "$assets/$name.tar.gz" -C $output San9R.x86_64 OFL.txt GODOT-LICENSE.txt GODOT-COPYRIGHT.txt
+              & tar -czf "$assets/$name.tar.gz" -C $output San9R.x86_64 README.txt OFL.txt GODOT-LICENSE.txt GODOT-COPYRIGHT.txt
               if ($LASTEXITCODE -ne 0) { throw 'Linux packaging failed.' }
             }
             macos {
               Copy-Item -LiteralPath "$output/San9R.zip" -Destination "$assets/$name.zip"
-              & zip -j "$assets/$name.zip" "$output/OFL.txt" "$output/GODOT-LICENSE.txt" "$output/GODOT-COPYRIGHT.txt"
+              & zip -j "$assets/$name.zip" "$output/README.txt" "$output/OFL.txt" "$output/GODOT-LICENSE.txt" "$output/GODOT-COPYRIGHT.txt"
               if ($LASTEXITCODE -ne 0) { throw 'macOS packaging failed.' }
             }
           }
