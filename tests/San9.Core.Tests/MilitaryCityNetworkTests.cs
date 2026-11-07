@@ -16,6 +16,20 @@ public sealed class MilitaryCityNetworkTests
         MilitaryCityNetwork.Generate(new(map), map.Places.Select(p => p.Id), new(map.Formations[0].FootprintFor(soldiers), null));
 
     [Fact]
+    public void GenerationCanBeCancelledAfterEnumeratingItsInput()
+    {
+        var map = Map([(17, 2, 12), (9001, 37, 12)]);
+        using var cancellation = new CancellationTokenSource();
+        IEnumerable<int> Cities()
+        {
+            yield return 17;
+            cancellation.Cancel();
+            yield return 9001;
+        }
+        Assert.Throws<OperationCanceledException>(() => MilitaryCityNetwork.Generate(new(map), Cities(), token: cancellation.Token));
+    }
+
+    [Fact]
     public void DistantTwoCityMapDoesNotAcquireAnAbsoluteTimeCap()
     {
         var map = Map([(17, 2, 12), (9001, 37, 12)]) with { Terrains = [new(7, 100, null)] };

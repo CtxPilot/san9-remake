@@ -11,9 +11,9 @@ public static class ScenarioContentCompiler
     public static ImmutableArray<FormationGrant> FormationGrants(int? countryTitleId) => countryTitleId is >= 4 and <= 8
         ? [new(countryTitleId.Value + 11, FormationGrantCondition.Barbarian), new(26, FormationGrantCondition.Barbarian)] : [];
 
-    public static (ScenarioInitialState Scenario, TextCatalog Text) Compile(byte[] exe, byte[] scenario, byte[] messages, byte[] biographies)
+    public static (ScenarioInitialState Scenario, TextCatalog Text) Compile(byte[] exe, ScenarioSource scenario, byte[] messages, byte[] biographies, CancellationToken token = default)
     {
-        T Read<T>(Func<Stream, T> parser) { using var stream = new MemoryStream(scenario); return parser(stream); }
+        T Read<T>(Func<Stream, T> parser) where T : notnull { token.ThrowIfCancellationRequested(); return scenario.Read(parser); }
         var header = Read(San9ScenarioArchive.ReadHeader);
         var cities = Read(San9ScenarioCityArchive.ReadKnownRecords);
         var zones = Read(San9ScenarioZoneArchive.ReadKnownRecords);
@@ -140,6 +140,7 @@ public static class ScenarioContentCompiler
         var catalog = text.Catalog;
         var units = UnitContentCompiler.Compile(sourceUnits, Root);
         var penglai = EventContentCompiler.Penglai(header.ScenarioModeCode, persons, officers.Select(o => o.State.Id), summaries);
+        token.ThrowIfCancellationRequested();
         var snapshot = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, header.ScenarioId.ToString(System.Globalization.CultureInfo.InvariantCulture),
             header.StartDate.Year, header.StartDate.Month, header.StartDate.Day, null, summaries, settlements.OrderBy(s => s.Id).ToArray(), regions, regionCities)
         { UnbuiltPlaces = personPlaces.Where(p => settlements.All(s => s.Id != p.Id)).Select(p => new San9.Core.Domain.PersonPlace(p.Id, San9.Core.Domain.MapCoordinates.Center(new(p.X, p.Y)))).ToImmutableArray(),
@@ -207,7 +208,7 @@ public static class ScenarioContentCompiler
             ImperialSealId = 79, ImperialCourt = ImperialCourtContentCompiler.Compile(header.ScenarioModeCode, persons, officers.Select(o => o.State.Id)),
             ImperialCourtEnded = ImperialCourtContentCompiler.IsInitiallyEnded(header.ScenarioWorldFlagWords, header.StartDate) };
         snapshot = snapshot with { MilitaryCityConnections = San9.Core.Domain.MilitaryCityNetwork.Generate(
-            new(snapshot.Military!), settlements.Where(s => s.Kind == San9.Core.Domain.SettlementKind.City).Select(s => s.Id)).Connections };
+            new(snapshot.Military!), settlements.Where(s => s.Kind == San9.Core.Domain.SettlementKind.City).Select(s => s.Id), token: token).Connections };
         snapshot = EventContentCompiler.InitializePenglai(snapshot);
         snapshot = InitialLeadershipCompiler.Compile(snapshot);
         snapshot.Validate(); catalog.Validate(); return (snapshot, catalog);

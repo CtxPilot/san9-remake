@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Godot;
+using San9.Content.Packages;
 
 namespace San9.Client.Godot;
 
@@ -10,9 +11,10 @@ public partial class ContentImportPanel : Control
     public string Failure { get; init; } = "";
     public bool ImportAvailable { get; init; }
     public Func<Task> Continue { get; init; } = () => Task.CompletedTask;
-    private readonly ConcurrentQueue<string> _messages = new();
+    private readonly ConcurrentQueue<ContentImportProgress> _messages = new();
     private readonly Queue<string> _recent = new();
     private CancellationTokenSource? _cancellation;
+    private ContentImportStage? _stage;
     private bool _busy;
     private bool _exiting;
     private string? _source;
@@ -201,7 +203,7 @@ public partial class ContentImportPanel : Control
     private async Task Import()
     {
         if (_busy || _exiting || !ImportAvailable || _source is null) return;
-        _recent.Clear(); _log.Text = "";
+        _recent.Clear(); _log.Text = ""; _stage = null;
         _continue.Text = "重新加载内容"; SetPrimary(_continue, false); SetPrimary(_start, true);
         _title.Text = "正在准备游戏内容";
         _introduction.Text = "正在转换所选内容，请等待完成。";
@@ -232,7 +234,7 @@ public partial class ContentImportPanel : Control
         {
             if (!_exiting)
             {
-                _messages.Enqueue(error.Message); DrainMessages();
+                _messages.Enqueue(new(ContentImportStage.Failed, error.Message)); DrainMessages();
                 _title.Text = "准备游戏内容"; _introduction.Text = "调整目录或转换选项后，可以重新开始。";
                 _status.Text = "转换失败，请查看日志，调整后重试。";
                 _status.AddThemeColorOverride("font_color", new Color("edb79a")); SetLogVisible(true);
@@ -246,11 +248,12 @@ public partial class ContentImportPanel : Control
     private void DrainMessages()
     {
         bool changed = false;
-        while (_messages.TryDequeue(out string? line))
+        while (_messages.TryDequeue(out var update))
         {
-            _recent.Enqueue(line);
+            _recent.Enqueue(update.Message);
             if (_recent.Count > 80) _recent.Dequeue();
-            if (_cancellation is not null && (line.StartsWith('[') || line == "校验转换内容……")) _status.Text = line;
+            if (_cancellation is not null && update.Stage != _stage) _status.Text = update.Message;
+            _stage = update.Stage;
             changed = true;
         }
         if (changed) { _log.Text = string.Join('\n', _recent); _logToggle.Disabled = false; }
@@ -272,7 +275,7 @@ public partial class ContentImportPanel : Control
         try { await Continue(); if (!_exiting) QueueFree(); }
         catch (Exception error)
         {
-            if (!_exiting) { _messages.Enqueue(error.Message); DrainMessages(); _status.Text = "内容加载失败，请查看日志。"; SetLogVisible(true); }
+            if (!_exiting) { _messages.Enqueue(new(ContentImportStage.Failed, error.Message)); DrainMessages(); _status.Text = "内容加载失败，请查看日志。"; SetLogVisible(true); }
         }
         finally { if (!_exiting) SetBusy(false); }
     }

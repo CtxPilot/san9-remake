@@ -1,3 +1,4 @@
+using San9.Rendering;
 using San9.Importer.San9PkTc101.Images;
 using San9.Content.Packages;
 using San9.Content.Images;
@@ -7,9 +8,9 @@ namespace San9.Importer.San9PkTc101;
 
 public static class MapImporter
 {
-    internal static MapPackage Build(byte[] scenario, MapResources resources, IReadOnlyList<ContentSource> sources)
+    internal static MapPackage Build(ScenarioSource scenario, MapResources resources, IReadOnlyList<ContentSource> sources)
     {
-        T Scenario<T>(Func<Stream, T> read) { using var stream = new MemoryStream(scenario); return read(stream); }
+        T Scenario<T>(Func<Stream, T> read) where T : notnull => scenario.Read(read);
         var header = Scenario(San9ScenarioArchive.ReadHeader);
         if (header.MapWidth != 200 || header.MapHeight != 200)
             throw new InvalidDataException("Unsupported TC101 map dimensions.");
@@ -29,19 +30,15 @@ public static class MapImporter
             if (s.OpaqueField0C > 1) throw new InvalidDataException("Invalid bridge orientation.");
             var c = MapTerrainCompiler.Center(s.GridX, s.GridY); bridges.Add(new($"bridge-{s.OpaqueField0C}", c.X - 96, c.Y - 16));
         }
-        string BuildingImage(int id, bool alpha) => $"building-{id}-{(alpha ? "alpha" : "key")}";
-        int[] bases = [0, 15, 19, 24, 29, 34, 39, 43, 48, 53, 58, 62, 66, 71, 76, 81, 86]; List<MapBuilding> buildings = [];
+        List<MapBuilding> buildings = [];
         void Building(int id, int x, int y, int type, int durability, int appearance, int development)
         {
             int max = fixedBuildings[type].MaxDurability;
             if (max <= 0 || x >= 200 || y >= 200) throw new InvalidDataException("Invalid building dimensions or durability.");
-            bool four = type is 0 or 2 or 3 or 4 or 5 or 7 or 9 or 12 or 13 or 16;
-            int frame = durability * 100 < max * 20 ? 0 : four && durability * 100 < max * 40 ? 1 : durability * 100 < max * 60 ? (four ? 2 : 1) : (four ? 3 : 2);
-            int style = type != 0 ? 0 : appearance switch { 0 => 1, 1 => 2, 2 => 0, _ => throw new InvalidDataException("Invalid city appearance.") };
-            int composition = bases[type] + 1 + frame + (type == 0 ? style * 5 : 0);
+            int composition = BuildingAppearance.CompositionId(type, appearance, durability, max);
             var definition = compositions.SingleOrDefault(c => c.Id == composition) ?? throw new InvalidDataException($"Unconfirmed composition {composition}.");
             var center = MapTerrainCompiler.Center(x, y); int height = squares[y * 200 + x].Elevation;
-            var sprites = definition.Parts.Select(p => new MapSprite(BuildingImage(p.ResourceId + (type == 0 && p.DevelopmentVariant ? (development <= 300 ? 0 : development <= 600 ? 1 : 2) : 0), p.PaletteAlpha), center.X + p.X, center.Y - 10 * (height - 1) + p.Y)).ToArray();
+            var sprites = BuildingAppearance.Sprites(definition, type == 0, development, center.X, center.Y - 10 * (height - 1));
             buildings.Add(new(id, x, y, type, composition, sprites));
         }
         for (int i = 0; i < cities.Count; i++)

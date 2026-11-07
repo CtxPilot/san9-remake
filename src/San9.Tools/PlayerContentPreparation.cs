@@ -10,11 +10,9 @@ internal static class PlayerContentPreparation
         Console.CancelKeyPress += cancel;
         try
         {
-            await PlayerContentImporter.ImportAsync(gameDirectory, output, ffmpeg, audio, movies, Console.WriteLine, cancellation.Token);
-            Console.WriteLine("校验转换内容……");
-            await ContentVerification.VerifyAsync(output, Console.WriteLine, cancellation.Token);
-            cancellation.Token.ThrowIfCancellationRequested();
-            Console.WriteLine("转换完成，可以进入游戏。");
+            await PlayerContentImporter.ImportAsync(gameDirectory, output,
+                token => ContentVerification.VerifyAsync(output, Console.WriteLine, token),
+                ffmpeg, audio, movies, update => Console.WriteLine(update.Message), cancellation.Token);
         }
         finally { Console.CancelKeyPress -= cancel; }
     }

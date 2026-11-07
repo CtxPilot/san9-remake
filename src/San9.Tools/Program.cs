@@ -105,7 +105,7 @@ try
         San9.Importer.San9PkTc101.Text.MessageArchiveCompiler.Export(source.Root, Required("--output"), Console.WriteLine);
         MessageVerification.Run(Required("--output"));
         if(options.TryGetValue("--exe-evidence",out var evidence))
-            San9.Importer.San9PkTc101.Text.ExecutableTextCompiler.Export(source.Executable,evidence,Required("--output"));
+            San9.Tools.ExecutableTextCompiler.Export(source.Executable,evidence,Required("--output"));
     }
     else if(args[0]=="import-textures")
     {

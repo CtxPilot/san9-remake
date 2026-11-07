@@ -10,16 +10,17 @@ namespace San9.Content.Tests;
 public sealed class TextureDependencyTests
 {
     [Fact]
-    public void TextureMetadataSerializesWithoutDigests()
+    public void TextureMetadataStoresSourceFingerprintsWithoutImageDigests()
     {
         var image = new ImageAsset("portrait/0", "images/portraits/0.png", 240, 240, 3);
         var resources = new MapResources([], [], [], [], [], new int[288], new int[16], [], new byte[32]);
         var textures = new TexturePackage(TexturePackage.CurrentSchemaVersion, 7, "source",
-            [new("G_FaceL.s9", 123, new DateTime(2026, 9, 12, 0, 0, 0, DateTimeKind.Utc))],
+            [new("G_FaceL.s9", 123, new string('0', 64))],
             resources, new(InterfaceSkin.CurrentSchemaVersion, [], [], [], []), new(3, [new("portrait", "portraits", [new(0, 0, image)])]),
             [new(0, image, new(0, 0), new(32d / 240, 30d / 240))]);
         string json = JsonSerializer.Serialize(textures, PackageFiles.JsonOptions);
-        Assert.DoesNotContain("sha256", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("sha256", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("lastWriteTimeUtc", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("fingerprint", json, StringComparison.OrdinalIgnoreCase);
         var restored = JsonSerializer.Deserialize<TexturePackage>(json, PackageFiles.JsonOptions)!;
         Assert.Equal(textures.Sources, restored.Sources);

@@ -1,3 +1,4 @@
+using San9.Rendering;
 using San9.Importer.San9PkTc101.Images;
 using San9.Content.Packages;
 using San9.Content.Images;
@@ -55,11 +56,10 @@ public static class MapResourceCompiler
         List<MapComposition> compositions = [];
         using var pe = new System.Reflection.PortableExecutable.PEReader(new MemoryStream(exe));
         int At(int address) => BinaryPrimitives.ReadInt32LittleEndian(pe.GetSectionData(checked(address - (int)pe.PEHeaders.PEHeader!.ImageBase)).GetContent(0, 4).AsSpan());
-        int[] compositionBases = [0, 15, 19, 24, 29, 34, 39, 43, 48, 53, 58, 62, 66, 71, 76, 81, 86];
         foreach (var location in root.GetProperty("compositions").EnumerateArray())
         {
             int compositionId = location.GetProperty("id").GetInt32();
-            int type = Enumerable.Range(0, compositionBases.Length).Last(i => compositionBases[i] <= compositionId);
+            int type = BuildingAppearance.CompositionType(compositionId);
             int group = At(0x615d60 + type * 4) + (type == 0 ? compositionId / 5 : 0);
             int start = location.GetProperty("offset").GetInt32(), count = location.GetProperty("count").GetInt32();
             var parts = Enumerable.Range(0, count).Select(i => { int p = start + 28 * i; return new MapCompositionPart(Int(p) != 0, Int(p + 4) != 0, Int(p + 12), Int(p + 16), Int(p + 20)) { DepthOffset = Int(p + 24), Ground = Int(p + 8) != 0 }; }).ToArray();
@@ -119,7 +119,7 @@ public static class MapResourceCompiler
         var smoke = MapBuildingSmokeCompiler.Compile(exe, dataDir, Read, Save, assets, clips);
         compositions = compositions.Select(c => c with
         {
-            Smoke = smoke[Enumerable.Range(0, compositionBases.Length).Last(i => compositionBases[i] <= c.Id)]
+            Smoke = smoke[BuildingAppearance.CompositionType(c.Id)]
         }).ToList();
         var colors = Palettes("P_MapEtc", 2)[0].Skip(4).Take(32).ToArray();
         return new(seasons.ToArray(), assets.ToArray(), maskRecords.ToArray(), compositions.ToArray(), clips.ToArray(),

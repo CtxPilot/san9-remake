@@ -43,6 +43,7 @@ public sealed partial class MilitaryCityNetwork
 
     private sealed class Generator
     {
+        private readonly CancellationToken token;
         private readonly int[] ids, seeds;
         private readonly MapCell[] positions;
         private readonly Grid movement, geography;
@@ -55,8 +56,10 @@ public sealed partial class MilitaryCityNetwork
         private int stamp, clearanceSearches, bypassSearches;
         private long expanded;
 
-        internal Generator(MilitaryRulebook rules, int[][] sites, MilitaryCityReferenceProfile reference)
+        internal Generator(MilitaryRulebook rules, int[][] sites, MilitaryCityReferenceProfile reference, CancellationToken token)
         {
+            this.token = token;
+            token.ThrowIfCancellationRequested();
             var ids = sites.Select(s => s[0]).ToArray();
             this.ids = ids;
             width = rules.Map.Width;
@@ -136,6 +139,7 @@ public sealed partial class MilitaryCityNetwork
 
         internal MilitaryCityNetwork Build()
         {
+            token.ThrowIfCancellationRequested();
             var distances = Fields(movement);
             var geographicDistances = Fields(geography);
             var ranks = new int[ids.Length][];
@@ -210,6 +214,7 @@ public sealed partial class MilitaryCityNetwork
                 queue.Enqueue(seeds[city], 0);
                 while (queue.TryDequeue(out int node, out long cost))
                 {
+                    token.ThrowIfCancellationRequested();
                     if (cost != distance[node]) continue;
                     expanded++;
                     for (int side = 0; side < 4; side++)
@@ -244,6 +249,7 @@ public sealed partial class MilitaryCityNetwork
             visited[start] = stamp;
             while (corridorQueue.TryDequeue(out int node))
             {
+                token.ThrowIfCancellationRequested();
                 expanded++;
                 if (node == end) return true;
                 for (int side = 0; side < 4; side++)
@@ -280,6 +286,7 @@ public sealed partial class MilitaryCityNetwork
             searchQueue.Enqueue(start, (lower[start], 0, start));
             while (searchQueue.TryDequeue(out int node, out var priority))
             {
+                token.ThrowIfCancellationRequested();
                 long cost = -priority.NegativeCost;
                 if (visited[node] != stamp || searchCosts[node] != cost) continue;
                 expanded++;

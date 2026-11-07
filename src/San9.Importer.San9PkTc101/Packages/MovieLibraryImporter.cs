@@ -16,6 +16,14 @@ public static class MovieLibraryImporter
     public static async Task<bool> ImportAsync(string gameDirectory, string output,
         MovieLibraryGroup group = MovieLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default, string? ffmpegPath = null)
     {
+        using var operation = ImportOperation.Acquire(output);
+        return await ImportCoreAsync(operation, gameDirectory, output, group, progress, token, ffmpegPath);
+    }
+
+    internal static async Task<bool> ImportCoreAsync(ImportOperation operation, string gameDirectory, string output,
+        MovieLibraryGroup group = MovieLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default, string? ffmpegPath = null)
+    {
+        operation.RequireOutput(output);
         if (!Enum.IsDefined(group)) throw new ArgumentOutOfRangeException(nameof(group));
         var encoder = ffmpegPath is null ? FfmpegEncoder.Find() : new FfmpegEncoder(Path.GetFullPath(ffmpegPath));
         if (encoder is null) { progress?.Invoke("Skipped movies: ffmpeg was not found on PATH."); return false; }

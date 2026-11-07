@@ -57,19 +57,15 @@ public static class ScenarioContentFiles
     }
 
     /// <summary>Refreshes selection metadata without loading or rewriting the world dependencies.</summary>
-    public static async Task WritePreviewAsync(string root, ScenarioPreviewEntry preview, CancellationToken token = default)
+    public static async Task WritePreviewAsync(string root, ScenarioPreviewEntry preview, CancellationToken token = default,
+        ContentPublication? publication = null)
     {
+        using var own = publication is null ? new ContentPublication() : null;
+        var batch = publication ?? own!;
         var manifest = await ReadManifestAsync(root, token);
-        string target = Path.Combine(root, "content.json"), pending = target + ".pending";
-        try
-        {
-            await File.WriteAllTextAsync(pending, JsonSerializer.Serialize(manifest with { Preview = preview }, PackageFiles.JsonOptions),
-                System.Text.Encoding.UTF8, token);
-            token.ThrowIfCancellationRequested();
-            Publish([(pending, target)]);
-            File.Delete(Path.Combine(root, "preview.json"));
-        }
-        finally { File.Delete(pending); }
+        await batch.StageAsync(Path.Combine(root, "content.json"), manifest with { Preview = preview }, PackageFiles.JsonOptions, token);
+        batch.AfterCommit(() => File.Delete(Path.Combine(root, "preview.json")));
+        own?.Commit(token);
     }
 
     /// <summary>Publishes shared inputs and rebuilt worlds together, preserving map and presentation resources.</summary>
@@ -78,38 +74,34 @@ public static class ScenarioContentFiles
     {
         shared.Validate();
         resourceRoot = Path.GetFullPath(resourceRoot);
-        List<(string Pending, string Target)> files = [];
+        using var publication = new ContentPublication();
         List<(string Path, ScenarioContentManifest Manifest)> manifests = [];
-        try
+        await ScenarioDataFiles.WriteSharedAsync(resourceRoot, shared, token, publication);
+        foreach (var (package, scenario, texts) in worlds)
         {
-            await ScenarioDataFiles.StageSharedAsync(resourceRoot, shared, files, token);
-            foreach (var (package, scenario, texts) in worlds)
-            {
-                string root = PackageFiles.Resolve(resourceRoot, package);
-                // Read publication metadata only; the old world is never interpreted.
-                var layout = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(root, "content.json"), token))!.AsObject();
-                layout["definitions"] = shared.DefinitionsPath;
-                layout["officerDefaults"] = shared.OfficersPath;
-                layout["geography"] = shared.GeographyPath;
-                var manifest = layout.Deserialize<ScenarioContentManifest>(PackageFiles.JsonOptions)
-                    ?? throw new InvalidDataException("Empty scenario manifest.");
-                scenario.Validate();
-                if (ResolveResourceRoot(root, manifest.ResourceRoot) != resourceRoot)
-                    throw new InvalidDataException("Rebuilt scenario uses a different publication root.");
-                if (manifest.Preview is { } preview && (preview.Id != scenario.ScenarioId || preview.Year != scenario.Year || preview.Month != scenario.Month))
-                    throw new InvalidDataException("Rebuilt world differs from scenario selection metadata.");
-                await ScenarioDataFiles.StageAsync(resourceRoot, manifest.Scenario, shared.Describe(scenario, texts), files, DataJsonOptions, token);
-                manifests.Add((Path.GetRelativePath(resourceRoot, Path.Combine(root, "content.json")),
-                    manifest with { SchemaVersion = ScenarioContent.CurrentSchemaVersion }));
-            }
-            // All dependency and world files precede every entry point. Publish rolls
-            // back the whole batch if replacing any file fails.
-            foreach (var (path, manifest) in manifests)
-                await ScenarioDataFiles.StageAsync(resourceRoot, path, manifest, files, PackageFiles.JsonOptions, token);
-            token.ThrowIfCancellationRequested();
-            Publish(files);
+            string root = PackageFiles.Resolve(resourceRoot, package);
+            // Read publication metadata only; the old world is never interpreted.
+            var layout = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(root, "content.json"), token))!.AsObject();
+            layout["definitions"] = shared.DefinitionsPath;
+            layout["officerDefaults"] = shared.OfficersPath;
+            layout["geography"] = shared.GeographyPath;
+            var manifest = layout.Deserialize<ScenarioContentManifest>(PackageFiles.JsonOptions)
+                ?? throw new InvalidDataException("Empty scenario manifest.");
+            scenario.Validate();
+            if (ResolveResourceRoot(root, manifest.ResourceRoot) != resourceRoot)
+                throw new InvalidDataException("Rebuilt scenario uses a different publication root.");
+            if (manifest.Preview is { } preview && (preview.Id != scenario.ScenarioId || preview.Year != scenario.Year || preview.Month != scenario.Month))
+                throw new InvalidDataException("Rebuilt world differs from scenario selection metadata.");
+            await publication.StageAsync(PackageFiles.Resolve(resourceRoot, manifest.Scenario), shared.Describe(scenario, texts), DataJsonOptions, token);
+            manifests.Add((Path.GetRelativePath(resourceRoot, Path.Combine(root, "content.json")),
+                manifest with { SchemaVersion = ScenarioContent.CurrentSchemaVersion }));
         }
-        finally { foreach (var (pending, _) in files) File.Delete(pending); }
+        // All dependency and world files precede every entry point. Publish rolls
+        // back the whole batch if replacing any file fails.
+        foreach (var (path, manifest) in manifests)
+            await publication.StageAsync(PackageFiles.Resolve(resourceRoot, path), manifest, PackageFiles.JsonOptions, token);
+        token.ThrowIfCancellationRequested();
+        publication.Commit(token);
     }
 
     /// <summary>Reads the authored state needed for force selection without unrelated rules or presentation data.</summary>
@@ -211,8 +203,10 @@ public static class ScenarioContentFiles
     public static async Task WriteAsync(string root, ScenarioContent content, CancellationToken token = default,
         IReadOnlyDictionary<string, string>? messageGroups = null, string? resourceRoot = null,
         SharedMessageLibrary? sharedMessages = null, IReadOnlyCollection<string>? messageOverrides = null,
-        SharedMapDefinition? sharedMap = null, SharedScenarioData? sharedScenario = null)
+        SharedMapDefinition? sharedMap = null, SharedScenarioData? sharedScenario = null, ContentPublication? publication = null)
     {
+        using var own = publication is null ? new ContentPublication() : null;
+        var batch = publication ?? own!;
         if (content.SchemaVersion != ScenarioContent.CurrentSchemaVersion) throw new InvalidDataException("Unsupported scenario content version.");
         if (content.Map.Definition.SchemaVersion != MapDefinition.CurrentSchemaVersion) throw new InvalidDataException("Unsupported map definition version.");
         if (messageGroups is not null && messageGroups.Keys.Any(key => !content.Text.Messages.ContainsKey(key)))
@@ -283,45 +277,42 @@ public static class ScenarioContentFiles
                     .Where(path => IsInside(root, path)).ToArray();
             }
         }
-        List<(string Pending, string Target)> files = [];
+        HashSet<string> ownedPaths = new(StringComparer.OrdinalIgnoreCase);
         async Task Stage<T>(string name, T value, JsonSerializerOptions options)
         {
             string target = name == "content.json" ? manifestPath : PackageFiles.Resolve(resourceRoot, name);
-            if (files.Any(f => f.Target.Equals(target, StringComparison.OrdinalIgnoreCase)) ||
+            if (ownedPaths.Contains(target) ||
                 sharedScenario is not null && reusablePaths.Contains(target))
                 throw new InvalidDataException($"Scenario publication collides with another content file: {name}.");
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            string pending = target + ".pending";
-            files.Add((pending, target));
-            await using var file = File.Create(pending);
-            await JsonSerializer.SerializeAsync(file, value, options, token);
+            ownedPaths.Add(target);
+            await batch.StageAsync(target, value, options, token);
         }
-        try
+        if (sharedMap is null) await Stage(mapDefinitionPath, content.Map.Definition, DataJsonOptions);
+        await Stage(manifest.Map, new ScenarioMapManifest(mapDefinitionPath, content.Map.Buildings), DataJsonOptions);
+        if (sharedScenario is null)
         {
-            if (sharedMap is null) await Stage(mapDefinitionPath, content.Map.Definition, DataJsonOptions);
-            await Stage(manifest.Map, new ScenarioMapManifest(mapDefinitionPath, content.Map.Buildings), DataJsonOptions);
-            if (sharedScenario is null)
-            {
-                await Stage(scenarioData.DefinitionsPath, scenarioData.Definitions, DataJsonOptions);
-                await Stage(scenarioData.OfficersPath, scenarioData.Officers, DataJsonOptions);
-                await Stage(scenarioData.GeographyPath, scenarioData.Geography, DataJsonOptions);
-            }
-            await Stage(manifest.Scenario, scenarioDocument, DataJsonOptions);
-            var ownedPeople = OfficerComposition.Profiles(scenarioDocument.Officers,
-                [.. scenarioData.Officers.Officers, .. scenarioDocument.AdditionalOfficerDefaults]);
-            var ownedKeys = ownedPeople.SelectMany(p => new[] { p.NameKey, p.CourtesyNameKey, p.BiographyKey,
-                $"officer-surname.{p.Id}", $"officer-given-name.{p.Id}" }.OfType<string>()).ToHashSet(StringComparer.Ordinal);
-            await Stage(manifest.Text, new StaticTextContent(content.Text.SchemaVersion,
-                content.Text.Entries.Where(p => !ownedKeys.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value))
-                { MessagePeople = content.Text.MessagePeople, MessageTags = content.Text.MessageTags }, DataJsonOptions);
-            foreach (var (path, messages) in messageFiles) await Stage(path, messages, MessageJsonOptions);
-            await Stage(manifest.Illustrations, content.IllustrationRoles, DataJsonOptions);
-            await Stage(manifest.Presentation, content.Presentation, DataJsonOptions);
-            await Stage("content.json", manifest, PackageFiles.JsonOptions);
-            token.ThrowIfCancellationRequested();
-            Publish(files);
+            await Stage(scenarioData.DefinitionsPath, scenarioData.Definitions, DataJsonOptions);
+            await Stage(scenarioData.OfficersPath, scenarioData.Officers, DataJsonOptions);
+            await Stage(scenarioData.GeographyPath, scenarioData.Geography, DataJsonOptions);
+        }
+        await Stage(manifest.Scenario, scenarioDocument, DataJsonOptions);
+        var ownedPeople = OfficerComposition.Profiles(scenarioDocument.Officers,
+            [.. scenarioData.Officers.Officers, .. scenarioDocument.AdditionalOfficerDefaults]);
+        var ownedKeys = ownedPeople.SelectMany(p => new[] { p.NameKey, p.CourtesyNameKey, p.BiographyKey,
+            $"officer-surname.{p.Id}", $"officer-given-name.{p.Id}" }.OfType<string>()).ToHashSet(StringComparer.Ordinal);
+        await Stage(manifest.Text, new StaticTextContent(content.Text.SchemaVersion,
+            content.Text.Entries.Where(p => !ownedKeys.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value))
+            { MessagePeople = content.Text.MessagePeople, MessageTags = content.Text.MessageTags }, DataJsonOptions);
+        foreach (var (path, messages) in messageFiles) await Stage(path, messages, MessageJsonOptions);
+        await Stage(manifest.Illustrations, content.IllustrationRoles, DataJsonOptions);
+        await Stage(manifest.Presentation, content.Presentation, DataJsonOptions);
+        await Stage("content.json", manifest, PackageFiles.JsonOptions);
+        token.ThrowIfCancellationRequested();
+        batch.AfterCommit(() =>
+        {
             File.Delete(Path.Combine(root, "preview.json"));
-            var currentFiles = files.Select(file => file.Target).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var currentFiles = ownedPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
             currentFiles.Add(PackageFiles.Resolve(resourceRoot, mapDefinitionPath));
             foreach (string path in new[] { scenarioData.DefinitionsPath, scenarioData.OfficersPath, scenarioData.GeographyPath })
                 currentFiles.Add(PackageFiles.Resolve(resourceRoot, path));
@@ -337,48 +328,8 @@ public static class ScenarioContentFiles
                     directory = Path.GetDirectoryName(directory);
                 }
             }
-        }
-        finally
-        {
-            foreach (var (pending, target) in files)
-            {
-                File.Delete(pending);
-            }
-        }
-    }
-
-    internal static void Publish(List<(string Pending, string Target)> files)
-    {
-        List<(string Target, string? Backup)> replaced = [];
-        List<string> backups = [];
-        bool complete = false;
-        try
-        {
-            foreach (var (pending, target) in files)
-            {
-                string? backup = File.Exists(target) ? target + ".previous" : null;
-                if (backup is not null)
-                {
-                    File.Copy(target, backup, true);
-                    backups.Add(backup);
-                }
-                File.Move(pending, target, true);
-                replaced.Add((target, backup));
-            }
-            complete = true;
-        }
-        catch
-        {
-            foreach (var (target, backup) in replaced.AsEnumerable().Reverse())
-                if (backup is null) File.Delete(target);
-                else File.Move(backup, target, true);
-            complete = true;
-            throw;
-        }
-        finally
-        {
-            if (complete) foreach (string backup in backups) File.Delete(backup);
-        }
+        });
+        own?.Commit(token);
     }
 
     public static async Task<ScenarioInitialState> LoadScenarioAsync(string root, CancellationToken token = default)

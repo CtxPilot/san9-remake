@@ -39,7 +39,7 @@ public sealed class TextureRebuildTests : IDisposable
     public void RebuildingSkinDiscardsItsObsoleteSchemaButRequiresRetainedUnitsToBeReadable()
     {
         var skin = new InterfaceSkin(35, [], [], [], []) { BuildingTargetOffsets = new() { [0] = new(-16, -58) } };
-        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, 25, "test", [new("shared.s9", 10, DateTime.UnixEpoch)],
+        var package = new TexturePackage(TexturePackage.CurrentSchemaVersion, 25, "test", [new("shared.s9", 10, new string('0', 64))],
             new([], [], [], [], [], new int[288], new int[16], [], new byte[32]), skin, new(3, []), []);
         var manifest = JsonSerializer.SerializeToNode(package, PackageFiles.JsonOptions)!.AsObject();
         manifest["skin"] = JsonNode.Parse("{\"schemaVersion\":29}");

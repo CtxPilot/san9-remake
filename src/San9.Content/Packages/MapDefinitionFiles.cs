@@ -9,21 +9,13 @@ public sealed record SharedMapDefinition(string Path, MapDefinition Definition);
 public static class MapDefinitionFiles
 {
     public static async Task<SharedMapDefinition> WriteAsync(string resourceRoot, string path, MapDefinition definition,
-        CancellationToken token = default)
+        CancellationToken token = default, ContentPublication? publication = null)
     {
         if (definition.SchemaVersion != MapDefinition.CurrentSchemaVersion)
             throw new InvalidDataException("Unsupported map definition version.");
-        string target = PackageFiles.Resolve(resourceRoot, path);
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
-        string pending = target + ".pending";
-        try
-        {
-            await using (var stream = File.Create(pending))
-                await JsonSerializer.SerializeAsync(stream, definition, ScenarioContentFiles.DataJsonOptions, token);
-            token.ThrowIfCancellationRequested();
-            ScenarioContentFiles.Publish([(pending, target)]);
-        }
-        finally { File.Delete(pending); }
+        using var own = publication is null ? new ContentPublication() : null;
+        await (publication ?? own!).StageAsync(PackageFiles.Resolve(resourceRoot, path), definition, ScenarioContentFiles.DataJsonOptions, token);
+        own?.Commit(token);
         return new(path, definition);
     }
 }

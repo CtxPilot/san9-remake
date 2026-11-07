@@ -12,22 +12,29 @@ public static class ContentCatalogImporter
     public static async Task ImportAsync(string gameDirectory, string output, Action<string>? progress = null, CancellationToken token = default,
         bool openingOnly = false)
     {
+        var source = await San9ImportSource.OpenAsync(gameDirectory, token);
+        using var operation = ImportOperation.Acquire(output);
+        await ImportCoreAsync(operation, source, output, progress, token, openingOnly);
+    }
+
+    internal static async Task ImportCoreAsync(ImportOperation operation, San9ImportSource source, string output, Action<string>? progress,
+        CancellationToken token, bool openingOnly = false)
+    {
+        operation.RequireOutput(output);
         output = Path.GetFullPath(output);
-        var source = new San9SourceDirectory(gameDirectory);
-        var identity = await San9PkTc101Detector.DetectAsync(source.Executable, token);
-        if (!identity.IsMatch) throw new InvalidDataException(identity.Reason);
+        using var publication = new ContentPublication();
         string textureRoot = PackageFiles.Resolve(output, "shared/textures");
-        var textures = await TexturePackageFiles.LoadAsync(textureRoot, token);
-        byte[] exe = await File.ReadAllBytesAsync(source.Executable, token);
-        byte[] messageBytes = await File.ReadAllBytesAsync(source.File("M_MsgPK.s9"), token);
-        var messages = MessageArchiveCompiler.CompileForPublication(messageBytes, "M_MsgPK.s9", "messages").Messages;
+        var textures = await source.LoadTexturesAsync(textureRoot, token);
+        byte[] exe = source.Executable;
+        byte[] messageBytes = source.Read("M_MsgPK.s9");
+        var messages = source.Messages("M_MsgPK.s9", "messages", token).Messages;
         var text = new TextCatalog(TextCatalog.CurrentSchemaVersion, []) { Messages = messages.ToDictionary(p => p.Key, p => new MessageDefinition(MessageGraph.Simplify(p.Value.Nodes))) };
         var headers = Enumerable.Range(1, 20).Select(i =>
         {
-            using var file = File.OpenRead(source.File($"D_Sce{i:D3}.S9"));
-            return San9ScenarioArchive.ReadHeader(file);
+            token.ThrowIfCancellationRequested();
+            return source.Scenario($"D_Sce{i:D3}.S9").Read(San9ScenarioArchive.ReadHeader);
         }).ToArray();
-        var map = OpeningMapCompiler.Compile(exe, File.ReadAllBytes(source.File("G_MMap.s9")), textures.Library);
+        var map = OpeningMapCompiler.Compile(exe, source.Read("G_MMap.s9"), textures.Library);
         var selection = ScenarioSelectionPresentationCompiler.Compile(exe, textures.Library, text, headers, map);
         List<ScenarioCatalogEntry> entries = [];
         SharedMessageLibrary? sharedMessages = null;
@@ -37,10 +44,9 @@ public static class ContentCatalogImporter
         {
             // TC101 explicitly chooses scenario 0 as its publication baseline. Every
             // other scenario retains its differences; no majority-value inference.
-            var (baseline, baselineText) = ScenarioContentCompiler.Compile(exe, await File.ReadAllBytesAsync(source.File("D_Sce001.S9"), token),
-                messageBytes, await File.ReadAllBytesAsync(source.File("M_RtdnPK.s9"), token));
+            var (baseline, baselineText) = source.World("D_Sce001.S9", token);
             sharedScenario = SharedScenarioData.From(baseline, "shared/definitions.json", "shared/officer-defaults.json", "shared/maps/china/geography.json", baselineText);
-            await ScenarioDataFiles.WriteSharedAsync(output, sharedScenario, token);
+            await ScenarioDataFiles.WriteSharedAsync(output, sharedScenario, token, publication);
         }
         foreach (var preview in selection.Entries)
         {
@@ -49,19 +55,21 @@ public static class ContentCatalogImporter
             entries.Add(new(preview.Id, path));
             if (openingOnly)
             {
-                await ScenarioContentFiles.WritePreviewAsync(PackageFiles.Resolve(output, path), preview, token);
+                await ScenarioContentFiles.WritePreviewAsync(PackageFiles.Resolve(output, path), preview, token, publication);
                 progress?.Invoke($"Refreshed scenario preview: {preview.Id}.");
                 continue;
             }
-            var package = await ClientContentImporter.ImportAsync(gameDirectory, $"D_Sce{header.ScenarioId + 1:D3}.S9", textureRoot,
-                PackageFiles.Resolve(output, path), progress, token: token, resourceRoot: output,
-                sharedMessages: sharedMessages, publishSharedMessages: sharedMessages is null,
-                sharedMap: sharedMap, publishSharedMap: sharedMap is null, preview: preview, sharedScenario: sharedScenario);
-            sharedMessages ??= new("shared/messages/library.json", package.Text.Messages);
-            sharedMap ??= new("shared/maps/china/map.json", MapDefinition.From(package.Map));
-            progress?.Invoke($"Published {preview.Id}: {preview.Year}/{preview.Month} ({preview.CategoryId}).");
+            var compiled = ClientContentCompiler.Compile(source, $"D_Sce{header.ScenarioId + 1:D3}.S9", textureRoot,
+                textures, PackageFiles.Resolve(output, path), false, token, preview);
+            sharedMessages ??= await MessageLibraryFiles.WriteAsync(output, "shared/messages/library.json", compiled.Content.Text.Messages,
+                PublicationMessageCatalog.Groups, token, publication);
+            sharedMap ??= await MapDefinitionFiles.WriteAsync(output, "shared/maps/china/map.json", compiled.Content.Map.Definition, token, publication);
+            await ClientContentImporter.StageAsync(PackageFiles.Resolve(output, path), compiled, publication, false, progress, token,
+                new(output, sharedMessages, sharedMap, sharedScenario!));
+            source.ReleaseScenario($"D_Sce{header.ScenarioId + 1:D3}.S9");
+            progress?.Invoke($"Prepared {preview.Id}: {preview.Year}/{preview.Month} ({preview.CategoryId}).");
         }
-        var preparedAudio = AudioAssetCompiler.Discover(source.Root);
+        var preparedAudio = source.Audio;
         Dictionary<string, string> sounds = [];
         foreach (var (role, file) in new[] { ("setup", "BGM/BGM_02"), ("game-start", "SE/SE_S001") })
         {
@@ -73,28 +81,19 @@ public static class ContentCatalogImporter
             { Audio = new("setup", "game-start", sounds) };
         opening.Audio.Validate(output, requireFiles: false);
         await Publish("shared/opening.json", opening);
-        using (var peopleSource = File.OpenRead(source.File("D_Sce001.S9")))
         using (var names = new ScenarioTextReader(messageBytes, exe))
         {
-            var flags = OfficerFlagCatalogCompiler.Compile(San9ScenarioPersonArchive.ReadKnownRecords(peopleSource), names.Surname);
+            var people = source.Scenario("D_Sce001.S9").Read(San9ScenarioPersonArchive.ReadKnownRecords);
+            var flags = OfficerFlagCatalogCompiler.Compile(people, names.Surname);
             flags.ValidateReferences(textures.Map.Clips.Select(c => c.Id).ToHashSet());
             await Publish("shared/officer-flags.json", flags);
         }
         await Publish("catalog.json", new ContentCatalog(ContentCatalog.CurrentSchemaVersion, "shared/textures", "shared/opening.json", entries.ToArray())
             { OfficerFlags = "shared/officer-flags.json", Definitions = "shared/definitions.json", OfficerDefaults = "shared/officer-defaults.json" });
 
-        async Task Publish<T>(string path, T value)
-        {
-            string target = PackageFiles.Resolve(output, path);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            string pending = target + ".pending";
-            try
-            {
-                await File.WriteAllTextAsync(pending, JsonSerializer.Serialize(value, PackageFiles.JsonOptions), System.Text.Encoding.UTF8, token);
-                File.Move(pending, target, true);
-            }
-            finally { File.Delete(pending); }
-        }
-    }
+        publication.Commit(token);
+        progress?.Invoke("Published complete scenario catalog.");
 
+        Task Publish<T>(string path, T value) => publication.StageAsync(PackageFiles.Resolve(output, path), value, PackageFiles.JsonOptions, token);
+    }
 }

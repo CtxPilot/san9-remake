@@ -1,3 +1,4 @@
+using San9.Content.Packages;
 using System.Diagnostics;
 
 namespace San9.Importer.San9PkTc101.Packages;
@@ -5,12 +6,17 @@ namespace San9.Importer.San9PkTc101.Packages;
 /// <summary>Complete player import, independent of any client or console host.</summary>
 public static class PlayerContentImporter
 {
-    public static async Task ImportAsync(string gameDirectory, string output, string? ffmpeg = null, bool audio = true, bool movies = true,
-        Action<string>? progress = null, CancellationToken token = default)
+    public static async Task ImportAsync(string gameDirectory, string output, Func<CancellationToken, Task> validate,
+        string? ffmpeg = null, bool audio = true, bool movies = true,
+        Action<ContentImportProgress>? progress = null, CancellationToken token = default)
     {
-        var source = new San9SourceDirectory(gameDirectory);
+        ArgumentNullException.ThrowIfNull(validate);
+        ContentImportStage stage = ContentImportStage.Checking;
+        void Log(string message) => progress?.Invoke(new(stage, message));
+        void Stage(ContentImportStage next, string message) { stage = next; Log(message); }
+        var source = await San9ImportSource.OpenAsync(gameDirectory, token);
         output = Path.TrimEndingDirectorySeparator(Path.GetFullPath(output));
-        string sourceRoot = Path.TrimEndingDirectorySeparator(source.Root);
+        string sourceRoot = Path.TrimEndingDirectorySeparator(source.Directory.Root);
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (Within(output, sourceRoot) || Within(sourceRoot, output))
             throw new ArgumentException("原版目录与内容目录必须相互独立，不能相同或互相包含。");
@@ -18,9 +24,7 @@ public static class PlayerContentImporter
         bool Within(string path, string root) => path.Equals(root, comparison) ||
             path.StartsWith(Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar, comparison);
 
-        progress?.Invoke("检查原版版本：仅支持繁体中文三国志 IX 威力加强版 1.0.1.0 的已登记构建。");
-        var identity = await San9PkTc101Detector.DetectAsync(source.Executable, token);
-        if (!identity.IsMatch) throw new InvalidDataException("原版版本不受支持：" + identity.Reason);
+        Log("检查原版版本：仅支持繁体中文三国志 IX 威力加强版 1.0.1.0 的已登记构建。");
         string? encoder = null;
         if (audio || movies)
         {
@@ -28,29 +32,30 @@ public static class PlayerContentImporter
             await CheckEncoderAsync(encoder, movies, token);
         }
         token.ThrowIfCancellationRequested();
-        Directory.CreateDirectory(output);
-        await using var ownership = new FileStream(Path.Combine(output, ".import.lock"), FileMode.OpenOrCreate,
-            FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+        using var operation = ImportOperation.Acquire(output);
 
-        progress?.Invoke("[1/4] 转换纹理与界面资源……");
-        await TexturePackageImporter.ImportAsync(source.Root, Path.Combine(output, "shared", "textures"), progress, token);
+        Stage(ContentImportStage.Textures, "转换纹理与界面资源……");
+        await TexturePackageImporter.ImportCoreAsync(source, Path.Combine(output, "shared", "textures"), Log, token, parent: operation);
+        Stage(ContentImportStage.Audio, "准备音乐与音效……");
         if (audio)
         {
-            progress?.Invoke("[2/4] 转换音乐与音效……");
-            await AudioLibraryImporter.ImportAsync(source.Root, output, AudioLibraryGroup.All, progress, token, ffmpegPath: encoder);
+            await AudioLibraryImporter.ImportCoreAsync(operation, source.Directory.Root, output, AudioLibraryGroup.All, Log, token, ffmpegPath: encoder);
         }
-        else progress?.Invoke("[2/4] 本次不转换音频，保留已有音乐与音效。");
-        progress?.Invoke("[3/4] 转换全部剧本……");
-        await ContentCatalogImporter.ImportAsync(source.Root, output, progress, token);
+        else Log("本次不转换音频，保留已有音乐与音效。");
+        Stage(ContentImportStage.Scenarios, "转换全部剧本……");
+        await ContentCatalogImporter.ImportCoreAsync(operation, source, output, Log, token);
+        Stage(ContentImportStage.Movies, "准备影片……");
         if (movies)
         {
-            progress?.Invoke("[4/4] 转换影片……");
-            if (!await MovieLibraryImporter.ImportAsync(source.Root, output, MovieLibraryGroup.All, progress, token, ffmpegPath: encoder))
+            if (!await MovieLibraryImporter.ImportCoreAsync(operation, source.Directory.Root, output, MovieLibraryGroup.All, Log, token, ffmpegPath: encoder))
                 throw new InvalidOperationException("找不到 FFmpeg，影片转换未完成。");
         }
-        else progress?.Invoke("[4/4] 本次不转换影片，保留已有影片。");
+        else Log("本次不转换影片，保留已有影片。");
         token.ThrowIfCancellationRequested();
-        progress?.Invoke("资源转换完成，等待内容校验。");
+        Stage(ContentImportStage.Verifying, "校验转换内容……");
+        await validate(token);
+        token.ThrowIfCancellationRequested();
+        Stage(ContentImportStage.Complete, "转换与内容校验完成。");
     }
 
     private static string ResolveEncoder(string? selected)

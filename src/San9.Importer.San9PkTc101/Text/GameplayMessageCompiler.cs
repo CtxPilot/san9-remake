@@ -9,11 +9,12 @@ public sealed record GameplayMessageAudit(string Key, bool SourceConfirmed, bool
 /// <summary>Removes source identities and catalog sort encodings before messages enter the runtime package.</summary>
 public sealed class GameplayMessageCompiler(ScenarioInitialState scenario, IReadOnlyList<San9ScenarioPersonRecord> people)
 {
-    public Dictionary<string, MessageDefinition> Compile(IReadOnlyDictionary<string, MessageDefinition> source)
+    public Dictionary<string, MessageDefinition> Compile(IReadOnlyDictionary<string, MessageDefinition> source, CancellationToken token = default)
     {
         Dictionary<string, MessageDefinition> result = [];
         foreach (var (key, definition) in source)
         {
+            token.ThrowIfCancellationRequested();
             MessageExpression Unsupported(string detail) => throw new InvalidDataException($"Message {key}: {detail}");
             MessageExpression Entity(string kind, int id) => new("entity", kind, id);
             MessageExpression Number(long value) => new("constant", Number: value);

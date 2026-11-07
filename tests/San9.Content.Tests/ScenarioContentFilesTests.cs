@@ -27,6 +27,54 @@ public sealed class ScenarioContentFilesTests : IDisposable
         }, new() { ["portrait"] = "portrait/0" });
 
     [Fact]
+    public async Task CatalogPublicationKeepsLiveSharedInputsAndFirstWorldWhenLaterScenarioFails()
+    {
+        var content = Fixture();
+        var shared = SharedScenarioData.From(content.Scenario, "shared/definitions.json", "shared/officers.json", "shared/geography.json", content.Text);
+        string first = Path.Combine(_root, "first");
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared);
+        await ScenarioContentFiles.WriteAsync(first, content, resourceRoot: _root, sharedScenario: shared);
+        byte[] definitions = await File.ReadAllBytesAsync(Path.Combine(_root, shared.DefinitionsPath));
+        byte[] world = await File.ReadAllBytesAsync(Path.Combine(first, "scenario.json"));
+        var changed = content with { Scenario = content.Scenario with { DefaultLoyalty = 77 } };
+        var replacement = SharedScenarioData.From(changed.Scenario, shared.DefinitionsPath, shared.OfficersPath, shared.GeographyPath, changed.Text);
+        using (var batch = new ContentPublication())
+        {
+            await ScenarioDataFiles.WriteSharedAsync(_root, replacement, publication: batch);
+            await ScenarioContentFiles.WriteAsync(first, changed, resourceRoot: _root, sharedScenario: replacement, publication: batch);
+            await Assert.ThrowsAsync<InvalidDataException>(() => ScenarioContentFiles.WriteAsync(Path.Combine(_root, "second"),
+                changed with { SchemaVersion = 0 }, resourceRoot: _root, sharedScenario: replacement, publication: batch));
+            Assert.Equal(definitions, await File.ReadAllBytesAsync(Path.Combine(_root, shared.DefinitionsPath)));
+        }
+        Assert.Equal(definitions, await File.ReadAllBytesAsync(Path.Combine(_root, shared.DefinitionsPath)));
+        Assert.Equal(world, await File.ReadAllBytesAsync(Path.Combine(first, "scenario.json")));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.pending", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task CatalogPublicationCommitsSharedMessagesMapAndAllWorldsTogether()
+    {
+        var content = Fixture();
+        var shared = SharedScenarioData.From(content.Scenario, "shared/definitions.json", "shared/officers.json", "shared/geography.json", content.Text);
+        using var batch = new ContentPublication();
+        await ScenarioDataFiles.WriteSharedAsync(_root, shared, publication: batch);
+        var messages = await MessageLibraryFiles.WriteAsync(_root, "shared/messages/library.json", content.Text.Messages, publication: batch);
+        var map = await MapDefinitionFiles.WriteAsync(_root, "shared/maps/china.json", content.Map.Definition, publication: batch);
+        foreach (string id in new[] { "first", "second" })
+            await ScenarioContentFiles.WriteAsync(Path.Combine(_root, id), content with { Scenario = content.Scenario with { ScenarioId = id } },
+                resourceRoot: _root, sharedMessages: messages, sharedMap: map, sharedScenario: shared, publication: batch);
+        Assert.False(File.Exists(Path.Combine(_root, shared.DefinitionsPath)));
+        Assert.False(File.Exists(Path.Combine(_root, "first/content.json")));
+        batch.Commit();
+        foreach (string id in new[] { "first", "second" })
+        {
+            var loaded = await ScenarioContentFiles.LoadAsync(Path.Combine(_root, id));
+            Assert.Equal(id, loaded.Scenario.ScenarioId);
+            Assert.Equal(content.Text.Messages.Count, loaded.Text.Messages.Count);
+        }
+    }
+
+    [Fact]
     public async Task GlobalLoyaltyDefaultRoundTripsThroughSharedRulesAndScenarioOverrides()
     {
         var content = Fixture();

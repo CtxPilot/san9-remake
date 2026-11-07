@@ -11,19 +11,14 @@ public static class ScenarioWorldImporter
     public static async Task RebuildAsync(string gameDirectory, string output, Action<string>? progress = null,
         CancellationToken token = default)
     {
-        var source = new San9SourceDirectory(gameDirectory);
-        var identity = await San9PkTc101Detector.DetectAsync(source.Executable, token);
-        if (!identity.IsMatch) throw new InvalidDataException(identity.Reason);
+        var source = await San9ImportSource.OpenAsync(gameDirectory, token);
+        using var operation = ImportOperation.Acquire(output);
         output = Path.GetFullPath(output);
         var catalog = await ContentCatalogFiles.LoadAsync(output, token);
-        byte[] exe = await File.ReadAllBytesAsync(source.Executable, token);
-        byte[] messages = await File.ReadAllBytesAsync(source.File("M_MsgPK.s9"), token);
-        byte[] biographies = await File.ReadAllBytesAsync(source.File("M_RtdnPK.s9"), token);
         var sources = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string path in Directory.EnumerateFiles(source.Root, "D_Sce*.S9"))
+        foreach (string path in Directory.EnumerateFiles(source.Directory.Root, "D_Sce*.S9"))
         {
-            using var stream = File.OpenRead(path);
-            string id = San9ScenarioArchive.ReadHeader(stream).ScenarioId.ToString(CultureInfo.InvariantCulture);
+            string id = source.Scenario(Path.GetFileName(path)).Read(San9ScenarioArchive.ReadHeader).ScenarioId.ToString(CultureInfo.InvariantCulture);
             if (!sources.TryAdd(id, path)) throw new InvalidDataException($"Duplicate source scenario identity: {id}.");
         }
         List<(ScenarioCatalogEntry Entry, ScenarioInitialState Scenario, San9.Content.Text.TextCatalog Text)> worlds = [];
@@ -31,8 +26,7 @@ public static class ScenarioWorldImporter
         {
             token.ThrowIfCancellationRequested();
             if (!sources.TryGetValue(entry.Id, out var path)) throw new InvalidDataException($"Missing source scenario: {entry.Id}.");
-            byte[] bytes = await File.ReadAllBytesAsync(path, token);
-            var (scenario, texts) = ScenarioContentCompiler.Compile(exe, bytes, messages, biographies);
+            var (scenario, texts) = source.World(Path.GetFileName(path), token);
             worlds.Add((entry, scenario, texts));
         }
         var baseline = worlds.Single(w => w.Entry.Id == "0").Scenario;

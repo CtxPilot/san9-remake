@@ -35,8 +35,10 @@ public static class MessageLibraryFiles
 
     public static async Task<SharedMessageLibrary> WriteAsync(string resourceRoot, string path,
         IReadOnlyDictionary<string, MessageDefinition> messages, IReadOnlyDictionary<string, string>? groups = null,
-        CancellationToken token = default)
+        CancellationToken token = default, ContentPublication? publication = null)
     {
+        using var own = publication is null ? new ContentPublication() : null;
+        var batch = publication ?? own!;
         MessageGraph.Validate(messages);
         foreach (string key in messages.Keys)
             if (!MessageGraph.ReferencesValid(key, messages)) throw new InvalidDataException($"Invalid or cyclic shared message reference: {key}.");
@@ -51,25 +53,15 @@ public static class MessageLibraryFiles
             .ToDictionary(group => group.Key + ".json", group => group.ToDictionary(p => p.Key, p => p.Value));
         if (files.Keys.Any(name => PackageFiles.Resolve(root, name).Equals(manifestPath, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("Message group collides with the library manifest.");
-        List<(string Pending, string Target)> staged = [];
-        async Task Stage<T>(string target, T value, JsonSerializerOptions options)
+        foreach (var (name, values) in files)
+            await batch.StageAsync(PackageFiles.Resolve(root, name), values, ScenarioContentFiles.MessageJsonOptions, token);
+        await batch.StageAsync(manifestPath, new MessageLibraryManifest(MessageLibraryManifest.CurrentSchemaVersion, files.Keys.ToArray()), PackageFiles.JsonOptions, token);
+        batch.AfterCommit(() =>
         {
-            string pending = target + ".pending";
-            staged.Add((pending, target));
-            await using var stream = File.Create(pending);
-            await JsonSerializer.SerializeAsync(stream, value, options, token);
-        }
-        try
-        {
-            foreach (var (name, values) in files)
-                await Stage(PackageFiles.Resolve(root, name), values, ScenarioContentFiles.MessageJsonOptions);
-            await Stage(manifestPath, new MessageLibraryManifest(MessageLibraryManifest.CurrentSchemaVersion, files.Keys.ToArray()), PackageFiles.JsonOptions);
-            token.ThrowIfCancellationRequested();
-            ScenarioContentFiles.Publish(staged);
             foreach (string obsolete in previous.Except(files.Keys, StringComparer.Ordinal))
                 File.Delete(PackageFiles.Resolve(root, obsolete));
-        }
-        finally { foreach (var file in staged) File.Delete(file.Pending); }
+        });
+        own?.Commit(token);
         return new(path, new Dictionary<string, MessageDefinition>(messages, StringComparer.Ordinal));
     }
 }

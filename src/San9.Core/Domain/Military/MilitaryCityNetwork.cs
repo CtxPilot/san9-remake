@@ -40,8 +40,9 @@ public sealed partial class MilitaryCityNetwork
 
     /// <summary>Generate once from immutable authored map inputs; no world-state or random-stream access.</summary>
     public static MilitaryCityNetwork Generate(MilitaryRulebook rules, IEnumerable<int> cityIds,
-        MilitaryCityReferenceProfile? reference = null)
+        MilitaryCityReferenceProfile? reference = null, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var ids = cityIds.Order().ToArray();
         if (ids.Distinct().Count() != ids.Length || ids.Any(id => !rules.Places.ContainsKey(id)))
             throw new ArgumentException("Military cities require distinct place references.");
@@ -53,7 +54,7 @@ public sealed partial class MilitaryCityNetwork
         // Fine-coordinate cities in one navigation cell share a strategic site. Expand
         // site links back to identities rather than imposing a coarse-grid identity limit.
         var sites = ids.GroupBy(id => MapCoordinates.Cell(rules.Places[id].Position)).Select(g => g.ToArray()).ToArray();
-        var generated = sites.Length > 1 ? new Generator(rules, sites, reference).Build() : Empty;
+        var generated = sites.Length > 1 ? new Generator(rules, sites, reference, token).Build() : Empty;
         var members = sites.ToDictionary(s => s[0]);
         var expanded = generated.Connections.SelectMany(c => members[c.FromCityId]
             .SelectMany(from => members[c.ToCityId].Select(to => new CityConnection(from, to))));

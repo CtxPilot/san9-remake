@@ -1,7 +1,4 @@
-using System.Security.Cryptography;
 using San9.Content.Packages;
-using San9.Importer.San9PkTc101.Interface;
-using San9.Importer.San9PkTc101.Scenarios;
 using San9.Importer.San9PkTc101.Text;
 
 namespace San9.Importer.San9PkTc101.Packages;
@@ -9,94 +6,35 @@ namespace San9.Importer.San9PkTc101.Packages;
 public static class ClientContentImporter
 {
     public static async Task<ClientContentPackage> ImportAsync(string gameDirectory, string scenarioFile,
-        string textureRoot, string output, Action<string>? progress = null, bool messageReports = false, CancellationToken token = default, string? resourceRoot = null,
-        SharedMessageLibrary? sharedMessages = null, bool publishSharedMessages = false,
-        SharedMapDefinition? sharedMap = null, bool publishSharedMap = false,
-        San9.Content.Interface.ScenarioPreviewEntry? preview = null, SharedScenarioData? sharedScenario = null)
+        string textureRoot, string output, Action<string>? progress = null, bool messageReports = false, CancellationToken token = default)
     {
-        var sourceDirectory = new San9SourceDirectory(gameDirectory);
-        string sourceExe = sourceDirectory.Executable, dataDirectory = sourceDirectory.Root;
-        string scenarioPath = sourceDirectory.File(scenarioFile);
-        var identity = await San9PkTc101Detector.DetectAsync(sourceExe, token);
-        if (!identity.IsMatch) throw new InvalidDataException(identity.Reason);
         textureRoot = Path.GetFullPath(textureRoot); output = Path.GetFullPath(output);
         if (textureRoot == output) throw new InvalidDataException("Scenario and texture package directories must differ.");
-        var textures = await TexturePackageFiles.LoadAsync(textureRoot, token);
-        if (textures.SourceBuild != San9PkTc101Detector.SourceBuildId) throw new InvalidDataException("Texture source build differs.");
-        var buffers = new Dictionary<string, byte[]>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        byte[] Read(string path)
-        {
-            token.ThrowIfCancellationRequested();
-            path = Path.GetFullPath(path);
-            if (buffers.TryGetValue(path, out var cached)) return cached;
-            byte[] bytes = File.ReadAllBytes(path);
-            buffers.Add(path, bytes);
-            return bytes;
-        }
-        byte[] exe = Read(sourceExe), scenarioBytes = Read(scenarioPath);
-        var map = MapImporter.Build(scenarioBytes, textures.Map,
-            [new(Path.GetFileName(sourceExe), Convert.ToHexString(SHA256.HashData(exe))),
-             new(Path.GetFileName(scenarioPath), Convert.ToHexString(SHA256.HashData(scenarioBytes)))]);
-        var (scenario, text) = ScenarioContentCompiler.Compile(exe, scenarioBytes, Read(Path.Combine(dataDirectory, "M_MsgPK.s9")), Read(Path.Combine(dataDirectory, "M_RtdnPK.s9")));
-        Dictionary<string, San9.Content.Text.MessageDefinition> messages = [];
-        List<MessageContentAdaptation> adaptations = [];
-        foreach (var (file, catalog) in new[] { ("M_MsgPK.s9", "messages"), ("M_RtdnPK.s9", "biographies") })
-        {
-            var converted = MessageArchiveCompiler.CompileForPublication(Read(Path.Combine(dataDirectory, file)), file, catalog);
-            foreach (var item in converted.Messages) messages.Add(item.Key, item.Value);
-            if (messageReports) adaptations.AddRange(converted.Adaptations);
-        }
-        var audioFiles = AudioAssetCompiler.Discover(sourceDirectory.Root);
-        San9.Content.Interface.CommandPresentation presentation;
-        using (var source = new MemoryStream(scenarioBytes))
-        {
-            var header = San9ScenarioArchive.ReadHeader(source);
-            source.Position = 0;
-            var people = San9ScenarioPersonArchive.ReadKnownRecords(source);
-            presentation = CommandPresentationCompiler.Compile(people, audioFiles) with
-            {
-                OpeningMovie = MovieLibraryImporter.ScenarioOpeningRole(header.ScenarioId),
-                Notices = new() { ["scroll-hover"] = "messages.8427", ["scroll-click"] = "messages.8428" }
-            };
-            messages = new GameplayMessageCompiler(scenario, people).Compile(messages);
-            text = text with { MessageTags = ScenarioMessageTags.For(header.ScenarioId, header.ScenarioModeCode) };
-        }
-        messages = PublicationMessageCatalog.Compile(messages);
-        San9.Content.Text.NameMessages.AddTo(messages);
-        EventPresentationCompiler.AddMessages(messages);
-        ChroniclePresentationCompiler.AddMessages(messages);
-        ExecutionPresentationCompiler.AddMessages(messages);
-        text = text with { Messages = messages };
-        var roles = InformationArtCompiler.Compile(exe, scenarioBytes, scenario, textures.Library, textures.Portraits);
-        var dependency = new TextureDependency(Path.GetRelativePath(output, textureRoot).Replace('\\','/'));
-        var mapAudio = MapAudioCompiler.Compile(exe);
-        var battle = BattlePresentationCompiler.Compile(exe, textures.Library);
-        presentation = presentation with { MapAudio = mapAudio.Definition, Battle = battle.Definition,
-            Diplomacy = DiplomacyPresentationCompiler.Compile(textures.Library), Ending = EndingPresentationCompiler.Compile(textures.Library) };
-        foreach (var source in mapAudio.Sources.Concat(MapAudioCompiler.MusicSources).Concat(battle.Sources))
-            presentation.Sounds.Add(source.Role, AudioAssetCompiler.Path(AudioAssetCompiler.Resolve(audioFiles, source.File)));
-        resourceRoot = Path.GetFullPath(resourceRoot ?? output);
-        var content = new ScenarioContent(ScenarioContent.CurrentSchemaVersion,
-            dependency, MapInstance.From(map), scenario, text, roles)
-        { Presentation = presentation, Preview = preview };
-        var loaded = ClientContentFiles.Resolve(content, textures, textureRoot) with { ContentRoot = resourceRoot };
-        foreach (string key in messages.Keys)
-            if (!San9.Content.Text.MessageGraph.ReferencesValid(key, messages))
-                throw new InvalidDataException($"Invalid or cyclic message references: {key}.");
-        if (publishSharedMessages)
-        {
-            if (resourceRoot is null) throw new InvalidDataException("Publishing shared messages requires a content root.");
-            sharedMessages = await MessageLibraryFiles.WriteAsync(resourceRoot, "shared/messages/library.json", messages,
-                PublicationMessageCatalog.Groups, token);
-        }
-        if (publishSharedMap)
-            sharedMap = await MapDefinitionFiles.WriteAsync(resourceRoot, "shared/maps/china/map.json", content.Map.Definition, token);
-        await ScenarioContentFiles.WriteAsync(output, content, token, PublicationMessageCatalog.Groups, resourceRoot, sharedMessages,
-            sharedMap: sharedMap, sharedScenario: sharedScenario);
-        File.Delete(Path.Combine(output, "message-id-map.json"));
+        var source = await San9ImportSource.OpenAsync(gameDirectory, token);
+        using var operation = ImportOperation.Acquire(output);
+        var textures = await source.LoadTexturesAsync(textureRoot, token);
+        var compiled = ClientContentCompiler.Compile(source, scenarioFile, textureRoot, textures, output, messageReports, token);
+        using var publication = new ContentPublication();
+        await StageAsync(output, compiled, publication, messageReports, progress, token);
+        publication.Commit(token);
+        return ClientContentFiles.Resolve(compiled.Content, textures, textureRoot) with { ContentRoot = output };
+    }
+
+    internal sealed record SharedContent(string Root, SharedMessageLibrary Messages, SharedMapDefinition Map, SharedScenarioData Scenario);
+
+    internal static async Task StageAsync(string output, CompiledScenario compiled, ContentPublication publication,
+        bool messageReports, Action<string>? progress, CancellationToken token, SharedContent? shared = null)
+    {
+        var content = compiled.Content;
+        var messages = content.Text.Messages;
+        var scenario = content.Scenario;
+        await ScenarioContentFiles.WriteAsync(output, content, token, PublicationMessageCatalog.Groups,
+            resourceRoot: shared?.Root ?? output, sharedMessages: shared?.Messages, sharedMap: shared?.Map,
+            sharedScenario: shared?.Scenario, publication: publication);
+        publication.Retire(Path.Combine(output, "message-id-map.json"));
         if (messageReports)
         {
-            var adaptedKeys = adaptations.Select(a => a.Key).ToHashSet(StringComparer.Ordinal);
+            var adaptedKeys = compiled.Adaptations.Select(a => a.Key).ToHashSet(StringComparer.Ordinal);
             var messageAudit = GameplayMessageCompiler.Audit(messages)
                 .Select(a => new
                 {
@@ -106,21 +44,17 @@ public static class ClientContentImporter
                     a.RuntimeReady,
                     a.RequiredArguments
                 }).ToArray();
-            await File.WriteAllTextAsync(Path.Combine(output, "message-adaptations.json"),
-                System.Text.Json.JsonSerializer.Serialize(adaptations.Select(a => new
-                { a.Key, SourceKey = a.Key, a.SourceSha256, a.Decision, a.DiscardedHex }),
-                    PackageFiles.JsonOptions), System.Text.Encoding.UTF8, token);
-            await File.WriteAllTextAsync(Path.Combine(output, "message-readiness.json"),
-                System.Text.Json.JsonSerializer.Serialize(messageAudit, PackageFiles.JsonOptions), System.Text.Encoding.UTF8, token);
+            await publication.StageAsync(Path.Combine(output, "message-adaptations.json"), compiled.Adaptations.Select(a => new
+                { a.Key, SourceKey = a.Key, a.SourceSha256, a.Decision, a.DiscardedHex }), PackageFiles.JsonOptions, token);
+            await publication.StageAsync(Path.Combine(output, "message-readiness.json"), messageAudit, PackageFiles.JsonOptions, token);
         }
         else
         {
-            File.Delete(Path.Combine(output, "message-adaptations.json"));
-            File.Delete(Path.Combine(output, "message-readiness.json"));
+            publication.Retire(Path.Combine(output, "message-adaptations.json"));
+            publication.Retire(Path.Combine(output, "message-readiness.json"));
         }
-        progress?.Invoke($"Messages: {messages.Count} runtime-ready." +
+        progress?.Invoke($"Compiled messages: {messages.Count} runtime-ready." +
             (messageReports ? " See message-readiness.json for arguments." : ""));
-        progress?.Invoke($"Scenario: {scenario.Settlements.Length} settlements; references independent textures at {dependency.Path}.");
-        return loaded;
+        progress?.Invoke($"Scenario: {scenario.Settlements.Length} settlements; references independent textures at {content.Textures.Path}.");
     }
 }

@@ -96,7 +96,7 @@ public static class ScenarioDataFiles
                     throw new InvalidDataException("Player content changed since editing began.");
             }
             token.ThrowIfCancellationRequested();
-            ScenarioContentFiles.Publish(staged);
+            ContentPublication.PublishFiles(staged);
             return prepared;
         }
         finally
@@ -157,37 +157,16 @@ public static class ScenarioDataFiles
             OfficerComposition.Profiles(document.Officers, [.. officers.Officers, .. document.AdditionalOfficerDefaults]));
     }
 
-    public static async Task WriteSharedAsync(string resourceRoot, SharedScenarioData shared, CancellationToken token = default)
+    public static async Task WriteSharedAsync(string resourceRoot, SharedScenarioData shared, CancellationToken token = default,
+        ContentPublication? publication = null)
     {
         shared.Validate();
-        List<(string Pending, string Target)> files = [];
-        try
-        {
-            await StageSharedAsync(resourceRoot, shared, files, token);
-            token.ThrowIfCancellationRequested();
-            ScenarioContentFiles.Publish(files);
-        }
-        finally { foreach (var (pending, _) in files) File.Delete(pending); }
-    }
-
-    internal static async Task StageSharedAsync(string resourceRoot, SharedScenarioData shared,
-        List<(string Pending, string Target)> files, CancellationToken token)
-    {
-        shared.ResolvePaths(resourceRoot);
-        await StageAsync(resourceRoot, shared.DefinitionsPath, shared.Definitions, files, ScenarioContentFiles.DataJsonOptions, token);
-        await StageAsync(resourceRoot, shared.OfficersPath, shared.Officers, files, ScenarioContentFiles.DataJsonOptions, token);
-        await StageAsync(resourceRoot, shared.GeographyPath, shared.Geography, files, ScenarioContentFiles.DataJsonOptions, token);
-    }
-
-    internal static async Task StageAsync<T>(string resourceRoot, string relative, T value,
-        List<(string Pending, string Target)> files, JsonSerializerOptions options, CancellationToken token)
-    {
-        string target = PackageFiles.Resolve(resourceRoot, relative), pending = target + ".pending";
-        if (files.Any(f => f.Target.Equals(target, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidDataException($"Duplicate scenario publication path: {relative}.");
-        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        files.Add((pending, target));
-        await File.WriteAllTextAsync(pending, JsonSerializer.Serialize(value, options), System.Text.Encoding.UTF8, token);
+        using var own = publication is null ? new ContentPublication() : null;
+        var batch = publication ?? own!;
+        await batch.StageAsync(PackageFiles.Resolve(resourceRoot, shared.DefinitionsPath), shared.Definitions, ScenarioContentFiles.DataJsonOptions, token);
+        await batch.StageAsync(PackageFiles.Resolve(resourceRoot, shared.OfficersPath), shared.Officers, ScenarioContentFiles.DataJsonOptions, token);
+        await batch.StageAsync(PackageFiles.Resolve(resourceRoot, shared.GeographyPath), shared.Geography, ScenarioContentFiles.DataJsonOptions, token);
+        own?.Commit(token);
     }
 
     private static Task<T> ReadAsync<T>(string root, string path, CancellationToken token) =>

@@ -6,7 +6,7 @@ using San9.Content.Maps;
 
 namespace San9.Content.Packages;
 
-public sealed record TextureSourceStamp(string Name, long Length, DateTime LastWriteTimeUtc);
+public sealed record TextureSourceStamp(string Name, long Length, string Sha256);
 
 public sealed record CloudPlacement(int Side, int A, int B, int C);
 
@@ -24,7 +24,7 @@ public sealed record TexturePackage(int SchemaVersion, int ConversionVersion, st
 {
     [System.Text.Json.Serialization.JsonIgnore]
     public IReadOnlyDictionary<string, string> PortraitImageSources { get; init; } = new Dictionary<string, string>();
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
     [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<ImageAsset> Assets => Map.Assets.Concat(Map.Seasons.SelectMany(s => s.Textures))
         .Concat(Skin.Assets).Concat(Library.Assets).Concat(Portraits.Select(p => p.Image));
@@ -33,6 +33,9 @@ public sealed record TexturePackage(int SchemaVersion, int ConversionVersion, st
     {
         if (SchemaVersion != CurrentSchemaVersion || Map.MinimapColors.Length != 32 || Map.MaskPositions.Length != 288 ||
             Map.MaskHeightAdjustments.Length != 16) throw new InvalidDataException("Invalid texture package.");
+        if (Sources.Any(s => string.IsNullOrWhiteSpace(s.Name) || s.Name.IndexOfAny(['/', '\\', ':']) >= 0 ||
+            s.Length < 0 || s.Sha256 is null || s.Sha256.Length != 64 || s.Sha256.Any(c => !Uri.IsHexDigit(c))))
+            throw new InvalidDataException("Invalid texture source fingerprint.");
         if (Portraits.Select(p => p.Id).Distinct().Count() != Portraits.Length) throw new InvalidDataException("Duplicate portrait ID.");
         foreach (var portrait in Portraits) portrait.Validate();
         Map.Units.Validate(Map.Clips.ToDictionary(c => c.Id), Map.Assets.Select(a => a.Id).ToHashSet());

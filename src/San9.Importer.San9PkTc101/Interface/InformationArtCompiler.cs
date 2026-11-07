@@ -8,12 +8,10 @@ namespace San9.Importer.San9PkTc101.Interface;
 /// <summary>Resolves scenario illustrations to the source catalog; never decodes or writes an image.</summary>
 public static class InformationArtCompiler
 {
-    public static Dictionary<string,string> Compile(byte[] executable, byte[] scenarioBytes, ScenarioInitialState scenario, TextureLibrary library, PortraitDefinition[] portraits)
+    public static Dictionary<string,string> Compile(byte[] executable, ScenarioSource source, ScenarioInitialState scenario, TextureLibrary library, PortraitDefinition[] portraits)
     {
-        using var stream = new MemoryStream(scenarioBytes);
-        var people = San9ScenarioPersonArchive.ReadKnownRecords(stream);
-        stream.Position = 0;
-        var treasures = San9ScenarioItemArchive.ReadKnownRecords(stream);
+        var people = source.Read(San9ScenarioPersonArchive.ReadKnownRecords);
+        var treasures = source.Read(San9ScenarioItemArchive.ReadKnownRecords);
         Dictionary<string,string> roles = [];
         string Image(string archive, int index, int palette = 0) => library.Archives.Single(a => a.Id == archive)
             .Variants.Single(v => v.ImageIndex == index && v.PaletteIndex == (archive == "g_still" ? index : palette)).Image.Id;

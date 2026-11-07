@@ -51,21 +51,23 @@ public static class MessageArchiveCompiler
     }
 
     public static (Dictionary<string, MessageDefinition> Messages, MessageContentAdaptation[] Adaptations) CompileForPublication(
-        byte[] bytes, string file, string catalog, OriginalMessagePresentation presentation = OriginalMessagePresentation.Standard)
+        byte[] bytes, string file, string catalog, OriginalMessagePresentation presentation = OriginalMessagePresentation.Standard,
+        CancellationToken token = default)
     {
         var table = new San9MessageTable(bytes);
         return CompileRecordsForPublication(ReadRecords(table, catalog, presentation).Select(row => (row.Key, row.Raw, row.Parsed)),
-            file, catalog, presentation);
+            file, catalog, presentation, token);
     }
 
     internal static (Dictionary<string, MessageDefinition> Messages, MessageContentAdaptation[] Adaptations) CompileRecordsForPublication(
         IEnumerable<(string Key, byte[] Raw, ParsedMessage Parsed)> records, string file, string catalog,
-        OriginalMessagePresentation presentation = OriginalMessagePresentation.Standard)
+        OriginalMessagePresentation presentation = OriginalMessagePresentation.Standard, CancellationToken token = default)
     {
         List<MessageContentAdaptation> adaptations = [];
         Dictionary<string, MessageDefinition> source = [];
         foreach (var (key, raw, parsed) in records)
         {
+            token.ThrowIfCancellationRequested();
             source.Add(key, parsed.Definition);
             if (MessageContentPolicy.Apply(key, raw, catalog, source, presentation) is { } adaptation)
                 adaptations.Add(adaptation);
@@ -80,6 +82,7 @@ public static class MessageArchiveCompiler
         Dictionary<string, MessageDefinition> messages = [];
         foreach (var (key, definition) in source)
         {
+            token.ThrowIfCancellationRequested();
             try { messages.Add(key, OriginalMessageStyles.Compile(definition, source)); }
             catch (InvalidDataException error)
             { throw new InvalidDataException($"Message {key} style conversion failed: {error.Message}", error); }

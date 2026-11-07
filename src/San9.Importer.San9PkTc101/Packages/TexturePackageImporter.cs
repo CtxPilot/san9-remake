@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using San9.Content.Images;
 using San9.Content.Packages;
@@ -14,11 +15,19 @@ public static class TexturePackageImporter
         Action<string>? progress = null, CancellationToken token = default, string? rebuild = null)
     {
         if (rebuild is not null && rebuild != "all")
+        {
+            using var operation = ImportOperation.Acquire(output);
             return await TexturePackageRebuilder.RebuildAsync(gameDirectory, output, rebuild, progress, token);
-        var sourceDirectory = new San9SourceDirectory(gameDirectory);
-        string sourceExe = sourceDirectory.Executable, dataDirectory = sourceDirectory.Root;
-        var identity = await San9PkTc101Detector.DetectAsync(sourceExe, token);
-        if (!identity.IsMatch) throw new InvalidDataException(identity.Reason);
+        }
+        var source = await San9ImportSource.OpenAsync(gameDirectory, token);
+        return await ImportCoreAsync(source, output, progress, token, rebuild == "all");
+    }
+
+    internal static async Task<TexturePackage> ImportCoreAsync(San9ImportSource source, string output,
+        Action<string>? progress, CancellationToken token, bool force = false, ImportOperation? parent = null)
+    {
+        using var operation = ImportOperation.Acquire(output, parent);
+        string sourceExe = source.Directory.Executable, dataDirectory = source.Directory.Root;
         TextureLibraryCompiler.ValidateInventory(dataDirectory);
         output = Path.GetFullPath(output); Directory.CreateDirectory(output);
         string manifest = Path.Combine(output, "textures.json");
@@ -29,17 +38,10 @@ public static class TexturePackageImporter
             reusable = header.RootElement.GetProperty("schemaVersion").GetInt32() == TexturePackage.CurrentSchemaVersion &&
                 header.RootElement.TryGetProperty("conversionVersion", out var version) && version.GetInt32() == ConversionVersion;
         }
-        if (reusable && rebuild != "all")
+        if (reusable && !force)
         {
             var previous = await TexturePackageFiles.LoadAsync(output, token);
-            bool unchanged = previous.ConversionVersion == ConversionVersion;
-            foreach (var source in previous.Sources)
-            {
-                string path = source.Name == Path.GetFileName(sourceExe) ? sourceExe : Path.Combine(dataDirectory, source.Name);
-                var info = new FileInfo(path);
-                if (!info.Exists || info.Length != source.Length || info.LastWriteTimeUtc != source.LastWriteTimeUtc)
-                { unchanged = false; break; }
-            }
+            bool unchanged = await SourcesMatchAsync(dataDirectory, previous.Sources, token);
             if (unchanged)
             {
                 await ImageAssetFiles.VerifyAsync(output, previous.Assets, token);
@@ -49,9 +51,9 @@ public static class TexturePackageImporter
         List<TextureSourceStamp> sources = [];
         byte[] Read(string path)
         {
-            token.ThrowIfCancellationRequested(); var bytes = File.ReadAllBytes(path);
+            token.ThrowIfCancellationRequested(); var bytes = source.Read(Path.GetFileName(path));
             var info = new FileInfo(path);
-            sources.Add(new(info.Name, info.Length, info.LastWriteTimeUtc)); return bytes;
+            sources.Add(new(info.Name, bytes.Length, Convert.ToHexString(SHA256.HashData(bytes)))); return bytes;
         }
         string staging = Path.Combine(output, ".sources");
         int sourceNumber = 0;
@@ -78,6 +80,24 @@ public static class TexturePackageImporter
         await PublishAsync(output, package, token, publication);
         progress?.Invoke($"Independent textures: {package.Assets.Count()} logical images, {package.Assets.Select(a => a.File).Distinct().Count()} physical files.");
         return package;
+    }
+
+    internal static async Task<bool> SourcesMatchAsync(string root, IEnumerable<TextureSourceStamp> stamps, CancellationToken token = default)
+    {
+        foreach (var stamp in stamps)
+        {
+            token.ThrowIfCancellationRequested();
+            string path = PackageFiles.Resolve(root, stamp.Name);
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length != stamp.Length || stamp.Sha256 != await FingerprintAsync(path, token)) return false;
+        }
+        return true;
+    }
+
+    private static async Task<string> FingerprintAsync(string path, CancellationToken token)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await SHA256.HashDataAsync(stream, token));
     }
 
     internal static async Task PublishAsync(string output, TexturePackage package, CancellationToken token, TexturePublication publication)

@@ -10,6 +10,14 @@ public static class AudioLibraryImporter
     public static async Task ImportAsync(string gameDirectory, string output,
         AudioLibraryGroup group = AudioLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default, string? ffmpegPath = null)
     {
+        using var operation = ImportOperation.Acquire(output);
+        await ImportCoreAsync(operation, gameDirectory, output, group, progress, token, ffmpegPath);
+    }
+
+    internal static async Task ImportCoreAsync(ImportOperation operation, string gameDirectory, string output,
+        AudioLibraryGroup group = AudioLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default, string? ffmpegPath = null)
+    {
+        operation.RequireOutput(output);
         if (!Enum.IsDefined(group)) throw new ArgumentOutOfRangeException(nameof(group));
         string[] directories = group switch
         {

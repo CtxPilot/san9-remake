@@ -5,7 +5,9 @@ using System.Text;
 using System.Text.Json;
 using San9.Content.Packages;
 
-namespace San9.Importer.San9PkTc101.Text;
+using San9.Importer.San9PkTc101.Text;
+
+namespace San9.Tools;
 
 public static class ExecutableTextCompiler
 {
