@@ -15,6 +15,9 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# Preserve upstream formatting in vendored license texts.
+licenses/**/*.txt -whitespace
+
 *.png binary
 *.jpg binary
 *.jpeg binary
