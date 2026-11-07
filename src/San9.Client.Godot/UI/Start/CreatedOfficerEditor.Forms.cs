@@ -13,7 +13,7 @@ public partial class CreatedOfficerEditor
         OfficerEditorValues Read() => OfficerEditorValues.From(Library.Officers.Single(p => p.Id == person.Id));
         OfficerEditorForm.Build(this, _tabs, Read, edit => Change(person.Id, p => edit(OfficerEditorValues.From(p)).Apply(p)),
             tactics, _portraitService, parent => BuildFlags(parent, person), parent => BuildRelationships(parent, person),
-            ShowCurrent, surname =>
+            ShowCurrent, (_definitions?.OfficerGrowth ?? San9.Core.Domain.OfficerGrowthRules.Default).TacticProficiencyCap, surname =>
             {
                 surname.Editable = !Preferences.Current.AutoAssignOfficerFlag || Workspace.FlagCatalog is not null;
                 if (!surname.Editable) surname.TooltipText = "公共旗字目录载入后可编辑姓氏。";

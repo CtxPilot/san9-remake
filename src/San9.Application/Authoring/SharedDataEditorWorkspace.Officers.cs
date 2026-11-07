@@ -28,6 +28,8 @@ public sealed partial class SharedDataEditorWorkspace
         var entries = Officers.ToArray();
         int index = Array.FindIndex(entries, p => p.Id == value.Id);
         if (index < 0) throw new InvalidDataException("找不到武将。");
+        if (value.TacticProficiencies.Where((v, i) => v > Definitions.OfficerGrowth.TacticProficiencyCap && v != entries[index].TacticProficiencies[i]).Any())
+            throw new InvalidDataException("修改后的兵法熟练度不能超过基础规则上限；已有超限值可保留。");
         var original = _officerBaselines[value.Id];
         if (value.NameKey != original.NameKey || value.CourtesyNameKey != original.CourtesyNameKey || value.BiographyKey != original.BiographyKey)
             throw new InvalidDataException("请保留人物文本引用身份。");

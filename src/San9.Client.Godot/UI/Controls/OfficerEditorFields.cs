@@ -55,14 +55,14 @@ internal static class OfficerEditorFields
     }
 
     internal static void Training(Node parent, Func<OfficerTrainingFields> read, Action<OfficerTrainingFields> write,
-        IReadOnlyList<OfficerTacticChoice> tactics)
+        IReadOnlyList<OfficerTacticChoice> tactics, int proficiencyCap)
     {
         var initial = read();
         var proficiencies = new SpinBox[TacticCategoryLabels.Names.Length];
         var mastery = new Button[TacticCategoryLabels.Names.Length];
         var learned = new Dictionary<int, Button>();
         bool building = true;
-        bool ProficienciesFull(OfficerTrainingFields p) => p.Proficiencies.All(v => v >= 1000);
+        bool ProficienciesFull(OfficerTrainingFields p) => p.Proficiencies.All(v => v >= proficiencyCap);
         bool MasteryFull(OfficerTrainingFields p) => Enumerable.Range(0, TacticCategoryLabels.Names.Length).All(p.MasteredCategories.Contains);
         bool TacticsFull(OfficerTrainingFields p) => tactics.Count > 0 && tactics.All(t => p.LearnedTactics.Contains(t.Id));
         var actions = ContentEditorControls.ButtonGroup(parent);
@@ -72,7 +72,7 @@ internal static class OfficerEditorFields
         {
             var p = read();
             max.Text = ProficienciesFull(p) ? "清空熟练度" : "熟练度全满";
-            max.TooltipText = ProficienciesFull(p) ? "九类熟练度全部清零。" : "九类熟练度全部设为1000。";
+            max.TooltipText = ProficienciesFull(p) ? "九类熟练度全部清零。" : $"九类熟练度全部设为{proficiencyCap}。";
             master.Text = MasteryFull(p) ? "取消全精通" : "全精通";
             master.TooltipText = MasteryFull(p) ? "取消九类精通。" : "开启九类精通。";
             learn.Text = TacticsFull(p) ? "清空兵法" : "全兵法";
@@ -90,7 +90,7 @@ internal static class OfficerEditorFields
             write(change(read())); Refresh();
         }
         max = ContentEditorControls.ActionButton(actions, "熟练度全满", () => Edit(p => p with
-            { Proficiencies = Enumerable.Repeat(ProficienciesFull(p) ? 0 : 1000, TacticCategoryLabels.Names.Length).ToImmutableArray() }), "MaxProficiencies");
+            { Proficiencies = Enumerable.Repeat(ProficienciesFull(p) ? 0 : proficiencyCap, TacticCategoryLabels.Names.Length).ToImmutableArray() }), "MaxProficiencies");
         master = ContentEditorControls.ActionButton(actions, "全精通", () => Edit(p => p with
             { MasteredCategories = MasteryFull(p) ? [] : Enumerable.Range(0, TacticCategoryLabels.Names.Length).ToImmutableArray() }), "MasterAllCategories");
         learn = ContentEditorControls.ActionButton(actions, "全兵法", () => Edit(p => p with
@@ -107,8 +107,12 @@ internal static class OfficerEditorFields
             int category = c;
             var row = new HBoxContainer { CustomMinimumSize = new(0, 36) }; row.AddThemeConstantOverride("separation", 12); parent.AddChild(row);
             row.AddChild(new Label { Text = TacticCategoryLabels.Names[c], CustomMinimumSize = new(48, 0), VerticalAlignment = VerticalAlignment.Center });
-            proficiencies[c] = ContentEditorControls.NumericInput(row, initial.Proficiencies[c], 0, int.MaxValue,
-                v => Edit(p => p with { Proficiencies = p.Proficiencies.SetItem(category, (int)v) }));
+            proficiencies[c] = ContentEditorControls.NumericInput(row, initial.Proficiencies[c], 0, Math.Max(proficiencyCap, initial.Proficiencies[c]),
+                v =>
+                {
+                    if (v > proficiencyCap) { Refresh(); return; }
+                    Edit(p => p with { Proficiencies = p.Proficiencies.SetItem(category, (int)v) });
+                }, tooltip: $"当前熟练度上限：{proficiencyCap}。已有超限值可保留。");
             proficiencies[c].SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
             mastery[c] = ContentEditorControls.Toggle(row, "精通", initial.MasteredCategories.Contains(c), enabled => Edit(p => p with
                 { MasteredCategories = enabled ? p.MasteredCategories.Add(category).Distinct().Order().ToImmutableArray() : p.MasteredCategories.Remove(category) }));

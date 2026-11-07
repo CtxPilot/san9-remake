@@ -182,7 +182,7 @@ public sealed class WorldEditorDraft
             for (int i = 0; i < categories.Length; i++)
             {
                 int category = i;
-                Number<OfficerEdit>($"{categories[i]}熟练", 0, 1000, p => (uint)p.Proficiencies[category],
+                Number<OfficerEdit>($"{categories[i]}熟练", 0, (uint)_session.OfficerGrowth.TacticProficiencyCap, p => (uint)p.Proficiencies[category],
                     (p, v) => p with { Proficiencies = p.Proficiencies.SetItem(category, (int)v) });
                 Number<OfficerEdit>($"{categories[i]}精通", 0, 1, p => p.MasteredCategories.Contains(category) ? 1u : 0u,
                     (p, v) => p with { MasteredCategories = Toggle(p.MasteredCategories, category, v != 0) }, true);

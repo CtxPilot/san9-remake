@@ -24,7 +24,8 @@ public partial class OfficerEditorPage : SharedCatalogEditorPage
             .Select(t => new OfficerTacticChoice(t.Id, Workspace.GetTacticCatalog(t.Id).Name, t.Category!.Value)).ToArray();
         OfficerEditorForm.Build(this, tabs, () => OfficerEditorValues.From(Workspace.GetOfficer(id)),
             Guard<Func<OfficerEditorValues, OfficerEditorValues>>(change => Edit(id, p => change(OfficerEditorValues.From(p)).Apply(p))),
-            tactics, PortraitService, parent => BuildFlags(parent, id), parent => BuildRelationships(parent, id), Rebuild);
+            tactics, PortraitService, parent => BuildFlags(parent, id), parent => BuildRelationships(parent, id), Rebuild,
+            Workspace.Definitions.OfficerGrowth.TacticProficiencyCap);
         tabs.CurrentTab = _tab;
         tabs.TabChanged += index => _tab = (int)index;
     }

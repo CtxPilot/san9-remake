@@ -6,13 +6,13 @@ namespace San9.Core.Tests;
 
 public sealed class OfficerGrowthTests
 {
-    private static WorldMutation World(int ability = 99, ulong seed = 52, CompanionSettings? companion = null)
+    private static WorldMutation World(int ability = 99, ulong seed = 52, CompanionSettings? companion = null, OfficerGrowthRules? growth = null)
     {
         var world = WorldState.Create(new(190, 1, 1), 42,
             [new(1, 0) { LeaderId = 1 }],
             [new(1, 1, 0, 100, 100, 0, 0, 0, 100, 0, 100)],
             [new(1, 1, 1, new(ability, ability, ability, ability), false) { Status = OfficerStatus.Ruler }], corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(1000, 1000)) { IsRoot = true }]);
-        var mutation = world.BeginMutation(companion: companion);
+        var mutation = world.BeginMutation(new OfficerAbilityRules(TreasureRulebook.Empty, new([]), growth), companion: companion);
         mutation.SetSimulation(mutation.Simulation with { RandomStreams = [new("growth", seed)] });
         return mutation;
     }
@@ -110,6 +110,21 @@ public sealed class OfficerGrowthTests
         OfficerTacticGrowth.Increase(world, 1, category, 3, events);
         Assert.All(world.Officers[1].TacticProficiencies, value => Assert.Equal(0, value));
         Assert.Empty(events);
+    }
+
+    [Theory]
+    [InlineData(600, 599, 600)]
+    [InlineData(600, 1000, 1000)]
+    [InlineData(1500, 999, 1002)]
+    [InlineData(1500, 1499, 1500)]
+    public void ProficiencyUsesContentCapForEveryCategoryAndPreservesExistingExcess(int cap, int before, int expected)
+    {
+        var world = World(growth: new(100) { TacticProficiencyCap = cap });
+        world.Replace(world.Officers[1] with { TacticProficiencies = [before, before, before, before, before, before, before, before, before] });
+        List<DomainEvent> events = [];
+        for (int category = 0; category < 9; category++) OfficerTacticGrowth.Increase(world, 1, category, 3, events);
+        Assert.All(world.Officers[1].TacticProficiencies, value => Assert.Equal(expected, value));
+        Assert.Equal(before == expected ? 0 : 9, events.Count);
     }
 
     [Theory]

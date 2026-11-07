@@ -56,6 +56,7 @@ public partial class SharedDataEditor : ModalView
             _workspace = await Task.Run(() => SharedDataEditorWorkspace.OpenAsync(ContentRoot, ReferenceScenarioId, _lifetime.Token), _lifetime.Token);
             _lifetime.Token.ThrowIfCancellationRequested();
             string? appearanceError = await LoadAppearance();
+            AddPage(new BasicRulesEditorPage { Name = "基础规则", Workspace = _workspace, ReportStatus = Status });
             AddPage(new RankEditorPage { Name = "爵位", Workspace = _workspace, ReportStatus = Status });
             AddPage(new OfficeEditorPage { Name = "官职", Workspace = _workspace, ReportStatus = Status });
             AddPage(new OfficerEditorPage { Name = "武将", Workspace = _workspace, ReportStatus = Status, PortraitService = _appearanceService, Flags = _flags });

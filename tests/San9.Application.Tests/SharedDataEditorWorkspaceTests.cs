@@ -70,6 +70,54 @@ public sealed partial class SharedDataEditorWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public async Task BasicMilitaryRulesPersistAndRespectScenarioOverrides()
+    {
+        await Create();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var links = workspace.Definitions.Military!.LinkRules;
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.SetDefensiveTacticChance(101));
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.SetKinshipLinkBonus(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.SetCityInfluence(new(-1, 10)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.SetCityInfluence(new(8, 101)));
+        Assert.False(workspace.HasChanges);
+        workspace.SetDefensiveTacticChance(65);
+        workspace.SetKinshipLinkBonus(30);
+        workspace.SetCityInfluence(new(6, 15));
+        await workspace.SaveAsync();
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal(links with { KinshipBonus = 30 }, reopened.Definitions.Military!.LinkRules);
+        foreach (string id in new[] { "a", "private" })
+        {
+            var manifest = JsonSerializer.Deserialize<ScenarioContentManifest>(await File.ReadAllTextAsync(Path.Combine(_root, id, "content.json")), PackageFiles.JsonOptions)!;
+            var scenario = await ScenarioDataFiles.LoadScenarioAsync(_root, manifest);
+            var rules = new MilitaryRulebook(scenario.Military!);
+            Assert.Equal(id == "a" ? 65 : 0, rules.DefensiveTacticChance);
+            Assert.Equal(id == "a" ? new CityInfluenceRule(6, 15) : null, rules.CityInfluence);
+            Assert.Equal(id == "a" ? 30 : links.KinshipBonus, rules.LinkRules.KinshipBonus);
+        }
+    }
+
+    [Fact]
+    public async Task ProficiencyCapPersistsInPlayerDefinitionsWithoutChangingBaseOrOfficerValues()
+    {
+        await CreatePeopleAndTactics();
+        var workspace = await SharedDataEditorWorkspace.OpenAsync(_root);
+        var before = workspace.GetOfficer(9001);
+        Assert.Throws<ArgumentOutOfRangeException>(() => workspace.SetTacticProficiencyCap(0));
+        workspace.SetTacticProficiencyCap(1500);
+        workspace.SetOfficer(before with { TacticProficiencies = before.TacticProficiencies.SetItem(0, 1500) });
+        await workspace.SaveAsync();
+        var reopened = await SharedDataEditorWorkspace.OpenAsync(_root);
+        Assert.Equal(1500, reopened.Definitions.OfficerGrowth.TacticProficiencyCap);
+        Assert.Equal(1500, reopened.GetOfficer(9001).TacticProficiencies[0]);
+        var baseline = JsonSerializer.Deserialize<ScenarioDefinitions>(await File.ReadAllTextAsync(workspace.DefinitionPath), ScenarioContentFiles.DataJsonOptions)!;
+        Assert.Equal(1000, baseline.OfficerGrowth.TacticProficiencyCap);
+        reopened.SetTacticProficiencyCap(600);
+        reopened.SetOfficer(reopened.GetOfficer(9001) with { Surname = "改" });
+        Assert.Equal(1500, reopened.GetOfficer(9001).TacticProficiencies[0]);
+    }
+
+    [Fact]
     public async Task UnplacedOfficerBiographyIsValidatedBeforeEitherPlayerDocumentIsPublished()
     {
         await Create();

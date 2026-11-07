@@ -2,13 +2,18 @@ using System.Text.Json.Serialization;
 
 namespace San9.Core.Domain;
 
-/// <summary>Base-ability growth and editing limits, independent of effective ability and event eligibility.</summary>
+/// <summary>Officer growth and editing limits, independent of effective ability and event eligibility.</summary>
 public sealed record OfficerGrowthRules([property: JsonRequired] int MaximumBaseAbility)
 {
+    [JsonRequired] public int TacticProficiencyCap { get; init; } = 1000;
     public static OfficerGrowthRules Default { get; } = new(100);
     public const int MinimumEditableAbility = 1;
 
-    public void Validate() => ArgumentOutOfRangeException.ThrowIfLessThan(MaximumBaseAbility, MinimumEditableAbility);
+    public void Validate()
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(MaximumBaseAbility, MinimumEditableAbility);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TacticProficiencyCap);
+    }
 
     public bool CanIncrease(int current) => current < MaximumBaseAbility;
 

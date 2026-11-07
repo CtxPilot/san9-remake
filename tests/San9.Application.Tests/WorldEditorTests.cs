@@ -12,6 +12,17 @@ namespace San9.Application.Tests;
 public sealed class WorldEditorTests
 {
     [Fact]
+    public void OfficerProficiencyEditingUsesContentCap()
+    {
+        var session = GameSession.Start(Fixture() with { OfficerGrowth = new(100) { TacticProficiencyCap = 1500 } }, 190);
+        var draft = new WorldEditorDraft(session, WorldEditorKind.Officers, Texts());
+        Set(draft, 1, "步兵熟练", 1500);
+        Assert.Equal(1500, draft.Preview.World.Officers.Single(p => p.Id == 1).TacticProficiencies[0]);
+        Assert.Equal(SessionDisposition.Accepted, session.Apply(session.Request(draft.Operation)).Disposition);
+        Assert.Equal(1500, session.Snapshot.Officers.Single(p => p.Id == 1).TacticProficiencies[0]);
+    }
+
+    [Fact]
     public void CancelCurrentObjectRestoresItsSessionValuesWhileKeepingOtherDraftEdits()
     {
         var session = GameSession.Start(Fixture(), 190);

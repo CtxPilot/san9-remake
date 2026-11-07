@@ -8,7 +8,7 @@ internal static class OfficerEditorForm
 {
     public static void Build(Node dialogOwner, TabContainer tabs, Func<OfficerEditorValues> read,
         Action<Func<OfficerEditorValues, OfficerEditorValues>> edit, IReadOnlyList<OfficerTacticChoice> tactics,
-        TextureService? textures, Action<Node> flags, Action<Node> relationships, Action rebuild,
+        TextureService? textures, Action<Node> flags, Action<Node> relationships, Action rebuild, int proficiencyCap,
         Action<LineEdit>? configureSurname = null)
     {
         var p = read();
@@ -78,7 +78,7 @@ internal static class OfficerEditorForm
         ContentEditorControls.TextArea(basic, "列传", p.Biography, v => edit(x => x with { Biography = v }), "OfficerBiography");
 
         var training = Page("兵法");
-        OfficerEditorFields.Training(training, () => read().Training, v => edit(x => x with { Training = v }), tactics);
+        OfficerEditorFields.Training(training, () => read().Training, v => edit(x => x with { Training = v }), tactics, proficiencyCap);
         var bonus = ContentEditorControls.ProfileGrid(training, "兵法加成");
         ContentEditorControls.Caption(bonus, "连携加成");
         ContentEditorControls.NumericInput(bonus, p.TacticLinkBonus, 0, 100, v => edit(x => x with { TacticLinkBonus = (int)v }));
