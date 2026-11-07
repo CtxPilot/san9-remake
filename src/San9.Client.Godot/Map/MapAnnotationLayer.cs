@@ -48,16 +48,16 @@ internal sealed class MapAnnotationLayer
         static bool Animated(int value, int maximum) => BuildingInfoGeometry.FillWidth(value, maximum) > 0 &&
             BuildingInfoGeometry.FillState(value, maximum) != "normal";
     }
-    public MapObjectTarget? Hit(Vector2 point)
+    public IEnumerable<MapObjectTarget> Hits(Vector2 point)
     {
         for (int i = _entries.Length - 1; i >= 0; i--)
-            if (_entries[i].HitBounds is { } bounds && bounds.HasPoint(point)) return _entries[i].Target;
-        return null;
+            if (_entries[i].HitBounds is { } bounds && bounds.HasPoint(point)) yield return _entries[i].Target;
     }
     public void Draw(Node2D target, Font font, TextureScope textures, MapObjectTarget? hovered,
         Func<Vector2, Vector2> project, float zoom, double barTime)
     {
-        foreach (var entry in _entries)
+        // Promote only presentation; hit candidates retain a stable order while hovering.
+        foreach (var entry in _entries.OrderBy(entry => entry.Target == hovered))
         {
             target.DrawSetTransform(project(entry.Position), 0, Vector2.One * zoom);
             var style = GameTextStyles.Building(hovered == entry.Target);

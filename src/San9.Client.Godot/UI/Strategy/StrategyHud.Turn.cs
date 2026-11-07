@@ -84,7 +84,7 @@ public partial class StrategyHud
                 }, _ => throw new InvalidDataException("Turn confirmation must not require randomness.")).BbCode : "继续电脑势力的行动？";
         }
         Overview.Close();
-        _mapContext.Close(); _commandMenu.Close();
+        _mapContext.Close(); _commandMenu.Close(); _objectPicker.Close();
         Selection.Clear(); World.HoverObject(null);
         _hoverCard.ShowInfo(null, Vector2.Zero);
         UpdateTurnControls();

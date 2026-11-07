@@ -240,6 +240,7 @@ public partial class StrategyHud : Control
         BuildTurnControls();
         BuildTargetControls();
         BuildCommandFlows();
+        BuildObjectPicker();
         BuildSessionPresentation();
         // Adding controls can trigger hit testing before the HUD is fully constructed.
         _execution = new(Turn, World, _battle, _feedback, _executionPanels, _presentation, _textures,
@@ -341,7 +342,7 @@ public partial class StrategyHud : Control
         _presentation?.HasQueuedNarration == true, Session.View.PlayerForceId is not null);
     private bool IsMapInteractionBlocked => !Interaction.CanUseMap;
     public bool CanNavigateMap => Interaction.CanNavigate;
-    private bool HasMapPopup => _commandMenu?.Visible == true || _mapContext?.Visible == true;
+    private bool HasMapPopup => _commandMenu?.Visible == true || _mapContext?.Visible == true || _objectPicker?.Visible == true;
 
     // Navigation passes through passive artwork; object clicks retain the artwork hit masks.
     public bool IsNavigationBlocked(Vector2 point) => !CanNavigateMap || IsInteractivePoint(point);
@@ -565,6 +566,11 @@ public partial class StrategyHud : Control
     private void ResumeHover() => _pointerOutsideWindow = false;
     private void UpdateHover(Vector2 mouse)
     {
+        if (_objectPicker?.Visible == true)
+        {
+            World.HoverObject(_objectPicker.PreviewTarget);
+            return;
+        }
         var context = Interaction.InformationContext;
         var view = Scenario;
         bool visible = false;
@@ -650,6 +656,9 @@ public partial class StrategyHud : Control
         World.UnitContextRequested -= ShowUnitContext;
         World.EmptyContextRequested -= ShowShortcutMenu;
         World.CommandMenuRequested -= ShowCommandMenu;
+        World.ObjectChoiceRequested -= ShowObjectChoices;
+        if (World.CommandSourceAllowed == IsCommandSource) World.CommandSourceAllowed = null;
+        if (World.ContextAllowed == HasObjectContext) World.ContextAllowed = null;
         GetWindow().MouseExited -= ClearHover;
         GetWindow().MouseEntered -= ResumeHover;
         _textures.Dispose();

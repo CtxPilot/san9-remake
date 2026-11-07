@@ -234,16 +234,17 @@ public partial class MapSceneView : Node2D
         }
     }
     private readonly List<(string Asset, Vector2 Position, MapObjectTarget Target)> _hitSprites = [];
-    public MapObjectTarget? ObjectAt(Vector2 point)
+    public MapObjectTarget? ObjectAt(Vector2 point) => HitObjects(point).Select(target => (MapObjectTarget?)target).FirstOrDefault();
+    public IReadOnlyList<MapObjectTarget> ObjectsAt(Vector2 point) => HitObjects(point).Distinct().ToArray();
+    private IEnumerable<MapObjectTarget> HitObjects(Vector2 point)
     {
-        if (_annotationLayout.Hit(point) is { } label) return label;
+        foreach (var label in _annotationLayout.Hits(point)) yield return label;
         for (int i = _hitSprites.Count - 1; i >= 0; i--)
         {
             var sprite = _hitSprites[i];
             if (Textures.Hit(Textures.MapAssets[sprite.Asset], (int)Math.Floor(point.X - sprite.Position.X),
-                (int)Math.Floor(point.Y - sprite.Position.Y))) return sprite.Target;
+                (int)Math.Floor(point.Y - sprite.Position.Y))) yield return sprite.Target;
         }
-        return null;
     }
     private void RebuildObjects()
     {

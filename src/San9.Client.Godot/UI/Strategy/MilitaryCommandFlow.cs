@@ -97,7 +97,7 @@ public partial class MilitaryCommandFlow : Node
         {
             if (construction.At(cell) is { } target) PickMilitaryTarget(target);
             else construction.SetWaypoint(cell);
-        } : null);
+        } : null, allowed: target => Targets?.Candidates.ContainsKey(new(target.Id, target.IsUnit)) == true);
         Changed?.Invoke();
         if (RememberTargetMode && !Preferences.IsMap(Settings.SelectionViewGroup.MilitaryTargets)) ShowTargetList();
     }

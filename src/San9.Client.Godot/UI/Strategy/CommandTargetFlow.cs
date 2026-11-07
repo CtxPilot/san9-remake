@@ -31,7 +31,7 @@ public partial class CommandTargetFlow : Node
         {
             if (target is null) End();
             else if (request.Selection.Resolve(new CommandMapObject(target.Value.Id,target.Value.IsUnit)) is int id) PickCommandTarget(id);
-        });
+        }, allowed: target => request.Selection.Resolve(new CommandMapObject(target.Id, target.IsUnit)) is not null);
         Changed?.Invoke();
         if (!Preferences.IsMap(ModeGroup)) ShowList();
     }

@@ -80,17 +80,70 @@ public partial class WorkflowLifecycleVerification : Node
         var world = new MapWorld();
         Action<MapObjectTarget?> firstTarget = _ => { }, secondTarget = _ => { };
         Action<MapCell> firstCell = _ => { }, secondCell = _ => { };
-        using var first = new MapTargetInputLease(world, firstTarget, firstCell, firstCell);
-        using var second = new MapTargetInputLease(world, secondTarget, secondCell, secondCell);
+        Func<MapObjectTarget, bool> firstAllowed = target => !target.IsUnit, secondAllowed = target => target.IsUnit;
+        using var first = new MapTargetInputLease(world, firstTarget, firstCell, firstCell, firstAllowed);
+        using var second = new MapTargetInputLease(world, secondTarget, secondCell, secondCell, secondAllowed);
         first.Dispose();
-        Check(world.TargetPicked == secondTarget && world.WaypointPicked == secondCell && world.SitePicked == secondCell,
+        Check(world.TargetPicked == secondTarget && world.TargetAllowed == secondAllowed && world.WaypointPicked == secondCell && world.SitePicked == secondCell,
             "Old workflow erased replacement callbacks.");
         var military = new MilitaryCommandFlow { World = world }; AddChild(military); military.Free();
         var targets = new CommandTargetFlow { World = world }; AddChild(targets); targets.Free();
         Check(world.TargetPicked == secondTarget && world.WaypointPicked == secondCell && world.SitePicked == secondCell,
             "Inactive workflow exit erased another workflow's input.");
+        CheckObjectPicker(world, secondTarget);
+        var oldOwner = world.TargetInputOwner;
+        var pending = new MapObjectPickRequest([new(1, true)], _ => true,
+            () => ReferenceEquals(world.TargetInputOwner, oldOwner), _ => throw new InvalidOperationException("Stale picker submitted."));
+        using var replacement = new MapTargetInputLease(world, secondTarget, secondCell, secondCell, firstAllowed);
         second.Dispose(); second.Dispose();
-        Check(world.TargetPicked is null && world.WaypointPicked is null && world.SitePicked is null, "Active input lease did not release.");
+        Check(world.TargetPicked == secondTarget && world.TargetAllowed == firstAllowed && !pending.IsCurrent,
+            "Rebinding the same callback retained an old click or lost its replacement input.");
+        replacement.Dispose();
+        Check(world.TargetPicked is null && world.TargetAllowed is null && world.WaypointPicked is null && world.SitePicked is null, "Active input lease did not release.");
         world.Free();
+    }
+
+    private void CheckObjectPicker(MapWorld world, Action<MapObjectTarget?> targetInput)
+    {
+        MapObjectTarget? preview = null, picked = null;
+        var picker = new MapObjectPicker { Preview = target => preview = target };
+        AddChild(picker);
+        var choices = Enumerable.Range(1, 8).Select(id =>
+            new MapObjectChoice(new(id, true), $"Unit {id}", 1000, Colors.Blue)).ToArray();
+        MapObjectPickRequest Request() => new(choices.Select(row => row.Target), _ => true,
+            () => world.TargetPicked == targetInput, target =>
+            {
+                Check(!picker.Visible && preview is null, "Selection ran before dismissing the object picker.");
+                picked = target;
+            });
+        var request = Request();
+        picker.Open(request, choices, new(100, 100));
+        var rows = picker.GetChild<ScrollContainer>(0).GetChild<VBoxContainer>(0);
+        var seventh = rows.GetChild<InformationMenuButton>(6);
+        seventh.EmitSignal(Control.SignalName.MouseEntered);
+        Check(preview == choices[6].Target, "Object row did not preview its map identity.");
+        seventh.EmitSignal(BaseButton.SignalName.Pressed);
+        Check(picked == choices[6].Target && !request.IsCurrent, "More than five overlapping objects were not selectable.");
+
+        picked = null; request = Request();
+        picker.Open(request, choices, new(100, 100));
+        using var outside = new InputEventMouseButton { ButtonIndex = MouseButton.Left, Pressed = false, Position = new(-1, -1) };
+        picker._GuiInput(outside);
+        Check(!picker.Visible && !request.IsCurrent && picked is null && world.TargetPicked == targetInput,
+            "Outside dismissal submitted or cancelled the underlying target workflow.");
+
+        request = Request(); picker.Open(request, choices, new(100, 100));
+        using var openingRelease = new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = false };
+        picker._Input(openingRelease);
+        Check(picker.Visible, "Opening right-button release dismissed the object picker.");
+        using var rightPress = new InputEventMouseButton { ButtonIndex = MouseButton.Right, Pressed = true };
+        picker._Input(rightPress); picker._Input(openingRelease);
+        Check(!picker.Visible && picked is null && world.TargetPicked == targetInput, "Right cancellation leaked into target selection.");
+
+        request = Request(); picker.Open(request, choices, new(100, 100));
+        using var escape = new InputEventKey { Pressed = true, Keycode = Key.Escape };
+        picker._Input(escape);
+        Check(!picker.Visible && !request.IsCurrent, "Escape left the object selection active.");
+        picker.Free();
     }
 }

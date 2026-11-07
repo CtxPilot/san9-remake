@@ -96,6 +96,11 @@ public partial class MapWorld : Node2D
     public Func<Vector2, bool>? IsInspectionBlocked { get; set; }
     public Func<bool>? CanIssueOrders { get; set; }
     public Action<MapObjectTarget?>? TargetPicked { get; set; }
+    internal object? TargetInputOwner { get; set; }
+    public Func<MapObjectTarget, bool>? TargetAllowed { get; set; }
+    public Func<MapObjectTarget, bool>? CommandSourceAllowed { get; set; }
+    public Func<MapObjectTarget, bool>? ContextAllowed { get; set; }
+    public event Action<MapObjectPickRequest, Vector2>? ObjectChoiceRequested;
     public Action<San9.Core.Domain.MapCell>? WaypointPicked { get; set; }
     public Action<San9.Core.Domain.MapCell>? SitePicked { get; set; }
     public event Action<int, Vector2>? BuildingContextRequested;
@@ -253,7 +258,7 @@ public partial class MapWorld : Node2D
         Session = session; Presentation = null; Day = null;
         SynchronizeSeason();
         ResetNavigation(); HoverObject(null);
-        TargetPicked = null; WaypointPicked = null; SitePicked = null;
+        TargetInputOwner = null; TargetPicked = null; TargetAllowed = null; WaypointPicked = null; SitePicked = null;
         if (_display is not null) { _display.Targets = null; _display.PersonnelTargets = null; _display.CommandTargets = null; }
         if (Scene is null) return;
         // Retain terrain resources, but never carry motion history across player loads.
@@ -280,6 +285,20 @@ public partial class MapWorld : Node2D
     }
     public int? BuildingAtViewport(Vector2 point) => ObjectAtViewport(point) is { IsUnit: false } target ? target.Id : null;
     public MapObjectTarget? ObjectAtViewport(Vector2 point) => CanPickAt(point) ? ObjectAt(ViewportToWorld(point)) : null;
+    private void PickObject(Vector2 point, IReadOnlyList<MapObjectTarget> hits, Func<MapObjectTarget, bool>? allowed,
+        Func<bool> current, Action<MapObjectTarget> selected)
+    {
+        var session = Session;
+        var inputOwner = TargetInputOwner;
+        long revision = session.Snapshot.Revision;
+        var request = new MapObjectPickRequest(hits, target => allowed?.Invoke(target) != false,
+            () => ReferenceEquals(Session, session) && ReferenceEquals(TargetInputOwner, inputOwner) &&
+                Session.Snapshot.Revision == revision && current(), selected);
+        if (request.Candidates.Count == 1) request.TrySelect(request.Candidates[0]);
+        else if (request.Candidates.Count > 1) ObjectChoiceRequested?.Invoke(request, point);
+    }
+    private IReadOnlyList<MapObjectTarget> ObjectsAtViewport(Vector2 point) =>
+        CanPickAt(point) ? _display?.ObjectsAt(ViewportToWorld(point)) ?? [] : [];
     private bool CanPickAt(Vector2 point) => HasCompleteView && !IsLoading && PresentedViewportBounds.HasPoint(point);
     private MapObjectTarget? ObjectAt(Vector2 point) => _display?.ObjectAt(point);
     private IEnumerable<string> HoverFlagAssets(int color, int glyph)
@@ -356,7 +375,8 @@ public partial class MapWorld : Node2D
                             var point = ViewportToWorld(button.Position);
                             if (MapGeometry.TrySquare(point.X, point.Y, out int x, out int y, _map!.Width, _map.Height)) sitePick(new(x,y));
                         }
-                        else if (ObjectAtViewport(button.Position) is { } target) pick(target);
+                        else if (ObjectsAtViewport(button.Position) is { Count: > 0 } hits)
+                            PickObject(button.Position, hits, TargetAllowed, () => TargetPicked == pick, target => pick(target));
                         else
                         {
                             var point = ViewportToWorld(button.Position);
@@ -377,11 +397,12 @@ public partial class MapWorld : Node2D
             else if (button.Pressed && button.ButtonIndex == MouseButton.Right)
             {
                 _mapDrag.Cancel();
-                if (ObjectAtViewport(button.Position) is {} target)
-                {
-                    if (target.IsUnit) UnitContextRequested?.Invoke(target.Id, button.Position);
-                    else BuildingContextRequested?.Invoke(target.Id, button.Position);
-                }
+                if (ObjectsAtViewport(button.Position) is { Count: > 0 } hits)
+                    PickObject(button.Position, hits, ContextAllowed, () => TargetPicked is null, target =>
+                    {
+                        if (target.IsUnit) UnitContextRequested?.Invoke(target.Id, button.Position);
+                        else BuildingContextRequested?.Invoke(target.Id, button.Position);
+                    });
                 else EmptyContextRequested?.Invoke(button.Position);
                 GetViewport().SetInputAsHandled();
             }
@@ -396,8 +417,8 @@ public partial class MapWorld : Node2D
             }
             else if (button.Pressed && button.ButtonIndex == MouseButton.Left)
             {
-                if (ObjectAtViewport(button.Position) is {} target)
-                    CommandMenuRequested?.Invoke(target, button.Position);
+                PickObject(button.Position, ObjectsAtViewport(button.Position), CommandSourceAllowed,
+                    () => TargetPicked is null, target => CommandMenuRequested?.Invoke(target, button.Position));
                 GetViewport().SetInputAsHandled();
             }
         }

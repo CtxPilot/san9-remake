@@ -14,6 +14,7 @@ public partial class InformationMenuButton : BaseButton
         set { _title = value; if (_label is not null) _label.Text = value; }
     }
     public string HintText { get; init; } = "";
+    public bool ClipTitle { get; init; }
     public string? RichTitle { get; init; }
     public string DisplayText => _richLabel?.GetParsedText() ?? Title;
     public Func<bool, bool, bool, GameTextStyle> TextStyle { get; init; } = GameTextStyles.InformationMenu;
@@ -35,7 +36,9 @@ public partial class InformationMenuButton : BaseButton
         }
         else
         {
-            _label = new Label { Text = Title, Size = Size, HorizontalAlignment = HorizontalAlignment.Center,
+            _label = new Label { Text = Title, Size = Size, ClipText = ClipTitle,
+                TextOverrunBehavior = ClipTitle ? TextServer.OverrunBehavior.TrimEllipsis : TextServer.OverrunBehavior.NoTrimming,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center, MouseFilter = MouseFilterEnum.Ignore };
             AddChild(_label);
             _label.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);

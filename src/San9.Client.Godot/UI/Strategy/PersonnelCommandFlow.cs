@@ -70,7 +70,8 @@ public partial class PersonnelCommandFlow : Node
         {
             if (target is null) EndTargets();
             else if (!target.Value.IsUnit) PickTarget(target.Value.Id);
-        }, PickPlace, view.Draft.Kind == "search" ? PickPlace : null);
+        }, PickPlace, view.Draft.Kind == "search" ? PickPlace : null,
+            allowed: target => !target.IsUnit && view.Draft.Targets.Contains(target.Id));
         Changed?.Invoke();
         if (!Preferences.IsMap(ModeGroup)) ShowTargetList();
     }
