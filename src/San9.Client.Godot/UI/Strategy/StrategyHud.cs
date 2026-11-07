@@ -31,7 +31,7 @@ public partial class StrategyHud : Control
     private readonly List<Label> _regionLabels = [];
     private bool _regionVisible;
     private (bool Strategy, bool Targeting, bool Command, bool Region)? _drawState;
-    private Vector2? _hoverPosition;
+    private bool _pointerOutsideWindow;
     private StrategyRosterList _rosterList = null!;
     private MapContextPopup _mapContext = null!;
     private MapCommandPopup _commandMenu = null!;
@@ -82,6 +82,7 @@ public partial class StrategyHud : Control
         BuildLayout();
         World.MapReady += Build;
         GetWindow().MouseExited += ClearHover;
+        GetWindow().MouseEntered += ResumeHover;
         _message = new GameMessageBar { Textures = _textures, Text = "正在准备地图…" };
         _bottomBar.AddChild(_message);
         _message.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -557,10 +558,10 @@ public partial class StrategyHud : Control
             GetViewport().SetInputAsHandled();
             return;
         }
-        if (@event is InputEventMouseMotion motion) _hoverPosition = motion.Position;
         if (_built) _feedback.HandleInput(@event);
     }
-    private void ClearHover() => _hoverPosition = new Vector2(-1, -1);
+    private void ClearHover() => _pointerOutsideWindow = true;
+    private void ResumeHover() => _pointerOutsideWindow = false;
     private void UpdateHover(Vector2 mouse)
     {
         var context = Interaction.InformationContext;
@@ -614,7 +615,7 @@ public partial class StrategyHud : Control
             _minimap!.SetCommandSource(_flow.Source ?? _patrolFlow.Source ?? _facilityFlow.Source ?? _demolitionFlow.Source ?? _appointmentFlow.Source ?? _personnelFlow.Source ?? (_commandMenu!.Visible ? _commandTarget : null));
             UpdateSidebar(delta);
         }
-        UpdateHover(_hoverPosition ?? GetGlobalMousePosition());
+        UpdateHover(_pointerOutsideWindow ? new Vector2(-1, -1) : GetGlobalMousePosition());
         UpdateMessage();
         _large?.SetPressedNoSignal(!Overview.IsOpen); _small?.SetPressedNoSignal(Overview.IsOpen);
         if (_territory is not null) _territory.Disabled = Overview.IsOpen;
@@ -649,6 +650,7 @@ public partial class StrategyHud : Control
         World.EmptyContextRequested -= ShowShortcutMenu;
         World.CommandMenuRequested -= ShowCommandMenu;
         GetWindow().MouseExited -= ClearHover;
+        GetWindow().MouseEntered -= ResumeHover;
         _textures.Dispose();
         _text.Dispose();
         _titleFlashMaterial.Dispose();
