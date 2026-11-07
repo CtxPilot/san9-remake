@@ -71,15 +71,7 @@ public partial class Main : Node
                     Preferences = _preferences, Closed = () => GetTree().Quit() });
                 return;
             }
-            if (options.PackageRoot is null && options.ScenarioId is null)
-            {
-                if (options.RequiresWorldVerification || options.TextSmoke)
-                    throw new ArgumentException("World verification requires an explicit --scenario or --content-package.");
-                await PlayStartupMovies();
-                await SwitchScene(PrepareOpening, transition: false);
-                return;
-            }
-            await StartNewGame(options, transition: false);
+            await StartInitialContent();
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception e)
@@ -87,21 +79,32 @@ public partial class Main : Node
             if (token.IsCancellationRequested) return;
             GD.PushError($"客户端内容加载失败：{e}");
             string? contentRoot = _options?.PackageRoot ?? _directories?.ContentRoot;
-            ui.AddChild(new Label { Text = $"内容加载失败：{e.Message}\n\n内容目录：{contentRoot}\n请自行转换内容，放入内容目录后重新启动。", Position = new(24, 120), Size = new(970, 300), AutowrapMode = TextServer.AutowrapMode.WordSmart });
-            if (contentRoot is not null)
+            if (contentRoot is not null && _options is not null)
             {
-                var open = new Button { Text = "打开内容目录", Position = new(24, 440), Size = new(192, 48) };
-                open.Pressed += () =>
+                ui.AddChild(new ContentImportPanel
                 {
-                    try { ClientFolderAccess.Open(contentRoot); }
-                    catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
-                    { open.Text = "打开失败"; open.TooltipText = error.Message; }
-                };
-                ui.AddChild(open);
+                    ContentRoot = contentRoot, Failure = e.Message,
+                    ImportAvailable = _options.PackageRoot is null && ContentImportService.Available,
+                    Continue = StartInitialContent
+                });
             }
+            else ui.AddChild(new Label { Text = $"启动失败：{e.Message}", Position = new(24, 120),
+                Size = new(970, 300), AutowrapMode = TextServer.AutowrapMode.WordSmart });
             if (OS.GetCmdlineUserArgs().Contains("--map-quit")) GetTree().Quit(1);
         }
     }
+    private async Task StartInitialContent()
+    {
+        if (_options.PackageRoot is null && _options.ScenarioId is null)
+        {
+            if (_options.RequiresWorldVerification || _options.TextSmoke)
+                throw new ArgumentException("World verification requires an explicit --scenario or --content-package.");
+            await PlayStartupMovies();
+            await SwitchScene(PrepareOpening, transition: false);
+        }
+        else await StartNewGame(_options, transition: false);
+    }
+
     private ClientDataPaths DataPaths => _directories.UserData;
 
     public override void _Input(InputEvent input)

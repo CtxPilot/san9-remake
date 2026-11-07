@@ -67,7 +67,7 @@ try {
     if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { throw "Godot did not produce $output." }
 
     Write-Host "Exported: $output"
-    Write-Host 'The export includes the project and .NET publish outputs. Converted content is not copied.'
+    Write-Host 'The export includes the client and in-process importer sharing one .NET runtime. Converted content and FFmpeg are not copied.'
 } finally {
     Pop-Location
 }

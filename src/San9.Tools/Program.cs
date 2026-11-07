@@ -1,3 +1,5 @@
+using System.Text;
+using San9.Application.Diagnostics;
 using San9.Importer.San9PkTc101.Packages;
 using San9.Content.Packages;
 using San9.Content.Images;
@@ -6,14 +8,18 @@ using San9.Content.Maps;
 using San9.Importer.San9PkTc101;
 using San9.Rendering;
 
+Console.OutputEncoding = new UTF8Encoding(false);
+Console.InputEncoding = new UTF8Encoding(false);
+
 try
 {
-    if(args.Length==0)throw new ArgumentException("Commands: import-audio --game-dir PATH --output PATH [--group bgm|effects|all]; import-movies --game-dir PATH --output PATH [--group events|scenarios|startup|all]; upgrade-portrait-anchors --texture-package PATH | --portrait-pack PATH; import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|map/formation-appearance|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
+    if(args.Length==0)throw new ArgumentException("Commands: prepare-content --game-dir PATH --output PATH [--ffmpeg PATH] [--audio true|false] [--movies true|false]; import-audio --game-dir PATH --output PATH [--group bgm|effects|all]; import-movies --game-dir PATH --output PATH [--group events|scenarios|startup|all]; upgrade-portrait-anchors --texture-package PATH | --portrait-pack PATH; import-content --game-dir PATH --output PATH [--rebuild opening|worlds]; verify-content --content-root PATH; import-textures --game-dir PATH --output PATH [--rebuild all|cursors|skin|map|map/formation-appearance|portraits|library/ARCHIVE]; import-client --game-dir PATH --scenario FILENAME --texture-package PATH --output PATH [--message-reports true|false]; verify-textures --texture-package PATH; verify-client --content-package PATH; import-text --game-dir PATH --output PATH; render-map --content-package PATH --output PATH");
     Dictionary<string,string> options=[];
     for(int i=1;i<args.Length;i+=2)
         if(i+1>=args.Length||!args[i].StartsWith("--",StringComparison.Ordinal)||!options.TryAdd(args[i],args[i+1]))throw new ArgumentException("Invalid or duplicate option.");
     string[] allowed = args[0] switch
     {
+        "prepare-content" => ["--game-dir", "--output", "--ffmpeg", "--audio", "--movies"],
         "import-audio" or "import-movies" => ["--game-dir", "--output", "--group"],
         "upgrade-portrait-anchors" => ["--texture-package", "--portrait-pack"],
         "import-content" or "import-textures" => ["--game-dir", "--output", "--rebuild"],
@@ -28,7 +34,18 @@ try
     if(options.Keys.Any(k=>!allowed.Contains(k)))throw new ArgumentException("Unknown option.");
     string Required(string key)=>options.TryGetValue(key,out var value)?value:throw new ArgumentException($"Missing {key}.");
     var watch=Stopwatch.StartNew();
-    if (args[0] == "import-audio")
+    if (args[0] == "prepare-content")
+    {
+        bool Boolean(string key, string fallback) => options.GetValueOrDefault(key, fallback) switch
+        {
+            "true" => true,
+            "false" => false,
+            _ => throw new ArgumentException($"{key} must be true or false.")
+        };
+        await PlayerContentPreparation.RunAsync(Required("--game-dir"), Required("--output"),
+            options.GetValueOrDefault("--ffmpeg"), Boolean("--audio", "true"), Boolean("--movies", "true"));
+    }
+    else if (args[0] == "import-audio")
     {
         var group = options.GetValueOrDefault("--group", "all") switch
         {
@@ -70,42 +87,7 @@ try
     }
     else if (args[0] == "verify-content")
     {
-        string root = Required("--content-root");
-        var catalog = await ContentCatalogFiles.LoadAsync(root);
-        _ = await MovieCatalogFiles.LoadAsync(root);
-        var textures = await TexturePackageFiles.LoadAsync(PackageFiles.Resolve(root, catalog.Textures));
-        var flags = await ContentCatalogFiles.LoadOfficerFlagsAsync(root, catalog);
-        flags.ValidateReferences(textures.Map.Clips.Select(c => c.Id).ToHashSet());
-        var opening = await ContentCatalogFiles.LoadOpeningAsync(root, catalog);
-        opening.Menu.Validate(textures.Assets); opening.Selection.Validate(textures.Assets);
-        foreach (var entry in catalog.Scenarios)
-        {
-            var scenario = await ScenarioContentFiles.LoadAsync(PackageFiles.Resolve(root, entry.Package));
-            if (scenario.Scenario.ScenarioId != entry.Id)
-                throw new InvalidDataException($"Scenario identity differs from catalog: {entry.Id}.");
-            _ = ClientContentFiles.Resolve(scenario, textures, PackageFiles.Resolve(root, catalog.Textures));
-            var preview = opening.Selection.Entries.Single(p => p.Id == entry.Id);
-            if (scenario.Scenario.Year != preview.Year || scenario.Scenario.Month != preview.Month)
-                throw new InvalidDataException($"Scenario preview date differs from world: {entry.Id}");
-            var forces = San9.Application.Presentation.ScenarioForceSelection.Read(
-                scenario.Scenario, scenario.Text, scenario.IllustrationRoles);
-            if (preview.CityColors.Any(p => !forces.CityColors.TryGetValue(p.Key, out var color) || color != p.Value))
-                throw new InvalidDataException($"Scenario preview ownership differs from world: {entry.Id}; rebuild opening content.");
-            foreach (string path in scenario.Presentation.Sounds.Values)
-                if (!File.Exists(PackageFiles.Resolve(scenario.ResourceRoot, path))) throw new InvalidDataException($"Missing sound: {path}");
-            var session = San9.Application.GameSession.Start(scenario.Scenario, 42);
-            if (!session.Snapshot.Forces.Select(f => f.Id).Order().SequenceEqual(scenario.Scenario.Forces.Select(f => f.Id).Order()) ||
-                !session.Snapshot.Settlements.Select(s => s.Id).Order().SequenceEqual(scenario.Scenario.Settlements.Select(s => s.Id).Order()) ||
-                !session.Snapshot.Officers.Select(o => o.Id).Order().SequenceEqual(scenario.Scenario.Officers.Select(o => o.State.Id).Order()))
-                throw new InvalidDataException($"Initial world lost scenario identities: {entry.Id}");
-            NewGameContentVerification.Verify(scenario);
-            var query = new San9.Application.Presentation.InformationQuery(session, scenario.Text);
-            foreach (var category in new[] { San9.Application.Presentation.InformationCategory.Forces, San9.Application.Presentation.InformationCategory.Cities,
-                San9.Application.Presentation.InformationCategory.Regions, San9.Application.Presentation.InformationCategory.Officers, San9.Application.Presentation.InformationCategory.Treasures })
-                _ = query.Read(category);
-            Console.WriteLine($"Verified {entry.Id}: {scenario.Scenario.Forces.Length} forces; {scenario.Scenario.Settlements.Length} settlements; {scenario.Scenario.Officers.Length} officers; world and queries ready.");
-        }
-        await ImageAssetFiles.VerifyAsync(PackageFiles.Resolve(root, catalog.Textures), textures.Assets);
+        await ContentVerification.VerifyAsync(Required("--content-root"), Console.WriteLine);
     }
     else if(args[0]=="verify-client")
     {
@@ -190,7 +172,12 @@ try
     else throw new ArgumentException("Unknown command.");
     return 0;
 }
-catch(Exception e)when(e is IOException or InvalidDataException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException)
+catch (OperationCanceledException)
+{
+    Console.Error.WriteLine("转换已取消，可以重新选择目录后重试。");
+    return 130;
+}
+catch(Exception e)when(e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidDataException or ArgumentException or InvalidOperationException or System.Text.Json.JsonException)
 {
     Console.Error.WriteLine(e.Message);return 1;
 }

@@ -8,7 +8,7 @@ public enum AudioLibraryGroup { Bgm, Effects, All }
 public static class AudioLibraryImporter
 {
     public static async Task ImportAsync(string gameDirectory, string output,
-        AudioLibraryGroup group = AudioLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default)
+        AudioLibraryGroup group = AudioLibraryGroup.All, Action<string>? progress = null, CancellationToken token = default, string? ffmpegPath = null)
     {
         if (!Enum.IsDefined(group)) throw new ArgumentOutOfRangeException(nameof(group));
         string[] directories = group switch
@@ -20,7 +20,7 @@ public static class AudioLibraryImporter
         var sources = AudioAssetCompiler.Discover(gameDirectory, directories).Values;
         if (group is AudioLibraryGroup.Bgm or AudioLibraryGroup.All)
         {
-            var encoder = FfmpegEncoder.Find();
+            var encoder = ffmpegPath is null ? FfmpegEncoder.Find() : new FfmpegEncoder(Path.GetFullPath(ffmpegPath));
             MediaConversion? conversion = encoder is null ? null : new(output, encoder);
             foreach (string source in sources.Where(p => p.StartsWith("BGM/", StringComparison.OrdinalIgnoreCase)))
             {

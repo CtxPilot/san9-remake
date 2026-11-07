@@ -5,6 +5,7 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <DefineConstants>$(DefineConstants);SAN9_EXPORT_IMPORTER</DefineConstants>
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
     <IsTrimmable>false</IsTrimmable>
@@ -16,6 +17,8 @@
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <ProjectReference Include="../San9.Importer.San9PkTc101/San9.Importer.San9PkTc101.csproj" />
+    <TrimmerRootAssembly Include="San9.Importer.San9PkTc101;OpenccNetLib" />
     <TrimmerRootAssembly Include="San9.Client.Godot;San9.Application;San9.Content;San9.Core;San9.Rendering;GodotSharp" />
     <!-- System.Text.Json locates immutable collection factories through reflection. -->
     <TrimmerRootAssembly Include="System.Collections.Immutable" />
