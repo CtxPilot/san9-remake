@@ -6,7 +6,7 @@
 
 - 取证ID：`AI-FORMATION-FULL-20261025`／`AI-FORMATION-CONTINUATION-20261025`；作者Codex，身份沿用RE-SAN9PK-0075／0082。
 - 样本：[SRC-SAN9PK-TC-101](../sources/SRC-SAN9PK-TC-101.md)，繁中PK1.0.1.0、x86、基址`0x400000`，2,636,800字节，SHA-256 `d20794aeff67301ec2bf8c3becb1e9944c68c6c0588fbfd4bf04e8597f0e5028`，已与磁盘重核。
-- 工具：Windows、IDA9.4／Hex-Rays9.4.0.260915；主库`research/analysis/San9PK-TC-101.i64`。产品审核基线为`b504ab0217b39991bfd603ee07e948790a484dfb`。
+- 工具：Windows、IDA9.4／Hex-Rays9.4.0.260915；主库`research/analysis/San9PK-TC-101.i64`。产品审核基线为`070e782e2140608e80c5ab261ee63adf21d07e2b`。
 - 从出征、建设、输送三个公共命令构造器反查消费者。登记EXE两个可执行节的E8／E9扫描，对六个边界／选择器目标共16处相对调用，与已知链一致；不据此形式化排除任意计算地址调用。
 - 初查35函数及一段数据区回调，共61段14,575字节对盘一致；续核9函数16段4,888字节一致。关键分支核对指令；`4A2A88`既存正栈指针警告保留，未调整边界或类型。
 

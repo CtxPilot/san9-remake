@@ -359,7 +359,7 @@ Windows、Python 3.14.2、标准库；200×200粗格、50城、94个城市／港
 
 ### 与旧自主增强AI的核对
 
-用户补充旧路线背景后，已核对[系统设计](../../specs/archive/autonomous-ai/README.md#原型结构与取舍)、[AI-03／04实现记录](../../specs/archive/autonomous-ai/README.md#暂停范围)和Git保留代码。`codex/ai-route-planning`指向`b35dcd2c`，包含2026-10-15的暂停检查点`09f4251a`；主线于`edf3b296`退出旧主动规划。代码仍在分支中，本轮只读核对，没有切换或合并。
+用户补充旧路线背景后，已核对[系统设计](../../specs/archive/autonomous-ai/README.md#原型结构与取舍)、[AI-03／04实现记录](../../specs/archive/autonomous-ai/README.md#暂停范围)和Git保留代码。`codex/ai-route-planning`指向`339f3b25`，包含2026-10-15的暂停检查点`c3383dd3`；主线于`c3c00a37`退出旧主动规划。代码仍在分支中，本轮只读核对，没有切换或合并。
 
 **代码事实。**旧`CampaignObservation.cs`已经按行程、目标价值及可用力量形成作战方向。前沿候选既保留接近最快来源的方案，也保留“更近来源并不同时拥有更强兵力”的方案，避免仅凭距离排掉较远但更强的来源。后方输送填补具体前沿的缺口，扣除已在途兵力；缺将时生成调将前置行动，并计入到下次合法下令边界的时间及调走后的源地守备。
 

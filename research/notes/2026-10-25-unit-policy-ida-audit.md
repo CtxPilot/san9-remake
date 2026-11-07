@@ -177,7 +177,7 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --no-rest
 
 用户随后指出：感知范围简化、选敌／同分排序、返城失败处理、摘要接收范围这四项似乎未经其确认。此前答复将“规格已写入／自称已采用”与“用户明确确认”混同，现撤回将四项作为已确认例外的分类。
 
-限定上述两份规格执行Git逐行追溯与引入提交检查：前三项随`ed845b225024fcd8d0240924914609dbffe9cae6`（2026-09-13，`feat(warfare): implement unit deployment policies`）进入G07；摘要范围随`7d39f3db78ce0e85d8e2a68551bdcee1fc637bf7`（2026-10-20，`fix(presentation): publish occurrence feedback through explicit channels`）进入统一消息规格。提交及其随附文档证明文字被写入，未提供用户逐项确认记录；提交作者身份也不是确认依据。
+限定上述两份规格执行Git逐行追溯与引入提交检查：前三项随`f24069d6a220cbcefb689f83d7d78e2520b90201`（2026-09-13，`feat(warfare): implement unit deployment policies`）进入G07；摘要范围随`c328182595abb86a2300520d0cf4a9e271c119f2`（2026-10-20，`fix(presentation): publish occurrence feedback through explicit channels`）进入统一消息规格。提交及其随附文档证明文字被写入，未提供用户逐项确认记录；提交作者身份也不是确认依据。
 
 本次未搜索全部历史聊天，故不作“历史上绝不存在确认”的断言。当前可支持的结论是**未找到用户确认依据，用户现已质疑，不能当成用户批准的原作偏离**。这四项继续列作现存差异，后续原作对齐不得仅以旧规格的“已采用”措辞豁免；本次不据此擅自改玩法或执行产品修复。
 

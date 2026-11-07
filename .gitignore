@@ -6,6 +6,9 @@
 /research/analysis/
 /research/archive/
 /research/findings.zip
+/research/ida-write-plans/
+/research/*-status.json
+/research/program-analysis-*.json
 *.idb
 *.i64
 *.id0
