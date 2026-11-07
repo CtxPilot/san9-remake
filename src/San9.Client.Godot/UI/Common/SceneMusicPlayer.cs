@@ -24,6 +24,7 @@ public partial class SceneMusicPlayer : Node
     public void SetEnabled(bool enabled) => _state.SetEnabled(enabled);
     public void SetMapTrack(string? role) => _state.SetMapTrack(role is null ? null : Tracks[role]);
     public MusicPlaybackState.Lease Begin(string role, bool loop) => _state.Begin(Tracks[role], loop);
+    public IDisposable Suspend() => _state.Suspend();
     public override void _Process(double delta) => _state.Advance(delta);
     public void SetMapTransitionGain(float gain)
     {

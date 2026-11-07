@@ -3,6 +3,35 @@ namespace San9.Client.Godot.Tests;
 public sealed class MusicPlaybackStateTests
 {
     [Fact]
+    public void MovieSuspensionRetainsPlaybackAndFreezesSceneFadeUntilAllOwnersRelease()
+    {
+        var state = new MusicPlaybackState();
+        state.SetMapTrack("spring");
+        var map = state.Audible;
+        using var scene = state.Begin("story", loop: false);
+        int completed = 0;
+        scene.FadeOut(2, () => completed++);
+        state.Advance(.5);
+        var movie = state.Suspend();
+        var nested = state.Suspend();
+        Assert.Null(state.Audible);
+        Assert.Contains(map!, state.Tracks);
+        state.Advance(60);
+        Assert.Equal(.75f, state.SceneGain);
+        Assert.Equal(0, completed);
+        movie.Dispose(); movie.Dispose();
+        Assert.Null(state.Audible);
+        state.SetEnabled(false);
+        nested.Dispose();
+        Assert.Null(state.Audible);
+        state.SetEnabled(true);
+        Assert.Equal("story", state.Audible!.Resource);
+        state.Advance(1.5);
+        Assert.Equal(1, completed);
+        Assert.Same(map, state.Audible);
+    }
+
+    [Fact]
     public void FadeRetainsTheSceneUntilSilenceThenRestoresItsLiveOwnerOnce()
     {
         var state = new MusicPlaybackState();

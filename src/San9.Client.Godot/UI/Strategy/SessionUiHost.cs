@@ -147,6 +147,12 @@ public partial class SessionUiHost : Node
         _sessionUi = new Node { Name = "SessionUi" }; AddChild(_sessionUi);
         var backdropHost = new Node(); _sessionUi.AddChild(backdropHost);
         var overlayHost = StrategyOverlayHost.Create();
+        var media = new SceneMoviePlayer
+        {
+            ContentRoot = Content.ContentRoot, OverlayHost = overlayHost,
+            Music = Music, ReadSettings = () => _settings.Current
+        };
+        _sessionUi.AddChild(media);
         Hud = new StrategyHud
         {
             IntroduceNewGame = _pendingKind == SessionReplacementKind.Startup,
@@ -158,7 +164,7 @@ public partial class SessionUiHost : Node
             ReturnToOpening = ReturnToOpening, LoadGame = LoadSlot,
             ControlDelegated = () => Activate(Session, SessionReplacementKind.ControlDelegation),
             StartNewGame = OpenNewGame,
-            Music = Music, OverlayHost = overlayHost,
+            Music = Music, OverlayHost = overlayHost, SceneMedia = media,
             ReadSettings = () => _settings.Current,
             Preferences = Preferences,
             ReadFormationAppearance = () => _companionSettings.FormationAppearanceEnabled,

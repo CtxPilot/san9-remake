@@ -213,9 +213,15 @@ public partial class CommandNarration : FixedPage
         if (MoviesEnabled() && Messages[_index].MovieRole is string movie)
         {
             _moviePending = true;
-            try { await Media.PlayMovieAsync(new(movie), _lifetime.Token); }
+            bool visible = Visible;
+            Hide();
+            try { await Media.PlayMovieAsync(new(movie, MovieBackdrop.GameScene), _lifetime.Token); }
             catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
-            finally { _moviePending = false; }
+            finally
+            {
+                _moviePending = false;
+                if (!_lifetime.IsCancellationRequested && IsInsideTree()) Visible = visible;
+            }
             if (_lifetime.IsCancellationRequested) return;
         }
         if (!RetainMeeting && Meeting is { Active: true } active &&

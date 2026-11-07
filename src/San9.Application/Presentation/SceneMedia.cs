@@ -2,7 +2,8 @@ namespace San9.Application.Presentation;
 
 public enum BackgroundMusicAction { Preserve, Stop, Play }
 public sealed record BackgroundMusicRequest(BackgroundMusicAction Action, string? Role = null);
-public sealed record MovieRequest(string Role);
+public enum MovieBackdrop { Black, GameScene }
+public sealed record MovieRequest(string Role, MovieBackdrop Backdrop = MovieBackdrop.Black);
 
 /// <summary>A scene owns requests; a platform owns playback and cancellation. No source filenames enter this boundary.</summary>
 public interface ISceneMedia

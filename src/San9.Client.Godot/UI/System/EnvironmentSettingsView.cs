@@ -9,7 +9,7 @@ public partial class EnvironmentSettingsView : SettingsView
     public Action<UserSettings> Apply { get; init; } = null!;
     private UserSettings _draft = null!;
     protected override string Title => "设定环境";
-    protected override string[] Labels => ["全屏", "锁定鼠标", "进行速度", "讯息速度", "进行记录", "BGM", "音效"];
+    protected override string[] Labels => ["全屏", "锁定鼠标", "进行速度", "讯息速度", "进行记录", "BGM", "音效", "电影"];
     protected override int LabelWidth => 128;
     protected override int ColumnCount => 3;
     protected override int LabelFontSize => 14;
@@ -36,6 +36,7 @@ public partial class EnvironmentSettingsView : SettingsView
             bool enabled = i == 0;
             Option(enabled ? "ON" : "OFF", i, 5, () => _draft = _draft with { MusicEnabled = enabled }, () => _draft.MusicEnabled == enabled);
             Option(enabled ? "ON" : "OFF", i, 6, () => _draft = _draft with { SoundEnabled = enabled }, () => _draft.SoundEnabled == enabled);
+            Option(enabled ? "ON" : "OFF", i, 7, () => _draft = _draft with { MoviesEnabled = enabled }, () => _draft.MoviesEnabled == enabled);
             Option(enabled ? "ON" : "OFF", i, 0, () => _draft = _draft with { FullscreenEnabled = enabled }, () => _draft.FullscreenEnabled == enabled);
             Option(enabled ? "ON" : "OFF", i, 1, () => _draft = _draft with { MouseConfined = enabled }, () => _draft.MouseConfined == enabled);
         }

@@ -119,7 +119,7 @@ public static class ScenarioContentFiles
         return await ReadSelectionAsync(manifest, ResolveResourceRoot(root, manifest.ResourceRoot), token);
     }
 
-    internal static async Task<ScenarioContentManifest> ReadManifestAsync(string root, CancellationToken token)
+    public static async Task<ScenarioContentManifest> ReadManifestAsync(string root, CancellationToken token = default)
     {
         // Check the version before interpreting the layout, including older monolithic files.
         await using var stream = File.OpenRead(Path.Combine(root, "content.json"));

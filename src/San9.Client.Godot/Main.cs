@@ -17,6 +17,7 @@ public partial class Main : Node
     private Node? _scene;
     private SceneTransitionOverlay _transition = null!;
     private bool _switching;
+    private OpeningMoviePlayback? _openingMovie;
     private ClientOptions _options = null!;
     private ClientDirectories _directories = null!;
     private readonly CancellationTokenSource _startup = new();
@@ -74,10 +75,11 @@ public partial class Main : Node
             {
                 if (options.RequiresWorldVerification || options.TextSmoke)
                     throw new ArgumentException("World verification requires an explicit --scenario or --content-package.");
+                await PlayStartupMovies();
                 await SwitchScene(PrepareOpening, transition: false);
                 return;
             }
-            await SwitchScene(() => PrepareWorld(options), transition: false);
+            await StartNewGame(options, transition: false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception e)
@@ -104,30 +106,93 @@ public partial class Main : Node
 
     public override void _Input(InputEvent input)
     {
-        if (_switching) GetViewport().SetInputAsHandled();
+        if (_switching && _openingMovie is null) GetViewport().SetInputAsHandled();
     }
 
-    private async Task<Node> PrepareOpening()
+    private async Task<PreparedScene> PrepareOpening()
     {
         var opening = new StartMenuPreview { ContentRoot = _options.ContentRoot, DataPaths = DataPaths, Preferences = _preferences, InitiallyVisible = false,
-            BeginGame = (id, players, settings, damage, setup) => SwitchScene(() => PrepareWorld(
-                _options with { PackageRoot = null, ScenarioId = id, ComputerDamageBonusPercent = damage }, players, settings, setup: setup)),
+            BeginGame = (id, players, settings, damage, setup) => StartNewGame(
+                _options with { PackageRoot = null, ScenarioId = id, ComputerDamageBonusPercent = damage }, players, settings, setup),
             LoadGame = document => LoadGame(document, transition: true) };
         GetNode<Control>("%UiRoot").AddChild(opening);
-        try { await opening.Prepared; return opening; }
+        try { await opening.Prepared; return new(opening); }
         catch { if (IsInstanceValid(opening)) opening.Free(); throw; }
     }
 
     private Task LoadGame(SlotSaveDocument document, bool transition) => SwitchScene(() => PrepareWorld(_options with
         { PackageRoot = null, ScenarioId = document.Header.Summary.ScenarioId }, save: document), transition);
 
-    private async Task SwitchScene(Func<Task<Node>> prepare, bool transition = true)
+    private Task StartNewGame(ClientOptions options, int[]? players = null, San9.Core.Domain.NewGameSettings? settings = null,
+        NewGameSetup? setup = null, bool transition = true) => SwitchScene(
+            () => PrepareWorld(options, players, settings, setup: setup), transition,
+            () => PrepareOpeningMovie(options));
+
+    private async Task<OpeningMoviePlayback?> PrepareOpeningMovie(ClientOptions options)
+    {
+        var token = _startup.Token;
+        var settings = ReadMovieSettings();
+        if (!settings.MoviesEnabled) return null;
+        string root = options.ContentRoot;
+        string? id = options.ScenarioId;
+        if (options.PackageRoot is { } packageRoot)
+        {
+            var manifest = await ScenarioContentFiles.ReadManifestAsync(packageRoot, token);
+            root = ScenarioContentFiles.ResolveResourceRoot(packageRoot, manifest.ResourceRoot);
+            id = manifest.Preview?.Id ?? (await ScenarioContentFiles.LoadScenarioAsync(packageRoot, token)).ScenarioId;
+        }
+        var catalog = await MovieCatalogFiles.LoadAsync(root, token);
+        return id is null ? null : CreateMovieLayer(root, catalog, MovieCatalog.ScenarioOpeningRole(id), settings);
+    }
+
+    private UserSettings ReadMovieSettings()
+    {
+        try { return new UserSettingsStore(DataPaths.Settings).Load(); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or System.Text.DecoderFallbackException or InvalidDataException)
+        { GD.PushWarning($"影片设置读取失败，使用默认值：{error.Message}"); return UserSettings.Default; }
+    }
+
+    private OpeningMoviePlayback? CreateMovieLayer(string root, MovieCatalog catalog, string role, UserSettings settings)
+    {
+        if (!settings.MoviesEnabled || !catalog.Movies.TryGetValue(role, out string? path)) return null;
+        return new OpeningMoviePlayback(this, PackageFiles.Resolve(root, path), settings.SoundEnabled, _startup.Token);
+    }
+
+    private async Task PlayStartupMovies()
+    {
+        var settings = ReadMovieSettings();
+        if (!settings.MoviesEnabled) return;
+        var token = _startup.Token;
+        var catalog = await MovieCatalogFiles.LoadAsync(_options.ContentRoot, token);
+        _switching = true;
+        _transition.Sample(1);
+        try
+        {
+            foreach (string role in new[] { MovieCatalog.StartupThemeRole, MovieCatalog.StartupOpeningRole })
+            {
+                token.ThrowIfCancellationRequested();
+                using var movie = CreateMovieLayer(_options.ContentRoot, catalog, role, settings);
+                _openingMovie = movie;
+                if (movie is not null) await movie.Finished;
+                _openingMovie = null;
+            }
+        }
+        finally
+        {
+            _openingMovie = null;
+            _switching = false;
+            if (!token.IsCancellationRequested) _transition.Sample(0);
+        }
+    }
+
+    private async Task SwitchScene(Func<Task<PreparedScene>> prepare, bool transition = true, Func<Task<OpeningMoviePlayback?>>? prepareMovie = null)
     {
         if (_switching) throw new InvalidOperationException("A scene switch is already in progress.");
         _switching = true;
         var token = _startup.Token;
         var previous = _scene;
         var replacement = new SceneReplacementTransition(ViewFadeDuration, ViewFadeDuration);
+        PreparedScene? prepared = null;
         Node? incoming = null;
         if (previous is not null) previous.ProcessMode = ProcessModeEnum.Disabled;
         async Task Animate(SceneReplacementPhase phase)
@@ -148,10 +213,24 @@ public partial class Main : Node
             var darkening = transition ? Animate(SceneReplacementPhase.Darkening) : Task.CompletedTask;
             try
             {
-                incoming = await prepare();
-                incoming.ProcessMode = ProcessModeEnum.Disabled;
+                if (prepareMovie is not null)
+                {
+                    await darkening;
+                    _openingMovie = await prepareMovie();
+                    if (_openingMovie is not null) _transition.Sample(1);
+                }
+                incoming = await ScenePreparation.PrepareAsync(_openingMovie?.Presented ?? Task.CompletedTask,
+                    _openingMovie?.Finished ?? Task.CompletedTask, async () =>
+                    {
+                        prepared = await prepare();
+                        incoming = prepared.Node;
+                        incoming.ProcessMode = ProcessModeEnum.Disabled;
+                        return incoming;
+                    }, token);
             }
             finally { await darkening; }
+            _openingMovie?.Dispose();
+            _openingMovie = null;
             if (incoming is StartMenuPreview opening) opening.Activate();
             else
             {
@@ -170,6 +249,8 @@ public partial class Main : Node
         }
         catch
         {
+            _openingMovie?.Dispose();
+            _openingMovie = null;
             if (incoming is not null && _scene != incoming && IsInstanceValid(incoming)) incoming.Free();
             if (!token.IsCancellationRequested && _scene == previous && IsInstanceValid(previous))
             {
@@ -184,12 +265,20 @@ public partial class Main : Node
         }
         finally
         {
+            prepared?.Dispose();
+            _openingMovie?.Dispose();
+            _openingMovie = null;
             if (!token.IsCancellationRequested) _transition.Sample(0);
             _switching = false;
         }
     }
 
-    private async Task<Node> PrepareWorld(ClientOptions options, int[]? players = null, San9.Core.Domain.NewGameSettings? settings = null,
+    private sealed record PreparedScene(Node Node, IDisposable? PreparationSilence = null) : IDisposable
+    {
+        public void Dispose() => PreparationSilence?.Dispose();
+    }
+
+    private async Task<PreparedScene> PrepareWorld(ClientOptions options, int[]? players = null, San9.Core.Domain.NewGameSettings? settings = null,
         SlotSaveDocument? save = null, NewGameSetup? setup = null)
     {
         setup ??= NewGameSetup.Empty;
@@ -204,6 +293,7 @@ public partial class Main : Node
         AddChild(runtime);
         world.SetProcessInput(false);
         world.SetProcessUnhandledInput(false);
+        IDisposable? preparationSilence = null;
         try
         {
             San9.Application.GameSession CreateNewSession(San9.Content.Scenarios.ScenarioInitialState definition)
@@ -255,7 +345,7 @@ public partial class Main : Node
                 layer.Show();
                 ui.AddChild(new TextVerification { Content = loaded.Content, Service = textures,
                     Output = Path.GetFullPath(Path.Combine(options.ContentRoot,"../verification/text")) });
-                return runtime;
+                return new(runtime);
             }
             var content = loaded.Content;
             GD.Print($"CLIENT_PREPARE content_ms={loaded.ValidationMs:F2} session_ms={loaded.SessionMs:F2} ui_prepare_ms={startup.Elapsed.TotalMilliseconds - loaded.ValidationMs - loaded.SessionMs:F2}");
@@ -264,6 +354,7 @@ public partial class Main : Node
             var dataPaths = DataPaths;
             var saveStore = new SlotSaveStore(dataPaths.SaveSlots);
             var music = new SceneMusicPlayer { ContentRoot = content.ContentRoot, Tracks = content.Presentation.Sounds };
+            preparationSilence = music.Suspend();
             runtime.AddChild(music);
             runtime.MoveChild(music, 1);
             world.Session = session;
@@ -299,11 +390,12 @@ public partial class Main : Node
                 });
             if (options.RequiresWorldVerification)
                 ui.AddChild(new ClientVerification { World = world, Selection = sessions.Selection, Hud = sessions.Hud, Options = options });
-            return runtime;
+            return new(runtime, preparationSilence);
         }
         catch
         {
             if (IsInstanceValid(runtime)) runtime.Free();
+            preparationSilence?.Dispose();
             throw;
         }
     }

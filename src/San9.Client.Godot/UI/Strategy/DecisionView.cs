@@ -261,7 +261,7 @@ public partial class DecisionView : FixedPage
     {
         try
         {
-            await Media.PlayMovieAsync(new("emperor-restoration"), _lifetime.Token);
+            await Media.PlayMovieAsync(new("emperor-restoration", MovieBackdrop.GameScene), _lifetime.Token);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { return; }
         if (_lifetime.IsCancellationRequested) return;

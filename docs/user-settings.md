@@ -4,7 +4,7 @@
 
 跨局通关、教学等完成事实不属于设置，独立保存在[玩家档案](player-profile.md)中。
 
-本地设置与内容包、剧本存档、Core 世界状态和规则随机无关。`San9.Client.Godot.Settings` 提供不可变 `UserSettings`、显式存储和客户端生命周期的 `UserSettingsSession`；启动只读取一次，新局及读档保留当前内存偏好。“功能→设定环境”依次包含全屏、锁定鼠标、进行速度、讯息速度、进行记录、BGM、音效七项可执行设置；“兵法演出”和“外交演出”在“功能→PK设定”中编辑。
+本地设置与内容包、剧本存档、Core 世界状态和规则随机无关。`San9.Client.Godot.Settings` 提供不可变 `UserSettings`、显式存储和客户端生命周期的 `UserSettingsSession`；新局及读档沿用本地偏好，地图创建前的开场影片独立读取已保存设置。“功能→设定环境”依次包含全屏、锁定鼠标、进行速度、讯息速度、进行记录、BGM、音效、电影八项可执行设置；“兵法演出”和“外交演出”在“功能→PK设定”中编辑。
 
 | 设置 | 取值 | 首版默认 |
 | --- | --- | --- |
@@ -13,7 +13,7 @@
 | FullscreenEnabled | ON／OFF，无边框全屏 | OFF |
 | MusicEnabled | 开／关 | 开 |
 | SoundEnabled | 开／关 | 开 |
-| MoviesEnabled | 开／关，仅影片 | 开 |
+| MoviesEnabled | ON／OFF，启动、剧本开场及事件电影 | 开 |
 | TacticScenesEnabled | 显示／不显示，武力兵法特写及场内回应，保留参与者发言和战报 | 显示 |
 | DiplomacyScenesEnabled | 显示／不显示，外交前后对白与会谈演出 | 显示 |
 | MessageSpeed | Normal／Fast／Pause，对应普通／快／暂停 | Normal |

@@ -10,12 +10,13 @@ public sealed class MusicPlaybackState
     }
 
     private readonly List<Lease> _scenes = [];
+    private readonly HashSet<Silence> _silences = [];
     public event Action? Changed;
     public bool Enabled { get; private set; } = true;
     public Track? MapTrack { get; private set; }
     public bool HasScene => _scenes.Count > 0;
     private Track? Selected => HasScene ? _scenes[^1].Track : MapTrack;
-    public Track? Audible => Enabled ? Selected : null;
+    public Track? Audible => Enabled && _silences.Count == 0 ? Selected : null;
     public float SceneGain => HasScene ? _scenes[^1].Gain : 1;
     public IEnumerable<Track> Tracks => (MapTrack is { } map ? new[] { map } : [])
         .Concat(_scenes.Select(s => s.Track)).Distinct();
@@ -42,9 +43,28 @@ public sealed class MusicPlaybackState
         return lease;
     }
 
+    public IDisposable Suspend()
+    {
+        var silence = new Silence(this);
+        _silences.Add(silence);
+        Changed?.Invoke();
+        return silence;
+    }
+
+    private sealed class Silence(MusicPlaybackState owner) : IDisposable
+    {
+        private MusicPlaybackState? _owner = owner;
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _owner, null) is { } state && state._silences.Remove(this))
+                state.Changed?.Invoke();
+        }
+    }
+
     public void Advance(double seconds)
     {
         if (!double.IsFinite(seconds) || seconds < 0) throw new ArgumentOutOfRangeException(nameof(seconds));
+        if (_silences.Count > 0) return;
         foreach (var lease in _scenes.ToArray()) lease.Advance(seconds);
     }
 
