@@ -77,6 +77,6 @@ public partial class StrategyHud
             _flow.Targets is SpecialDeploymentTargets { IsConstruction:true } ? CommandText.Resolve(Texts, "select.build-site") : CommandText.Resolve(Texts, "select.object"));
         _targetTitle.Visible = targeting;
         foreach (var button in _targetButtons) button.Visible = targeting;
-        ClearHover(); UpdateTurnControls(); QueueRedraw();
+        ClearMapHover(); UpdateTurnControls(); QueueRedraw();
     }
 }

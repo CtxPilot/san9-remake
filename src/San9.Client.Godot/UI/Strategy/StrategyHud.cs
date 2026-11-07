@@ -82,8 +82,8 @@ public partial class StrategyHud : Control
         Name = "StrategyHud"; SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); MouseFilter = MouseFilterEnum.Stop;
         BuildLayout();
         World.MapReady += Build;
-        GetWindow().MouseExited += ClearHover;
-        GetWindow().MouseEntered += ResumeHover;
+        GetWindow().MouseExited += OnWindowMouseExited;
+        GetWindow().MouseEntered += OnWindowMouseEntered;
         _message = new GameMessageBar { Textures = _textures, Text = "正在准备地图…" };
         _bottomBar.AddChild(_message);
         _message.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -575,8 +575,16 @@ public partial class StrategyHud : Control
         }
         if (_built) _feedback.HandleInput(@event);
     }
-    private void ClearHover() => _pointerOutsideWindow = true;
-    private void ResumeHover() => _pointerOutsideWindow = false;
+    private void OnWindowMouseExited() => _pointerOutsideWindow = true;
+    private void OnWindowMouseEntered() => _pointerOutsideWindow = false;
+    private void ClearMapHover()
+    {
+        World.HoverObject(null);
+        _hoverCard.ShowInfo(null, Vector2.Zero);
+        _hoverTarget = null;
+        _regionVisible = false;
+        foreach (var label in _regionLabels) label.Hide();
+    }
     private void UpdateHover(Vector2 mouse)
     {
         if (_objectPicker?.Visible == true)
@@ -678,8 +686,8 @@ public partial class StrategyHud : Control
         World.UnitGroupPickRequested -= PickUnitGroup;
         if (World.CommandSourceAllowed == IsCommandSource) World.CommandSourceAllowed = null;
         if (World.ContextAllowed == HasObjectContext) World.ContextAllowed = null;
-        GetWindow().MouseExited -= ClearHover;
-        GetWindow().MouseEntered -= ResumeHover;
+        GetWindow().MouseExited -= OnWindowMouseExited;
+        GetWindow().MouseEntered -= OnWindowMouseEntered;
         _textures.Dispose();
         _text.Dispose();
         _titleFlashMaterial.Dispose();
