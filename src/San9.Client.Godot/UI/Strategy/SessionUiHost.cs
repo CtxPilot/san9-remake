@@ -260,6 +260,12 @@ public partial class SessionUiHost : Node
         }
     }
 
+    public override void _Notification(int what)
+    {
+        // Embedded popup focus changes stay inside the application and must keep confinement.
+        if (what == NotificationApplicationFocusOut) _windowDisplay?.ReleaseMouse();
+    }
+
     public override void _Input(InputEvent input)
     {
         // Window input survives session replacement and remains available over modal pages.

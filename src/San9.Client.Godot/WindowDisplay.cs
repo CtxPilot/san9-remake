@@ -15,7 +15,6 @@ internal sealed class WindowDisplay : IDisposable
         _window = window;
         _position = window.Position;
         _size = window.Size;
-        window.FocusExited += ReleaseMouse;
     }
 
     private bool IsDesktop => DisplayServer.GetName() != "headless" && !_window.IsEmbedded();
@@ -29,7 +28,7 @@ internal sealed class WindowDisplay : IDisposable
         return true;
     }
 
-    private void ReleaseMouse()
+    public void ReleaseMouse()
     {
         if (IsDesktop && Input.MouseMode == Input.MouseModeEnum.Confined)
             Input.MouseMode = Input.MouseModeEnum.Visible;
@@ -37,7 +36,6 @@ internal sealed class WindowDisplay : IDisposable
 
     public void Dispose()
     {
-        _window.FocusExited -= ReleaseMouse;
         ReleaseMouse();
     }
 
