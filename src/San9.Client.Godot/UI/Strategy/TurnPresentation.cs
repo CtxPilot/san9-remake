@@ -56,8 +56,8 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
     public double Progress { get; private set; }
     public bool IsStrategy => Screen is TurnScreen.Strategy or TurnScreen.Confirmation;
     public int? CommandMarkForceId => IsStrategy ? session.View.PlayerForceId : null;
-    public bool UsesExecutionMusic => Screen is not (TurnScreen.Initializing or TurnScreen.Strategy or TurnScreen.Confirmation or TurnScreen.Returning or TurnScreen.Terminal);
-    public bool IsExecutionPresentation => Phase == ResolutionPhase.Daily && Screen is (TurnScreen.Playing or TurnScreen.Presenting);
+    public bool UsesExecutionMusic => _executionStarted && Screen is not (TurnScreen.Initializing or TurnScreen.Strategy or TurnScreen.Confirmation or TurnScreen.Returning or TurnScreen.Terminal);
+    public bool IsExecutionPresentation => _executionStarted && Phase == ResolutionPhase.Daily && Screen is (TurnScreen.Playing or TurnScreen.Presenting);
     public bool CanAdvance => Screen == TurnScreen.Strategy && session.Snapshot.Simulation.Boundary == SimulationBoundary.Stable;
     public bool CanBrowseMap => Screen is TurnScreen.Strategy or TurnScreen.Playing;
     public bool CanCancelFailure => !_presentationFailed && session.Snapshot.Simulation.CanPersist && session.Snapshot.Clock.DayNumber == _startedDay;
@@ -67,6 +67,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
     private double _remaining;
     private long _startedDay;
     private bool _advancing;
+    private bool _executionStarted;
     private bool _presentationFailed;
     private bool _stopAtBoundary;
     private sealed record FeedbackFrame(ResolutionPhase Phase, StrategySnapshot Before, StrategySnapshot After, int Start, int End);
@@ -124,16 +125,26 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
 
     private void BeginAdvance()
     {
-        Screen = TurnScreen.Entering;
+        Screen = TurnScreen.Preparing;
         _advancing = true;
+        _executionStarted = false;
         Display = session.View;
         _startedDay = session.Snapshot.Clock.DayNumber;
         Progress = 0;
         Phase = ResolutionPhase.Daily;
         Paused = false;
+        var state = session.Snapshot.Simulation;
+        if (!state.Controls.Skip(state.ActiveControl + 1).Any(c => c.Kind == ControllerKind.Player))
+            EnterExecution();
+        Start(new PrepareAdvanceOperation());
+    }
+
+    private void EnterExecution()
+    {
+        _executionStarted = true;
+        Screen = TurnScreen.Entering;
         _remaining = TransitionDuration;
         ExecutionTitleStarted?.Invoke();
-        Start(new PrepareAdvanceOperation());
     }
 
     public void TogglePause()
@@ -184,8 +195,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
             _remaining -= seconds;
             if (_remaining <= 0)
             {
-                Screen = TurnScreen.Strategy; Display = null; StrategyEntrance++;
-                StrategyReady?.Invoke();
+                CompleteStrategyEntrance();
             }
             return;
         }
@@ -197,7 +207,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
         }
         if (Screen == TurnScreen.Preparing)
         {
-            if (Publish()) Continue();
+            if (_pending is null || Publish()) Continue();
             return;
         }
         if (Screen == TurnScreen.AwaitingDecision)
@@ -344,7 +354,12 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
         }
         bool playerTurn = state.ActiveControl < state.Controls.Length && state.Controls[state.ActiveControl].Kind == ControllerKind.Player;
         if (session.Snapshot.Clock.DayNumber == _startedDay && playerTurn)
-        { ReturnToStrategy(); return; }
+        {
+            _advancing = false;
+            _stopAtBoundary = false;
+            CompleteStrategyEntrance();
+            return;
+        }
         if (session.Snapshot.Clock.DayNumber >= _startedDay + 10)
         {
             if (!state.Controls.Any(c => c.Kind == ControllerKind.Player) && !_stopAtBoundary)
@@ -357,6 +372,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
             Start(new PrepareAdvanceOperation());
             return;
         }
+        if (!_executionStarted) { EnterExecution(); return; }
         Screen = TurnScreen.Playing;
         Start(new AdvanceDayOperation());
     }
@@ -374,6 +390,14 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
                 CalendarDate = frame.After.World.Clock;
         }
         else Progress = 0;
+    }
+
+    private void CompleteStrategyEntrance()
+    {
+        Screen = TurnScreen.Strategy;
+        Display = null;
+        StrategyEntrance++;
+        StrategyReady?.Invoke();
     }
 
     private void ReturnToStrategy()

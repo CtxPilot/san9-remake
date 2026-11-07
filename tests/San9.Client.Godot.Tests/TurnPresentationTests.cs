@@ -63,31 +63,52 @@ public sealed class TurnPresentationTests
         Assert.Equal(TurnScreen.Strategy, new TurnPresentation(session).Screen);
     }
 
-    [Fact]
-    public void MultiplePlayersReturnToStrategyBeforeAdvancingTheDate()
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void MultiplePlayersHandOffWithoutPhaseTitlesBeforeAdvancingTheDate(int nextPlayer)
     {
         var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "turn", 190, 1, 1, 1,
-            [new(1, "first", 1, 100), new(2, "second", 2, 100)],
-            [new(15, "first-city", 1, 0, 0, 0, 100, 100, 0, []), new(16, "second-city", 2, 1, 0, 0, 100, 100, 0, [])], [], [])
+            [new(1, "first", 1, 100), new(2, "second", 2, 100), new(3, "third", 3, 100)],
+            [new(15, "first-city", 1, 0, 0, 0, 100, 100, 0, []), new(16, "second-city", 2, 1, 0, 0, 100, 100, 0, []),
+                new(17, "third-city", 3, 2, 0, 0, 100, 100, 0, [])], [], [])
         { Information = new([], [], [], [new San9.Core.Domain.CorpsState(1, 1, null, new(100, 100)) { IsRoot = true },
-            new San9.Core.Domain.CorpsState(2, 2, null, new(100, 100)) { IsRoot = true }], []) };
+            new San9.Core.Domain.CorpsState(2, 2, null, new(100, 100)) { IsRoot = true },
+            new San9.Core.Domain.CorpsState(3, 3, null, new(100, 100)) { IsRoot = true }], []) };
         var session = GameSession.Start(definition, 190);
-        Assert.Equal(SessionDisposition.Accepted, session.TakeOverForce(2).Disposition);
-        var turn = new TurnPresentation(session);
+        Assert.Equal(SessionDisposition.Accepted, session.TakeOverForce(nextPlayer).Disposition);
+        int executionTitles = 0, strategyTitles = 0, entrances = 0;
+        var turn = new TurnPresentation(session)
+        {
+            ExecutionTitleStarted = () => executionTitles++,
+            StrategyTitleStarted = () => strategyTitles++,
+            StrategyReady = () => entrances++
+        };
         var clock = session.Snapshot.Clock;
         Assert.Equal(1, turn.CommandMarkForceId);
         Assert.False(turn.ContinueAutomaticControls());
         Assert.True(turn.Request());
         Assert.Equal(1, turn.CommandMarkForceId);
-        turn.Confirm(); Ready(turn); turn.Update(2);
-        Assert.Equal(TurnScreen.Returning, turn.Screen);
+        turn.Confirm();
+        Assert.Equal(TurnScreen.Preparing, turn.Screen);
+        Assert.False(turn.UsesExecutionMusic);
+        Assert.False(turn.IsExecutionPresentation);
+        Assert.False(turn.Request());
         Assert.Null(turn.CommandMarkForceId);
+        Ready(turn); turn.Update(0);
+        Assert.Equal(TurnScreen.Strategy, turn.Screen);
+        Assert.Equal(0, executionTitles);
+        Assert.Equal(0, strategyTitles);
+        Assert.Equal(1, entrances);
+        Assert.Equal(2, turn.StrategyEntrance);
         Assert.Equal(clock, session.Snapshot.Clock);
-        Assert.Equal(2, session.View.PlayerForceId);
-        turn.Update(2);
+        Assert.Equal(nextPlayer, session.View.PlayerForceId);
         Assert.True(turn.CanAdvance);
-        Assert.Equal(2, turn.CommandMarkForceId);
+        Assert.Equal(nextPlayer, turn.CommandMarkForceId);
         Enter(turn); Finish(turn);
+        Assert.Equal(1, executionTitles);
+        Assert.Equal(1, strategyTitles);
+        Assert.Equal(2, entrances);
         Assert.Equal(TurnScreen.Strategy, turn.Screen);
         Assert.Equal(clock.DayNumber + 10, session.Snapshot.Clock.DayNumber);
         Assert.Equal(1, session.View.PlayerForceId);
