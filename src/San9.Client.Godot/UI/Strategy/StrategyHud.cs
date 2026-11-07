@@ -30,7 +30,6 @@ public partial class StrategyHud : Control
     private GameDialog _notice = null!;
     private Label _footerCity = null!;
     private readonly List<Label> _regionLabels = [];
-    private bool _regionVisible;
     private (bool Strategy, bool Targeting, bool Command, bool Region)? _drawState;
     private bool _pointerOutsideWindow;
     private StrategyRosterList _rosterList = null!;
@@ -59,9 +58,7 @@ public partial class StrategyHud : Control
     private TextureButton _functionsButton = null!;
     private StrategyOverviewPanel _overviewPanel = null!;
     private bool _built;
-    private MapHoverCard _hoverCard = null!;
-    private StrategySnapshot? _hoverView;
-    private MapInformationContext _hoverContext;
+    private MapHoverPresenter _hoverFeedback = null!;
     private long _stateRevision = -1;
     private readonly Dictionary<string,Label> _resourceValues = [];
     public string DisplayedMoney => _resourceValues.TryGetValue("资金", out var label) ? label.Text : "";
@@ -235,8 +232,9 @@ public partial class StrategyHud : Control
         World.UnitContextRequested += ShowUnitContext;
         World.EmptyContextRequested += ShowShortcutMenu;
         World.CommandMenuRequested += ShowCommandMenu;
-        _hoverCard = new MapHoverCard { Obstacles = MapObstacles, World = World, Textures = _textures, UiFont = GetThemeFont("font"), Visible = false };
-        AddChild(_hoverCard);
+        var hoverCard = new MapHoverCard { Obstacles = MapObstacles, World = World, Textures = _textures, UiFont = GetThemeFont("font"), Visible = false };
+        AddChild(hoverCard);
+        _hoverFeedback = new(World, Texts, hoverCard, _regionLabels, _footer, _footerCity);
         BuildTurnControls();
         BuildTargetControls();
         BuildCommandFlows();
@@ -378,7 +376,6 @@ public partial class StrategyHud : Control
         AcceptEvent();
     }
     private MapObjectTarget? _contextTarget;
-    private MapObjectTarget? _hoverTarget;
     private long _contextRevision;
     private void ShowCommandMenu(MapObjectTarget target, Vector2 point)
     {
@@ -392,7 +389,7 @@ public partial class StrategyHud : Control
         if (target.IsUnit) Selection.Clear(); else Selection.SelectBuilding(target.Id);
         _mapContext.Close();
         _commandMenu.Open(entries, target.IsUnit ? MapCommandSummary.Unit(Scenario, Texts, target.Id) : MapCommandSummary.Settlement(Scenario, Texts, target.Id), point);
-        World.HoverObject(target); _hoverCard.ShowInfo(null, point); _hoverTarget = null;
+        UpdateHover(point);
     }
     private void ShowSettlementContext(int id, Vector2 point)
     {
@@ -401,7 +398,7 @@ public partial class StrategyHud : Control
         _contextRevision = Session.Snapshot.Revision;
         _commandMenu.Close();
         _mapContext.Open(ContextEntries(SettlementContextMenu.Read(Scenario, id)), point);
-        World.HoverObject(null); _hoverCard.ShowInfo(null, point); _hoverTarget = null;
+        UpdateHover(point);
     }
 
     private void ActivateCommand(string command)
@@ -443,7 +440,7 @@ public partial class StrategyHud : Control
         _contextRevision = Session.Snapshot.Revision;
         _commandMenu.Close();
         _mapContext.Open(ContextEntries(UnitMapInteraction.Menu(Scenario, id)), point);
-        World.HoverObject(null); _hoverCard.ShowInfo(null, point); _hoverTarget = null;
+        UpdateHover(point);
     }
     private void OpenMapContextEntry(MapContextEntry entry)
     {
@@ -470,7 +467,7 @@ public partial class StrategyHud : Control
             new("储存", Texts.ResolveRich(StrategyHintText.Key("functions-save")), true, () => SystemMenu.Open(Persistence.SaveLoadMode.Save)),
             new("载入", Texts.ResolveRich(StrategyHintText.Key("functions-load")), true, () => SystemMenu.Open(Persistence.SaveLoadMode.Load))
         ], point, 40);
-        World.HoverObject(null); _hoverCard.ShowInfo(null, point); _hoverTarget = null;
+        UpdateHover(point);
     }
     private void SelectRosterPage(RosterPage page)
     {
@@ -534,13 +531,6 @@ public partial class StrategyHud : Control
             ?? (Overview.IsOpen ? _overviewPanel.HoverButton : null);
         _message.SetMessage(button?.HintText ?? (Overview.IsOpen ? "" : "请选择命令起点。"), button is null || !button.Disabled);
     }
-    private void UpdateRegion(int x, int y)
-    {
-        if (World.Package is not { } map) return;
-        var info = RegionHoverInfo.Resolve(map, new(x, y), Scenario, Texts);
-        _footer.Text = info.Region; _footerCity.Text = info.City;
-    }
-
     private void ShowScrollModeNotice(EdgeScrollMode mode)
     {
         string key = CommandPresentation.Notices[mode == EdgeScrollMode.Hover ? "scroll-hover" : "scroll-click"];
@@ -577,53 +567,36 @@ public partial class StrategyHud : Control
     }
     private void OnWindowMouseExited() => _pointerOutsideWindow = true;
     private void OnWindowMouseEntered() => _pointerOutsideWindow = false;
-    private void ClearMapHover()
-    {
-        World.HoverObject(null);
-        _hoverCard.ShowInfo(null, Vector2.Zero);
-        _hoverTarget = null;
-        _regionVisible = false;
-        foreach (var label in _regionLabels) label.Hide();
-    }
+    private void ClearMapHover() => _hoverFeedback.Clear();
     private void UpdateHover(Vector2 mouse)
     {
-        if (_objectPicker?.Visible == true)
-        {
-            World.HoverObject(_objectPicker.PreviewTarget);
-            return;
-        }
-        var context = Interaction.InformationContext;
-        var view = Scenario;
-        bool visible = false;
+        if (!_built) return;
+        var interaction = Interaction;
         MapObjectTarget? hovered = null;
-        if (_built && Interaction.CanInspectMap && World.IsInspectionBlocked?.Invoke(mouse) != true && !World.IsLoading && World.PresentedViewportBounds.HasPoint(mouse) && !IsCoveredPoint(mouse) && !IsSpeechPoint(mouse))
+        San9.Core.Domain.MapCell? region = null;
+        bool pointerInside = !_pointerOutsideWindow && GetViewportRect().HasPoint(mouse);
+        if (pointerInside && interaction.CanInspectMap && World.IsInspectionBlocked?.Invoke(mouse) != true &&
+            !World.IsLoading && World.PresentedViewportBounds.HasPoint(mouse) && !IsCoveredPoint(mouse) && !IsSpeechPoint(mouse))
         {
             if (Overview.IsOpen)
             {
                 if (_overviewPanel.TrySquare(_overviewPanel.GetGlobalTransform().AffineInverse() * mouse, out int x, out int y))
-                { UpdateRegion(x, y); visible = true; }
+                    region = new(x, y);
             }
             else
             {
                 hovered = World.ObjectAtViewport(mouse);
                 var world = World.ViewportToWorld(mouse);
                 if (MapGeometry.TrySquare(world.X, world.Y, out int x, out int y, World.Package!.Width, World.Package.Height))
-                { UpdateRegion(x, y); visible = true; }
+                    region = new(x, y);
             }
         }
-        if (_unitGroupList?.Visible == true && HudRect(_unitGroupList).HasPoint(mouse))
-            hovered = _unitGroupList.PreviewTarget;
-        World.HoverObject(_commandMenu?.Visible == true ? _commandTarget : hovered);
-        if (_built && (_hoverTarget != hovered || !ReferenceEquals(_hoverView, view) || _hoverContext != context))
-        {
-            _hoverView = view;
-            _hoverContext = context;
-            if (_hoverTarget != hovered) _hoverCard.ShowInfo(null, mouse);
-            _hoverTarget = hovered;
-            _hoverCard.ShowInfo(hovered is {} target ? target.IsUnit ? UnitMapInteraction.Hover(view, Texts, target.Id, context) : MapHoverInfo.Resolve(view, Texts, target.Id, context) : null, mouse);
-        }
-        _regionVisible = visible;
-        foreach (var label in _regionLabels) label.Visible = visible;
+        var feedback = MapHoverFeedback.Resolve(pointerInside,
+            _objectPicker?.Visible == true ? new(_objectPicker.PreviewTarget) : null,
+            _commandMenu?.Visible == true ? new(_commandTarget) : null,
+            _unitGroupList?.Visible == true && HudRect(_unitGroupList).HasPoint(mouse) ? new(_unitGroupList.PreviewTarget) : null,
+            hovered, region);
+        _hoverFeedback.Apply(feedback, Scenario, interaction.InformationContext, mouse);
     }
     public override void _Process(double delta)
     {
@@ -647,12 +620,12 @@ public partial class StrategyHud : Control
                 _unitGroup.UnitIds.Select(id => new MapObjectTarget(id, true)).ToArray()));
             UpdateSidebar(delta);
         }
-        UpdateHover(_pointerOutsideWindow ? new Vector2(-1, -1) : GetGlobalMousePosition());
+        UpdateHover(GetGlobalMousePosition());
         UpdateMessage();
         _large?.SetPressedNoSignal(!Overview.IsOpen); _small?.SetPressedNoSignal(Overview.IsOpen);
         if (_territory is not null) _territory.Disabled = Overview.IsOpen;
         _territory?.SetPressedNoSignal(World.ShowBoundaries);
-        var drawState = (Turn?.IsStrategy == true, SelectingTargets, _commandMenu?.Visible == true, _regionVisible);
+        var drawState = (Turn?.IsStrategy == true, SelectingTargets, _commandMenu?.Visible == true, _hoverFeedback?.RegionVisible == true);
         if (_drawState != drawState) { _drawState = drawState; QueueRedraw(); }
     }
     private void Strip(string role, Vector2 position, int width)
@@ -671,7 +644,7 @@ public partial class StrategyHud : Control
         if (!SelectingTargets) DrawTexture(_textures.Get("season-" + _badgeSeason, this), new(26, 31),
             new Color(_badgeBrightness, _badgeBrightness, _badgeBrightness, 1));
         if (Turn.IsStrategy && !SelectingTargets) { Strip("field", new(377, 15), 88); Strip("field", new(457, 15), 112); Strip("field", new(561, 15), 112); }
-        if (_regionVisible) DrawTexture(_textures.Get("region-frame", this), GroupPosition(_bottomRight) + new Vector2(824, 738));
+        if (_hoverFeedback?.RegionVisible == true) DrawTexture(_textures.Get("region-frame", this), GroupPosition(_bottomRight) + new Vector2(824, 738));
     }
     public override void _ExitTree()
     {

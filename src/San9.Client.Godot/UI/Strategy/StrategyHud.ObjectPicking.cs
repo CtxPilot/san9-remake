@@ -15,7 +15,7 @@ public partial class StrategyHud
 
     private void BuildObjectPicker()
     {
-        _objectPicker = new() { Textures = _textures, Preview = World.HoverObject };
+        _objectPicker = new() { Textures = _textures };
         OverlayHost.AddChild(_objectPicker);
         World.ObjectChoiceRequested += ShowObjectChoices;
         World.CommandSourceAllowed = IsCommandSource;
@@ -25,8 +25,8 @@ public partial class StrategyHud
     private void ShowObjectChoices(MapObjectPickRequest request, Vector2 point)
     {
         var choices = ReadObjectChoices(request.Candidates);
-        _hoverCard.ShowInfo(null, point); _hoverTarget = null;
         _objectPicker.Open(request, choices, point);
+        UpdateHover(point);
     }
 
     private IReadOnlyList<MapObjectChoice> ReadObjectChoices(IEnumerable<MapObjectTarget> targets)

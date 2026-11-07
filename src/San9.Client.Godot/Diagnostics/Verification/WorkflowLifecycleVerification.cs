@@ -111,15 +111,15 @@ public partial class WorkflowLifecycleVerification : Node
 
     private void CheckObjectPicker(MapWorld world, Action<MapObjectTarget?> targetInput)
     {
-        MapObjectTarget? preview = null, picked = null;
-        var picker = new MapObjectPicker { Preview = target => preview = target };
+        MapObjectTarget? picked = null;
+        var picker = new MapObjectPicker();
         AddChild(picker);
         var choices = Enumerable.Range(1, 8).Select(id =>
             new MapObjectChoice(new(id, true), $"Unit {id}", Colors.Blue)).ToArray();
         MapObjectPickRequest Request() => new(choices.Select(row => row.Target), _ => true,
             () => world.TargetPicked == targetInput, target =>
             {
-                Check(!picker.Visible && preview is null, "Selection ran before dismissing the object picker.");
+                Check(!picker.Visible && picker.PreviewTarget is null, "Selection ran before dismissing the object picker.");
                 picked = target;
             });
         var request = Request();
@@ -127,7 +127,7 @@ public partial class WorkflowLifecycleVerification : Node
         var rows = picker.GetChild<ScrollContainer>(0).GetChild<VBoxContainer>(0);
         var seventh = rows.GetChild<InformationMenuButton>(6);
         seventh.EmitSignal(Control.SignalName.MouseEntered);
-        Check(preview == choices[6].Target, "Object row did not preview its map identity.");
+        Check(picker.PreviewTarget == choices[6].Target, "Object row did not preview its map identity.");
         seventh.EmitSignal(BaseButton.SignalName.Pressed);
         Check(picked == choices[6].Target && !request.IsCurrent, "More than five overlapping objects were not selectable.");
 

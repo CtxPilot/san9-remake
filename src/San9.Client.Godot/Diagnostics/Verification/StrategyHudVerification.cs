@@ -230,7 +230,7 @@ public partial class StrategyHud
             UpdateHover(point);
             var expectedRegion = San9.Application.Presentation.RegionHoverInfo.Resolve(
                 World.Package, new(facility.X, facility.Y), Scenario, Texts);
-            Check(_regionVisible && _footer.Text == expectedRegion.Region && _footerCity.Text == expectedRegion.City,
+            Check(_hoverFeedback.RegionVisible && _footer.Text == expectedRegion.Region && _footerCity.Text == expectedRegion.City,
                 "Mouse region and parent city mismatch.");
             Selection.SelectBuilding(first);
             Check(_footer.Text == expectedRegion.Region, "Selection overwrote hovered region.");
@@ -238,7 +238,7 @@ public partial class StrategyHud
         foreach (var point in new[] { new Vector2(-10, 400), new Vector2(970, 400), new Vector2(800, 100) })
         {
             UpdateHover(point);
-            Check(!_regionVisible && !_footer.Visible, "UI or black bar retained the region panel.");
+            Check(!_hoverFeedback.RegionVisible && !_footer.Visible, "UI or black bar retained the region panel.");
         }
         World.SetZoom(1); FocusFacility(first); await View();
         await Click(new(512, 384));

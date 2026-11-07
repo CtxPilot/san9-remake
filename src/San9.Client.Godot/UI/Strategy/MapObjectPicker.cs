@@ -9,7 +9,6 @@ public sealed record MapObjectChoice(MapObjectTarget Target, string Name, Color 
 public partial class MapObjectPicker : ModalView
 {
     public TextureScope Textures { get; init; } = null!;
-    public Action<MapObjectTarget?>? Preview { get; init; }
     private MapObjectPickRequest? _request;
     private ScrollContainer? _scroll;
     private Rect2 _panel;
@@ -62,7 +61,7 @@ public partial class MapObjectPicker : ModalView
     }
 
     private void SetPreview(MapObjectTarget? target)
-    { PreviewTarget = target; Preview?.Invoke(target); }
+    { PreviewTarget = target; }
 
     private void Relayout()
     {
@@ -116,5 +115,5 @@ public partial class MapObjectPicker : ModalView
 
     public override void _Draw() => SkinPainter.MapObjectPicker(this, Textures, _panel);
     public override void _ExitTree()
-    { GetViewport().SizeChanged -= Relayout; _request?.Cancel(); Preview?.Invoke(null); }
+    { GetViewport().SizeChanged -= Relayout; _request?.Cancel(); }
 }
