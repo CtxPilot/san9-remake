@@ -11,6 +11,8 @@ public sealed record PersonnelJourneyPreview(CommandRejection Rejection, int? Da
     public bool Available => Rejection == CommandRejection.None;
 }
 
+public sealed record PersonnelAdvicePreview(CommandAdvice Advice, ThreeVisitsStep? SearchAdvice = null);
+
 internal static class PersonnelSearchChances
 {
     internal static long PoliticsScore(int politics) => Math.Max(1, Math.Min(politics, 60) / 2) + Math.Max(0, Math.Min(politics, 80) - 60)
@@ -37,7 +39,62 @@ public sealed partial class SimulationEngine
         if (_world.IsExecuting) throw new InvalidOperationException("Simulation is executing.");
         var world = PreparationWorld();
         return world.Officers.Keys.Where(id => PersonnelMissions.ValidateRecruit(world,
-            new(Guid.Empty, forceId, 0, officerId, id), _rules, out _, out _) == CommandRejection.None).Order().ToImmutableArray();
+            new(Guid.Empty, forceId, 0, [officerId], id), _rules, out _, out _) == CommandRejection.None).Order().ToImmutableArray();
+    }
+
+    /// <summary>Read-only sparse comparisons. Shared qualifications and discovery counts are evaluated once per batch; no routes are calculated.</summary>
+    public ImmutableDictionary<(int Actor, int Target), PersonnelAdvicePreview> GetPersonnelAdvice(int forceId,
+        PersonnelJourneyKind kind, ImmutableArray<(int Actor, int Target)> comparisons)
+    {
+        if (comparisons.IsDefault) throw new ArgumentException("Personnel advice requires explicit comparisons.", nameof(comparisons));
+        if (kind is not (PersonnelJourneyKind.Search or PersonnelJourneyKind.Recruit)) throw new ArgumentOutOfRangeException(nameof(kind));
+        var world = PreparationWorld();
+        if (!world.Forces.ContainsKey(forceId)) throw new ArgumentException("Unknown personnel force.", nameof(forceId));
+        var pairs = comparisons.Distinct().ToArray();
+        var actors = pairs.Select(p => p.Actor).Distinct().ToDictionary(id => id, id => world.Forces[forceId].LeaderId is null
+            ? CommandRejection.PersonUnavailable : PersonnelMissions.ActorEligibility(world, forceId, id, _rules));
+        var targets = pairs.Select(p => p.Target).Distinct().ToDictionary(id => id, id => kind == PersonnelJourneyKind.Recruit
+            ? PersonnelMissions.RecruitTargetEligibility(world, forceId, id, _rules, out _, out _)
+            : PersonnelMissions.CanSearch(world, forceId, id, _rules.Personnel) ? CommandRejection.None : CommandRejection.InvalidTask);
+        Dictionary<int, int> people = [], items = [];
+        if (kind == PersonnelJourneyKind.Search)
+        {
+            people = world.Officers.Values.Where(p => p.Status == OfficerStatus.Undiscovered)
+                .Where(p => (p.SettlementId ?? p.RegionId) is not null).GroupBy(p => (p.SettlementId ?? p.RegionId)!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+            items = world.Treasures.Values.Where(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
+                    t.DiscoveryRegionId is not null && _rules.Treasures.Items.ContainsKey(t.Id))
+                .GroupBy(t => t.DiscoveryRegionId!.Value).ToDictionary(g => g.Key, g => g.Count());
+        }
+        var result = ImmutableDictionary.CreateBuilder<(int Actor, int Target), PersonnelAdvicePreview>();
+        foreach (var (actor, target) in pairs)
+        {
+            var rejection = actors[actor] != CommandRejection.None ? actors[actor] : targets[target];
+            result[(actor, target)] = rejection != CommandRejection.None
+                ? new(new(rejection, null, AdviserOpinion.Unavailable))
+                : kind == PersonnelJourneyKind.Recruit
+                    ? EvaluateRecruitmentAdvice(world, forceId, actor, target, RecruitmentRules.Threshold(world, actor, target, _rules))
+                    : EvaluateSearchAdvice(world, forceId, actor, target, people.GetValueOrDefault(target), items.GetValueOrDefault(target));
+        }
+        return result.ToImmutable();
+    }
+
+    private static PersonnelAdvicePreview EvaluateRecruitmentAdvice(WorldMutation world, int forceId, int actor, int target, int threshold) =>
+        new(AdviserJudgment.Evaluate(world, forceId, ConditionalRandomPurpose.Recruitment, actor, target, threshold));
+
+    private PersonnelAdvicePreview EvaluateSearchAdvice(WorldMutation world, int forceId, int actor, int target, int people, int items)
+    {
+        long score = PersonnelSearchChances.PoliticsScore(world.Abilities(world.Officers[actor]).Politics);
+        var advice = AdviserJudgment.Evaluate(world, forceId, ConditionalRandomPurpose.SearchDiscovery, actor, target,
+            Math.Max(PersonnelSearchChances.Person(score, people), PersonnelSearchChances.Treasure(score, items)));
+        if (people == 0 && items == 0 && advice.AdviserId is not null) advice = advice with { Opinion = AdviserOpinion.Unfavorable };
+        ThreeVisitsStep? special = null;
+        if (_rules.ThreeVisits is { } visits && advice.AdviserId == visits.RecommenderId)
+        {
+            special = ThreeVisits.SearchStep(world, actor, forceId, target, visits);
+            if (special is not null) advice = advice with { Opinion = AdviserOpinion.Favorable };
+        }
+        return new(advice, special);
     }
 
     public ImmutableArray<int> GetSearchPlaces(int forceId)
@@ -59,7 +116,7 @@ public sealed partial class SimulationEngine
         {
             PersonnelJourneyKind.Move => PersonnelMissions.ValidateMove(world, new(Guid.Empty, forceId, 0, [officerId], targetId), _rules.Personnel, _rules.Military),
             PersonnelJourneyKind.Search => PersonnelMissions.ValidateSearch(world, new(Guid.Empty, forceId, 0, [officerId], targetId), _rules.Personnel, _rules.Military),
-            PersonnelJourneyKind.Recruit => PersonnelMissions.ValidateRecruit(world, new(Guid.Empty, forceId, 0, officerId, targetId), _rules, out destination, out unit),
+            PersonnelJourneyKind.Recruit => PersonnelMissions.ValidateRecruit(world, new(Guid.Empty, forceId, 0, [officerId], targetId), _rules, out destination, out unit),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         if (rejection != CommandRejection.None) return new(rejection, null, new(rejection, null, AdviserOpinion.Unavailable));
@@ -72,22 +129,16 @@ public sealed partial class SimulationEngine
         {
             threshold = RecruitmentRules.Threshold(world, officerId, targetId, _rules);
             if (includeAdvice)
-                advice = AdviserJudgment.Evaluate(world, forceId, ConditionalRandomPurpose.Recruitment, officerId, targetId, threshold.Value);
+                advice = EvaluateRecruitmentAdvice(world, forceId, officerId, targetId, threshold.Value).Advice;
         }
         if (kind == PersonnelJourneyKind.Search && includeAdvice)
         {
-            long score = PersonnelSearchChances.PoliticsScore(world.Abilities(world.Officers[officerId]).Politics);
             int people = world.Officers.Values.Count(p => p.Status == OfficerStatus.Undiscovered && (p.SettlementId ?? p.RegionId) == targetId);
             int items = world.Treasures.Values.Count(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
                 t.DiscoveryRegionId == targetId && _rules.Treasures.Items.ContainsKey(t.Id));
-            advice = AdviserJudgment.Evaluate(world, forceId, ConditionalRandomPurpose.SearchDiscovery, officerId, targetId,
-                Math.Max(PersonnelSearchChances.Person(score, people), PersonnelSearchChances.Treasure(score, items)));
-            if (people == 0 && items == 0 && advice.AdviserId is not null) advice = advice with { Opinion = AdviserOpinion.Unfavorable };
-            if (_rules.ThreeVisits is {} visits && advice.AdviserId == visits.RecommenderId)
-            {
-                searchAdvice = ThreeVisits.SearchStep(world,officerId,forceId,targetId,visits);
-                if (searchAdvice is not null) advice = advice with { Opinion = AdviserOpinion.Favorable };
-            }
+            var search = EvaluateSearchAdvice(world, forceId, officerId, targetId, people, items);
+            advice = search.Advice;
+            searchAdvice = search.SearchAdvice;
         }
         return new(CommandRejection.None, kind == PersonnelJourneyKind.Search ? route.XunRoundedDays : route.Days, advice) { DistanceDays = route.Days, SearchAdvice = searchAdvice, RecruitmentThreshold = threshold };
     }

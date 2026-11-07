@@ -26,6 +26,31 @@ public sealed class PersonnelJourneyPresentationTests
     }
 
     [Fact]
+    public void SuccessfulBatchRecruitmentExplainsWhyOtherEnvoysReturnWithoutFailureDialogue()
+    {
+        var definition = G01ScenarioTests.Fixture();
+        definition = definition with {
+            Officers = [.. definition.Officers.Select(p => p.State.Id is 2 or 3 ? p with {
+                State = p.State with { BaseAbilities = new(50,50,500,50) } } : p),
+                new("free",new OfficerState(7,null,1,new(50,50,50,50),false) { Status = OfficerStatus.Free }.WithLoyalty(1,100))]
+        };
+        var session = GameSession.Start(definition,42);
+        Assert.True(session.Execute(new("player"),new RecruitOfficersCommand(Guid.NewGuid(),1,0,[3,2],7)).Submission.Accepted);
+        var before = session.View;
+        var events = session.AdvanceXun().Events;
+        var index = Enumerable.Range(0,events.Count).Single(i => events[i] is PersonnelJourneyInterruptedEvent);
+        var fact = (PersonnelJourneyInterruptedEvent)events[index];
+        Assert.Equal(3,fact.OfficerId);
+        var (texts,content) = Presentation(session);
+        var output = PersonnelJourneyPresentation.Read(before,session.Messages(texts,before.World),texts,content.Personnel!,events,index,_ => 0);
+        var message = Assert.Single(output.Messages);
+        Assert.Equal(CommandText.Key("result.recruit-target-joined"),message.Message.Key);
+        Assert.Equal(3,message.SpeakerId);
+        Assert.Contains("已加入我方",message.Message.BbCode);
+        Assert.Equal(message.Message,Assert.Single(output.Records).Message);
+    }
+
+    [Fact]
     public void ActualTargetReleasePublishesInterruptionBeforeReturnAndOnlyOnceAcrossPlayers()
     {
         var baseline = G01ScenarioTests.Fixture();
@@ -35,7 +60,7 @@ public sealed class PersonnelJourneyPresentationTests
             Information = baseline.Information with { Relations = [new(1, 2, 80)] } };
         var session = GameSession.Start(definition, 42);
         var id = Guid.NewGuid();
-        Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(id, 1, 0, 2, 7)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"), new RecruitOfficersCommand(id, 1, 0, [2], 7)).Submission.Accepted);
         var before = session.View;
         var released = session.Execute(new("player"), new ReleasePrisonerCommand(Guid.NewGuid(), 1, 1, 7));
         Assert.True(released.Submission.Accepted);

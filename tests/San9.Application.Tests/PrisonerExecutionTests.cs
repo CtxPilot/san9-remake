@@ -44,7 +44,7 @@ public sealed class PrisonerExecutionTests
         }).ToArray() };
         var session = GameSession.Start(definition, 190);
         session.ConfigureCompanion(new() { DisableComputerPrisonerExecution = prohibitComputerExecution });
-        Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 2, 7)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [2], 7)).Submission.Accepted);
         var command = new ExecutePrisonerCommand(Guid.NewGuid(), 1, 1, 7);
         session.ConfigureCompanion(session.Companion with { DisablePlayerPrisonerExecution = true });
         var retained = session.Capture();

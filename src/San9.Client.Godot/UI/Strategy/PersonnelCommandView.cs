@@ -19,11 +19,12 @@ public partial class PersonnelCommandView : FixedPage
     public bool HasChild => _child is not null;
     private Control? _body, _child;
     private readonly GameTextPresenter _text = new();
-    private const int SearchRosterRows = 10;
+    private const int PersonnelRosterRows = 5;
     // Roster top + table header/rows + pagination allowance, matching the recall footer spacing.
-    private const int SearchWindowHeight = 88 + 44 + SearchRosterRows * 20 + 32;
+    private const int SearchWindowHeight = 88 + 44 + PersonnelRosterRows * 20 + 32;
+    private const int EmployWindowHeight = 216 + 44 + PersonnelRosterRows * 20 + 32;
     private Rect2 Bounds => Draft.Kind switch { "summon" => new(216,222,592,324), "move" => new(304,248,416,272),
-        "search" => new(196,(768-SearchWindowHeight)/2,632,SearchWindowHeight), _ => new(288,236,448,296) };
+        "search" => new(196,(768-SearchWindowHeight)/2,632,SearchWindowHeight), _ => new(164,(768-EmployWindowHeight)/2,696,EmployWindowHeight) };
     public override void _Ready() { Size = new(1024,768); MouseFilter = MouseFilterEnum.Stop; Rebuild(); }
     private void Label(string value, Rect2 bounds) => CommandPanelArt.Label(_body!, _text, value, bounds);
     private OfficerCardData Card(int id)
@@ -54,8 +55,8 @@ public partial class PersonnelCommandView : FixedPage
         Label(source, new(at, new(sourceWidth,32)));
         if (Draft.Kind != "summon")
         {
-            int? days = Draft.Members.IsEmpty ? null : Draft.ArrivalDays(Draft.Members[0]);
-            float arrivalX = Draft.Kind == "search" ? bounds.Size.X - 8 - 152 : 256;
+            int? days = Draft.Members.IsEmpty ? null : Draft.ArrivalDays(Draft.RepresentativeId!.Value);
+            float arrivalX = Draft.Kind is "search" or "employ" ? bounds.Size.X - 8 - 152 : 256;
             _body.AddChild(new CommandArrivalField { Textures = Textures, Position = at + new Vector2(arrivalX,0),
                 Size = new(152,32), Text = CommandArrivalField.FormatDays(Texts, days) });
         }
@@ -85,13 +86,7 @@ public partial class PersonnelCommandView : FixedPage
             window.ActionButton(CommandText.Resolve(Texts, "label.target-region"), "edit", new(0,48,104,40), ChooseMap).Disabled = Draft.Targets.Length < 2;
             Label(Draft.TargetId is int target ? Draft.PlaceName(Texts,target) : "", new(at + new Vector2(104,48), new(128,32)));
             window.ActionButton(CommandText.Resolve(Texts, "label.actor"), "edit", new(0,88,104,40), SelectOfficers).Disabled = Draft.Candidates.IsEmpty;
-            var roster = new OfficerRosterPanel { Service = Service, Textures = Textures,
-                Position = at + new Vector2(104,88), ShowPortrait = true, PortraitFollowsPage = false, VisibleRows = SearchRosterRows, ShowPagination = true,
-                Columns = [new(CommandText.Resolve(Texts,"label.advice"),96), new(CommandText.Resolve(Texts,"label.officer"),128),
-                    new(CommandText.Resolve(Texts,"label.politics"),80)] };
-            roster.SetEntries(Draft.OrderSearchOfficers(Draft.Members).Select(id => new OfficerRosterEntry(Card(id),
-                [Draft.AdviceSymbol(id), Card(id).Name, Card(id).Abilities.Politics.ToString()])));
-            _body.AddChild(roster);
+            AdvisedRoster(at + new Vector2(104,88));
         }
         else
         {
@@ -101,11 +96,26 @@ public partial class PersonnelCommandView : FixedPage
             Properties(at + new Vector2(312,48),
                 new(CommandText.Resolve(Texts, "label.force"), targetPerson?.OwnerId is int owner ? Texts.Resolve(Draft.View.Forces.Single(f => f.Id == owner).NameKey) : targetPerson is null ? "" : "—", 80),
                 new(CommandText.Resolve(Texts, "label.loyalty"), targetPerson?.OwnerId is null ? "" : Math.Min(100,Draft.View.World.Officers.Single(p => p.Id == targetPerson.Id).Loyalty).ToString(), 40));
-            window.ActionButton(CommandText.Resolve(Texts, "label.actor"), "edit", new(0,176,104,40), SelectOfficers).Disabled = Draft.Candidates.Length < 2;
-            Person(Draft.Members.IsEmpty ? null : Draft.Members[0], at + new Vector2(104,176));
-            Properties(at + new Vector2(312,176), new OfficerProperty(CommandText.Resolve(Texts, "label.politics"), Draft.Members.IsEmpty ? "" : Card(Draft.Members[0]).Abilities.Politics.ToString(), 40));
+            window.ActionButton(CommandText.Resolve(Texts, "label.actor"), "edit", new(0,216,104,40), SelectOfficers).Disabled = Draft.Candidates.IsEmpty;
+            AdvisedRoster(at + new Vector2(104,216));
         }
         _body.AddChild(new GameMessageBar { Textures = Textures, Text = Draft.Kind == "employ" ? CommandText.Resolve(Texts, "hint.employ") : Texts.Resolve(CommandMenuSkin.HintKey(Draft.Kind)) });
+    }
+    private void AdvisedRoster(Vector2 at)
+    {
+        var roster = new OfficerRosterPanel { Service = Service, Textures = Textures,
+            Position = at, ShowPortrait = true, PortraitFollowsPage = false, VisibleRows = PersonnelRosterRows, ShowPagination = true,
+            Columns = Draft.Kind == "employ"
+                ? [new(CommandText.Resolve(Texts,"label.advice"),80), new(CommandText.Resolve(Texts,"label.officer"),112),
+                    new(CommandText.Resolve(Texts,"label.politics"),64), new(CommandText.Resolve(Texts,"label.arrival"),96)]
+                : [new(CommandText.Resolve(Texts,"label.advice"),96), new(CommandText.Resolve(Texts,"label.officer"),128),
+                    new(CommandText.Resolve(Texts,"label.politics"),80)] };
+        roster.SetEntries(Draft.OrderAdvisedOfficers(Draft.Members).Select(id => new OfficerRosterEntry(Card(id),
+            Draft.Kind == "employ"
+                ? [Draft.AdviceSymbol(id), Card(id).Name, Card(id).Abilities.Politics.ToString(),
+                    Draft.ArrivalDays(id) is int days ? CommandText.Resolve(Texts,"value.days",days) : ""]
+                : [Draft.AdviceSymbol(id), Card(id).Name, Card(id).Abilities.Politics.ToString()])));
+        _body!.AddChild(roster);
     }
     private void CloseChild()
     { if (_child is not null) { RemoveChild(_child); _child.QueueFree(); _child = null; } Rebuild(); }
@@ -116,11 +126,10 @@ public partial class PersonnelCommandView : FixedPage
     }
     private void SelectOfficers()
     {
-        bool multiple = Draft.Kind is "summon" or "move" or "search";
         _child = new CatalogView { Title = CommandText.Resolve(Texts, "select.officer"), HintText = Texts.Resolve(CommandMenuSkin.OfficerSelectionHintKey), Service = Service, Textures = Textures,
             CloseTitle = CommandText.Resolve(Texts, "action.cancel"), Pages = PersonnelCatalog.OfficerPages(Draft,Texts), ReadRows = page => PersonnelCatalog.Officers(Draft,Texts,page), Portrait = id => $"catalog-person-{id}",
             InitialCurrentId = Draft.RepresentativeId,
-            Selection = multiple ? new(Draft.Candidates,Draft.Members,Draft.SelectionLimit) : null, CanConfirmSelection = ids => Draft.CanSelect(ids),
+            Selection = new(Draft.Candidates,Draft.Members,Draft.SelectionLimit), CanConfirmSelection = ids => Draft.CanSelect(ids),
             Activated = id => { if (Draft.SetMembers([id])) { CloseChild(); SelectionChanged(); } },
             ConfirmSelection = ids => { if (Draft.SetMembers(ids)) { CloseChild(); SelectionChanged(); } }, Closed = CloseChild };
         AddChild(_child);

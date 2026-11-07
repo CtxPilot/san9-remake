@@ -32,7 +32,7 @@ public sealed class RecruitmentTerritoryTests
             naturalDeathsEnabled: false, forceEmergenceEnabled: false, cityIndependenceEnabled: false,
             forceConsolidationEnabled: false, settlementDefectionsEnabled: false, unitDefectionsEnabled: false);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, geography);
-        Assert.True(engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20)).Submission.Accepted);
+        Assert.True(engine.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20)).Submission.Accepted);
         engine.EndControl(new("player")); engine.EndControl(new("ai:2"));
         var restored = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), EconomyRulebook.Empty, geography);
         var advance = engine.AdvanceXun();

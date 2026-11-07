@@ -41,7 +41,7 @@ public sealed class GuanduSessionTests
     public void PublicRecruitmentGuaranteesSuccessBeforeTransferAndReplaysAcrossSaveBoundaries()
     {
         var definition = Definition(); var session = GameSession.Start(definition, 17);
-        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 12, 23);
+        var command = new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [12], 23);
         Assert.True(session.Execute(new("player"), command).Submission.Accepted);
         var restored = SaveService.Decode(SaveService.Encode(session), definition);
         var result = session.AdvanceXun();
@@ -66,7 +66,7 @@ public sealed class GuanduSessionTests
     {
         var definition = Definition() with { ConsumedEventKeys = [new("guandu")] };
         var session = GameSession.Start(definition, 17);
-        Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 12, 23)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [12], 23)).Submission.Accepted);
         var result = session.AdvanceXun();
         Assert.Empty(result.Events.OfType<GuanduEvent>());
         Assert.False(Assert.Single(result.Events.OfType<RecruitmentResolvedEvent>()).Success);
@@ -81,7 +81,7 @@ public sealed class GuanduSessionTests
         var definition = basis with { Officers = basis.Officers.Select(o => o.State.Id == 23
             ? o with { State = o.State with { Status = OfficerStatus.Serving, SettlementId = 2 } } : o).ToArray() };
         var session = GameSession.Start(definition, 17);
-        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 12, 23);
+        var command = new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [12], 23);
         Assert.True(session.Execute(new("player"), command).Submission.Accepted);
         session.EndControl(new("player"));
         Assert.True(session.Execute(new("ai:2"), new MoveOfficersCommand(Guid.NewGuid(), 2,

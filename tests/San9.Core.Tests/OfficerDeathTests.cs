@@ -72,7 +72,7 @@ public sealed class OfficerDeathTests
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, places,
             new([new(7, default, 0), new(8, default, 0)]));
         Assert.Equal(CommandRejection.None, engine.Execute(new("enemy"),
-            new RecruitOfficerCommand(Guid.NewGuid(), 2, 0, 2, 11)).Submission.Rejection);
+            new RecruitOfficersCommand(Guid.NewGuid(), 2, 0, [2], 11)).Submission.Rejection);
         var mission = Assert.Single(engine.Snapshot.Simulation.Tasks);
         var mutation = world.BeginMutation();
         var events = new List<DomainEvent>();

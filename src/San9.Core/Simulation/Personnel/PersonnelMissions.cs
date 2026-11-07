@@ -3,7 +3,7 @@ using San9.Core.Domain;
 
 namespace San9.Core.Simulation;
 
-public sealed record RecruitOfficerCommand(Guid CommandId, int IssuerId, long Sequence, int OfficerId, int TargetOfficerId)
+public sealed record RecruitOfficersCommand(Guid CommandId, int IssuerId, long Sequence, ImmutableArray<int> OfficerIds, int TargetOfficerId)
     : GameCommand(CommandId, IssuerId, Sequence);
 public sealed record MoveOfficersCommand(Guid CommandId, int IssuerId, long Sequence, ImmutableArray<int> OfficerIds, int DestinationId)
     : GameCommand(CommandId, IssuerId, Sequence);
@@ -96,34 +96,57 @@ internal static class PersonnelMissions
         return CommandRejection.None;
     }
 
-    internal static CommandRejection StartRecruit(WorldMutation world, CommandContext context, RecruitOfficerCommand command,
+    internal static CommandRejection StartRecruit(WorldMutation world, CommandContext context, RecruitOfficersCommand command,
         SimulationRules simulationRules, List<DomainEvent> events)
     {
         var rules = simulationRules.Personnel;
         var rejection = ValidateRecruit(world, command, simulationRules, out int destination, out UnitState? unit);
         if (rejection != CommandRejection.None) return rejection;
-        int origin = world.Officers[command.OfficerId].SettlementId!.Value;
-        int roll = ConditionalRandom.Percentile(world.Simulation.InitialSeed, ConditionalRandomPurpose.Recruitment,
-            world.Clock, command.OfficerId, command.TargetOfficerId);
-        Add(world, context, command, command.CommandId, command.OfficerId, origin,
-            new(destination, command.TargetOfficerId, roll) { RecruitmentUnitId = unit?.Id }, RecruitKind, rules, events, unit?.Position);
+        var ids = command.OfficerIds.Order().ToArray();
+        for (int index = 0; index < ids.Length; index++)
+        {
+            int officer = ids[index];
+            int origin = world.Officers[officer].SettlementId!.Value;
+            int roll = ConditionalRandom.Percentile(world.Simulation.InitialSeed, ConditionalRandomPurpose.Recruitment,
+                world.Clock, officer, command.TargetOfficerId);
+            Guid taskId = index == 0 ? command.CommandId : world.AllocateTaskId();
+            Add(world, context, command, taskId, officer, origin,
+                new(destination, command.TargetOfficerId, roll) { RecruitmentUnitId = unit?.Id }, RecruitKind, rules, events, unit?.Position);
+        }
         return CommandRejection.None;
     }
 
-    internal static CommandRejection ValidateRecruit(WorldMutation world, RecruitOfficerCommand command,
+    internal static CommandRejection ValidateRecruit(WorldMutation world, RecruitOfficersCommand command,
         SimulationRules simulationRules, out int destination, out UnitState? unit)
     {
         destination = -1; unit = null;
-        var rules = simulationRules.Personnel;
-        if (!CanStartMission(world, command.IssuerId, command.OfficerId, simulationRules.Military)) return CommandRejection.PersonUnavailable;
-        if (!world.Officers.TryGetValue(command.TargetOfficerId, out var target)) return CommandRejection.UnknownPerson;
-        if (!Recruitable(world, command.IssuerId, target)) return CommandRejection.PersonUnavailable;
-        if (world.Forces[command.IssuerId].LeaderId is null) return CommandRejection.PersonUnavailable;
-        if (target.OwnerId is int other && !world.Relations.ContainsKey((Math.Min(other, command.IssuerId), Math.Max(other, command.IssuerId))))
+        if (command.OfficerIds.IsDefaultOrEmpty || command.OfficerIds.Distinct().Count() != command.OfficerIds.Length)
             return CommandRejection.InvalidTask;
-        int origin = world.Officers[command.OfficerId].SettlementId!.Value;
-        if (!rules.Places.ContainsKey(origin)) return CommandRejection.InvalidTask;
-        return RecruitDestination(world, target, simulationRules, out destination, out unit);
+        foreach (int id in command.OfficerIds)
+        {
+            var rejection = ActorEligibility(world, command.IssuerId, id, simulationRules);
+            if (rejection != CommandRejection.None) return rejection;
+        }
+        return RecruitTargetEligibility(world, command.IssuerId, command.TargetOfficerId, simulationRules, out destination, out unit);
+    }
+
+    internal static CommandRejection ActorEligibility(WorldMutation world, int forceId, int officerId, SimulationRules rules)
+    {
+        if (!CanStartMission(world, forceId, officerId, rules.Military)) return CommandRejection.PersonUnavailable;
+        return rules.Personnel.Places.ContainsKey(world.Officers[officerId].SettlementId!.Value)
+            ? CommandRejection.None : CommandRejection.InvalidTask;
+    }
+
+    internal static CommandRejection RecruitTargetEligibility(WorldMutation world, int forceId, int targetId, SimulationRules rules,
+        out int destination, out UnitState? unit)
+    {
+        destination = -1; unit = null;
+        if (!world.Officers.TryGetValue(targetId, out var target)) return CommandRejection.UnknownPerson;
+        if (!Recruitable(world, forceId, target)) return CommandRejection.PersonUnavailable;
+        if (world.Forces[forceId].LeaderId is null) return CommandRejection.PersonUnavailable;
+        if (target.OwnerId is int other && !world.Relations.ContainsKey((Math.Min(other, forceId), Math.Max(other, forceId))))
+            return CommandRejection.InvalidTask;
+        return RecruitDestination(world, target, rules, out destination, out unit);
     }
 
     internal static CommandRejection StartSearch(WorldMutation world, CommandContext context, SearchCommand command,

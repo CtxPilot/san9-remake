@@ -42,7 +42,7 @@ public sealed class FieldRecruitmentSessionTests
     public void PublicFieldRecruitmentPreservesBothJourneyLegs(bool success)
     {
         var definition = Definition(success); var session = GameSession.Start(definition, 17);
-        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20);
+        var command = new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20);
         Assert.True(session.Execute(new("player"), command).Submission.Accepted);
         var submitted = Assert.Single(session.Snapshot.Simulation.Tasks);
         Assert.Equal(100, submitted.Journey!.RecruitmentUnitId);
@@ -68,7 +68,7 @@ public sealed class FieldRecruitmentSessionTests
     public void FieldTargetIdentityIsRequiredAndMalformedPayloadCannotRestore()
     {
         var definition = Definition(true); var session = GameSession.Start(definition, 17);
-        Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20)).Submission.Accepted);
         var task = Assert.Single(session.Snapshot.Simulation.Tasks);
         var json = JsonNode.Parse(CanonicalJson.Text(task.Journey))!.AsObject();
         Assert.True(json.Remove("recruitmentUnitId"));

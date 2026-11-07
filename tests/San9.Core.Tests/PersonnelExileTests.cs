@@ -106,7 +106,7 @@ public sealed class PersonnelExileTests
         };
         var engine = new SimulationEngine(WorldState.Restore(state), Economy, Geography(), new([new(10, new(5, 0, 0, 0), 0)]),
             new([new(1, 10000, 0) { AbilityBonuses = new(4, 0, 0, 0) }]));
-        Assert.True(engine.Execute(new("enemy"), new RecruitOfficerCommand(Guid.NewGuid(), 2, 0, 22, 11)).Submission.Accepted);
+        Assert.True(engine.Execute(new("enemy"), new RecruitOfficersCommand(Guid.NewGuid(), 2, 0, [22], 11)).Submission.Accepted);
         var task = Assert.Single(engine.Snapshot.Simulation.Tasks);
         engine.EndControl(new("enemy"));
         var result = Exile(engine);

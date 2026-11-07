@@ -10,8 +10,12 @@ namespace San9.Application.Presentation;
 public sealed class PersonnelDraft
 {
     private readonly GameSession _session;
-    // A draft belongs to one world revision; repeated UI reads share its immutable previews.
-    private readonly Dictionary<(int Actor, int Target), PersonnelJourneyPreview> _previews = [];
+    // Journey estimates and adviser judgments share the draft's fixed world revision.
+    private readonly Dictionary<(int Actor, int Target), PersonnelJourneyPreview> _journeys = [];
+    private readonly Dictionary<int, Dictionary<int, PersonnelAdvicePreview>> _advice = [];
+    private readonly Dictionary<int, PersonnelAdviceGrade> _targetRecommendations = [];
+    private readonly Dictionary<int, int> _politics;
+    private bool HasAdvice => Kind is "search" or "employ";
     public StrategySnapshot View { get; }
     public SettlementState Home { get; }
     public string Kind { get; }
@@ -21,13 +25,15 @@ public sealed class PersonnelDraft
     public ImmutableArray<int> Members { get; private set; } = [];
     public int? TargetId { get; private set; }
     private bool _membersEdited;
-    private int? _searchRepresentative;
-    public int? RepresentativeId => Kind == "search" ? _searchRepresentative : Members.IsEmpty ? null : Members[0];
-    public int SelectionLimit => Kind == "employ" ? 1 : Candidates.Length;
+    private int? _representative;
+    public int? RepresentativeId => HasAdvice
+        ? _representative : Members.IsEmpty ? null : Members[0];
+    public long RecommendationRevision { get; private set; }
+    public int SelectionLimit => Candidates.Length;
     public bool IsCurrent => _session.Snapshot.Revision == View.World.Revision;
-    public bool CanExecute => IsCurrent && TargetId is int target && !Members.IsEmpty && Members.All(id => Preview(id, target).Available);
-    public CommandAdvice? Advice => IsCurrent && RepresentativeId is int actor && TargetId is int target && Kind is "search" or "employ" ? Preview(actor, target).Advice : null;
-    public ThreeVisitsStep? SearchAdvice => IsCurrent && Kind == "search" && RepresentativeId is int actor && TargetId is int target ? Preview(actor,target).SearchAdvice : null;
+    public bool CanExecute => IsCurrent && TargetId is int target && !Members.IsEmpty && Members.All(id => Journey(id, target).Available);
+    public CommandAdvice? Advice => RepresentativeId is int actor ? AdviceFor(actor) : null;
+    public ThreeVisitsStep? SearchAdvice => RepresentativeId is int actor ? SearchAdviceFor(actor) : null;
     public static bool Supports(string kind) => kind is "summon" or "move" or "search" or "employ";
     public static string? UnavailableReasonKey(StrategySnapshot view, int homeId, string kind) => Supports(kind)
         ? new MapCommandAvailability(view).SettlementReasonKey(homeId, kind) : San9.Content.Interface.CommandMenuSkin.ReasonKey("unavailable");
@@ -35,75 +41,123 @@ public sealed class PersonnelDraft
     public PersonnelDraft(GameSession session, int homeId, string kind)
     {
         _session = session; View = session.View; Kind = kind;
+        _politics = View.Officers.ToDictionary(p => p.Id, p => p.Abilities.Politics);
         if (UnavailableReasonKey(View, homeId, kind) is string reason) throw new ArgumentException(reason, nameof(homeId));
         Home = View.World.Settlements.Single(s => s.Id == homeId);
         var availability = new MapCommandAvailability(View);
         Candidates = availability.PersonnelActors(Home, kind)
-            .Where(p => kind != "summon" || Preview(p.Id, homeId).Available)
-            .OrderByDescending(p => View.Officers.Single(o => o.Id == p.Id).Abilities.Politics)
+            .Where(p => kind != "summon" || Journey(p.Id, homeId).Available)
+            .OrderByDescending(p => _politics[p.Id])
             .ThenBy(p => p.Id).Select(p => p.Id).ToImmutableArray();
         Targets = kind == "summon" ? [homeId] : kind == "search" ? session.GetSearchPlaces(Home.OwnerId!.Value) :
             availability.PersonnelTargets(Home, kind).Order().ToImmutableArray();
         if (kind == "employ") Targets = Targets.Intersect(session.GetRecruitTargets(Home.OwnerId!.Value, Candidates[0])).ToImmutableArray();
         if (Targets.Length == 1) TargetId = Targets[0];
-        if (kind == "search") RefreshSearchSelection();
-        else if (Candidates.Length == 1 || kind == "employ") Members = Candidates.Take(1).ToImmutableArray();
+        if (HasAdvice) RefreshAdvisedSelection();
+        else if (Candidates.Length == 1) Members = Candidates.Take(1).ToImmutableArray();
     }
-    private PersonnelJourneyPreview Preview(int actor, int target)
+    private PersonnelJourneyPreview Journey(int actor, int target)
     {
         if (!IsCurrent) throw new InvalidOperationException("Stale personnel preparation.");
-        if (!_previews.TryGetValue((actor, target), out var preview))
+        if (!_journeys.TryGetValue((actor, target), out var preview))
         {
-            preview = _session.GetPersonnelJourney(Home.OwnerId!.Value, actor, target, JourneyKind);
-            _previews.Add((actor, target), preview);
+            preview = _session.GetPersonnelJourney(Home.OwnerId!.Value, actor, target, JourneyKind, includeAdvice: false);
+            _journeys.Add((actor, target), preview);
         }
         return preview;
     }
-    public CommandAdvice? AdviceFor(int actor) => IsCurrent && Candidates.Contains(actor) && TargetId is int target
-        ? Preview(actor, target).Advice : null;
-    public ThreeVisitsStep? SearchAdviceFor(int actor) => IsCurrent && Kind == "search" && Candidates.Contains(actor) && TargetId is int target
-        ? Preview(actor, target).SearchAdvice : null;
-    public int AdvicePriority(int actor) => SearchAdviceFor(actor) is not null ? 3 : AdviceFor(actor)?.Opinion switch
+    private void EnsureAdvice(IEnumerable<int> actors, IEnumerable<int> targets)
     {
-        AdviserOpinion.Favorable => 2,
-        AdviserOpinion.Unfavorable => 1,
-        _ => 0
-    };
-    public string AdviceSymbol(int actor) => AdvicePriority(actor) switch { 3 => "◎", 2 => "○", 1 => "×", _ => "" };
-    public IEnumerable<int> OrderSearchOfficers(IEnumerable<int> ids)
-    {
-        var politics = View.Officers.ToDictionary(p => p.Id, p => p.Abilities.Politics);
-        return ids.OrderByDescending(AdvicePriority).ThenByDescending(id => politics[id]).ThenBy(id => id);
+        if (!IsCurrent) throw new InvalidOperationException("Stale personnel preparation.");
+        var missing = ImmutableArray.CreateBuilder<(int Actor, int Target)>();
+        foreach (int actor in actors)
+        {
+            _advice.TryGetValue(actor, out var row);
+            if (row?.Count == Targets.Length) continue;
+            foreach (int target in targets)
+                if (row?.ContainsKey(target) != true) missing.Add((actor, target));
+        }
+        if (missing.Count == 0) return;
+        foreach (var (pair, advice) in _session.GetPersonnelAdvice(Home.OwnerId!.Value, JourneyKind, missing.ToImmutable()))
+        {
+            if (!_advice.TryGetValue(pair.Actor, out var row)) _advice.Add(pair.Actor, row = []);
+            row.Add(pair.Target, advice);
+        }
     }
-    public int? ArrivalDays(int actor) => IsCurrent && TargetId is int target ? Preview(actor, target).Days : null;
+    private PersonnelAdvicePreview PairAdvice(int actor, int target)
+    {
+        if (!_advice.TryGetValue(actor, out var row) || !row.TryGetValue(target, out var advice))
+        {
+            EnsureAdvice(Candidates, [target]);
+            return _advice[actor][target];
+        }
+        return advice;
+    }
+    public CommandAdvice? AdviceFor(int actor) => IsCurrent && HasAdvice && Candidates.Contains(actor) && TargetId is int target
+        ? PairAdvice(actor, target).Advice : null;
+    public ThreeVisitsStep? SearchAdviceFor(int actor) => IsCurrent && Kind == "search" && Candidates.Contains(actor) && TargetId is int target
+        ? PairAdvice(actor, target).SearchAdvice : null;
+    public PersonnelAdviceGrade AdviceGrade(int actor) => IsCurrent && HasAdvice && Candidates.Contains(actor) && TargetId is int target
+        ? PersonnelAdviceGrades.From(PairAdvice(actor, target)) : PersonnelAdviceGrade.None;
+    public PersonnelAdviceGrade TargetAdviceGrade(int target)
+    {
+        if (!IsCurrent || !HasAdvice || !Targets.Contains(target)) return PersonnelAdviceGrade.None;
+        if (_targetRecommendations.TryGetValue(target, out var grade)) return grade;
+        var pool = _membersEdited ? Members : Candidates;
+        EnsureAdvice(pool, Targets);
+        grade = PersonnelAdviceGrades.Summarize(pool.Select(actor => _advice[actor][target]));
+        _targetRecommendations.Add(target, grade);
+        return grade;
+    }
+    public int AdvicePriority(int actor) => (int)AdviceGrade(actor);
+    public int TargetAdvicePriority(int target) => (int)TargetAdviceGrade(target);
+    public string AdviceSymbol(int actor) => PersonnelAdviceGrades.Symbol(AdviceGrade(actor));
+    public string TargetAdviceSymbol(int target) => PersonnelAdviceGrades.Symbol(TargetAdviceGrade(target));
+    public IEnumerable<int> OrderAdvisedOfficers(IEnumerable<int> ids) =>
+        ids.OrderByDescending(AdviceGrade).ThenByDescending(id => _politics[id]).ThenBy(id => id);
+    private void InvalidateRecommendations()
+    {
+        _targetRecommendations.Clear();
+        RecommendationRevision++;
+    }
+    public int? ArrivalDays(int actor) => IsCurrent && TargetId is int target ? Journey(actor, target).Days : null;
     public int? ArrivalDaysTo(int target) => IsCurrent && Targets.Contains(target)
-        ? Preview(Members.IsEmpty ? Candidates[0] : Members[0], target).Days : null;
+        ? Journey(Members.IsEmpty ? Candidates[0] : Members[0], target).Days : null;
     public int? DistanceDaysTo(int target) => IsCurrent && Targets.Contains(target)
-        ? Preview(Members.IsEmpty ? Candidates[0] : Members[0], target).DistanceDays : null;
+        ? Journey(Members.IsEmpty ? Candidates[0] : Members[0], target).DistanceDays : null;
     public bool CanSelect(IReadOnlyCollection<int> ids) => IsCurrent && ids.Count <= SelectionLimit &&
         ids.Distinct().Count() == ids.Count && !ids.Except(Candidates).Any() &&
-        (TargetId is not int target || ids.All(id => Preview(id, target).Available));
+        (TargetId is not int target || ids.All(id => Journey(id, target).Available));
     public bool SetMembers(IEnumerable<int> ids)
     {
         int[] chosen = ids.ToArray();
         if (!CanSelect(chosen)) return false;
         Members = Candidates.Where(chosen.Contains).ToImmutableArray();
         _membersEdited = true;
-        if (Kind == "search") RefreshSearchSelection();
+        InvalidateRecommendations();
+        if (HasAdvice) RefreshAdvisedSelection();
         return true;
     }
     public bool SetTarget(int id)
     {
         if (!IsCurrent || !Targets.Contains(id)) return false;
         TargetId = id;
-        if (Kind == "search") RefreshSearchSelection();
+        if (HasAdvice) RefreshAdvisedSelection();
         return true;
     }
-    private void RefreshSearchSelection()
+    private void RefreshAdvisedSelection()
     {
         if (!_membersEdited)
-            Members = Candidates.Where(id => AdvicePriority(id) >= 2).ToImmutableArray();
-        _searchRepresentative = OrderSearchOfficers(Members).Select(id => (int?)id).FirstOrDefault();
+        {
+            var favorable = Candidates.Where(id => AdviceGrade(id) is PersonnelAdviceGrade.Favorable or PersonnelAdviceGrade.Special);
+            Members = OrderAdvisedOfficers(favorable).Take(1).ToImmutableArray();
+        }
+        else if (TargetId is int target && Members.Any(id => !Journey(id, target).Available))
+        {
+            Members = Members.Where(id => Journey(id, target).Available).ToImmutableArray();
+            InvalidateRecommendations();
+        }
+        _representative = OrderAdvisedOfficers(Members).Select(id => (int?)id).FirstOrDefault();
     }
     public ImmutableHashSet<MapCell> TargetCells(MapPackage map)
     {
@@ -138,7 +192,7 @@ public sealed class PersonnelDraft
         return Kind switch
         {
             "search" => new SearchCommand(id, owner, sequence, Members, target),
-            "employ" => new RecruitOfficerCommand(id, owner, sequence, Members[0], target),
+            "employ" => new RecruitOfficersCommand(id, owner, sequence, Members, target),
             _ => new MoveOfficersCommand(id, owner, sequence, Members, target)
         };
     }

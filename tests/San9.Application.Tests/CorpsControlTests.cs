@@ -23,12 +23,12 @@ public sealed class CorpsControlTests
         };
         var session = GameSession.Start(definition, 190);
         Assert.True(session.Execute(new("player"), new SetCorpsControlCommand(Guid.NewGuid(), 1, 0, 11, CorpsControlMode.Automatic)).Submission.Accepted);
-        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, 1, 2, 7);
+        var command = new RecruitOfficersCommand(Guid.NewGuid(), 1, 1, [2], 7);
         var hash = session.Snapshot;
         Assert.False(session.Execute(new("player"), command).Submission.Accepted);
         StateAssert.Equal(hash, session.Snapshot);
         Assert.True(session.Validate(new(CorpsControl.ControllerId(11)), command).Accepted);
-        Assert.False(session.Validate(new(CorpsControl.ControllerId(11)), command with { OfficerId = 1 }).Accepted);
+        Assert.False(session.Validate(new(CorpsControl.ControllerId(11)), command with { OfficerIds = [2, 1] }).Accepted);
         Assert.False(session.Validate(new(CorpsControl.ControllerId(11)), new DissolveCorpsCommand(Guid.NewGuid(), 1, 1, 11)).Accepted);
         Assert.True(session.Execute(new("corps:11"), command).Submission.Accepted);
         var result = session.Apply(session.Request(new AdvanceOperation()));

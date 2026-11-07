@@ -41,7 +41,7 @@ public sealed record RespondDailyTaskCommand(Guid CommandId, int IssuerId, long 
 [System.Text.Json.Serialization.JsonDerivedType(typeof(ConstructFacilityCommand), "construct-facility")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(AppointAdviserCommand), "appoint-adviser")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(SearchCommand), "search")]
-[System.Text.Json.Serialization.JsonDerivedType(typeof(RecruitOfficerCommand), "recruit-officer")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(RecruitOfficersCommand), "recruit-officers")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(MoveOfficersCommand), "move-officers")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(RewardOfficerCommand), "reward-officer")]
 [JsonDerivedType(typeof(FoodTradeCommand), "food-trade")]

@@ -50,7 +50,6 @@ public partial class MapSceneView : Node2D
     private ShaderMaterial _outlineMaterial = null!;
     private ShaderMaterial _candidateMaterial = null!;
     private ShaderMaterial _unavailableMaterial = null!;
-    private ShaderMaterial _regionHoverMaterial = null!;
     private readonly ShaderMaterial[] _meshMaterials = new ShaderMaterial[3];
     private readonly ImageTexture[] _meshTextures = new ImageTexture[16];
     private MilitaryTargets? _drawnTargets;
@@ -142,9 +141,7 @@ public partial class MapSceneView : Node2D
                 i == 1 ? TargetOverlayGeometry.InfluenceOpacity : TargetOverlayGeometry.StrongInfluenceOpacity;
             _meshMaterials[i].SetShaderParameter("weight", opacity * 256);
         }
-        _regionHoverMaterial = new ShaderMaterial { Shader = meshShader };
-        _regionHoverMaterial.SetShaderParameter("overlay_rgb", new Vector3(208, 208, 208));
-        _regionHoverMaterial.SetShaderParameter("weight", 64f);
+        PreparePersonnelOverlayMaterials(meshShader);
         _water = new Node2D { Material = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add } };
         _water.Draw += DrawWater; AddChild(_water);
         _additiveMaterial = new CanvasItemMaterial { BlendMode = CanvasItemMaterial.BlendModeEnum.Add };
@@ -179,7 +176,7 @@ public partial class MapSceneView : Node2D
         if (readyTerrain != _drawnTerrainCount) QueueRedraw();
         bool hoverChanged = _drawnHover != Hovered || _drawnPersonnelHoverPlace != PersonnelHoverPlace;
         bool resourcesChanged = _drawnAssetRevision != frame.Assets.Revision;
-        bool targetsChanged = _drawnTargets != Targets || _drawnPersonnelTargets != PersonnelTargets || _drawnCommandTargets != CommandTargets || _routeRevision != (Targets?.Revision ?? -1) ||
+        bool targetsChanged = _drawnPersonnelRecommendationRevision != (PersonnelTargets?.RecommendationRevision ?? -1) || _drawnTargets != Targets || _drawnPersonnelTargets != PersonnelTargets || _drawnCommandTargets != CommandTargets || _routeRevision != (Targets?.Revision ?? -1) ||
             _drawnConstructionPointer != ConstructionPointer || _previewRevision != (_previewAssets?.Revision ?? 0);
         bool markerChanged = (Targets is not null || PersonnelTargets?.Kind == "move" || CommandTargets is not null) && _markerFrame != (int)(AnimationTime() / 200) % 4;
         markerChanged |= Targets is not null && _routeFrame != (int)(AnimationTime() / 200) % 8;
@@ -269,18 +266,21 @@ public partial class MapSceneView : Node2D
                 PersonnelTargets is {} personnel ? TargetOverlayGeometry.Meshes(frame.Region.Scene.Map, personnel.TargetCells(frame.Region.Scene.Map), System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty).ToArray() :
                 CommandTargets is {} command ? TargetOverlayGeometry.Meshes(frame.Region.Scene.Map, command.ClearCells, System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty).ToArray() : [];
             _personnelRegionMeshes.Clear();
+            _drawnPersonnelRecommendationRevision = -1;
             if (PersonnelTargets is { Kind: "search" } search)
             {
                 var map = frame.Region.Scene.Map;
                 var empty = System.Collections.Immutable.ImmutableHashSet<San9.Core.Domain.MapCell>.Empty;
                 var meshes = TargetOverlayGeometry.Meshes(map, empty, empty).ToArray();
+                var legal = search.Targets.ToHashSet();
                 foreach (var group in meshes.Select((mesh, index) => (Mesh: mesh, Place: search.PlaceAt(map, new(index % map.Width, index / map.Width))))
-                    .Where(item => item.Place is not null).GroupBy(item => item.Place!.Value))
-                    _personnelRegionMeshes.Add(group.Key, group.Select(item => item.Mesh).ToArray());
+                    .Where(item => item.Place is int place && legal.Contains(place)).GroupBy(item => item.Place!.Value))
+                    _personnelRegionMeshes.Add(group.Key,group.Select(item => item.Mesh).ToArray());
             }
             _meshRegion = null;
             if (Targets is not null || PersonnelTargets?.Kind == "move" || CommandTargets is not null) _ui.Request(TargetSelectionSkin.RequiredRoles.Where(r => r.StartsWith("target-marker-", StringComparison.Ordinal) || r.StartsWith("target-route-", StringComparison.Ordinal) || r.StartsWith("target-waypoint-", StringComparison.Ordinal)));
         }
+        RefreshPersonnelRecommendations();
         _drawnUiRevision = _ui.Revision;
         _drawnConstructionPointer = ConstructionPointer;
         _previewRevision = _previewAssets?.Revision ?? 0;
@@ -325,9 +325,7 @@ public partial class MapSceneView : Node2D
             foreach (var mesh in _visibleTargetMeshes)
                 Add(_meshTextures[mesh.ElevationMask], new(mesh.X, mesh.Y), _meshMaterials[mesh.Opacity == TargetOverlayGeometry.DimOpacity ? 0 :
                         mesh.Opacity == TargetOverlayGeometry.InfluenceOpacity ? 1 : 2]);
-            if (PersonnelHoverPlace is int place && _personnelRegionMeshes.TryGetValue(place, out var regionMeshes))
-                foreach (var mesh in regionMeshes)
-                    Add(_meshTextures[mesh.ElevationMask], new(mesh.X, mesh.Y), _regionHoverMaterial);
+            DrawPersonnelRecommendations(Add);
             if (Targets is { } route)
             {
                 for (int i = 0; i < route.Route.Length; i++)
@@ -436,7 +434,7 @@ public partial class MapSceneView : Node2D
             _outlineMaterial.Shader.Dispose(); _outlineMaterial.Dispose();
             _candidateMaterial.Shader.Dispose(); _candidateMaterial.Dispose();
             _unavailableMaterial.Shader.Dispose(); _unavailableMaterial.Dispose();
-            _regionHoverMaterial.Dispose();
+            DisposePersonnelOverlayMaterials();
             foreach (var texture in _meshTextures) texture.Dispose();
             _meshMaterials[0].Shader.Dispose(); foreach (var material in _meshMaterials) material.Dispose();
         });

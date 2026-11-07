@@ -90,7 +90,7 @@ public sealed class SettlementOperationTests
         {
             "move" => new MoveOfficersCommand(id, 1, 0, [12], 2),
             "search" => new SearchCommand(id, 1, 0, [12], 1),
-            "recruit" => new RecruitOfficerCommand(id, 1, 0, 12, 30),
+            "recruit" => new RecruitOfficersCommand(id, 1, 0, [12], 30),
             "gift" => new GiftCommand(id, 1, 0, 12, 2, new(GiftKind.Money, 1000, null)),
             _ => new AlienateCommand(id, 1, 0, 12, 22)
         };

@@ -24,11 +24,11 @@ public static class PersonnelCatalog
             var abilities = officers[id].Abilities;
             return abilities.Leadership + abilities.War + abilities.Intelligence + abilities.Politics;
         }
-        if (targets) return ids.OrderBy(id => people[id].Status switch { OfficerStatus.Captive => 0, OfficerStatus.Free => 1, _ => 2 })
+        if (targets) return ids.OrderByDescending(draft.TargetAdvicePriority).ThenBy(id => people[id].Status switch { OfficerStatus.Captive => 0, OfficerStatus.Free => 1, _ => 2 })
             .ThenBy(id => people[id].OwnerId is null ? -1 : Math.Min(100, people[id].Loyalty));
         return draft.Kind switch
         {
-            "search" => draft.OrderSearchOfficers(ids),
+            "search" or "employ" => draft.OrderAdvisedOfficers(ids),
             "summon" => ids.OrderBy(id => officers[id].CorpsId ?? int.MaxValue).ThenBy(LocationKind)
                 .ThenBy(id => people[id].SettlementId ?? int.MaxValue),
             "move" => ids.OrderBy(id => people[id].Status).ThenByDescending(OfficePriority).ThenByDescending(AbilityTotal),
@@ -41,12 +41,14 @@ public static class PersonnelCatalog
             : draft.Kind switch
             {
                 "summon" => ["corps", "location", "status", "leadership", "war", "intelligence", "politics", "estimate"],
-                "search" => ["politics", "status", "leadership", "war", "intelligence", "learned", "estimate"],
+                "search" or "employ" => ["politics", "status", "leadership", "war", "intelligence", "learned", "estimate"],
                 "move" => ["status", "office", "capacity", "leadership", "war", "intelligence", "politics", "learned"],
                 _ => ["politics", "status", "leadership", "war", "intelligence", "learned"]
             };
-        CatalogColumn[] prefix = !targets && draft.Kind == "search"
-            ? [new("advice", CommandText.Resolve(texts, "label.advice"), 8, CatalogAlignment.Center), OfficerColumn("name")] : [OfficerColumn("name")];
+        CatalogColumn[] prefix = targets && draft.Kind == "employ"
+            ? [new("advice", CommandText.Resolve(texts, "label.advice"), 4, CatalogAlignment.Center), OfficerColumn("name")]
+            : !targets && draft.Kind is "search" or "employ"
+                ? [new("advice", CommandText.Resolve(texts, "label.advice"), 8, CatalogAlignment.Center), OfficerColumn("name")] : [OfficerColumn("name")];
         return [new(CommandText.Resolve(texts, "title." + draft.Kind), [.. prefix, .. fields.Select(f => f == "estimate" ? Arrival(texts) : OfficerColumn(f))]), .. OfficerCatalog.Pages(draft.View, texts)];
     }
     public static CatalogRow[] Officers(PersonnelDraft draft, TextCatalog texts, int page, bool targets = false)
@@ -65,7 +67,9 @@ public static class PersonnelCatalog
             pageIndex => OfficerCatalog.Read(draft.View, texts, pageIndex, null, null).Rows.ToDictionary(r => r.Key.Id));
         CatalogCell Cell(int id, string field)
         {
-            if (field == "advice") return new(draft.AdviceSymbol(id), draft.AdvicePriority(id));
+            if (field == "advice") return targets
+                ? new(draft.TargetAdviceSymbol(id), draft.TargetAdvicePriority(id))
+                : new(draft.AdviceSymbol(id), draft.AdvicePriority(id));
             if (field == "estimate")
             {
                 int? days = targets ? draft.ArrivalDaysTo(id) : draft.ArrivalDays(id);
@@ -85,9 +89,14 @@ public static class PersonnelCatalog
             : ["city", "force", "corps-name", "commander", "serving", "captives", "free"];
         string[] strength = search ? ["soldiers", "wounded", "morale", "state", "facility", "durability", "max-durability", "recovery", "tactics", "trait"]
             : ["soldiers", "wounded", "morale", "state", "facility", "durability", "max-durability", "trait"];
-        CatalogPage Page(string title, IEnumerable<string> fields) => new(title,
-            [new("name",search ? CommandText.Resolve(texts, "label.region") : CommandText.Resolve(texts, "label.facility"),6,CatalogAlignment.Left), .. fields.Select(f => f == "estimate" ? Arrival(texts) : RegionColumn(f))]);
-        return search ? [Page(CommandText.Resolve(texts, "title." + draft.Kind),primary),Page(CommandText.Resolve(texts, "page.affiliation"),affiliation),Page(CommandText.Resolve(texts, "page.strength"),strength),Page(CommandText.Resolve(texts, "page.adjacent"),["frontline","adjacent"])]
+        CatalogPage Page(string title, IEnumerable<string> fields, bool recommendations = false)
+        {
+            var name = new CatalogColumn("name",search ? CommandText.Resolve(texts, "label.region") : CommandText.Resolve(texts, "label.facility"),6,CatalogAlignment.Left);
+            CatalogColumn[] prefix = recommendations
+                ? [new("advice",CommandText.Resolve(texts,"label.advice"),4,CatalogAlignment.Center), name] : [name];
+            return new(title,[.. prefix, .. fields.Select(f => f == "estimate" ? Arrival(texts) : RegionColumn(f))]);
+        }
+        return search ? [Page(CommandText.Resolve(texts, "title." + draft.Kind),primary,recommendations:true),Page(CommandText.Resolve(texts, "page.affiliation"),affiliation),Page(CommandText.Resolve(texts, "page.strength"),strength),Page(CommandText.Resolve(texts, "page.adjacent"),["frontline","adjacent"])]
             : [Page(CommandText.Resolve(texts, "title." + draft.Kind),primary),Page(CommandText.Resolve(texts, "page.affiliation"),affiliation),Page(CommandText.Resolve(texts, "page.strength"),strength)];
     }
     public static CatalogRow[] Targets(PersonnelDraft draft, TextCatalog texts, int page)
@@ -97,12 +106,13 @@ public static class PersonnelCatalog
         CatalogCell Cell(int id, string field)
         {
             if (field == "name") return draft.PlaceName(texts,id);
+            if (field == "advice") return new(draft.TargetAdviceSymbol(id),draft.TargetAdvicePriority(id));
             if (field == "estimate") return draft.ArrivalDaysTo(id) is int days ? days : CatalogCell.Unavailable;
             var cell = catalog.Cell(InformationCategory.Regions,id,field);
             return field == "facility" && cell.IsUnavailable ? "" : cell;
         }
         IEnumerable<int> ids = draft.Kind == "search"
-            ? draft.Targets.OrderBy(id => draft.DistanceDaysTo(id) ?? int.MaxValue).ThenBy(id => id)
+            ? draft.Targets.OrderByDescending(draft.TargetAdvicePriority).ThenBy(id => draft.DistanceDaysTo(id) ?? int.MaxValue).ThenBy(id => id)
             : draft.Targets.OrderBy(id => draft.View.Settlements.Single(s => s.Id == id).CorpsId ?? int.MaxValue)
                 .ThenBy(id => draft.View.Settlements.Single(s => s.Id == id).Kind == SettlementKind.City ? 0 : 1).ThenBy(id => id);
         return ids.Select(id => new CatalogRow(id,columns.Select(c => Cell(id,c.Id)).ToArray())).ToArray();

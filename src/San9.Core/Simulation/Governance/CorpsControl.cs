@@ -93,7 +93,7 @@ public static class CorpsControl
             ReformUnitCommand reform => ControlsUnit(reform.UnitId),
             FoodTradeCommand trade => ControlsPlace(trade.SettlementId),
             DevelopCommand develop => develop.Development is not null && ControlsPlace(develop.Development.SettlementId),
-            RecruitOfficerCommand recruit => OwnPerson(recruit.OfficerId),
+            RecruitOfficersCommand recruit => !recruit.OfficerIds.IsDefault && recruit.OfficerIds.All(OwnPerson),
             BurnCommand burn => OwnPerson(burn.OfficerId),
             AlienateCommand alienate => OwnPerson(alienate.OfficerId),
             SeizeCommand seize => OwnPerson(seize.OfficerId),

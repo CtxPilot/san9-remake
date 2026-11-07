@@ -16,7 +16,7 @@ public sealed class PersonnelReturnTests
             new OfficerInitialState("captive", new OfficerState(7, 2, 1, new(50, 50, 50, 50), false)
                 { Status = OfficerStatus.Captive }.WithLoyalty(1, 80))] };
         var session = GameSession.Start(definition, 190);
-        Assert.True(session.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 2, 7)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [2], 7)).Submission.Accepted);
         var result = session.Execute(new("player"), new ReleasePrisonerCommand(Guid.NewGuid(), 1, 1, 7));
         Assert.True(result.Submission.Accepted);
         Assert.Single(result.Events.OfType<TaskCancelledEvent>());

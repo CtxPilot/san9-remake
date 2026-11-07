@@ -65,8 +65,11 @@ public sealed partial class GameSession
 
     public System.Collections.Immutable.ImmutableArray<int> GetSearchPlaces(int forceId) => _simulation.GetSearchPlaces(forceId);
     public System.Collections.Immutable.ImmutableArray<int> GetRecruitTargets(int forceId, int officerId) => _simulation.GetRecruitTargets(forceId, officerId);
-    public PersonnelJourneyPreview GetPersonnelJourney(int forceId, int officerId, int targetId, PersonnelJourneyKind kind) =>
-        _simulation.GetPersonnelJourney(forceId, officerId, targetId, kind);
+    public System.Collections.Immutable.ImmutableDictionary<(int Actor, int Target), PersonnelAdvicePreview> GetPersonnelAdvice(int forceId,
+        PersonnelJourneyKind kind, System.Collections.Immutable.ImmutableArray<(int Actor, int Target)> comparisons) =>
+        _simulation.GetPersonnelAdvice(forceId, kind, comparisons);
+    public PersonnelJourneyPreview GetPersonnelJourney(int forceId, int officerId, int targetId, PersonnelJourneyKind kind,
+        bool includeAdvice = true) => _simulation.GetPersonnelJourney(forceId, officerId, targetId, kind, includeAdvice);
 
     public CommandAdvice GetUnitStrategyAdvice(int forceId, int officerId, UnitStrategyKind strategy, int targetUnitId) =>
         _simulation.GetUnitStrategyAdvice(forceId, officerId, strategy, targetUnitId);

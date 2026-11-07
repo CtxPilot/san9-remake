@@ -100,7 +100,7 @@ public sealed class PersonnelScenarioTests
             GameCommand? command = target.Status == OfficerStatus.Undiscovered && Available(actor.Id)
                 ? new SearchCommand(id, 1, world.Simulation.NextSequence, [actor.Id], 30)
                 : target.Status == OfficerStatus.Free && Available(actor.Id)
-                ? new RecruitOfficerCommand(id, 1, world.Simulation.NextSequence, actor.Id, target.Id)
+                ? new RecruitOfficersCommand(id, 1, world.Simulation.NextSequence, [actor.Id], target.Id)
                 : target.OwnerId == 1 && target.SettlementId == 1 && Available(target.Id)
                 ? new MoveOfficersCommand(id, 1, world.Simulation.NextSequence, [target.Id], 3)
                 : target.OwnerId == 1 && target.SettlementId == 3 && !appointed

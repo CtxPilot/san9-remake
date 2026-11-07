@@ -26,6 +26,88 @@ public sealed class PersonnelMissionTests
         StateAssert.Equal(before,engine.Snapshot);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void InvalidBatchRecruitmentDoesNotReserveAnyMember(int invalid)
+    {
+        var engine = Engine(World());
+        ImmutableArray<int> ids = invalid switch { 0 => default, 1 => [], 2 => [11,11], 3 => [11,999], _ => [11,20] };
+        var before = engine.Snapshot;
+        var command = new RecruitOfficersCommand(Guid.NewGuid(),1,0,ids,20);
+        Assert.NotEqual(CommandRejection.None,engine.GetPreparationEligibility(new("player"),command));
+        var result = engine.Execute(new("player"),command);
+        Assert.False(result.Submission.Accepted);
+        Assert.Empty(result.Events);
+        StateAssert.Equal(before,engine.Snapshot);
+    }
+
+    [Fact]
+    public void BatchRecruitmentOrdersIndependentTasksAndCancelsRemainingAttemptsAfterSuccess()
+    {
+        var world = World();
+        var mutation = world.BeginMutation();
+        mutation.Replace(mutation.Officers[11] with { BaseAbilities = new(50,50,500,50) });
+        world.Commit(mutation);
+        var engine = Engine(world);
+        var reordered = Engine(WorldState.Restore(engine.CaptureStableState()));
+        var command = new RecruitOfficersCommand(Guid.NewGuid(),1,0,[12,11],20);
+        var result = engine.Execute(new("player"),command);
+        Assert.True(result.Submission.Accepted);
+        EventAssert.Equal(result.Events,reordered.Execute(new("player"),command with { OfficerIds = [11,12] }).Events);
+        StateAssert.Equal(engine.Snapshot,reordered.Snapshot);
+        var tasks = result.Events.OfType<TaskStartedEvent>().Select(e => e.Task).ToArray();
+        Assert.Equal(new[] { 11,12 },tasks.Select(t => t.OfficerId));
+        Assert.Equal(2,tasks.Select(t => t.Id).Distinct().Count());
+        foreach (var task in tasks)
+        {
+            var single = Engine(World());
+            Assert.True(single.Execute(new("player"),command with { OfficerIds = [task.OfficerId] }).Submission.Accepted);
+            Assert.Equal(Assert.Single(single.Snapshot.Simulation.Tasks).Journey!.SuccessRoll,task.Journey!.SuccessRoll);
+        }
+        var restored = Engine(WorldState.Restore(engine.CaptureStableState()));
+        List<DomainEvent> outcomes = [];
+        for (int i = 0; i < 2; i++)
+        {
+            var events = Advance(engine);
+            EventAssert.Equal(events,Advance(restored));
+            outcomes.AddRange(events);
+        }
+        Assert.True(Assert.Single(outcomes.OfType<RecruitmentResolvedEvent>()).Success);
+        Assert.Contains(outcomes.OfType<TaskCancelledEvent>(),e => e.TaskId == tasks[1].Id);
+        Assert.DoesNotContain(outcomes.OfType<OfficerLoyaltyChangedEvent>(),e => e.Reason.StartsWith("recruit-failure"));
+        Assert.All(engine.Snapshot.Simulation.Tasks,t => Assert.Equal("personnel-return",t.Kind));
+        Assert.Contains(engine.Snapshot.Simulation.Tasks,t => t.OfficerId == 12);
+        Assert.False(engine.Snapshot.Officers.Single(p => p.Id == 12).Acted);
+        Assert.False(engine.GetPersonnelJourney(1,12,1,PersonnelJourneyKind.Search).Available);
+        EventAssert.Equal(Advance(engine),Advance(restored));
+        Assert.Empty(engine.Snapshot.Simulation.Tasks);
+        StateAssert.Equal(engine.Snapshot,restored.Snapshot);
+    }
+
+    [Fact]
+    public void BatchRecruitmentResolvesLaterAttemptAgainstEarlierFailureFeedback()
+    {
+        var world = World();
+        var mutation = world.BeginMutation();
+        mutation.Replace(mutation.Officers[11] with { BaseAbilities = new(50,50,0,50) });
+        mutation.Replace(mutation.Officers[12] with { BaseAbilities = new(50,50,500,50) });
+        mutation.Replace(mutation.Officers[20].WithLoyalty(1,50));
+        world.Commit(mutation);
+        var engine = Engine(world);
+        Assert.True(engine.Execute(new("player"),new RecruitOfficersCommand(Guid.NewGuid(),1,0,[12,11],20)).Submission.Accepted);
+        List<DomainEvent> events = [.. Advance(engine), .. Advance(engine)];
+        var results = events.OfType<RecruitmentResolvedEvent>().ToArray();
+        Assert.Equal(new[] { 11,12 },results.Select(e => e.OfficerId));
+        Assert.False(results[0].Success);
+        Assert.True(results[1].Success);
+        Assert.Contains(events.OfType<ForceRelationChangedEvent>(),e => e.Current < e.Previous);
+        Assert.Equal(1,engine.Snapshot.Officers.Single(p => p.Id == 20).OwnerId);
+    }
+
     [Fact]
     public void BatchSearchOrdersIndependentTasksAndPublishesFinalDepartureCommanderThenRestoresReturns()
     {
@@ -61,7 +143,7 @@ public sealed class PersonnelMissionTests
     public void PreparationEligibilityMatchesTrialsAndRefreshesAfterPersonnelLeaves()
     {
         var engine = Engine(World());
-        GameCommand[] commands = [new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20),
+        GameCommand[] commands = [new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20),
             new SearchCommand(Guid.NewGuid(), 1, 0, [11], 30),
             new MoveOfficersCommand(Guid.NewGuid(), 1, 0, [11], 1)];
         var before = engine.Snapshot;
@@ -205,7 +287,7 @@ public sealed class PersonnelMissionTests
         {
             GameCommand command = search
                 ? new SearchCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, [actor], 30)
-                : new RecruitOfficerCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, actor, 20);
+                : new RecruitOfficersCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, [actor], 20);
             Assert.True(engine.Execute(new("player"), command).Submission.Accepted);
         }
         Submit(direct, 11);
@@ -377,7 +459,7 @@ public sealed class PersonnelMissionTests
         relations: [new(1, 2, 80)], controls: [new("player", 1, ControllerKind.Player)], cityIndependenceEnabled: false, corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, 2, new(10000, 10000)) { IsRoot = true }]);
     private static SimulationEngine Engine(WorldState world) => new(world, EconomyRulebook.Empty, Places);
     private static CommandExecutionResult Recruit(SimulationEngine engine, int actor = 11, int target = 20) =>
-        engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, actor, target));
+        engine.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, [actor], target));
     private static IReadOnlyList<DomainEvent> Advance(SimulationEngine engine, bool acceptSearchRecruitment = true)
     {
         engine.EndControl(new("player"));
@@ -631,7 +713,7 @@ public sealed class PersonnelMissionTests
         {
             "move" => new MoveOfficersCommand(id, 1, 0, [11], 3),
             "search" => new SearchCommand(id, 1, 0, [11], 30),
-            _ => new RecruitOfficerCommand(id, 1, 0, 11, 20)
+            _ => new RecruitOfficersCommand(id, 1, 0, [11], 20)
         };
         Assert.True(engine.Execute(new("player"), journey).Submission.Accepted);
         var restored = Engine(WorldState.Restore(engine.CaptureStableState()));
@@ -815,7 +897,7 @@ public sealed class PersonnelMissionTests
         var id = Guid.NewGuid();
         GameCommand command = kind switch
         {
-            PersonnelJourneyKind.Recruit => new RecruitOfficerCommand(id, 1, 0, 11, 20),
+            PersonnelJourneyKind.Recruit => new RecruitOfficersCommand(id, 1, 0, [11], 20),
             PersonnelJourneyKind.Move => new MoveOfficersCommand(id, 1, 0, [11], 3),
             _ => new SearchCommand(id, 1, 0, [11], 30)
         };

@@ -36,7 +36,7 @@ public sealed class FieldRecruitmentTests
     private static (WorldMutation World, PersistentTask Task) Submit(int target = 20)
     {
         var state = World(); var engine = new SimulationEngine(state, Rules);
-        Assert.True(engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, target)).Submission.Accepted);
+        Assert.True(engine.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], target)).Submission.Accepted);
         return (state.BeginMutation(Rules.Abilities), Assert.Single(engine.Snapshot.Simulation.Tasks));
     }
 
@@ -138,7 +138,7 @@ public sealed class FieldRecruitmentTests
     public void PublicResolutionUsesCurrentUnitAndAllowsTargetReturningToCity(bool leaves)
     {
         var state = World(); var engine = new SimulationEngine(state, Rules);
-        Assert.True(engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20)).Submission.Accepted);
+        Assert.True(engine.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20)).Submission.Accepted);
         var mutation = state.BeginMutation(Rules.Abilities);
         mutation.Replace(mutation.Units[100] with { Position = new(502, 2) });
         if (leaves) mutation.Replace(mutation.Officers[20] with { UnitId = null, SettlementId = 2, BaseAbilities = new(1, 50, 100, 50) });
@@ -183,7 +183,7 @@ public sealed class FieldRecruitmentTests
         setup.MaintainLeadership([]);
         state.Commit(setup);
         var engine = new SimulationEngine(state, Rules);
-        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 22);
+        var command = new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 22);
         Assert.True(engine.Execute(new("player"), command).Submission.Accepted);
         var mutation = state.BeginMutation(Rules.Abilities);
         mutation.AddUnit(new(200, 2, new(502, 2), 5000) { CorpsId = 2, ServicePlaceId = 2,

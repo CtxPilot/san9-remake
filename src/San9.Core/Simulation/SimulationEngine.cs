@@ -656,7 +656,7 @@ public sealed partial class SimulationEngine
                     var searchRejection = PersonnelMissions.StartSearch(mutation, context, search, _rules.Personnel, _rules.Military, events);
                     if (searchRejection != CommandRejection.None) return Reject(searchRejection);
                     break;
-                case RecruitOfficerCommand recruit:
+                case RecruitOfficersCommand recruit:
                     var recruitRejection = PersonnelMissions.StartRecruit(mutation, context, recruit, _rules, events);
                     if (recruitRejection != CommandRejection.None) return Reject(recruitRejection);
                     break;

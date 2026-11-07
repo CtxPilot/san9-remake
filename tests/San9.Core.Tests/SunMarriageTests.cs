@@ -129,7 +129,7 @@ public sealed class SunMarriageTests
     {
         var state = World(); var rules = Rules();
         var engine = new SimulationEngine(state, rules.Economy, rules.Personnel, rules.Treasures);
-        Assert.True(engine.Execute(new("first"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 22)).Submission.Accepted);
+        Assert.True(engine.Execute(new("first"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 22)).Submission.Accepted);
         Guid task = Assert.Single(engine.Snapshot.Simulation.Tasks).Id;
         var world = state.BeginMutation(rules.Abilities); List<DomainEvent> events = [];
         SunMarriage.Apply(world, rules, events); state.Commit(world);

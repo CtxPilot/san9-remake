@@ -13,6 +13,87 @@ namespace San9.Application.Tests;
 public sealed class PersonnelCommandTests
 {
     [Fact]
+    public void RecruitmentTablesRecommendOneFavorableActorAndPreserveManualSelectionAcrossTargets()
+    {
+        var definition = Definition();
+        var template = definition.Officers.Single(p => p.State.Id == 3);
+        var target = definition.Officers.Single(p => p.State.Id == 100);
+        definition = definition with {
+            Officers = [.. definition.Officers.Select(p => p.State.Id == 3 ? p with {
+                State = p.State with { BaseAbilities = new(50,100,50,50) } } : p),
+                .. Enumerable.Range(110,20).Select(id => template with { State = template.State with {
+                    Id = id, Status = OfficerStatus.Serving, BaseAbilities = new(50,50,60+(id-110),50) } }),
+                target with { State = target.State with { Id = 101, ForceLoyalties = ImmutableDictionary<int,int>.Empty.Add(1,0) } }]
+        };
+        var session = GameSession.Start(definition,7);
+        var before = session.Snapshot;
+        var draft = new PersonnelDraft(session,1,"employ");
+        Assert.True(draft.SetTarget(100));
+        var ordered = draft.OrderAdvisedOfficers(draft.Candidates).ToArray();
+        Assert.True(ordered.Count(id => draft.AdviceSymbol(id) == "○") > 1);
+        Assert.Contains(ordered,id => draft.AdviceSymbol(id) == "×");
+        Assert.Equal(ordered[0],Assert.Single(draft.Members));
+        Assert.Equal("○",draft.AdviceSymbol(ordered[0]));
+        var texts = CatalogTexts(session.View);
+        Assert.Equal("advice",PersonnelCatalog.OfficerPages(draft,texts)[0].Columns[0].Id);
+        Assert.Contains(PersonnelCatalog.OfficerPages(draft,texts)[0].Columns,c => c.Id == "estimate");
+        var rows = PersonnelCatalog.Officers(draft,texts,0);
+        Assert.Equal(ordered,rows.Select(r => r.Id));
+        Assert.All(rows,row => Assert.Equal(draft.AdviceSymbol(row.Id),row.Cells[0].Text));
+        Assert.True(draft.SetTarget(101));
+        Assert.Empty(draft.Members);
+        Assert.True(draft.SetMembers([ordered[^1],ordered[0]]));
+        var selected = draft.Members;
+        Assert.True(draft.SetTarget(100));
+        Assert.Equal(selected,draft.Members);
+        Assert.Equal(ordered[0],draft.RepresentativeId);
+        Assert.True(draft.SetTarget(101));
+        Assert.Equal(selected,draft.Members);
+        Assert.All(draft.Members,id => Assert.Equal("×",draft.AdviceSymbol(id)));
+        Assert.True(draft.CanExecute);
+        Assert.Same(before,session.Snapshot);
+        Assert.Equal(selected,Assert.IsType<RecruitOfficersCommand>(draft.CreateCommand(Guid.NewGuid(),0)).OfficerIds);
+        Assert.True(draft.SetMembers([]));
+        Assert.True(draft.SetTarget(100));
+        Assert.Empty(draft.Members);
+        Assert.False(draft.CanExecute);
+    }
+
+    [Fact]
+    public void RecruitmentWithoutAdviserRequiresManualSelectionAndBatchSurvivesSaveAndCommandScript()
+    {
+        var definition = Definition();
+        definition = definition with {
+            Forces = definition.Forces.Select(f => f.Id == 1 ? f with { AdviserId = null } : f).ToArray(),
+            Officers = definition.Officers.Select(p => p.State.Id == 3 ? p with {
+                State = p.State with { Status = OfficerStatus.Serving } } : p).ToArray()
+        };
+        var session = GameSession.Start(definition,7);
+        var draft = new PersonnelDraft(session,1,"employ");
+        Assert.True(draft.SetTarget(100));
+        Assert.Empty(draft.Members);
+        Assert.All(draft.Candidates,id => Assert.Equal("",draft.AdviceSymbol(id)));
+        Assert.True(draft.SetMembers([3,1]));
+        var command = draft.CreateCommand(Guid.NewGuid(),0);
+        var header = San9.Application.Persistence.CommandLogService.CreateHeader(session);
+        var request = session.Request(new CommandOperation(command),id: command.CommandId);
+        Assert.Equal(SessionDisposition.Accepted,session.Apply(request).Disposition);
+        var restored = San9.Application.Persistence.SaveService.Decode(San9.Application.Persistence.SaveService.Encode(session),definition);
+        var path = Path.Combine(Path.GetTempPath(),$"san9-batch-recruit-{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            San9.Application.Persistence.CommandLogService.Write(path,header,[request]);
+            var replayed = GameSession.Start(definition,7);
+            var replay = San9.Application.Persistence.CommandLogService.Replay(path,replayed);
+            Assert.Null(replay.FirstFailure);
+            StateAssert.Equal(session.Capture(),replayed.Capture());
+        }
+        finally { File.Delete(path); }
+        EventAssert.Equal(session.AdvanceXun().Events,restored.AdvanceXun().Events);
+        StateAssert.Equal(session.Capture(),restored.Capture());
+    }
+
+    [Fact]
     public void SearchMapExcludesNamelessSquaresEvenInsideAnEligibleRegionOrBuildingFootprint()
     {
         var definition = MissionScenario.Create();
@@ -92,20 +173,20 @@ public sealed class PersonnelCommandTests
         var before = session.Snapshot;
         Assert.Empty(draft.Members);
         Assert.True(draft.SetTarget(1));
-        Assert.Equal(draft.Candidates.Where(id => draft.AdvicePriority(id) >= 2),draft.Members);
-        Assert.True(draft.Members.Length > 1);
+        Assert.Equal(draft.OrderAdvisedOfficers(draft.Candidates.Where(id => draft.AdvicePriority(id) >= 2)).First(),Assert.Single(draft.Members));
+        Assert.Single(draft.Members);
         Assert.True(draft.SetTarget(300));
         Assert.Empty(draft.Members);
         Assert.Null(draft.RepresentativeId);
         Assert.Null(draft.Advice);
         Assert.False(draft.CanExecute);
         Assert.True(draft.SetTarget(1));
-        Assert.True(draft.Members.Length > 1);
+        Assert.Single(draft.Members);
         Assert.True(draft.SetMembers(draft.Candidates.Reverse()));
         var selection = draft.Members;
         var texts = CatalogTexts(session.View);
         var ordered = PersonnelCatalog.Officers(draft,texts,0).Select(r => r.Id).ToArray();
-        Assert.Equal(ordered,draft.OrderSearchOfficers(draft.Members));
+        Assert.Equal(ordered,draft.OrderAdvisedOfficers(draft.Members));
         Assert.Equal(ordered[0],draft.RepresentativeId);
         Assert.Equal(draft.AdviceFor(ordered[0]),draft.Advice);
         string[] roles = ["search-favorable","search-unfavorable","search-start"];
@@ -128,7 +209,7 @@ public sealed class PersonnelCommandTests
         Assert.True(draft.SetTarget(300));
         var emptyPlaceOrder = PersonnelCatalog.Officers(draft,texts,0).Select(r => r.Id).ToArray();
         Assert.Equal(draft.Candidates,emptyPlaceOrder);
-        Assert.Equal(emptyPlaceOrder,draft.OrderSearchOfficers(draft.Members));
+        Assert.Equal(emptyPlaceOrder,draft.OrderAdvisedOfficers(draft.Members));
         Assert.Equal(selection,draft.Members);
         Assert.Equal(emptyPlaceOrder[0],draft.RepresentativeId);
         Assert.True(draft.SetMembers([]));
@@ -255,7 +336,11 @@ public sealed class PersonnelCommandTests
         int estimate = Array.FindIndex(page.Columns,c => c.Id == "estimate");
         Assert.Equal(1,rows.Single(r => r.Id == 1).Cells[free].Number);
         Assert.All(rows,r => Assert.NotNull(r.Cells[estimate].Number));
-        Assert.Equal(rows.Select(r => r.Cells[estimate].Number).Order(),rows.Select(r => r.Cells[estimate].Number));
+        Assert.Equal("advice",page.Columns[0].Id);
+        Assert.DoesNotContain(page.Columns,c => c.Id == "recommended-actor");
+        Assert.Equal(rows.Select(r => draft.TargetAdvicePriority(r.Id)).OrderDescending(),rows.Select(r => draft.TargetAdvicePriority(r.Id)));
+        foreach (var group in rows.GroupBy(r => draft.TargetAdvicePriority(r.Id)))
+            Assert.Equal(group.Select(r => r.Cells[estimate].Number).Order(),group.Select(r => r.Cells[estimate].Number));
         Assert.Equal("",rows.Single(r => r.Id == 300).Cells[Array.FindIndex(page.Columns,c => c.Id == "facility")].Text);
         Assert.Null(draft.TargetId);
         Assert.DoesNotContain(101,session.View.Officers.Select(o => o.Id));
@@ -307,16 +392,17 @@ public sealed class PersonnelCommandTests
         },7);
         var draft = new PersonnelDraft(session,1,"employ");
         var rows = PersonnelCatalog.Officers(draft,CatalogTexts(session.View),0,targets:true);
-        Assert.Equal(new[] { 102,101,100,103,5,6 },rows.Select(r => r.Id));
-        Assert.Equal(new[] { "武将","身分","忠诚","势力","所在","统率","武力","智力","政治","label.arrival" },
+        Assert.Equal(new[] { 102,101,100,103,5,6 }.OrderByDescending(draft.TargetAdvicePriority),rows.Select(r => r.Id));
+        Assert.All(rows,row => Assert.Equal(draft.TargetAdviceSymbol(row.Id),row.Cells[0].Text));
+        Assert.Equal(new[] { "label.advice","武将","身分","忠诚","势力","所在","统率","武力","智力","政治","label.arrival" },
             PersonnelCatalog.OfficerPages(draft,CatalogTexts(draft.View),targets:true)[0].Columns.Select(c => c.Title));
         var far = rows.Single(r => r.Id == 100);
         var near = rows.Single(r => r.Id == 103);
         Assert.True(far.Cells[^1].Number > near.Cells[^1].Number);
         Assert.Equal(0,near.Cells[^1].Number);
-        Assert.True(far.Cells[2].IsUnavailable);
-        Assert.Equal("",far.Cells[3].Text);
-        Assert.Equal(82,rows.Single(r => r.Id == 5).Cells[2].Number);
+        Assert.True(far.Cells[3].IsUnavailable);
+        Assert.Equal("",far.Cells[4].Text);
+        Assert.Equal(82,rows.Single(r => r.Id == 5).Cells[3].Number);
     }
     [Fact]
     public void RecallDefaultOrderUsesLocationBeforePolitics()
@@ -471,7 +557,7 @@ public sealed class PersonnelCommandTests
             Information = definition.Information with { Relations = [new(1,2,0)] },
             Officers = definition.Officers.Select(p => p.State.Id == 5 ? p with { State = p.State with { Status = OfficerStatus.Captive,SettlementId = 1 } } : p).ToArray()
         },7);
-        Assert.True(session.Execute(new("player"),new RecruitOfficerCommand(Guid.NewGuid(),1,0,1,5)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"),new RecruitOfficersCommand(Guid.NewGuid(),1,0,[1],5)).Submission.Accepted);
         string[] roles = ["employ-meeting","captive-success","captive-result-success"];
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion,[]) { Messages = roles.ToDictionary(r => r,r => new MessageDefinition([new MessageLiteral(r)])) };
         var content = new PersonnelPresentationDefinition(roles.ToDictionary(r => r,r => new DecisionMessageDefinition(r,[],r == "captive-success" ? "target" : null)));
@@ -488,7 +574,7 @@ public sealed class PersonnelCommandTests
     {
         var definition = Definition();
         var session = GameSession.Start(definition with { Information = definition.Information with { Relations = [new(1,2,0)] } },7);
-        Assert.True(session.Execute(new("player"),new RecruitOfficerCommand(Guid.NewGuid(),1,0,1,5)).Submission.Accepted);
+        Assert.True(session.Execute(new("player"),new RecruitOfficersCommand(Guid.NewGuid(),1,0,[1],5)).Submission.Accepted);
         string[] roles = ["employ-secret-meeting","employ-success","employ-result-success","employ-territory","employ-city"];
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion,[]) { Messages = roles.ToDictionary(r => r,r => new MessageDefinition([new MessageLiteral(r)])) };
         var content = new PersonnelPresentationDefinition(roles.ToDictionary(r => r,r => new DecisionMessageDefinition(r,[],

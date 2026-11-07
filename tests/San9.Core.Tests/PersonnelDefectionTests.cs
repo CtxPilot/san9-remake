@@ -28,7 +28,7 @@ public sealed class PersonnelDefectionTests
     public void CommanderDefectionTransfersObjectFollowersAndEmbeddedUnitWhileRefuserReturnsHome()
     {
         var engine = new SimulationEngine(World(), EconomyRulebook.Empty, Places);
-        Assert.True(engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20)).Submission.Accepted);
+        Assert.True(engine.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20)).Submission.Accepted);
         engine.EndControl(new("player"));
         var events = engine.AdvanceXun().Events;
         Assert.True(Assert.Single(events.OfType<RecruitmentResolvedEvent>()).Success);
@@ -62,7 +62,7 @@ public sealed class PersonnelDefectionTests
         world.Commit(change);
         var engine = new SimulationEngine(world, EconomyRulebook.Empty, Places);
         var before = engine.Snapshot;
-        Assert.False(engine.Execute(new("player"), new RecruitOfficerCommand(Guid.NewGuid(), 1, 0, 11, 20)).Submission.Accepted);
+        Assert.False(engine.Execute(new("player"), new RecruitOfficersCommand(Guid.NewGuid(), 1, 0, [11], 20)).Submission.Accepted);
         StateAssert.Equal(before, engine.Snapshot);
     }
 }

@@ -173,6 +173,7 @@
   "result.burn-gain": 2,
   "result.burn-loss": 3,
   "result.cancelled": 2,
+  "result.recruit-target-joined": 2,
   "result.corps-dissolved": 1,
   "result.corps-control": 2,
   "result.corps-policy": 1,

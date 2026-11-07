@@ -506,7 +506,7 @@ public partial class StrategyHud : Control
         }
         if (_commandMenu.Visible) { _message.SetMessage(_commandMenu.Hint, _commandMenu.HintEnabled); return; }
         if (_mapContext.Visible) { _message.SetMessage(_mapContext.Hint, _mapContext.HintEnabled); return; }
-        if (_personnelFlow?.IsTargeting == true) { _message.SetMessage(_personnelFlow.IsRegionSelection ? "请选择目标地域。" : "请选择目标设施。",true); return; }
+        if (_personnelFlow?.IsTargeting == true) { _message.SetMessage(_personnelFlow.IsRegionSelection ? "请选择目标地域。青蓝：推荐；金色：特殊建议。" : "请选择目标设施。",true); return; }
         if (_commandTargets?.IsActive == true) { _message.SetMessage("请选择目标。",true); return; }
         if (_targets is not null)
         {

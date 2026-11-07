@@ -294,12 +294,12 @@ public sealed partial class OriginalAiPersonnelTests
         Assert.True(h.Engine.GetRecruitmentThreshold(1, 6) >= 20, h.Engine.GetRecruitmentThreshold(1, 6).ToString());
         var before = h.Engine.Snapshot;
         var report = h.Run(OriginalAiWork.RecruitLocal, 2);
-        var commands = h.Commands.Cast<RecruitOfficerCommand>().ToArray();
+        var commands = h.Commands.Cast<RecruitOfficersCommand>().ToArray();
         Assert.Equal(2, commands.Length);
         Assert.Equal(5, commands[0].TargetOfficerId);
-        Assert.Equal(2, commands[0].OfficerId);
+        Assert.Equal(2, Assert.Single(commands[0].OfficerIds));
         Assert.True(h.Engine.GetRecruitmentThreshold(2, 5) > 100);
-        Assert.NotEqual(commands[0].OfficerId, commands[1].OfficerId);
+        Assert.NotEqual(Assert.Single(commands[0].OfficerIds), Assert.Single(commands[1].OfficerIds));
         Assert.NotEqual(commands[0].TargetOfficerId, commands[1].TargetOfficerId);
         Assert.Equal(reject ? 2 : 0, report.Rejected);
         if (reject) StateAssert.Equal(before, h.Engine.Snapshot);
@@ -318,9 +318,9 @@ public sealed partial class OriginalAiPersonnelTests
         var preview = h.Engine.GetPersonnelJourney(1, 1, 6, PersonnelJourneyKind.Recruit);
         Assert.True(preview.Available, preview.ToString());
         Assert.Equal(1, h.Run(OriginalAiWork.RecruitEnemy, 1, state: state).Submitted);
-        var recruit = Assert.IsType<RecruitOfficerCommand>(Assert.Single(h.Commands));
+        var recruit = Assert.IsType<RecruitOfficersCommand>(Assert.Single(h.Commands));
         Assert.Equal(6, recruit.TargetOfficerId);
-        Assert.NotEqual(2, recruit.OfficerId);
+        Assert.NotEqual(2, Assert.Single(recruit.OfficerIds));
     }
 
     [Theory]

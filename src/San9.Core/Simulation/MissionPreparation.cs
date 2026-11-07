@@ -131,7 +131,7 @@ public sealed partial class SimulationEngine
             GrantTreasureCommand grant => PersonnelTreasures.GrantEligibility(world, grant, _rules.Treasures),
             ConfiscateTreasureCommand confiscate => PersonnelTreasures.ConfiscateEligibility(world, confiscate, _rules.Treasures),
             SetCorpsDelegationCommand delegation => CorpsDelegations.Eligibility(world, delegation, _rules.Military),
-            RecruitOfficerCommand recruit => PersonnelMissions.ValidateRecruit(world, recruit, _rules, out _, out _),
+            RecruitOfficersCommand recruit => PersonnelMissions.ValidateRecruit(world, recruit, _rules, out _, out _),
             SearchCommand search => PersonnelMissions.ValidateSearch(world, search, _rules.Personnel, _rules.Military),
             MoveOfficersCommand move => PersonnelMissions.ValidateMove(world, move, _rules.Personnel, _rules.Military),
             TransportUnitCommand transport => MilitaryMovement.TransportEligibility(world, transport, _rules.Military, _rules.Treasures),

@@ -29,7 +29,7 @@ public sealed class FreeOfficerMigrationSessionTests
         Assert.True(new StableRandom(StableRandom.DeriveSeed(seed, "personnel-free-migration")).NextUInt64() % 100 < 50);
         var session = GameSession.Start(scenario, seed);
         session.AdvanceXun(); session.AdvanceXun();
-        var command = new RecruitOfficerCommand(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence, 2, 9000);
+        var command = new RecruitOfficersCommand(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence, [2], 9000);
         Assert.Equal(SessionDisposition.Accepted, session.Apply(session.Request(new CommandOperation(command), "player", command.CommandId)).Disposition);
         Assert.Contains(session.Snapshot.Simulation.Tasks, t => t.Id == command.CommandId);
         var restored = SaveService.Decode(SaveService.Encode(session), scenario, GameSession.EngineFactory(scenario));

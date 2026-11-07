@@ -319,7 +319,7 @@ public sealed class SettlementLossTests
         var world = state.BeginMutation();
         world.Replace((world.Officers[302] with { OwnerId = null, Status = OfficerStatus.Free, SettlementId = 30 }).WithLoyalty(1, 100));
         Assert.Equal(CommandRejection.None, PersonnelMissions.StartRecruit(world, new("system"),
-            new(Guid.NewGuid(), 1, 0, 103, 302), Rules(), []));
+            new(Guid.NewGuid(), 1, 0, [103], 302), Rules(), []));
         var task = Assert.Single(world.Simulation.Tasks);
         world.SetSimulation(world.Simulation with { NextSequence = 1, Tasks = [task with
             { Journey = task.Journey! with { SuccessRoll = 0 } }] });

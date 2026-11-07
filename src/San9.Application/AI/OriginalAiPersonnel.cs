@@ -206,7 +206,7 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
                         break;
                     }
                     actors.Remove(chosen.Actor); targets.Remove(chosen.Target);
-                    Send(Command((id, f, seq) => new RecruitOfficerCommand(id, f, seq, chosen.Actor, chosen.Target)));
+                    Send(Command((id, f, seq) => new RecruitOfficersCommand(id, f, seq, [chosen.Actor], chosen.Target)));
                 }
                 break;
         }
