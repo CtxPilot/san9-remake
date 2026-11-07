@@ -17,7 +17,9 @@ public static class PackageFiles
 
     public static string Resolve(string root, string relative)
     {
-        if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative)) throw new InvalidDataException("Asset path must be relative.");
+        if (string.IsNullOrWhiteSpace(relative) || Path.IsPathRooted(relative) || relative[0] == '\\' ||
+            (relative.Length >= 2 && char.IsAsciiLetter(relative[0]) && relative[1] == ':'))
+            throw new InvalidDataException("Asset path must be relative.");
         string directory = Path.GetFullPath(root);
         if (!Path.EndsInDirectorySeparator(directory)) directory += Path.DirectorySeparatorChar;
         string result = Path.GetFullPath(Path.Combine(directory, relative));

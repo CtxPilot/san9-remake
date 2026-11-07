@@ -118,6 +118,11 @@ public sealed class MapImageTests
     [InlineData("../outside.png")]
     [InlineData("../../outside.png")]
     [InlineData("C:/outside.png")]
+    [InlineData("C:\\outside.png")]
+    [InlineData("C:outside.png")]
+    [InlineData("/outside.png")]
+    [InlineData("\\outside.png")]
+    [InlineData("\\\\server\\share\\outside.png")]
     public void AssetPathsCannotEscapePackage(string path) => Assert.Throws<InvalidDataException>(() => PackageFiles.Resolve(Path.GetTempPath(), path));
 
     [Fact]
