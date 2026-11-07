@@ -63,7 +63,7 @@ runtime_y = logical_y * 5 + 2
   - `0x449CE0` → `scale_logical_coordinate_by_5`
   - `0x44ACD0` → `set_unit_logical_coordinate_scaled`
 - 在保存/加载函数、坐标校验指令、两条坐标入口和剧本加载函数写入 `[RE-SAN9PK-0036]` 注释；
-- 保存路径：`C:\home\game\san9\remake\research\analysis\San9PK-TC-101.i64`。
+- 保存路径：`research/analysis/San9PK-TC-101.i64`。
 
 回读确认上述函数名、`0x45E5A0` 的 `/2` 中点计算、`0x461150` 的 `5*right/bottom` 上限检查及直接坐标设置调用均保留。本次未修改程序字节、产品代码或旧版 IDA 数据库。
 

@@ -280,7 +280,7 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 
 **取证：RE-SAN9PK-0198，作者Codex。** 本节补充F05的分支精度，保留上文调查及实施历史，不将“已有自动改令反馈”解释为已区分全部服从／违令结果。样本沿用[SRC-SAN9PK-TC-101](../sources/SRC-SAN9PK-TC-101.md)，主库为`research/analysis/San9PK-TC-101.i64`；本次读取数据库元数据确认SHA-256为`d20794aeff67301ec2bf8c3becb1e9944c68c6c0588fbfd4bf04e8597f0e5028`、大小2,636,800字节、x86、映像基址`0x400000`，与登记一致。
 
-**方法与复现。** 使用本地IDA MCP及IDA Domain API 0.5.1，只读调用`db.pseudocode.get_text(0x467190)`，先沿`has_policy_post_action_attack`、主将性格字段与整数战力比的结果分流，再回查同函数结果分支的消息构造、返回／改攻动作及公共发布调用`0x433AA0`。消息正文对照现有转换包`shared/messages/messages.json`；候选建筑表未填充的判断复用[RE-0081权威正文](../ai.md#re-0081-2026-09-13事后命令与战力评估补核)的既有调用链证据。本次没有运行原作动态实验，也没有写入注释、名称、类型、函数边界或程序字节，未保存IDB。
+**方法与复现。** 使用本地IDA MCP及IDA Domain API 0.5.1，只读调用`db.pseudocode.get_text(0x467190)`，先沿`has_policy_post_action_attack`、主将性格字段与整数战力比的结果分流，再回查同函数结果分支的消息构造、返回／改攻动作及公共发布调用`0x433AA0`。消息正文对照现有转换包`shared/messages/messages.json`；候选建筑表未填充的判断复用[RE-0081权威正文](../topics/ai/unit-responses.md#re-0081-2026-09-13事后命令与战力评估补核)的既有调用链证据。本次没有运行原作动态实验，也没有写入注释、名称、类型、函数边界或程序字节，未保存IDB。
 
 **原作事实，静态高置信度。** 令`A`为主将性格0至3、`R`为本队对候选的整数评估战力百分比；有合法部队候选时，`0x467190`保留以下不同结果：
 

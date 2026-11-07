@@ -77,4 +77,4 @@
 
 ## 未决问题
 
-无。类别名称、宝物名称和发现地点资源映射已明确排除在本规格之外，并统一登记为 [`CONTENT-01`](../../research/scenario-field-research-checklist.md#当前未决项)。
+无。类别名称、宝物名称和发现地点资源映射已明确排除在本规格之外，并统一登记为 [`CONTENT-01`](../../research/topics/scenario-field-evidence.md)。

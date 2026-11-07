@@ -8,6 +8,83 @@
     "DEC-PROJECT-0002",
     "DEC-SIM-0001"
   ],
+  "specification_sources": {
+    "BEH-AI-0001": {
+      "behavior": "specs/original-ai/behavior.md",
+      "invariants": "specs/behavior/BEH-AI-0001-planning-boundary.md#状态与不变量",
+      "acceptance": "specs/original-ai/acceptance.md"
+    },
+    "BEH-UI-0001": {
+      "behavior": "specs/behavior/BEH-UI-0001-initial-strategy-screen.md",
+      "invariants": "specs/behavior/BEH-UI-0001-initial-strategy-screen.md#状态与不变量",
+      "acceptance": "specs/behavior/BEH-UI-0001-initial-strategy-screen.md#验收与剩余边界"
+    },
+    "BEH-COMPANION-0001": {
+      "behavior": "specs/behavior/BEH-COMPANION-0001-settings-and-player-domestic.md",
+      "invariants": "specs/behavior/BEH-COMPANION-0001-settings-and-player-domestic.md#设置与所有权",
+      "acceptance": "specs/behavior/BEH-COMPANION-0001-settings-and-player-domestic.md#持久化与验收"
+    },
+    "BEH-COMPANION-0002": {
+      "behavior": "specs/behavior/BEH-COMPANION-0002-combat-rules.md",
+      "invariants": "specs/behavior/BEH-COMPANION-0002-combat-rules.md#规则所有权",
+      "acceptance": "specs/behavior/BEH-COMPANION-0002-combat-rules.md#配置与边界"
+    },
+    "BEH-COMPANION-0003": {
+      "behavior": "specs/behavior/BEH-COMPANION-0003-tactic-rules.md",
+      "invariants": "specs/behavior/BEH-COMPANION-0003-tactic-rules.md#内容与协议",
+      "acceptance": "specs/behavior/BEH-COMPANION-0003-tactic-rules.md#验收边界"
+    },
+    "BEH-COMPANION-0004": {
+      "behavior": "specs/behavior/BEH-COMPANION-0004-proficiency-and-tactic-coefficients.md",
+      "invariants": "specs/behavior/BEH-COMPANION-0004-proficiency-and-tactic-coefficients.md#配置与协议",
+      "acceptance": "specs/behavior/BEH-COMPANION-0004-proficiency-and-tactic-coefficients.md#配置与协议"
+    },
+    "BEH-COMPANION-0005": {
+      "behavior": "specs/behavior/BEH-COMPANION-0005-player-local-search.md",
+      "invariants": "specs/behavior/BEH-COMPANION-0005-player-local-search.md#正式任务与玩家回报",
+      "acceptance": "specs/behavior/BEH-COMPANION-0005-player-local-search.md#验收边界"
+    },
+    "BEH-COMPANION-0006": {
+      "behavior": "specs/behavior/BEH-COMPANION-0006-ability-growth-and-naval-presets.md",
+      "invariants": "specs/behavior/BEH-COMPANION-0006-ability-growth-and-naval-presets.md#配置与生效",
+      "acceptance": "specs/behavior/BEH-COMPANION-0006-ability-growth-and-naval-presets.md#协议与交付"
+    },
+    "BEH-CONTENT-0001": {
+      "behavior": "specs/behavior/BEH-CONTENT-0001-shared-scenario-authoring.md",
+      "invariants": "specs/behavior/BEH-CONTENT-0001-shared-scenario-authoring.md#范围与所有权",
+      "acceptance": "specs/behavior/BEH-CONTENT-0001-shared-scenario-authoring.md#验收"
+    },
+    "BEH-EDITOR-0001": {
+      "behavior": "specs/behavior/BEH-EDITOR-0001-world-editors.md",
+      "invariants": "specs/behavior/BEH-EDITOR-0001-world-editors.md#所有权与提交",
+      "acceptance": "specs/behavior/BEH-EDITOR-0001-world-editors.md#验收"
+    },
+    "BEH-EDITOR-0002": {
+      "behavior": "specs/behavior/BEH-EDITOR-0002-created-officers.md",
+      "invariants": "specs/behavior/BEH-EDITOR-0002-created-officers.md#范围与所有权",
+      "acceptance": "specs/behavior/BEH-EDITOR-0002-created-officers.md#验收"
+    },
+    "BEH-UI-0008": {
+      "behavior": "specs/behavior/BEH-UI-0008-battle-presentation.md",
+      "invariants": "specs/behavior/BEH-UI-0008-battle-presentation.md#行为与状态所有权",
+      "acceptance": "specs/behavior/BEH-UI-0008-battle-presentation.md#验收"
+    },
+    "BEH-UI-0009": {
+      "behavior": "specs/behavior/BEH-UI-0009-pk-settings.md#目标行为",
+      "invariants": "specs/behavior/BEH-UI-0009-pk-settings.md#目标行为",
+      "acceptance": "specs/behavior/BEH-UI-0009-pk-settings.md#目标行为"
+    },
+    "BEH-UI-0010": {
+      "behavior": "specs/behavior/BEH-UI-0010-world-event-presentation.md",
+      "invariants": "specs/behavior/BEH-UI-0010-world-event-presentation.md#状态所有权与播放",
+      "acceptance": "specs/behavior/BEH-UI-0010-world-event-presentation.md#内容与验收"
+    },
+    "BEH-UI-0011": {
+      "behavior": "specs/behavior/BEH-UI-0011-new-game.md",
+      "invariants": "specs/behavior/BEH-UI-0011-new-game.md#目标与入口",
+      "acceptance": "specs/behavior/BEH-UI-0011-new-game.md#验收与范围"
+    }
+  },
   "domains": [
     {
       "id": "economy",
@@ -49,7 +126,7 @@
         "multi-officer command boundaries",
         "independent treasury and saturation",
         "quarterly and July gates",
-        "economic year with disk and recording replay"
+        "economic year with disk restore and explicit command scripts"
       ],
       "depends_on": [
         "simulation",
@@ -82,14 +159,14 @@
       "classification": "boundary",
       "behavior_specs": [
         "BEH-SAVE-0001",
-        "BEH-PROFILE-0001"
+        "BEH-PROFILE-0001",
+        "BEH-EDITOR-0001"
       ],
       "objects": [
         "ScenarioSessionDefinition",
         "SessionSnapshot",
         "SessionRequest",
-        "SaveEnvelope",
-        "SessionRecording"
+        "SaveEnvelope"
       ],
       "states": [
         "stable",
@@ -105,20 +182,21 @@
       "outputs": [
         "restored session",
         "ordered events",
-        "on-demand diagnostic hashes",
+        "on-demand semantic diagnostics",
         "machine report"
       ],
       "invariants": [
         "atomic session publication",
         "rejected request has no effects",
         "restore never repeats preparation",
-        "strict content and version identity"
+        "strict structure and reference validation",
+        "rules version difference warns without rejecting valid state"
       ],
       "acceptance_gates": [
         "disk roundtrip with pending tasks and random",
         "continuous versus restored replay",
         "sequence watermark and log header identity",
-        "bounded player saves and opt-in recordings",
+        "bounded player saves and explicit command scripts",
         "corrupt save rejection",
         "headless public and full scenario"
       ],
@@ -131,14 +209,12 @@
         "target_path": "src/San9.Application/Persistence",
         "entry_types": [
           "SaveService",
-          "CommandLogService",
-          "RecordingService"
+          "CommandLogService"
         ],
         "existing_anchors": [
           "src/San9.Application/GameSession.cs",
           "src/San9.Application/Persistence/SaveService.cs",
           "src/San9.Application/Persistence/CommandLogService.cs",
-          "src/San9.Application/Persistence/RecordingService.cs",
           "src/San9.Headless/HeadlessHost.cs"
         ]
       }
@@ -165,7 +241,7 @@
     {
       "id": "simulation",
       "classification": "core",
-      "behavior_specs": ["BEH-SIMULATION-0001"],
+      "behavior_specs": ["BEH-SIMULATION-0001", "BEH-SIMULATION-0002"],
       "objects": ["GameClock", "PeriodBoundary", "ResolutionPipeline", "SimulationState", "ControlSeat", "PersistentTask", "RandomStreamState", "GameCommand", "WorldSnapshot"],
       "states": ["stable-interaction", "xun-resolution", "daily-resolution", "terminal-short-circuit"],
       "inputs": ["typed command log", "authoritative world state", "stable random state", "periodic event catalog"],
@@ -184,7 +260,7 @@
     {
       "id": "personnel",
       "classification": "core",
-      "behavior_specs": ["BEH-PERSON-0001", "BEH-PERSON-0002", "BEH-PERSON-0003"],
+      "behavior_specs": ["BEH-PERSON-0001", "BEH-PERSON-0002", "BEH-PERSON-0003", "BEH-COMPANION-0005"],
       "objects": ["Person", "Affiliation", "LoyaltyLedger", "PersonLocation", "ActionReservation"],
       "states": ["hidden", "free", "serving", "captured", "reserved"],
       "inputs": ["typed personnel command", "current affiliation snapshot", "stable random payload", "valid destination"],
@@ -203,7 +279,7 @@
     {
       "id": "person-lifecycle",
       "classification": "core",
-      "behavior_specs": ["BEH-PERSON-LIFECYCLE-0001", "BEH-PERSON-LIFECYCLE-0002"],
+      "behavior_specs": ["BEH-PERSON-LIFECYCLE-0001", "BEH-PERSON-LIFECYCLE-0002", "BEH-COMPANION-0006"],
       "objects": ["PersonGrowth", "InjuryState", "LifeState", "ExecutionSuccessionDecision", "CapturedRulerDecision", "SnipingCombatDecision"],
       "states": ["not-appeared", "active", "injured", "dead", "execution-succession-pending", "captured-ruler-disposition-pending", "sniping-succession-pending"],
       "inputs": ["period boundary", "person snapshot", "growth cause", "death cause", "stable lifecycle random stream"],
@@ -222,7 +298,7 @@
     {
       "id": "governance",
       "classification": "core",
-      "behavior_specs": ["BEH-GOVERNANCE-0001", "BEH-GOVERNANCE-0002", "BEH-GOVERNANCE-0003"],
+      "behavior_specs": ["BEH-GOVERNANCE-0001", "BEH-GOVERNANCE-0002", "BEH-GOVERNANCE-0003", "BEH-COMPANION-0001"],
       "objects": ["Polity", "ForceOrigin", "Corps", "TerritoryAssignment", "DelegationPolicy", "TerritorialTransition"],
       "states": ["direct-control", "delegated-control", "planned-command", "territorial-transition", "consolidation-pending", "runtime-founded", "independence-selection", "voluntary-departure", "dissolved"],
       "inputs": ["current corps ownership", "delegation configuration", "direct territory snapshot", "stable planning order"],
@@ -279,7 +355,7 @@
     {
       "id": "warfare",
       "classification": "core",
-      "behavior_specs": ["BEH-WAR-0001", "BEH-WAR-0002", "BEH-WAR-0003", "BEH-WAR-0004", "BEH-WAR-0005", "BEH-WAR-0006"],
+      "behavior_specs": ["BEH-WAR-0001", "BEH-WAR-0002", "BEH-WAR-0003", "BEH-WAR-0004", "BEH-WAR-0005", "BEH-WAR-0006", "BEH-COMPANION-0002", "BEH-COMPANION-0003", "BEH-COMPANION-0004"],
         "objects": ["UnitState", "BattlefieldMap", "MilitaryDefinition", "FacilityRule", "ConstructionSite", "FacilityInstance", "ConstructionPlan", "MilitaryOrder", "SettlementState", "CombatProfile", "OrdinaryAttack"],
       "states": ["planned", "moving", "resolving", "returning", "defeated", "complete"],
       "inputs": ["typed battlefield command", "map occupancy snapshot", "live target", "unit and building state"],
@@ -299,19 +375,29 @@
       "id": "ai",
       "classification": "core",
       "behavior_specs": ["BEH-AI-0001"],
-      "objects": ["AiObservation", "AiPlanningContext", "AiPlanningBudget", "EconomicObservation", "CampaignObservation", "OpportunityObservation", "AllocationCandidate", "AiSessionState", "AllocationDiagnostics"],
-      "states": ["observing", "analyzing", "proposed", "validated", "submitted"],
-      "inputs": ["force-perspective immutable observation", "named planning purpose", "deterministic work budget", "diagnostic level"],
-      "outputs": ["ordered command proposals", "integer scores and rationale", "optional non-authoritative diagnostics"],
+      "objects": ["OriginalAiState", "OriginalAiForceState", "OriginalAiCorpsState", "OriginalAiTurnRunner", "AutomaticResponseRunner"],
+      "states": ["preparing", "working", "awaiting-player-response", "continuing", "completed"],
+      "inputs": ["work-authorized immutable world input", "adopted strategy parameters", "independent deterministic planning random"],
+      "outputs": ["ordered public command submissions", "published strategy state", "non-authoritative work diagnostics"],
       "invariants": ["no mutable world reference", "analysis random never consumes resolution random", "diagnostics never change proposals", "AI and player commands share final validation"],
-      "acceptance_gates": ["stable analysis seed", "fixed-budget repeatability", "diagnostic independence", "shared command rejection without partial writeback"],
+      "acceptance_gates": ["stable scheduling and random", "ordered work and failure consumption", "player response suspension and continuation", "shared command rejection and transaction rollback"],
       "depends_on": ["simulation", "personnel", "governance", "diplomacy", "strategy", "warfare"],
       "implementation": {
         "project": "San9.Application",
         "target_namespace": "San9.Application.AI",
         "target_path": "src/San9.Application/AI",
-        "entry_types": ["AiObservation", "AiPlanningContext", "EconomicObservation", "CampaignObservation", "OpportunityObservation", "SharedAllocator", "AllocationDiagnostics"],
-        "existing_anchors": ["src/San9.Application/AI/AiPlanning.cs", "src/San9.Core/Simulation/SimulationEngine.cs"]
+        "entry_types": [
+          "OriginalAiTurnRunner",
+          "OriginalAiState",
+          "AutomaticTurnRunner",
+          "AutomaticResponseRunner"
+        ],
+        "existing_anchors": [
+          "src/San9.Application/AI/OriginalAiTurnRunner.cs",
+          "src/San9.Application/AI/OriginalAiState.cs",
+          "src/San9.Application/AI/AutomaticTurnRunner.cs",
+          "src/San9.Application/AI/AutomaticResponseRunner.cs"
+        ]
       }
     },
     {
@@ -376,7 +462,7 @@
     {
       "id": "content-import",
       "classification": "boundary",
-      "behavior_specs": ["BEH-IMPORT-0001", "BEH-IMPORT-0002", "BEH-IMPORT-0003", "BEH-IMPORT-0004", "BEH-IMPORT-0005", "BEH-IMPORT-0006", "BEH-IMPORT-0007", "BEH-IMPORT-0008", "BEH-IMPORT-0009", "BEH-IMPORT-0010", "BEH-IMPORT-0011", "BEH-IMPORT-0012", "BEH-IMPORT-0013", "BEH-IMPORT-0014", "BEH-IMPORT-0015", "BEH-IMPORT-0016", "BEH-IMPORT-0017"],
+      "behavior_specs": ["BEH-IMPORT-0001", "BEH-IMPORT-0002", "BEH-IMPORT-0003", "BEH-IMPORT-0004", "BEH-IMPORT-0005", "BEH-IMPORT-0006", "BEH-IMPORT-0007", "BEH-IMPORT-0008", "BEH-IMPORT-0009", "BEH-IMPORT-0010", "BEH-IMPORT-0011", "BEH-IMPORT-0012", "BEH-IMPORT-0013", "BEH-IMPORT-0014", "BEH-IMPORT-0015", "BEH-IMPORT-0016", "BEH-IMPORT-0017", "BEH-CONTENT-0001", "BEH-EDITOR-0002"],
       "objects": ["source archive", "lossless source record", "content package", "scenario definition"],
       "states": ["unrecognized", "validated", "decoded", "normalized", "rejected"],
       "inputs": ["approved local source container"],
@@ -395,7 +481,7 @@
     {
       "id": "presentation",
       "classification": "boundary",
-      "behavior_specs": ["BEH-RENDER-0001", "BEH-RENDER-0002", "BEH-RENDER-0003", "BEH-RENDER-0004", "BEH-UI-0001", "BEH-UI-0002", "BEH-UI-0003", "BEH-UI-0004", "BEH-UI-0005", "BEH-UI-0006", "BEH-UI-0007"],
+      "behavior_specs": ["BEH-RENDER-0001", "BEH-RENDER-0002", "BEH-RENDER-0003", "BEH-RENDER-0004", "BEH-UI-0001", "BEH-UI-0002", "BEH-UI-0003", "BEH-UI-0004", "BEH-UI-0005", "BEH-UI-0006", "BEH-UI-0007", "BEH-UI-0008", "BEH-UI-0009", "BEH-UI-0010", "BEH-UI-0011"],
       "objects": ["read-only world snapshot", "static map snapshot", "calendar view model", "requested and presented viewport", "presentation clock", "strategy selection"],
       "states": ["unbound", "rendering", "presented"],
       "inputs": ["application snapshot", "validated content assets"],
@@ -416,91 +502,146 @@
     {
       "id": "recruit-failure-affiliation-loyalty",
       "kind": "intentional-difference",
-      "behavior_specs": ["BEH-PERSON-0001"],
+      "behavior_specs": [
+        "BEH-PERSON-0001"
+      ],
       "decision": "DEC-PERSON-0001",
       "disposition": "failed recruitment reduces loyalty toward the current affiliated force as approved"
     },
     {
-      "id": "fixed-logical-canvas",
+      "id": "desktop-widescreen-layout",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-RENDER-0002", "BEH-UI-0001"],
-      "decision": "DEC-UI-0001",
-      "disposition": "use the approved fixed four-by-three logical canvas with uniform scaling"
+      "behavior_specs": [
+        "BEH-RENDER-0002",
+        "BEH-UI-0001"
+      ],
+      "decision": "DEC-UI-0008",
+      "disposition": "dynamic map viewport, fixed content areas and full-viewport input isolation"
     },
     {
       "id": "modern-text-effects",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-UI-0001"],
+      "behavior_specs": [
+        "BEH-UI-0001"
+      ],
       "decision": "DEC-UI-0002",
       "disposition": "preserve text roles and layout using modern fonts and approved approximate effects"
     },
     {
       "id": "seasonal-textures-standard-alpha",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-RENDER-0002", "BEH-RENDER-0003"],
+      "behavior_specs": [
+        "BEH-RENDER-0002",
+        "BEH-RENDER-0003"
+      ],
       "decision": "DEC-RENDER-0002",
       "disposition": "use converted seasonal textures and standard alpha without consuming simulation state"
     },
     {
       "id": "continuous-map-camera-boundary",
       "kind": "intentional-difference",
-      "behavior_specs": ["BEH-RENDER-0002"],
+      "behavior_specs": [
+        "BEH-RENDER-0002"
+      ],
       "decision": "DEC-UI-0003",
       "disposition": "constrain camera centers continuously to the visual map boundary without grid snapping"
     },
     {
       "id": "deterministic-ai-planning",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-AI-0001"],
+      "behavior_specs": [
+        "BEH-AI-0001"
+      ],
       "decision": "DEC-AI-0001",
-      "disposition": "force-perspective immutable observations, deterministic work budgets, isolated analysis random streams and shared command validation"
+      "disposition": "work-specific immutable inputs, deterministic scheduling and planning random, shared public command validation; retired prototype allocation and information-symmetry policies do not apply"
     },
     {
       "id": "deterministic-resolution",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-SIMULATION-0001", "BEH-PERSON-0001", "BEH-PERSON-0002", "BEH-PERSON-0003", "BEH-PERSON-LIFECYCLE-0001", "BEH-PERSON-LIFECYCLE-0002", "BEH-GOVERNANCE-0002", "BEH-GOVERNANCE-0003", "BEH-DIPLOMACY-0001", "BEH-DIPLOMACY-0002", "BEH-DIPLOMACY-0003", "BEH-STRATEGY-0001", "BEH-STRATEGY-0002", "BEH-STRATEGY-0003", "BEH-WAR-0001", "BEH-DUEL-0001", "BEH-DUEL-0002", "BEH-DUEL-0003", "BEH-EVENT-0001", "BEH-EVENT-0002"],
+      "behavior_specs": [
+        "BEH-SIMULATION-0001",
+        "BEH-PERSON-0001",
+        "BEH-PERSON-0002",
+        "BEH-PERSON-0003",
+        "BEH-PERSON-LIFECYCLE-0001",
+        "BEH-PERSON-LIFECYCLE-0002",
+        "BEH-GOVERNANCE-0002",
+        "BEH-GOVERNANCE-0003",
+        "BEH-DIPLOMACY-0001",
+        "BEH-DIPLOMACY-0002",
+        "BEH-DIPLOMACY-0003",
+        "BEH-STRATEGY-0001",
+        "BEH-STRATEGY-0002",
+        "BEH-STRATEGY-0003",
+        "BEH-WAR-0001",
+        "BEH-DUEL-0001",
+        "BEH-DUEL-0002",
+        "BEH-DUEL-0003",
+        "BEH-EVENT-0001",
+        "BEH-EVENT-0002"
+      ],
       "decision": "DEC-SIM-0001",
       "disposition": "typed commands, named stable random streams, explicit save state and deterministic commit order"
     },
     {
       "id": "modern-domain-model",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-GOVERNANCE-0001", "BEH-GOVERNANCE-0002", "BEH-GOVERNANCE-0003", "BEH-WAR-0001", "BEH-WAR-0002", "BEH-WAR-0003", "BEH-SCENARIO-0001", "BEH-SCENARIO-0002", "BEH-SIMULATION-0001"],
+      "behavior_specs": [
+        "BEH-GOVERNANCE-0001",
+        "BEH-GOVERNANCE-0002",
+        "BEH-GOVERNANCE-0003",
+        "BEH-WAR-0001",
+        "BEH-WAR-0002",
+        "BEH-WAR-0003",
+        "BEH-SCENARIO-0001",
+        "BEH-SCENARIO-0002",
+        "BEH-SIMULATION-0001"
+      ],
       "decision": "DEC-PROJECT-0002",
       "disposition": "preserve selected behavior while replacing source storage and task structures with explicit domain types"
     },
     {
       "id": "duel-noop-random-removal",
       "kind": "intentional-difference",
-      "behavior_specs": ["BEH-DUEL-0001"],
+      "behavior_specs": [
+        "BEH-DUEL-0001"
+      ],
       "decision": "DEC-PROJECT-0002",
       "disposition": "do not consume an ineffective additional-participant roll for an already selected initial participant"
     },
     {
       "id": "duel-low-martial-winner-growth",
       "kind": "source-conflict",
-      "behavior_specs": ["BEH-DUEL-0003"],
+      "behavior_specs": [
+        "BEH-DUEL-0003"
+      ],
       "decision": "DEC-DUEL-0001",
       "disposition": "adopt the guide and non-PK rule where a bout winner whose duel-start effective martial is lower than the paired loser gains one base martial, instead of the unreachable PK guard"
     },
     {
       "id": "shenshou-probability",
       "kind": "parameter-adjustment",
-      "behavior_specs": ["BEH-EVENT-0001"],
+      "behavior_specs": [
+        "BEH-EVENT-0001"
+      ],
       "decision": "DEC-EVENT-0001",
       "disposition": "use the approved continuous effective-martial formula"
     },
     {
       "id": "event-content-separation",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-EVENT-0002"],
+      "behavior_specs": [
+        "BEH-EVENT-0002"
+      ],
       "decision": "DEC-DATA-0001",
       "disposition": "event rules consume stable content keys and typed conditions instead of source object codes"
     },
     {
       "id": "high-color-map",
       "kind": "system-redesign",
-      "behavior_specs": ["BEH-RENDER-0001"],
+      "behavior_specs": [
+        "BEH-RENDER-0001"
+      ],
       "decision": "DEC-RENDER-0001",
       "disposition": "preserve source coordinates and blending relationships while rendering to RGB888"
     }

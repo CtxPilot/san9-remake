@@ -10,7 +10,7 @@
 - 前置记录：[RE-SAN9PK-0067](RE-SAN9PK-0067.md)、[RE-SAN9PK-0070](RE-SAN9PK-0070.md)、[RE-SAN9PK-0089](RE-SAN9PK-0089.md)、[RE-SAN9PK-0102](RE-SAN9PK-0102.md)、[RE-SAN9PK-0113](RE-SAN9PK-0113.md)、[RE-SAN9PK-0114](RE-SAN9PK-0114.md)
 - IDA 写入计划：[`alienate-burn-seize-gossip-lifecycle-batch-1.json`](../archive/ida-write-records/alienate-burn-seize-gossip-lifecycle-batch-1.json)
 
-2026-10-24补证：“阿会喃系统”在当前繁中样本的离间链表现为人物编号保序与首个可行目标短路，而非运行时姓名比较；修正前重制也有同类低ID偏向，后续v184已按[B18](../../specs/original-ai/behavior.md#b18)采用独立规划随机线性洗牌。原作证据、重制核对、版本限制及两项IDA注释回读见[原版AI权威研究](../ai.md#akainan-target-order)。
+2026-10-24补证：“阿会喃系统”在当前繁中样本的离间链表现为人物编号保序与首个可行目标短路，而非运行时姓名比较；修正前重制也有同类低ID偏向，后续v184已按[B18](../../specs/original-ai/behavior.md#b18)采用独立规划随机线性洗牌。原作证据、重制核对、版本限制及两项IDA注释回读见[原版AI权威研究](../topics/ai/missions-diplomacy.md#akainan-target-order)。
 
 ## 对象、状态、输入、输出与不变量
 
@@ -30,7 +30,7 @@
 
 ### AI 生产者与共享命令
 
-本节自动选择及其共享命令边界已迁入[原版AI权威研究](../ai.md#re-0115-ai-生产者与共享命令)，本记录继续维护其他公共规则与取证。
+本节自动选择及其共享命令边界已迁入[原版AI权威研究](../topics/ai/missions-diplomacy.md#re-0115-ai-生产者与共享命令)，本记录继续维护其他公共规则与取证。
 
 ### 公式、军师意见与随机
 

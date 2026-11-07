@@ -1,6 +1,6 @@
 # AI 策略缺陷复核（2026-10-29）
 
-编号：AI-CURRENT-AUDIT-20261029，作者Codex。原始诊断对象为提交`f23ba95af5ea3e1efee5dbb1d3b534c84c52c11f`；下文A1～A5描述该版本的输入、观察及当时建议，白马港来源与满兵输送另见[权威研究](../ai.md#baima-idle-20261029)。诊断未修改正式测试、用户存档或原游戏内存。
+编号：AI-CURRENT-AUDIT-20261029，作者Codex。原始诊断对象为提交`f23ba95af5ea3e1efee5dbb1d3b534c84c52c11f`；下文A1～A5描述该版本的输入、观察及当时建议，白马港来源与满兵输送另见[权威研究](../topics/ai/military.md#baima-idle-20261029)。诊断未修改正式测试、用户存档或原游戏内存。
 
 ## 当前处理状态（2026-10-31）
 
@@ -11,7 +11,7 @@
 | A4 救援时间门、A5 剩余工作 | 五日门与沿途建筑解耦、局部耗尽继续后续来源的修复已提交 |
 | 白马港来源与输送 | 进攻范围扩展、需求驱动输送已撤回；已提交的后续目标尝试和输送容量保护保留，来源重建问题仍作为后续方案案例 |
 
-取舍理由及后续方向集中见[采用规格](../../specs/original-ai/behavior.md#attack-planning-decision-20261031)；本记录不把七项问题一概标为已解决。已提交的Core公共出征准备和单条命令复用保留。
+取舍理由及后续方向集中见[采用规格](../../specs/original-ai/design-boundaries.md#attack-planning-decision-20261031)；本记录不把七项问题一概标为已解决。已提交的Core公共出征准备和单条命令复用保留。
 
 ## 原版遗留与重制实现问题的归因复核
 
@@ -55,9 +55,9 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 
 `AttackUsableStrength`按驻兵减留兵估算为80000，通过40000×1.25的严格优势门；它没有计入可用将领、每队带兵上限、最终阵形容量和真实组队后还能组成几队。`Allocate`先以逐名主将模拟额度，`AttackPeople`随后一次消耗多名成员，实际派遣也会再次限额，因而模拟分配不等于最终可执行批次。
 
-定位：[强度与分配](../../src/San9.Application/AI/OriginalAiMilitary.Attack.cs)、[最终装备与容量限制](../../src/San9.Application/AI/OriginalAiMilitary.Equipment.cs)。原作的估值与预分配骨架见[工作9](../ai.md#military)；本轮没有在原游戏复现此精确人数组合。
+定位：[强度与分配](../../src/San9.Application/AI/OriginalAiMilitary.Attack.cs)、[最终装备与容量限制](../../src/San9.Application/AI/OriginalAiMilitary.Equipment.cs)。原作的估值与预分配骨架见[工作9](../topics/ai/military.md#military)；本轮没有在原游戏复现此精确人数组合。
 
-**影响判断：**能够在实际出兵不满足自己的优势门时发动进攻，出现少量兵逐批投入的风险；不据此断言上述部队必然战败。当时建议先形成实际可执行批次，再按该批次判断强度与成本；后续评估认为统一收紧优势门可能压制激进势力，未采用该建议，见[取舍决定](../../specs/original-ai/behavior.md#attack-strength-decision-20261031)。
+**影响判断：**能够在实际出兵不满足自己的优势门时发动进攻，出现少量兵逐批投入的风险；不据此断言上述部队必然战败。当时建议先形成实际可执行批次，再按该批次判断强度与成本；后续评估认为统一收紧优势门可能压制激进势力，未采用该建议，见[取舍决定](../../specs/original-ai/design-boundaries.md#attack-strength-decision-20261031)。
 
 ## A2：任官反复撤职、换职，无法收敛
 
@@ -69,7 +69,7 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 
 定位：`OriginalAiPersonnel.Offices`。候选排除君主，但 `allPresent`又与包含君主的本方在职总数比较；在通常君主有效的局面中，该值为假，所有已占官职均从待分配表扣除。候选原职不归还，随后无官职选项还能撤掉现任，导致下一次又把刚空出的职位当作新资源。
 
-**证据分类：**这是诊断基线所采用行为的缺陷，不能标成“实现偏离规格”。当时的正式测试 `OfficesRetainOccupiedSlotsWhenFilteredRosterExcludesRulerAndDoNotRequireIdleRulerForOrdinarySlots`明确断言首轮撤职；[原作14记录](../ai.md#personnel)也说明候选数不等时不归还原职、外层仍可生产命令。上述三轮换职是本轮重制动态观察，不是新增原作实机结论。
+**证据分类：**这是诊断基线所采用行为的缺陷，不能标成“实现偏离规格”。当时的正式测试 `OfficesRetainOccupiedSlotsWhenFilteredRosterExcludesRulerAndDoNotRequireIdleRulerForOrdinarySlots`明确断言首轮撤职；[原作14记录](../topics/ai/domestic-personnel.md#personnel)也说明候选数不等时不归还原职、外层仍可生产命令。上述三轮换职是本轮重制动态观察，不是新增原作实机结论。
 
 **建议：**从最终任官方案判断职位占用；被纳入同一重分配计划的人物，其现职应由该计划统一处理。无官职应表达有理由的撤职，不应成为填充时的必经选项。相同局面重复规划应稳定。优先级高。
 
@@ -85,9 +85,9 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 
 定位：`OriginalAiStaffing.Organize`在操作前读取 `rootCities`与 `children`；先按根直属城数判断，再解散已有子军团，创建时仍使用解散前的城数与 `maximum - children.Length`。新建造成根直属城数下降，下次又因此进入只解散的分支，不能保持自己的有效组织结果。即使解散后能够重建，区域候选也取自解散前，原都督身份还可能提前排除该区域。
 
-**影响判断：**组织不稳定会反复改变辖区、都督、钱粮分配和后续人员配额。原作的直属启动门、同根规划与新设／解散流程见[工作12](../ai.md#re-0123-自动军团规划人物与资源)。诊断直接隔离工作12，不声称三个相邻旬都必定通过其周期门，也没有模拟长期经济损失。
+**影响判断：**组织不稳定会反复改变辖区、都督、钱粮分配和后续人员配额。原作的直属启动门、同根规划与新设／解散流程见[工作12](../topics/ai/domestic-personnel.md#re-0123-自动军团规划人物与资源)。诊断直接隔离工作12，不声称三个相邻旬都必定通过其周期门，也没有模拟长期经济损失。
 
-**当时建议：**先求稳定的目标划分，再提交组织差异。当前只采用总城数阈值及合格分区保留修复，完整重规划已放弃，见[取舍决定](../../specs/original-ai/behavior.md#corps-replanning-decision-20261031)。
+**当时建议：**先求稳定的目标划分，再提交组织差异。当前只采用总城数阈值及合格分区保留修复，完整重规划已放弃，见[取舍决定](../../specs/original-ai/design-boundaries.md#corps-replanning-decision-20261031)。
 
 ## A4：远方威胁是否阻止救援，取决于沿途是否碰到建筑
 
@@ -99,7 +99,7 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 
 定位：`OriginalAiActions.Targets.RetainsRelief`中，`route.Cost >= 5 * DailyBudget`置于“沿途找到另一建筑”分支内；没有建筑就不会执行时间门。于是第一组把远队计为1个压力，要求保留12000加载荷3000；第二组排除该远队，只需保留8000加3000。
 
-**证据分类：**[原作工作28](../ai.md#strategy-actions)明确登记相同嵌套条件；不是本轮发现的复刻条件遗漏。缺陷判断来自威胁相同、只挪动沿途建筑就逆转留兵结论的可观察后果。若采纳修正，应将距离与阻挡分别建模，明确采用哪个方向的ETA，再统一应用；不能直接把某个现有分支搬出后就声称完全等价。优先级中。
+**证据分类：**[原作工作28](../topics/ai/missions-diplomacy.md#strategy-actions)明确登记相同嵌套条件；不是本轮发现的复刻条件遗漏。缺陷判断来自威胁相同、只挪动沿途建筑就逆转留兵结论的可观察后果。若采纳修正，应将距离与阻挡分别建模，明确采用哪个方向的ETA，再统一应用；不能直接把某个现有分支搬出后就声称完全等价。优先级中。
 
 ## A5：一个城市无法安排剩余工作，会让后面的城市都不工作
 
@@ -112,12 +112,12 @@ dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --filter 
 
 **影响判断：**前面的小城或孤将据点可持续压住后方其他城市的剩余训练／搜索。现有 `ResidualAllFreeSourceLeavesBestAdjustedLeaderAndStopsWhenOnlyOneRemains`只覆盖单来源停止，不能检出跨城阻断。建议区分“本城无计划”和“整项工作失效”，让局部耗尽只消费当前来源。优先级中。
 
-**同日归因补核，原版静态事实、高置信度。**复用[SRC-SAN9PK-TC-101](../sources/SRC-SAN9PK-TC-101.md)的样本／主库登记，只读回看`4A8FF0`、`4A8C60`、`4A8D00`与`4A8DC0`：`4A8D00`先复用未处理人物，没有剩余才弹一个建筑；全员可行动且不能训练时移除排序首人，移除后为空直接返回0，不在内部重新弹下一个建筑。结合[父任务失败消费](../ai.md#工作批次资格与失败消费)，原版同样结束该工作。主库`4A8D00`已有RE-0126／AI-CLOSURE-20261016-N注释明确记载此行为，本次回读与其一致，无需新增标注；`4AAA00`与`4A9FA0`另回看A3的直属阈值与同根规划范围。未修改IDB、程序字节或游戏状态，未做原作多城动态实验。本节替代首轮“A5原版未核实”的证据边界，不把重制士气50→55的数值提升为原作实测结果。
+**同日归因补核，原版静态事实、高置信度。**复用[SRC-SAN9PK-TC-101](../sources/SRC-SAN9PK-TC-101.md)的样本／主库登记，只读回看`4A8FF0`、`4A8C60`、`4A8D00`与`4A8DC0`：`4A8D00`先复用未处理人物，没有剩余才弹一个建筑；全员可行动且不能训练时移除排序首人，移除后为空直接返回0，不在内部重新弹下一个建筑。结合[父任务失败消费](../topics/ai/control.md#工作批次资格与失败消费)，原版同样结束该工作。主库`4A8D00`已有RE-0126／AI-CLOSURE-20261016-N注释明确记载此行为，本次回读与其一致，无需新增标注；`4AAA00`与`4A9FA0`另回看A3的直属阈值与同根规划范围。未修改IDB、程序字节或游戏状态，未做原作多城动态实验。本节替代首轮“A5原版未核实”的证据边界，不把重制士气50→55的数值提升为原作实测结果。
 
 ## 既有问题及本轮没有升级的判断
 
-- [白马港来源重建](../ai.md#baima-idle-20261029)：路线改选实际目标后，来源重建会把起始港排除；单城失败又不重开其他目标，能够形成长期停滞。已另有原作受控动态证据，本轮不重复计数。
-- [满兵继续输送](../ai.md#baima-full-transport-20261029)：目标容量及在途容量没有成为派遣硬约束，和不能出兵相互放大；重制到达溢出会转入上级城兵役，不能说士兵直接消失。原作满兵候选已核对，未声称在该受控局面实际生成了新输送队。
+- [白马港来源重建](../topics/ai/military.md#baima-idle-20261029)：路线改选实际目标后，来源重建会把起始港排除；单城失败又不重开其他目标，能够形成长期停滞。已另有原作受控动态证据，本轮不重复计数。
+- [满兵继续输送](../topics/ai/military.md#baima-full-transport-20261029)：目标容量及在途容量没有成为派遣硬约束，和不能出兵相互放大；重制到达溢出会转入上级城兵役，不能说士兵直接消失。原作满兵候选已核对，未声称在该受控局面实际生成了新输送队。
 - 普通进攻弱来源的负贡献、无ETA的部分来源压力留兵、有限工作预算与原作固定目标优先级均可能保守，但已有采用理由。本轮没有新的反例足以将其单独升级为实现错误；“没列为缺陷”不表示策略最优。
 - 只做了定向有效输入和静态审查，没有穷举全部剧本、长期演进、Mod或原作全局动态对照。A1～A5的现象已确认；实际出现频率、完整战役损失和是否需要全部改变，仍需后续玩法验证／采用裁决。
 

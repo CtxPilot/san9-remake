@@ -1,6 +1,6 @@
 # SRC-KOEIWMA-SAN9TC-001：koeiwma.dll
 
-- 来源：用户工作区繁中 PK 安装目录，`private/游戏文件/koeiwma.dll`；发布者 KOEI，识别日期2026-10-23。
+- 来源：用户工作区繁中 PK 安装目录，`private/game-files/koeiwma.dll`；发布者 KOEI，识别日期2026-10-23。
 - 文件大小：90,112字节；文件版本`1.0.0.0`。
 - SHA-256：`3362F228C2EFE497D13C4647C97E500315365540818CD5FC14D18B771305BB99`。
 - 格式：原生32位PE，x86，映像基址`0x10000000`。

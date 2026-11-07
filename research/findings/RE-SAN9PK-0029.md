@@ -100,7 +100,7 @@ bit 0 的其它 upstream 行为包括把所属都市作为距离计算起点、�
 - 项目 IDA 数据库 `research/analysis/San9PK-TC-101.i64`：`0x460FF0`、`0x45EBB0`、`0x45EBF0`、`0x45EC10`、`0x45EC20`、`0x461730`、`0x461A90`、`0x463C80`、`0x568240`、`0x45EA60`、`0x45EA70`、`0x45EA80`、`0x45EA90`、`0x49A1FA`、`0x49A637`、`0x504FE5`、`0x507034`、`0x50BD00` 等。
 - `local/generated/research/catalogs/san9pk-tc-101-editor-enums.csv`：`unit_status` 的 0–8 名称，以及 `unit_command`、`unit_target_type` 的编辑器/消息词汇；该本地派生目录被 Git 忽略。
 - upstream `private/research/upstream/San9PKHard/InsertAsmSrc.h`、`InsertAsmSrc2.h`：状态 1/4/5/6/7、已出征、单人/内嵌分类、主动/被动交战组合，以及建设中/建设图标/运输标志的上下文注释。upstream 作为二级证据，不替代当前样本 IDA 证据。
-- `private/剧本编辑器截图/部队.png`：状态下拉框与独立“交战”复选框的显示结构；截图不单独证明内部字段。
+- 历史截图“部队.png”：状态下拉框与独立“交战”复选框的显示结构；截图不单独证明内部字段。
 
 本结论的边界是：已经确认状态字段分层、生命周期和若干位的读写/组合关系，但还没有完成所有高位的单变量黑盒实验。`unit_command` 字段位置与范围已经确认；其逐命令行为由各命令研究记录承载，不属于本状态记录。
 
@@ -203,7 +203,7 @@ IDA MCP回读`49B460`状态1009：本次来源仍有效时，分别以双方为�
 临时探针`local/generated/verification/unit-status-origin-audit/`直接用当前Importer读取`D_Sce001..020`和`D_Ttrl00..05`共26文件、20,800条部队记录：原始0共20,794条、原始1共6条，原始2／3均0。命令：
 
 ```powershell
-dotnet run --project local/generated/verification/unit-status-origin-audit/Probe.csproj -- C:/home/game/san9/remake
+dotnet run --project local/generated/verification/unit-status-origin-audit/Probe.csproj -- .
 ```
 
 修复前Importer将外部原始2／3分别映射为持久`UnitCondition.Engaged`／`Trap`，Core没有正常玩法写入这两者的路径。独立探针`local/generated/verification/siege-intensity-audit/`复核：正常Condition加主动交战标记后，Condition仍Normal且可计入围攻；而强行写入`Engaged`／`Trap`加攻击命令时两者也都计入。持续期0调用`MilitaryConditions.Tick`仍保留这两种Condition，与原版上述日级归一化不同。该探针记录修复前行为，没有修改用户存档；后续实现见本记录末节。
@@ -244,7 +244,7 @@ dotnet run --project local/generated/verification/unit-status-origin-audit/Probe
 
 **关联条件补准确。**两个回调末尾的`5B1E80(60或3, unit)`按列传资源查人物，再经`44C0E0 → 44C0B0 → have_same_root_force`比较人物与部队的共同君主，即同根势力；不要求指定人物就在该部队内。此前主库第一条恢复注释的“belongs to this unit”过窄，本次更正，仓库表述“人物关联检查”明确为同根势力。两者仍只读原始状态1。
 
-**实现对照与裁定。**当前[普通新局范围](../../specs/behavior/BEH-UI-0011-new-game.md)与[G10覆盖边界](../../docs/g10-event-coverage.md)均明确未接教学／挑战；已有季度／旬历史与搜索事件不挂载这两张挑战模式表。此次恢复补齐该模式的研究证据，没有发现当前普通战役中应补而漏掉的筛选条件，不改变普通围攻计数或伤害公式，也不把尚未支持的挑战事件列成当前实现缺陷。此前外部原始2／3接入模型差异仍独立成立，不能归因于这两个恢复回调。
+**实现对照与裁定。**当前[普通新局范围](../../specs/behavior/BEH-UI-0011-new-game.md)与[G10覆盖边界](../../docs/history/stages/g10-event-coverage.md)均明确未接教学／挑战；已有季度／旬历史与搜索事件不挂载这两张挑战模式表。此次恢复补齐该模式的研究证据，没有发现当前普通战役中应补而漏掉的筛选条件，不改变普通围攻计数或伤害公式，也不把尚未支持的挑战事件列成当前实现缺陷。此前外部原始2／3接入模型差异仍独立成立，不能归因于这两个恢复回调。
 
 本次向两个恢复回调补注挑战模式归属及同根势力条件，修正第一条过窄文字；两处注释／名称回读、四个上游名称与模式函数及两个回调反编译通过，字节保持。实际追加和更正见[影响复核写入记录](../archive/ida-write-records/unit-status-recovery-impact-20261025.json)。仅更新研究记录、符号说明和IDA标注，没有改产品代码、运行产品测试或重新转换内容。
 

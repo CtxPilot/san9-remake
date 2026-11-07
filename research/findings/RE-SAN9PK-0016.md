@@ -13,9 +13,9 @@
 证据来源如下：
 
 - `SRC-IDA-006`：`deserialize_scenario_chunks`（`0x453F60`）、`deserialize_kkgu_record`（`0x4499F0`）、`CKokugouData` 类识别（`0x449780`）、名称解析、势力国号访问和授予/清除分支。
-- `SRC-BIN-004`：`private/游戏文件/D_Sce001.S9`–`D_Sce020.S9`、`D_Ttrl00.S9`–`D_Ttrl05.S9`。
+- `SRC-BIN-004`：`private/game-files/D_Sce001.S9`–`D_Sce020.S9`、`D_Ttrl00.S9`–`D_Ttrl05.S9`。
 - `SRC-BIN-004`：同目录 `M_MsgPK.s9` 的本地只读解析结果；产物写入被 Git 忽略的 `local/generated/research/cntry-02/`。
-- `SRC-BLACKBOX-007`：`private/剧本编辑器截图/国号.png`。
+- `SRC-BLACKBOX-007`：历史截图“国号.png”。
 
 ## 2. 黑盒与样本观察
 

@@ -1,8 +1,6 @@
 # 测试组织与运行
 
-测试按依赖边界分成六个项目，公共 SDK、xUnit 版本和测试属性由本目录的 `Directory.Build.props` 管理，并显式继承仓库根目录的构建配置。各项目只声明自己的工程依赖。
-
-默认解决方案包含五个测试项目；`San9.Headless.Tests`（宿主与少量进程测试）独立于解决方案，按需单独运行。Headless 产品工程仍在解决方案中，参与日常构建。
+六个测试项目按依赖边界划分，公共 SDK、xUnit 和测试属性由 `tests/Directory.Build.props` 管理。默认解决方案包含五个测试项目；Headless 产品工程参与构建，其测试项目按触发条件独立运行。
 
 ## 职责
 
@@ -21,45 +19,7 @@ Rendering 的测试目前与客户端测试放在一起。仅为目录对称而�
 
 Godot 历史画面验收脚本也不属于默认测试集，后续开发默认不执行；只有当前任务明确要求复现对应场景时才运行。脚本分类与入口见[Godot 历史画面验收](../docs/ui/client-verification.md)。
 
-资料编辑器保存刷新可用无资源引擎检查验证，覆盖保存不重建当前表单／不丢失控件输入，以及隐藏页切回时刷新；不代表画面验收：
-
-```powershell
-godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/SharedEditorRefreshVerification.tscn
-```
-
-成功输出`SHARED_EDITOR_REFRESH_OK`并退出。
-
-联携关系表检查设置`SAN9_TACTIC_LINK_CONTENT`为现有内容根目录，运行`godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/TacticLinkEditorVerification.tscn`，可验证联携关系表的初次显示、按人物筛选、选中修改、删除及搜索选人后添加。仅改变内存草稿，不发布玩家资料；成功输出`TACTIC_LINK_EDITOR_OK`，不代表画面验收。
-
-涉及工作流窗口或地图回调生命周期时，可在客户端编译后运行无资源依赖的引擎检查（将 `godot` 替换为本机 Godot .NET 可执行文件）：
-
-```powershell
-godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/WorkflowLifecycleVerification.tscn
-```
-
-成功输出 `WORKFLOW_LIFECYCLE_OK` 并以 0 退出；覆盖窗口锁、退出顺序、地图回调所有权，以及模态窗口重开、嵌套、初始化期间创建子窗口、动态控件、原始输入隔离、Tab焦点约束、关闭时排除退出控件的焦点恢复和祖先返回路由。`COMPANION_DRAFT_OK`另验证伴侣面板待提交数值、隐藏页预设与重置、无变化不写入及保存失败后的草稿保留；不代表画面或完整命令交互验收。
-
-设置`SAN9_OPENING_CONTENT`为已有转换内容根目录（含281年剧本），运行同一headless入口可单独检查真实开局控件：用未完成的读取任务核对首帧禁用状态，再检查悬停转移焦点、禁用控件不抢焦点及数据就绪后的部署状态。成功输出`OPENING_CONTROLS_OK`并退出；该模式不运行其他工作流检查，不创建游戏世界或操作桌面窗口。例如PowerShell：
-
-```powershell
-$env:SAN9_OPENING_CONTENT = (Resolve-Path local/generated/content).Path
-godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/WorkflowLifecycleVerification.tscn
-Remove-Item Env:SAN9_OPENING_CONTENT
-```
-
-设置`SAN9_MODAL_CONTENT`为已有转换包目录后，同一入口另检查真实环境设定的保存失败提示，以及终局标题菜单到存档行的鼠标选择和读取回调，成功时追加`MODAL_CONTENT_OK`。检查使用独立存档目录`local/generated/verification/modal-content/`，不读取用户存档；不创建真实战败事件，也不替代画面验收。例如PowerShell：
-
-```powershell
-$env:SAN9_MODAL_CONTENT = (Resolve-Path local/generated/content/scenarios/historical/scenario-0).Path
-godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/WorkflowLifecycleVerification.tscn
-Remove-Item Env:SAN9_MODAL_CONTENT
-```
-
-设置`SAN9_UNIT_GROUP_CONTENT`为已有转换包目录，运行`WorkflowLifecycleVerification.tscn`可单独检查多选常驻名单：实际鼠标点击刘备行后保留其余行对象，检查名单／滚动视口／条目的边界、独立选择状态、隐藏恢复及重复刷新，并通过原有皮肤的“决定”按钮提交重叠名单临时选择。成功输出`UNIT_GROUP_LIST_OK`；有图形设备时同时保存`local/generated/verification/unit-group-list.png`，无图形设备时仅检查布局与输入。该检查不覆盖完整战略地图下令流程。
-
 ## 运行入口
-
-设置`SAN9_UI_PREFERENCES_CONTENT`为已有转换包目录后，运行上面的`WorkflowLifecycleVerification.tscn`入口，可检查真实存读档页鼠标翻页／中止共享、情报与都市编辑的地图／一览互通、地图起始时详情候选初始化及仅关闭时统一保存。成功输出`UI_PREFERENCES_OK`；该模式只做本功能的引擎交互检查，不代表画面验收，不读写用户偏好文件。
 
 按实际受影响行为选入口，不按文件数量选择检查：局部C#逻辑改动验证受影响项目，共享契约或跨层行为变更运行默认解决方案；纯视觉调整按下文取舍，跨目录移动、注释或纯文档变更本身不构成跨层行为变更。Headless的触发条件见下文。
 
@@ -88,7 +48,7 @@ dotnet test San9Remake.slnx --logger "trx;LogFilePrefix=tests" --results-directo
 
 同一代码、输入及相关配置已通过的验证不因准备提交而重复执行。后续只改文档不使代码测试失效；仅文件时间戳变化时先核对实际差异，不能据此判定必须重跑。`G01ScenarioTests` 默认使用公开夹具；设置 `SAN9_G01_SCENARIO` 会切换到指定本地剧本，不能把默认测试通过当作私有内容包已验收。
 
-Headless 默认不运行。修改 CLI 参数解析、退出码、文件产物、存档／命令日志／录制回放协议或其跨进程接线时，单独运行上述 Headless 命令；普通领域规则、界面和导入器改动运行对应测试即可。共享契约和跨层变更仍运行默认解决方案测试，只有涉及这些进程边界时才追加 Headless。修改公共测试配置时，还需单独验证 Headless 项目继承该配置后的构建与测试。
+Headless 默认不运行。修改 CLI 参数解析、退出码、文件产物、存档／命令日志协议或其跨进程接线时，单独运行上述 Headless 命令；普通领域规则、界面和导入器改动运行对应测试即可。共享契约和跨层变更仍运行默认解决方案测试，只有涉及这些进程边界时才追加 Headless。修改公共测试配置时，还需单独验证 Headless 项目继承该配置后的构建与测试。
 
 需要验证全部六个项目时，分别执行两个入口。历史全解决方案测试记录反映当时范围，不代表当前默认入口仍包含 Headless。
 
@@ -108,23 +68,11 @@ Headless 默认不运行。修改 CLI 参数解析、退出码、文件产物、
 
 删除或合并用例，应明确它防止的错误、替代覆盖所在和是否丢失独有入口或状态；不按数量指标裁剪，不添加只复述实现的断言，也不把不同规则塞进难以定位失败的通用测试框架。同名功能的领域规则测试与会话接线测试承担不同职责。
 
-外交资金推荐的请求／交还、有／无军师四种接线场景集中在`DiplomacyNegotiationPresentationTests.EditingTermsUsesOrdinaryAdviceAndKeepsFormalSpeechesInTheMeeting`，同时覆盖有利上界、手动金额、取消前的草稿保留与只读查询。删除重复的`CounterofferAmountTests`；金额搜索方向、端点及溢出边界仍由`AdvisedAmountTests`负责。
+后续优先复用现有夹具，只为新增规则、独有边界和实际缺陷补充覆盖。已删除接口及旧实现的测试整理过程由 Git 保留，不作为当前测试规范。
 
-命令进度的同旬与跨旬倒计时合并为`ExecutionCommandsTests.JourneyCountdownMarksOnlyTheFinishingXun`的数据用例，保留三个旬首、跨年、逐日剩余时间及完成后移除覆盖。地图测试夹具引用`MapPackage.CurrentSchemaVersion`，不各自维护版本数字。
+## 引擎交互与画面
 
-后续开发默认复用现有夹具与覆盖，只为新增规则、独有边界或实际缺陷补最小回归；不逐项把实现细节写成测试，不为每个功能重复保存／回放、确定性或公共失败矩阵。验证按本次风险选择必要入口，通过即交付，不以增加测试数量作为完成标准。
-
-自建势力增兵的兵役人口与容量矩阵归`NewGameInitializationTests`；`NewGameSetupTests`只保留开局接线、补偿顺序、草稿原子性及新增定义的真实保存恢复／命令脚本入口。忽略年龄的用例直接核对开局组合身份和作者输入，不重复全年推进或通用保存协议；新势力贴图的四个来源编号共享一份透明度样本与对照。
-
-整旬表现采样接口退出后，删除仅约束该接口的`PresentedAdvanceTests`：整旬事务失败回滚保留在`IncrementalAdvanceTests.FailedBatchDiscardsEarlierDaysAndSessionChanges`，跨季／跨年与逐日一致性复用该类已有用例，终局拒绝由`EndingSessionTests`覆盖。待答暂停与禁止继续推进并入`DailyTaskDecisionTests.IncrementalAnswersResumeOnlyCurrentDayAndPreserveReplay`；电脑自动答复后的表现投影改由`CapturedRulerDispositionTests`通过后台逐日入口检查。采样数量和样本合并断言随接口删除，正式演出仍由客户端逐日测试覆盖。
-
-单挑领域测试保留触发、随机短路、逐刀守恒、超出原版名单数量、后果与继任边界；`DuelContestTests`不再重复整场结算或逐刀做JSON往返，真实事件与确定性由领域单挑用例和保存恢复后的事件比较承担。该会话往返只跑显式继任选择，自动／显式选择矩阵留在`DuelCombatIntegrationTests`，电脑自动响应仍有独立会话入口。选项和自定义单挑特性共用一次保存／命令日志验证。演出保留体力、替补、粒子和对白边界，将体力等待并入逐刀场景、对白局部动画并入暂停／跳过场景，稳定旗帜与粒子复用已有重复计划检查；不追加全套播放排列。
-
-世界事件演出测试聚焦发生时身份、自动／待答输出归属、重复播放抑制及记录正文复用，不逐项固定装饰文案排列或消息总数。地图喊话完成状态并入已有延迟、主动关闭、资源等待和自然结束场景；真实内容包绑定样本独立求值，不把互斥结果拼成领域事件时间线。
-
-## 录像撤下后的覆盖
-
-2026-10-22删除录制开关、起点、文件格式、事件对比和独立录像回放专属测试；混合玩法用例只移除录像步骤，保留领域结果、原子性、查询、存档和恢复断言。命令脚本用例显式构造输入，不建立替代录制器。Headless保留`run`／`verify`的报告、存档、失败前缀、玩家加载和进程接线，并拒绝撤下的录像模式／参数。无需每次功能变化维护录像版本或完整重放。
+[引擎交互检查](../docs/ui/engine-verification.md)集中维护资料编辑器、工作流／模态生命周期、开局控件、多选名单和界面偏好的入口、环境变量及成功标志。实际画面与试听按当前任务分工验收。
 
 ## 公共协议与进程覆盖
 
@@ -140,18 +88,10 @@ Headless 的领域场景由`HeadlessHostTests`直接调用生产宿主，并以�
 
 内容合法性与必需字段归 Content，会话指纹和接线归 Application，规则矩阵归 Core。表格样式中的精确数值须有规格依据；不能仅为固定实现常量增加断言。数量和耗时不是覆盖目标，历史整理基线由 Git 保留。
 
-状态一致性断言使用共享的`StateAssert.Equal`／`NotEqual`，直接传入不可变世界或会话快照。共享状态和相等记录跳过序列化，跨快照按分块使用源生成诊断元数据比较语义内容；`NotEqual`使用`AreEqual`，不定位差异，`Equal`只在失败时定位字段差异，不计算SHA-256、不生成规范化JSON字符串。只读界面验收使用`Revision`。测试中的存档序列化仍覆盖真实产品协议，不另建替代存档实现。
+## 断言与夹具
 
-事件一致性使用`EventAssert.Equal`逐项比较，保留类型、顺序、长度和字段语义；相等记录跳过JSON，仅不相等的事件使用源生成元数据比较。玩法测试以快照断言比较恢复／重放状态，实际往返仍使用产品存档协议；存档字节稳定性、格式和恢复隔离集中在`PersistenceTests`验证。失败诊断仅在断言失败时序列化。固定分支夹具使用已知种子或`TestSeeds`随机向量，并核对要求的随机值；随机矩阵继续覆盖原有输入范围，不运行时搜索分支种子。
-
-默认存档不累计操作／事件历史由3旬短流程、文件字段检查和恢复后继续一致性验证；记录队列通过`AutomaticRecordsAreBoundedWhilePlayerNotesArePreserved`越过128条上限并验证精确淘汰顺序。删除40年推进及存档长度差阈值，后者随当前AI目标、随机流和日期位数变化，不能证明历史有界。这些用例不承担长期对局或内存泄漏验收；有具体长期故障时按实际状态／资源增长补回归。
-
-## 粗细两级导航覆盖
-
-地图预览是粗路线意图，不能与逐日细步或攻城最终停点直接比较。`BattlefieldPathSearchTests`、`PlanningRouteCostTests`检查粗格连接、预算与工作区复用；`MovementNavigationTests`、`CombatApproachTests`、`AmphibiousMovementTests`检查实际细步、完整对象碰撞、中心地形扣费及跨岸。旧A*最优路径、整队地形净空和精细预览相等断言已迁移，局部受阻不要求升级为全图细搜索。
-
-`NavigationQueryConsistencyTests`覆盖正式移动日期下的ETA首次到达、等待／混乱、预测状态隔离和占用缓存；`MilitaryMovementTests`检查非法途经点的命令拒绝与恢复，`MilitaryRoutePreviewTests`检查界面粗路线、中继和旧接触不污染改令预览。现有保存及Headless覆盖继续承担协议职责。
-
-## 原型AI退出后的覆盖
-
-2026-10-16删除共同分配、经济目标、战役搜索／配队／选阵、机会冷却、预测缓存与拒绝集合的专属测试，所约束实现已退出，不移为另一套生产回退。公共部署预检、途经点保存及实际行军、显式导航对照保留在`DeploymentPreparationTests`；军事、计略、军团权限及终局测试以显式公共命令继续验证实际效果和回放。经营脚本选人及独立规划随机测试仍保留。OAI-01新增`OriginalDomesticWorkTests`、`OriginalAiCycleTests`覆盖原版经营规则与生产接线，`AiProductionBaselineTests`、`DomesticPlanningBoundaryTests`与Headless同步验证实际自动经营、控制权限、推进、恢复及协议；必要电脑响应沿原有响应专项。后续基线能力按原版AI规格另行验收。
+- 世界／会话快照使用共享 `StateAssert.Equal`／`NotEqual` 比较语义；只读查询可检查 `Revision`。失败时再生成字段诊断，不在普通断言中计算全世界哈希。
+- 事件使用 `EventAssert.Equal` 比较类型、顺序、长度及字段。持久化测试使用真实产品存档，字节稳定性、格式和恢复隔离集中在 `PersistenceTests`。
+- 分支夹具使用固定种子或 `TestSeeds` 并核对所需随机值，不在运行时搜索种子。内容合法性归 Content，规则矩阵归 Core，会话身份与接线归 Application。
+- 导航粗路线表达意图，实际移动验证细步、碰撞、地形与跨岸；不以粗预览逐点相等作为验收。相关契约见[导航设计](../specs/navigation-redesign.md)。
+- 录像功能已撤下；保留存档、精确恢复、确定性与显式命令脚本验证。当前 AI 按[原版 AI 验收](../specs/original-ai/acceptance.md)验证，不恢复旧原型专属要求。

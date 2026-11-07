@@ -86,5 +86,5 @@ recovered = min(base, W)
 
 ### 非阻塞补证
 
-- 编辑器单变量修改后的保存差分，以及其他版本对 `+0x0A` 的目录标签，统一归入 [`EDITOR-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)；不得反向改变当前版本的负面审计结论。
-- `D_Trst01.S9`–`D_Trst28.S9` 的特殊 `head` 布局适用性归入 [`EXT-SCENARIO-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)。
+- 编辑器单变量修改后的保存差分，以及其他版本对 `+0x0A` 的目录标签，统一归入 [`EDITOR-01`](../../research/topics/scenario-field-evidence.md)；不得反向改变当前版本的负面审计结论。
+- `D_Trst01.S9`–`D_Trst28.S9` 的特殊 `head` 布局适用性归入 [`EXT-SCENARIO-01`](../../research/topics/scenario-field-evidence.md)。

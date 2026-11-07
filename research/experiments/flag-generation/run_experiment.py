@@ -352,7 +352,7 @@ def run(data_dir: Path, output: Path, font: Path) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, default=ROOT / "private/游戏文件")
+    parser.add_argument("--data-dir", type=Path, default=ROOT / "private/game-files")
     parser.add_argument("--output", type=Path, default=ROOT / "local/generated/research/flag-generation")
     parser.add_argument("--font", type=Path, default=Path("C:/Windows/Fonts/kaiu.ttf"))
     args = parser.parse_args()

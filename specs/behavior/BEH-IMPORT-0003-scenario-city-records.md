@@ -78,6 +78,6 @@
 
 ## 未决问题
 
-本记录字段范围内无。城市显示名称资源绑定登记为 [`CONTENT-01`](../../research/scenario-field-research-checklist.md#当前未决项)；坐标到道路连通性的设计不由 `city` chunk 单独决定，仍在本规格范围外。
+本记录字段范围内无。城市显示名称资源绑定登记为 [`CONTENT-01`](../../research/topics/scenario-field-evidence.md)；坐标到道路连通性的设计不由 `city` chunk 单独决定，仍在本规格范围外。
 
 城市建筑组合的耐久度分段、三组外观资源和开发度资源偏移见 [RE-SAN9PK-0055](../../research/findings/RE-SAN9PK-0055.md)；它们不改变本记录的导入字段语义。

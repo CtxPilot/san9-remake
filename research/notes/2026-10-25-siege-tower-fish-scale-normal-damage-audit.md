@@ -59,7 +59,7 @@
 临时探针位于忽略目录`local/generated/verification/siege-fish-damage/`，直接引用当前Core和Importer；未添加产品实现或持久测试。运行：
 
 ```powershell
-dotnet run --project local/generated/verification/siege-fish-damage/Probe.csproj -- C:/home/game/san9/remake
+dotnet run --project local/generated/verification/siege-fish-damage/Probe.csproj -- .
 ```
 
 探针用Importer读取源阵形，检查20个正式转换包，再把独立按IDA操作写出的整数算术与`CombatMath.TroopDamage`比较。矩阵为双方相同兵力`1/100/1000/6000/10000/20000/50000/100000`、相同统率`0/1/40/80/100/120`、相同士气`1/30/60/80/100`、相同攻击程度`1/2/4`，分别计算两个方向，共1,440项：**差异0**。以上五组单轮样例均直接调用当前Core得到。

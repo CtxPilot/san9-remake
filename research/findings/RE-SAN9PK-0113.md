@@ -45,7 +45,7 @@
 
 ### 玩家与 AI 生产者
 
-本节自动选择及其共享命令边界已迁入[原版AI权威研究](../ai.md#re-0113-玩家与-ai-生产者)，本记录继续维护其他公共规则与取证。
+本节自动选择及其共享命令边界已迁入[原版AI权威研究](../topics/ai/missions-diplomacy.md#re-0113-玩家与-ai-生产者)，本记录继续维护其他公共规则与取证。
 
 ### 复用公式 6/7 与军师意见
 
@@ -175,7 +175,7 @@ SanIX `SIX-STR-01` 声称“计略和外交为确定公式、无概率”。当�
 | F4：换异常时提前缩短持续期 | 原作混乱／攻心无阵／幻术等经`504CA0/505130/506A80 → 463C80`统一写状态；改变状态时取`max(原剩余日数,新日数)`。`504B80`允许无阵目标再受混乱，不是不可达组合 | `MilitaryConditions.Confuse`仅在原来已混乱时保留较长值；攻心附带无阵直接覆盖新日数。直接调用实际Confuse消费者，将无阵9日改成混乱2日，原作应为混乱9日；伪报的独立计略入口自身已取max，不重复列错 |
 | F5：普通状态变化无条件丢接战目标 | `463C80`仅4／7分支清当前接战目标，5／6／8分支不清；自然解除`461A90`、救援`492B00`、治疗`507280`不改事件目标／类型。刷新槽`461A70 → 44A990 → 433D80`只更新地图表现，不能解释成隐藏的指令清理 | `MilitaryUnitTransitions.Apply`遇任何`Condition`变化均置`ContactTarget=null`；实际Tick诊断中高昂1日到期，原接战目标被丢弃。`NavigationQueryConsistencyTests.ExpiringConditionDoesNotForecastArrivalAtTheDiscardedContact`也固化了这种行为。影响可扩到无阵、混乱、高昂生效／解除和治疗，不应把寻路缓存失效扩大成必然放弃当前接触 |
 
-F1/F2的诊断调用真实`UnitStrategies.Resolve`成功分支，再按实际`MilitaryConditions.Tick`计至到期；不是手工重复被审实现。F3仅复现当前状态投影，并未模拟原作溃败战斗；F4/F5分别调用真实Confuse与Tick。诊断项目、输入和输出位于忽略目录`local/generated/verification/status-order-audit/`，命令为`dotnet run --project local/generated/verification/status-order-audit/StatusOrderAudit.csproj -- C:\home\game\san9\remake`；使用本轮已生成的本地测试档副本，不写回用户存档。
+F1/F2的诊断调用真实`UnitStrategies.Resolve`成功分支，再按实际`MilitaryConditions.Tick`计至到期；不是手工重复被审实现。F3仅复现当前状态投影，并未模拟原作溃败战斗；F4/F5分别调用真实Confuse与Tick。诊断项目、输入和输出位于忽略目录`local/generated/verification/status-order-audit/`，命令为`dotnet run --project local/generated/verification/status-order-audit/StatusOrderAudit.csproj -- .`；使用本轮已生成的本地测试档副本，不写回用户存档。
 
 ### 连带路径与不计作新缺陷的项
 

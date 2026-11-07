@@ -77,6 +77,6 @@
 
 四份消息／列传档案合计命中 10 个文字片段：前三字各在 PK 和基础版消息中一处，第四字各两处；两份列传档案没有命中。运行包实际名称／表字已绑定前三项。190 年剧本保留三位人物定义，是否当时可见取决于人物状态；战斗台词已保存，当前没有据此证明某次实际游玩已经触发该随机分支。资源真实存在与画面当前可见要分开表述。
 
-复现：`python research/scripts/audit_font_glyph_occurrences.py private/游戏文件 local/generated/research/unified-text`。精确原文字节、源文／简体、节点路径和偏移写入 `accepted-glyph-occurrences.json`。
+复现：`python research/scripts/audit_font_glyph_occurrences.py private/game-files local/generated/research/unified-text`。精确原文字节、源文／简体、节点路径和偏移写入 `accepted-glyph-occurrences.json`。
 
 2026-09-11的处理记录：当时接受上述四个缺字并移除BabelStone Han回退，主字体沿用GB Lite。本节保留当时的字符出现位置、字节及验证结果；现行姓名、词汇和字体采用规则统一见[文字与翻译规范](../../specs/text-and-translation.md)，不能把历史缺字输出作为最终姓名要求。

@@ -39,4 +39,4 @@
 3. 在指定哈希样本和项目自己的 IDA 数据库中验证地址、结构与行为。
 4. 将验证结果写入逆向结论或黑盒实验记录；只有满足证据要求后，才提升为正式格式或行为规格。
 
-具体来源状态见[来源登记表](../SOURCES.md)，记录方式见[研究方法规范](../../specs/research-method.md)和[逆向工程规范](../../specs/reverse-engineering.md)。
+具体来源状态见[来源登记表](../SOURCES.md)，记录方式见[研究方法规范](../../docs/development/research-method.md)和[逆向工程规范](../../docs/development/reverse-engineering.md)。

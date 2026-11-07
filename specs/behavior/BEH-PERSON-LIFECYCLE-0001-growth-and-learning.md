@@ -53,7 +53,7 @@ chance = min(70, floor(max(proficiency-threshold, 0)/5) + 30)
 
 有效完成直接授予兵法，不复用普通习得概率，不增加额外熟练度或能力。修行期间人物不可兼任其他任务；人物死亡、被俘、改属或课程城市失去有效归属时，通过共享取消／安置事务处理，不继续发奖。重制用显式人员任务表示修行，不为零兵力人员活动创建战斗部队；课程、学员、地点、起止日期及报名选择的续行位置各有唯一权威状态。选择等待仅在内存续行，不进入存档；从此前稳定起点重放报名，不重复此前季度阶段。正式修行任务可跨旬保存，任务和直接学习事件参与完整录像。
 
-原作事实、倒计时纠错及对应证据见[RE-0131季度修行](../../research/findings/RE-SAN9PK-0131.md#quarterly-study-enrollment)。人员任务表达与失效取消是重制选择，避免教学继续绑定已失效的城市或占用第二份部队身份。课程使用必填`TacticCourses`集合表达；`PendingTacticStudy`保留当前城市及响应势力，候选实时查询。`tactic-study`任务保存目标兵法和起止日期，季度课程按城市ID排序处理。对应实现与公开验证见[G09记录](../../docs/g09-verification.md)。
+原作事实、倒计时纠错及对应证据见[RE-0131季度修行](../../research/findings/RE-SAN9PK-0131.md#quarterly-study-enrollment)。人员任务表达与失效取消是重制选择，避免教学继续绑定已失效的城市或占用第二份部队身份。课程使用必填`TacticCourses`集合表达；`PendingTacticStudy`保留当前城市及响应势力，候选实时查询。`tactic-study`任务保存目标兵法和起止日期，季度课程按城市ID排序处理。对应实现与公开验证见[G09记录](../../docs/history/stages/g09-verification.md)。
 
 ## 状态与不变量
 
@@ -75,7 +75,7 @@ chance = min(70, floor(max(proficiency-threshold, 0)/5) + 30)
 
 ## 验收标准
 
-- [x] 能力普通/强制成长及 100 上限由自动测试覆盖。`OfficerGrowthTests`覆盖严格3%、满值／超限跳过、强制饱和及随机消费；生产者覆盖见[G09入口审计](../../docs/g09-verification.md#成长入口审计)。
+- [x] 能力普通/强制成长及 100 上限由自动测试覆盖。`OfficerGrowthTests`覆盖严格3%、满值／超限跳过、强制饱和及随机消费；生产者覆盖见[G09入口审计](../../docs/history/stages/g09-verification.md#成长入口审计)。
 - [x] 精通倍数、类别边界及 1000 上限由自动测试覆盖。`OfficerGrowthTests`覆盖无效类别、普通／精通增量及大增量饱和。
 - [x] 兵法资格、30%–70% 概率、失败与直接授予旁路由自动测试覆盖。`OfficerGrowthTests`覆盖概率两端严格比较、每5点台阶、上限、无资格跳过、直接授予及重复调用。
 - [x] 多成员随机消费和最终状态哈希在固定顺序下稳定。

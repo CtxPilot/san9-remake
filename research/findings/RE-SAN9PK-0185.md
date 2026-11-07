@@ -4,7 +4,7 @@
 - 状态：本次采用的静态事实已确认；原作完整动态演出不在本次验证内
 - 来源：`SRC-SAN9PK-TC-101`，样本、SHA-256、版本及工具沿用[RE-0183](RE-SAN9PK-0183.md#样本与调查范围)
 - 主库：`research/analysis/San9PK-TC-101.i64`
-- 关联：[统一消息规格](../../specs/behavior/BEH-UI-0006-unified-messages.md)、[表现层规划](../../specs/presentation-implementation-plan.md)
+- 关联：[统一消息规格](../../specs/behavior/BEH-UI-0006-unified-messages.md)、[表现层规划](../../specs/plans/presentation.md)
 
 ## 结算事实与消息入口
 

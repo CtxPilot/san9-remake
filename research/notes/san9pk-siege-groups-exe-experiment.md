@@ -16,7 +16,7 @@
 
 ## 样本及原作依据
 
-事实，高置信度：本次只读核对沿用已登记的繁中 PK 1.0.1.0、x86、映像基址 `0x400000`，项目主库 `San9PK-TC-101.i64`。IDA／Hex-Rays 版本沿用该样本登记。输入为本地 `C:/home/game/san9/San9 Tc/San9PK.exe`，2636800字节，SHA-256：
+事实，高置信度：本次只读核对沿用已登记的繁中 PK 1.0.1.0、x86、映像基址 `0x400000`，项目主库 `San9PK-TC-101.i64`。IDA／Hex-Rays 版本沿用该样本登记。输入为本地 `private/game-files/San9PK.exe`，2636800字节，SHA-256：
 
 ```text
 d20794aeff67301ec2bf8c3becb1e9944c68c6c0588fbfd4bf04e8597f0e5028

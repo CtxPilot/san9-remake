@@ -90,7 +90,7 @@
 
 **重制诊断。** 临时`CapturedRulerAuditProbe`构造双势力、两城、原势力仍有在职成员的被俘君主，扣押方基础信望1000、俘虏当前四维100（原作普通自动分支处决概率必为0）；分别使用电脑／玩家扣押方，直接执行真实`ResolutionPipeline.AdvanceDay`。2项诊断通过，均观察到`UnitAndBuildingEvents`已完成、君主仍被俘、没有返回任务及处置等待。此“通过”证明审计基线遗漏可复现，不是目标行为验收。诊断观察日内mutation，不把非旬边界强行保存；临时源文件移至忽略的`local/generated/research/audit/captured-ruler/CapturedRulerAuditProbe.cs`，不把锁定错误现状的测试加入正式套件。
 
-基线复现命令（仅适用于`619bea7`，当前实现已修复）：将上述诊断源临时复制到`tests/San9.Core.Tests/`，运行`dotnet test tests/San9.Core.Tests/San9.Core.Tests.csproj --no-restore --filter FullyQualifiedName~CapturedRulerAuditProbe --verbosity quiet`，完成后移除临时测试源。审计阶段没有执行全量测试或画面验收，没有修改产品规则；后续实现与验证见[G10验收](../../docs/g10-verification.md#2026-09-22-被俘君主日结处置补齐)。
+基线复现命令（仅适用于`619bea7`，当前实现已修复）：将上述诊断源临时复制到`tests/San9.Core.Tests/`，运行`dotnet test tests/San9.Core.Tests/San9.Core.Tests.csproj --no-restore --filter FullyQualifiedName~CapturedRulerAuditProbe --verbosity quiet`，完成后移除临时测试源。审计阶段没有执行全量测试或画面验收，没有修改产品规则；后续实现与验证见[G10验收](../../docs/history/stages/g10-verification.md#2026-09-22日级机制补齐)。
 
 **主库实际同步与回读。** dry-run 4／4后，将`443EE0`、`443FA0`、`443F60`、`509230`分别更名为`should_execute_captured_ruler_automatically`、`resolve_captured_ruler_disposition`、`choose_captured_ruler_disposition`、`process_captured_ruler_dispositions_after_events`，均成功；四处解释注释引用本RE。保留函数恢复来源，替换两条错误／不完整的旧语义注释。首次普通反编译仍显示缓存旧注释，改用`get_func_cmt`核对持久注释，再`mark_cfunc_dirty`强制重新反编译，4／4回读包含本日说明且旧联盟判断消失，随后原位保存成功。未修改类型、函数边界或程序字节。
 

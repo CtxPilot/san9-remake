@@ -1,4 +1,4 @@
-"""Validate the CLOSE-03 implementation-facing behavior contract graph."""
+"""Validate the current behavior contract graph and its authoritative documents."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import re
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -42,11 +43,10 @@ REQUIRED_IMPLEMENTATION_FIELDS = {
     "entry_types",
     "existing_anchors",
 }
-REQUIRED_BEHAVIOR_SECTIONS = {
-    "重制行为",
-    "状态与不变量",
-    "验收标准",
-    "未决问题",
+SPECIFICATION_ROLES = {
+    "behavior": "重制行为",
+    "invariants": "状态与不变量",
+    "acceptance": "验收标准",
 }
 LEAK_PATTERN = re.compile(r"(?:\bRE-[A-Z0-9-]+|(?i:\b0x[0-9a-f]+|\bsub_[0-9a-f]+|private/))")
 BEHAVIOR_ID_PATTERN = re.compile(r"^(BEH-[A-Z-]+-\d{4})")
@@ -56,6 +56,75 @@ DECISION_ID_PATTERN = re.compile(r"^(DEC-[A-Z]+-\d{4})")
 def document_id(path: Path, pattern: re.Pattern[str]) -> str | None:
     match = pattern.match(path.stem)
     return match.group(1) if match else None
+
+
+def document_status(text: str) -> str | None:
+    match = re.search(r"(?m)^- 状态：(已确认|草案|验证中|已废弃)(?:[（\s]|$)", text)
+    return match.group(1) if match else None
+
+
+def heading_anchor(text: str) -> str:
+    text = re.sub(r"<[^>]+>", "", text)
+    return "".join(
+        char for char in text.lower()
+        if char in "_- " or unicodedata.category(char)[0] in "LN"
+    ).replace(" ", "-")
+
+
+def source_content(text: str, anchor: str) -> str | None:
+    """Select a Markdown heading and its subsections, ignoring fenced examples."""
+    if not anchor:
+        lines = text.splitlines()
+        start = 0
+        while start < len(lines) and (
+            not lines[start].strip() or lines[start].startswith("# ")
+            or re.match(r"^- [^：:]+[：:]", lines[start])
+        ):
+            start += 1
+        return "\n".join(lines[start:])
+    lines = text.splitlines()
+    headings: list[tuple[int, int, str]] = []
+    counts: Counter[str] = Counter()
+    fenced = False
+    for index, line in enumerate(lines):
+        if line.startswith(("```", "~~~")):
+            fenced = not fenced
+        if fenced:
+            continue
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*#*$", line)
+        if match:
+            key = heading_anchor(match.group(2))
+            suffix = counts[key]
+            counts[key] += 1
+            headings.append((index, len(match.group(1)), key + (f"-{suffix}" if suffix else "")))
+    for position, (start, level, key) in enumerate(headings):
+        if key == anchor:
+            end = next((index for index, depth, _ in headings[position + 1:] if depth <= level), len(lines))
+            return "\n".join(lines[start + 1:end])
+    return None
+
+
+def content_entries(text: str) -> int:
+    """Count prose paragraphs, list items and table rows; headings are not evidence."""
+    count = 0
+    paragraph = False
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "<a ", "<!--")):
+            paragraph = False
+            continue
+        if re.match(r"^\|?[\s:|-]+\|$", stripped):
+            continue
+        if stripped.startswith("|") and index + 1 < len(lines) and re.match(r"^\|?[\s:|-]+\|$", lines[index + 1].strip()):
+            continue
+        if re.match(r"^(?:[-*+] |\d+[.)] |\|)", stripped):
+            count += 1
+            paragraph = False
+        elif not paragraph:
+            count += 1
+            paragraph = True
+    return count
 
 
 def has_cycle(dependencies: dict[str, list[str]]) -> bool:
@@ -107,14 +176,49 @@ def validate_contracts(
     }
     behavior_statuses = {}
     for spec_id, text in behavior_texts.items():
-        status = re.search(r"(?m)^- 状态：(已确认|草案|验证中|已废弃)(?:[（\s]|$)", text)
+        status = document_status(text)
         if status is None:
             issue("invalid_behavior_status", spec_id)
         else:
-            behavior_statuses[spec_id] = status.group(1)
+            behavior_statuses[spec_id] = status
     confirmed_specs = {
         spec_id for spec_id, status in behavior_statuses.items() if status == "已确认"
     }
+
+    sources = contracts.get("specification_sources", {})
+    if not isinstance(sources, dict):
+        issue("invalid_specification_sources", "specification_sources must be an object")
+        sources = {}
+    for spec_id, roles in sources.items():
+        if spec_id not in behavior_by_id:
+            issue("unknown_source_spec", spec_id)
+        if not isinstance(roles, dict) or set(roles) - SPECIFICATION_ROLES.keys():
+            issue("invalid_specification_sources", spec_id)
+
+    def read_source(spec_id: str, role: str) -> str | None:
+        roles = sources.get(spec_id, {})
+        if not isinstance(roles, dict):
+            return None
+        declared = roles.get(role)
+        if role not in roles:
+            content = source_content(behavior_texts[spec_id], heading_anchor(SPECIFICATION_ROLES[role]))
+        else:
+            if not isinstance(declared, str) or not declared:
+                issue("invalid_specification_source", {"spec": spec_id, "role": role})
+                return None
+            path, _, anchor = declared.partition("#")
+            target = (repo_root / path).resolve()
+            if not target.is_relative_to((repo_root / "specs").resolve()) or not path.startswith("specs/") or target.suffix != ".md":
+                issue("invalid_specification_source", {"spec": spec_id, "role": role, "source": declared})
+                return None
+            if not target.is_file():
+                issue("missing_specification_source", {"spec": spec_id, "role": role, "source": declared})
+                return None
+            content = source_content(target.read_text(encoding="utf-8"), anchor)
+        if content is None or not content_entries(content):
+            issue("missing_specification_content", {"spec": spec_id, "role": role, "source": declared})
+            return None
+        return content
 
     domains = contracts.get("domains", [])
     if not isinstance(domains, list):
@@ -175,8 +279,6 @@ def validate_contracts(
             text = behavior_texts[str(spec_id)]
             if spec_id not in confirmed_specs:
                 issue("unconfirmed_behavior_spec", spec_id)
-            if classification == "core" and not re.search(r"(?m)^- 关联决策：", text):
-                issue("missing_decision_metadata", spec_id)
             decision_line = re.search(r"(?m)^- 关联决策：(.+)$", text)
             linked_decisions = set(re.findall(r"DEC-[A-Z]+-\d{4}", decision_line.group(1))) if decision_line else set()
             decisions_by_spec[str(spec_id)] = linked_decisions
@@ -184,13 +286,13 @@ def validate_contracts(
                 decision_path = decision_by_id.get(decision_id)
                 if decision_path is None:
                     issue("behavior_missing_decision", {"spec": spec_id, "decision": decision_id})
-                elif not re.search(r"(?m)^- 状态：已确认", decision_path.read_text(encoding="utf-8")):
+                elif document_status(decision_path.read_text(encoding="utf-8")) != "已确认":
                     issue("behavior_unconfirmed_decision", {"spec": spec_id, "decision": decision_id})
-            headings = set(re.findall(r"(?m)^## (.+)$", text))
-            missing_sections = sorted(REQUIRED_BEHAVIOR_SECTIONS - headings)
-            if missing_sections:
-                issue("missing_behavior_sections", {"spec": spec_id, "sections": missing_sections})
-            acceptance_count += len(re.findall(r"(?m)^- \[[ xX]\] ", text))
+            if spec_id in confirmed_specs:
+                for role in SPECIFICATION_ROLES:
+                    content = read_source(str(spec_id), role)
+                    if role == "acceptance" and content is not None:
+                        acceptance_count += content_entries(content)
         acceptance_by_domain[domain_id] = acceptance_count
         if acceptance_count == 0:
             issue("missing_acceptance_criteria", domain_id)
@@ -242,7 +344,7 @@ def validate_contracts(
         path = decision_by_id.get(decision)
         if path is None:
             issue("missing_decision", {"gate": gate_id, "decision": decision})
-        elif not re.search(r"(?m)^- 状态：已确认", path.read_text(encoding="utf-8")):
+        elif document_status(path.read_text(encoding="utf-8")) != "已确认":
             issue("unconfirmed_decision", decision)
         for spec_id in gate.get("behavior_specs", []):
             if spec_id not in behavior_by_id:
@@ -285,9 +387,7 @@ def validate_contracts(
             spec_classifications[str(domain.get("classification"))] += len(domain.get("behavior_specs", []))
     return {
         "schema_version": 1,
-        "batch": "CLOSE-03",
         "status": "completed" if not issues else "invalid",
-        "finding": "RE-SAN9PK-0146",
         "artifacts": [
             "specs/behavior/core-domain-contracts.json",
             "specs/behavior/core-domain-dependency-map.md",
@@ -317,8 +417,7 @@ def validate_contracts(
             "issue_counts": {key: len(value) for key, value in sorted(issues.items())},
             "issues": dict(sorted(issues.items())),
         },
-        "reproduce": "python research/scripts/validate_core_domain_contracts.py --contracts specs/behavior/core-domain-contracts.json --map specs/behavior/core-domain-dependency-map.md --behavior-dir specs/behavior --decision-dir specs/decisions --repo-root . --output research/archive/program-analysis/status/program-analysis-close-03-status.json",
-        "next_batch": "CLOSE-04" if not issues else None,
+        "reproduce": "python research/scripts/validate_core_domain_contracts.py --contracts specs/behavior/core-domain-contracts.json --map specs/behavior/core-domain-dependency-map.md --behavior-dir specs/behavior --decision-dir specs/decisions --repo-root . --output local/generated/verification/core-domain-contracts.json",
     }
 
 

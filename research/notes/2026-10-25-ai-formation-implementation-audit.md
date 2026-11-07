@@ -1,6 +1,6 @@
 # 全部AI选阵入口与实现偏差复核（2026-10-25）
 
-**当前结果：无阵攻城队漏算、异民族主计划阵位偏移已在v194修复，最终Application 1981／1981通过，含18项新回归。**58的Mod后备及异民族多专属阵形选择已由用户列为[待考虑项](../ai.md#formation-design-pending)，暂不实现。原作事实仍由[AI权威研究](../ai.md#all-formation-implementation-audit)维护；本记录保留实现对照、复现及IDA证据。
+**当前结果：无阵攻城队漏算、异民族主计划阵位偏移已在v194修复，最终Application 1981／1981通过，含18项新回归。**58的Mod后备及异民族多专属阵形选择已由用户列为[待考虑项](../topics/ai/boundaries.md#formation-design-pending)，暂不实现。原作事实仍由[AI权威研究](../topics/ai/military.md#all-formation-implementation-audit)维护；本记录保留实现对照、复现及IDA证据。
 
 ## 样本与方法
 
@@ -53,7 +53,7 @@
 | 58缺少规则阵 | 四类兵法全0：方圆可用选600、无步兵骰；方圆缺失转箕形700、无骰；方圆／箕形／锥行均缺失，步兵可用选720、抽一次`Next(2)`；连步兵也缺失，选通用400、仍抽一次。4项4次出征，兵法槽均空；原作同计数直接返回方圆，未做这一后备续行 |
 | 多种异民族专属阵形 | 授予陆600／700、船810／820，高ID攻防更高。全部可用选600／810，逆转内容数组及逆序授予仍相同；600超预算选700／810。3项3次出征，扣费一致。原作固定族阵没有对应多候选比较，当前实际为最低可用ID优先 |
 
-后两项仅属Mod边界，用户决定[暂缓实现](../ai.md#formation-design-pending)，建议不自动转为采用规则。没有穷尽所有Mod定义、队数或概率序列。
+后两项仅属Mod边界，用户决定[暂缓实现](../topics/ai/boundaries.md#formation-design-pending)，建议不自动转为采用规则。没有穷尽所有Mod定义、队数或概率序列。
 
 有效TRX及三个临时探针归档在`local/generated/verification/sortie-formation-20261025/continuation/`：`siege-overwrite-diagnostic.trx`10项、`formation-boundaries-diagnostic.trx`中未变且已通过的7项、`formation-naval-boundaries-diagnostic.trx`6项、`formation-land-boundaries-final.trx`6项。`continuation-summary.json`保留结果选择和文件哈希；初期资格类型／资金门等探针配置错误不计产品缺陷，已通过未变工况未重复跑。复现时将对应临时源码放回Application测试目录，按`SiegeOverwriteDiagnostic`、`FormationBoundaryDiagnostic`、`SpecialFormationDiagnostic`过滤，执行后移出。
 

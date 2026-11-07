@@ -36,7 +36,7 @@ TC101 Importer负责把原版剧本0～19的h／v视频对应关系写入各剧�
 电影转换只在显式执行`import-movies`时发生，使用用户环境PATH中的`ffmpeg`，不下载或捆绑编码器。找不到时打印跳过原因并正常返回，不修改已有电影及资源表；已找到但运行失败、缺少编码器或转换失败则报错，不伪装成跳过。普通`import-content`、`import-client`及其局部重建均不转换或复制BGM、音效和视频。
 
 ```powershell
-dotnet run --project src/San9.Tools -- import-movies --game-dir "C:/home/game/san9/San9 Tc" --output local/generated/content --group all
+dotnet run --project src/San9.Tools -- import-movies --game-dir "private/game-files" --output local/generated/content --group all
 ```
 
 分组为`events`（Event00～13，共14段）、`scenarios`（20段开场）、`startup`（theme与op_pk，不含logo）或默认`all`。命令直接读取原版游戏目录中的`MOVIE/*.mpg`，输出到最终内容包`shared/movies/<语义角色>.ogv`并更新电影资源表，保留其他已有绑定；不重导世界或纹理。客户端只读取最终内容包，不依赖原版或独立的已准备视频目录。

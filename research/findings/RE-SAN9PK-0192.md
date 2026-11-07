@@ -5,7 +5,7 @@
 - 结论类型：事实；重制选择单列
 - 置信度：高（主库调用链、消息参数与资源表交叉核对）
 - 来源：`SRC-SAN9PK-TC-101`，登记见[RE-0001](RE-SAN9PK-0001.md)
-- 规格：[BEH-UI-0008](../../specs/behavior/BEH-UI-0008-battle-presentation.md)、[表现规划](../../specs/presentation-implementation-plan.md)
+- 规格：[BEH-UI-0008](../../specs/behavior/BEH-UI-0008-battle-presentation.md)、[表现规划](../../specs/plans/presentation.md)
 
 ## 样本与方法
 

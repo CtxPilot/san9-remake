@@ -79,7 +79,7 @@
 
 281汇总可用`python local/generated/research/scenario281-year-performance-20261102/comparison/analyze.py`复核。其他版本、不同种子／局面或首轮计时只用于各自边界，不能直接计算优化倍率。
 
-原作事实保留在[原版旬推进性能采样](../research/experiments/original-turn-performance/README.md)：其完整AI任务含调度等待，显式准备入口、确认到每日入口和完整交互均有不同边界，不与本页纯逻辑整旬直接相除。[导航验收](pathfinding-verification.md)及[早期人工压力输入](scenario-performance-verification.md)另有100～500队证据，规则和输入不同，不代表本版已完成压力复测。[已退出生产的自主增强AI实验](ai-prototype-performance-records.md)保留方案取舍，不作为当前性能基线。当前数据未证明十年全图OAI-06验收。
+原作事实保留在[原版旬推进性能采样](../research/experiments/original-turn-performance/README.md)：其完整AI任务含调度等待，显式准备入口、确认到每日入口和完整交互均有不同边界，不与本页纯逻辑整旬直接相除。[导航验收](history/performance/pathfinding-verification.md)及[早期人工压力输入](history/performance/scenario-performance-verification.md)另有100～500队证据，规则和输入不同，不代表本版已完成压力复测。[已退出生产的自主增强AI实验](history/performance/ai-prototype-performance-records.md)保留方案取舍，不作为当前性能基线。当前数据未证明十年全图OAI-06验收。
 
 ## 目标分组与士气调度性能原型（2026-11-02）
 
@@ -148,4 +148,4 @@ OAI-04／05当时冻结的门槛为36旬平均≤1000ms、最近秩P95≤2000ms�
 
 ## 已撤回试验
 
-2026-10-29的v199→v200对照含进攻范围、批次动员及需求驱动输送，随后按[2026-10-31撤回决定](../specs/original-ai/behavior.md#attack-planning-decision-20261031)退出主线。其不同策略轨迹的成本不再列入当前性能比较。历史补丁、输入、程序和结果仍可由Git及`local/generated/verification/all-changes-perf-20261029/`、`ai-mobilization-perf/`追溯；专项验证边界见[当时审核](../research/notes/2026-10-29-current-ai-defect-audit.md)。
+2026-10-29的v199→v200对照含进攻范围、批次动员及需求驱动输送，随后按[2026-10-31撤回决定](../specs/original-ai/design-boundaries.md#attack-planning-decision-20261031)退出主线。其不同策略轨迹的成本不再列入当前性能比较。历史补丁、输入、程序和结果仍可由Git及`local/generated/verification/all-changes-perf-20261029/`、`ai-mobilization-perf/`追溯；专项验证边界见[当时审核](../research/notes/2026-10-29-current-ai-defect-audit.md)。

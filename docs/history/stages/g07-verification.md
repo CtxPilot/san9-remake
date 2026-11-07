@@ -1,0 +1,45 @@
+# G07军事规则验收
+
+> 历史记录：版本、命令、能力与限制均以正文标注的验收时点为准，不作为当前使用说明或重复验收要求。当前入口见[文档总览](../../README.md)。
+
+更新：2026-09-21。当前规则`san9-core-g10-v49`，存档／操作日志81；本轮只改战后规则，未改内容契约或重转内容包。本文保存当前验证入口和边界；历史迭代、临时哈希与逐轮执行日志交给Git及忽略目录，不用旧验收结论替代新规则验证。
+
+## 当前验证
+
+`dotnet test San9Remake.slnx --no-restore --verbosity minimal`通过3225项：Core2249、Content74、Importer343、Application445、Client98、Headless16。当前版本已运行完整解集，包含保存／恢复、记录重放、独立Headless及跨层内容契约测试。未启动游戏，未进行画面验收。
+
+正式内容包`local/generated/content/scenario-190-live`已原位重转；复用独立纹理包，组合schema53、剧本schema49。核对28阵型、41兵法、17设施、94据点、700人物、0初始野战部队；远距削墙仅阵型10，逐日熟练排除13／14，水战关联学习21／22／23→12／13／14，工作物毁坏学习源10–15→19、16→20。旧规则存档拒绝加载。转换入口见[内容管线](../../client-content.md)。
+
+## 占领战后对齐
+
+`WarfareAuditAlignmentTests`新增12项：原守军与奖励后攻击者士气加权、空守军和士气归零、奖励封顶、即时归并候选范围／军团／目标过滤、容量内实际接收与超额兵役人口回收、摧毁兵员转伤兵及封顶、设施来源无虚构队伍、多候选随机接收的保存恢复一致性、范围兵法多目标失守后仅归并一次。
+
+`MilitaryCombatTests`和`TacticCombatTests`验证普通攻击与兵法占领同日入城、俘虏落入新城、同日竞争不重复占领、兵法成长不因入城丢失；已有正式会话、录像及独立进程测试全部通过。`AttackRequestPlannerTests`将过路城市设为不主动攻击，以隔离请求目标规划：现在路过时反击攻下城市会当场入城，需要重新出征，不再沿旧测试的连续行军假设前进。未启动游戏，画面仍待验收。规则版本提升，旧规则存档／录像按现有校验拒绝。
+
+## 行为与验证入口
+
+| 行为 | 当前回归入口 |
+| --- | --- |
+| 出征、方针、接敌、返城、整编 | UnitPolicyTests、MilitaryMovementTests、UnitReformationTests、MilitarySessionTests、ShoreMilitarySessionTests |
+| 普通攻击与异常状态、周期士气、地利、后勤 | OriginalCombatAlignmentTests、CombatRuleCompletionTests、MilitaryCombatTests、MilitarySupplyTests |
+| 执行能力公式、智力副效果与武力连锁 | TacticMathTests、IntelligenceMartialChainTests、IntelligenceTacticTests、TacticCombatTests |
+| 鼓舞来源对象、治疗与高昂到期 | IntelligenceTacticTests、FacilityCombatTests、WarfareAuditAlignmentTests |
+| 近距削墙、发石留1与接近收尾、斜向范围 | WarfareAuditAlignmentTests、AttackRangeTests、MilitaryCombatTests |
+| 城市逐次交战损失、信望民心、半份额资源 | WarfareAuditAlignmentTests、BattleCaptureTests、G06CampaignTests |
+| 战斗成长、工作物销毁、设施反作用 | TacticCombatTests、WarfareAuditAlignmentTests、FacilityConstructionTests、FacilityReprisalTests |
+| 伤兵、俘虏、战败返回及空池安置 | WoundedRecoveryTests、PrisonerEscapeTests、CombatRuleCompletionTests、BattleCaptureTests、Application.PrisonerCycleTests |
+| 内容覆盖、查询与持久化 | MilitaryContentCompilerTests、MilitarySessionTests、ConstructionSessionTests、Headless.Tests |
+
+`WarfareAuditAlignmentTests`新增24项边界验证（包含三种失守入口的耐久四分之一下限）；原测试中固化“正常目标攻心／陷阱不连锁”“鼓舞范围加士气”“每击按比例扣士气”的断言已按采用规则重写。测试通过表示上述明确行为与不变量受验收，不表示原作所有战斗分支已复现。
+
+## 2026-09-13 主将选定对齐
+
+出征与整编按身份、官职、当前统率稳定排序；离队继任复用相同优先级；2026-09-19统一人物顺序选择将同分规则改为ID升序，并删除成员排序状态。对应UnitLeadershipTests及军事会话测试。原作证据保留在[RE-0081](../../../research/findings/RE-SAN9PK-0081.md)，不因本文删去过程日志而丢弃证据。
+
+## 采用规则与边界
+
+公式、副效果、鼓舞、治疗、高昂到期、成长入口、削墙与移动收尾、城市战损及占领资源的采用行为已并入[普通战斗](../../../specs/behavior/BEH-WAR-0004-normal-combat.md)、[兵法](../../../specs/behavior/BEH-WAR-0005-tactics.md)、[占领](../../../specs/behavior/BEH-WAR-0002-building-defeat-and-capture.md)与[状态](../../../specs/behavior/BEH-STRATEGY-0002-unit-status-and-reinforcement.md)。研究依据按主题分见[战斗公式](../../../research/findings/RE-SAN9PK-0068.md)、[连锁](../../../research/findings/RE-SAN9PK-0125.md)、[成长](../../../research/findings/RE-SAN9PK-0131.md)、[占领](../../../research/findings/RE-SAN9PK-0138.md)和[射程](../../../research/findings/RE-SAN9PK-0172.md)。独立审计过程文档已合并删除。
+
+保留用户确认的同类不同名武力连携、主发动者决定倍击、普通攻防取队内最高有效统率、电脑伤害加成一次、无主将守军不免疫智力兵法、溢出兵员回归兵役人口、空安置池转在野，以及治疗保留高昂但清除后续惩罚。
+
+驻军固定系数原作取值仍待溯源，本轮未凭推测替换。G05移动预算与占地仍按已声明的重制模型；完整人物生命周期／单挑、AI与所有消息文本分类展示留给后续阶段。本轮没有重新对旧190年临时战役录像做跨版本重放，旧规则录像不冒充当前规则证据。

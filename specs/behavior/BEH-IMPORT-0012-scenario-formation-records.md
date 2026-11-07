@@ -68,4 +68,4 @@
 
 ### 非阻塞补证
 
-- 编辑器对非库存阵位/说明代码的保存行为，以及其他版本是否读取 `+0x02/+0x04/+0x06`，统一归入 [`EDITOR-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)；当前版本的负面审计保持成立。
+- 编辑器对非库存阵位/说明代码的保存行为，以及其他版本是否读取 `+0x02/+0x04/+0x06`，统一归入 [`EDITOR-01`](../../research/topics/scenario-field-evidence.md)；当前版本的负面审计保持成立。

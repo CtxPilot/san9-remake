@@ -2,7 +2,7 @@
 
 界面开发从本页进入。`docs/ui/` 集中维护当前界面实现与通用约定；行为要求仍由 BEH 保存，重要取舍由 DEC 保存，原作证据由 RE 保存。本页提供统一导航，不复制这些正文。
 
-剩余接入顺序、进入战略阶段时的情境发言、IDA 核对与验收边界见[表现层后续接入规划](../../specs/presentation-implementation-plan.md)。BGM 和视频继续保持占位。
+剩余接入顺序、进入战略阶段时的情境发言、IDA 核对与验收边界见[表现层后续接入规划](../../specs/plans/presentation.md)。电影与音频当前接入分别见[电影说明](../movie-preparation.md)和[音频说明](../audio-preparation.md)，实际画面与试听按场景验收。
 
 ## 实现与通用约定
 
@@ -11,11 +11,13 @@
 | [战略界面](strategy-ui.md) | 状态所有权、输入、窗口缩放、侧栏、小地图、建筑悬停 |
 | [情报界面](information-browser.md) | 目录、详情、导航、行政查询、情报地图及当前边界 |
 | [坐标对齐](ui-layout-alignment.md) | 截图标定、透明留白、共同锚点与布局量测 |
+| [界面与演出内容](presentation-content.md) | 显示资源角色、皮肤、部队外观及演出契约 |
 | [文字样式](text-styles.md) | 字体、角色与状态、描边阴影、样式覆盖 |
 | [部队外观](../../specs/behavior/BEH-RENDER-0003-map-ambient-animation.md#阵型身体数量与站位) | 阵型身体、三类兵群数量与坐标、兵器护卫及固定船型 |
 | [消息编写](messages.md) | BBCode、图标、参数绑定与消息求值 |
 | [文字与翻译](../../specs/text-and-translation.md) | 解码、繁简转换、姓名及词汇校订的唯一权威 |
 | [地图消息测试](map-messages.md) | 首批计略喊话与左下记录接线、第40号本地测试存档及后续范围 |
+| [引擎交互检查](engine-verification.md) | 工作流、模态、编辑器和开局控件的定向检查 |
 | [画面验证](client-verification.md) | 验收分工、历史脚本分类、按需复现命令与限制 |
 
 ## 行为与设计依据
@@ -24,7 +26,7 @@ P1 已接通的计略、主动外交与军团管理见[操作与验证说明](mi
 
 | 主题 | 行为规格 | 重要取舍 |
 | --- | --- | --- |
-| 主界面与布局 | [初始战略界面](../../specs/behavior/BEH-UI-0001-initial-strategy-screen.md) | [桌面宽屏与固定内容区域布局](../../specs/decisions/DEC-UI-0008-desktop-widescreen-layout.md)（动态视口、公共宿主、HUD分组与确认框scene已接入） |
+| 主界面与布局 | [战略界面与地图操作](../../specs/behavior/BEH-UI-0001-initial-strategy-screen.md) | [桌面宽屏与固定内容区域布局](../../specs/decisions/DEC-UI-0008-desktop-widescreen-layout.md)（动态视口、公共宿主、HUD分组与确认框scene已接入） |
 | 侧栏名单 | [武将名单](../../specs/behavior/BEH-UI-0002-officer-roster.md) | [设施名单交互](../../specs/decisions/DEC-UI-0004-facility-list-interaction.md) |
 | 战略全图 | [全图面板](../../specs/behavior/BEH-UI-0003-strategy-overview.md) | [导航与悬停](../../specs/decisions/DEC-UI-0006-overview-navigation.md)、[相机边界](../../specs/decisions/DEC-UI-0003-continuous-map-camera-boundary.md) |
 | 情报浏览 | [目录与详情](../../specs/behavior/BEH-UI-0004-information-browser.md) | [运行态与交互](../../specs/decisions/DEC-UI-0007-information-browser.md)、[程序四维图](../../specs/decisions/DEC-RENDER-0003-procedural-officer-radar.md) |
@@ -39,8 +41,8 @@ P1 已接通的计略、主动外交与军团管理见[操作与验证说明](mi
 
 - [内容管线](../client-content.md)：转换命令、包契约、数据覆盖与校验。
 - [纹理资源](../texture-resources.md)与[字体资源](../../src/San9.Client.Godot/assets/README.md)：资源准备、生命周期与许可证。
-- [地图导入与运行](../map-import.md)及[地图坐标](../map-coordinates.md)：地图渲染和领域坐标。
-- [运行时架构](../runtime-state.md)：会话、领域状态与查询边界。
+- [地图导入与运行](../map-import.md)及[地图坐标](../architecture/map-coordinates.md)：地图渲染和领域坐标。
+- [运行时架构](../architecture/runtime-state.md)：会话、领域状态与查询边界。
 
 ## 维护方式
 

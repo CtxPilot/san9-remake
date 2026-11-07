@@ -56,4 +56,4 @@
 
 ## 未决问题
 
-无。`D_Trst01.S9`–`D_Trst28.S9` 的特殊 `head` 布局适用性属于 [`EXT-SCENARIO-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)，不在本规格适用范围内。
+无。`D_Trst01.S9`–`D_Trst28.S9` 的特殊 `head` 布局适用性属于 [`EXT-SCENARIO-01`](../../research/topics/scenario-field-evidence.md)，不在本规格适用范围内。

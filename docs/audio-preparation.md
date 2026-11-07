@@ -5,7 +5,7 @@
 ## 命令与输出
 
 ```powershell
-dotnet run --project src/San9.Tools -- import-audio --game-dir "private/游戏文件" --output local/generated/content --group all
+dotnet run --project src/San9.Tools -- import-audio --game-dir "private/game-files" --output local/generated/content --group all
 ```
 
 `--group`支持`bgm`、`effects`及默认`all`。BGM读取原版`BGM`目录的WMA，使用用户环境PATH中的`ffmpeg`转换为Ogg Vorbis Q5、44.1kHz双声道，直接输出到最终内容包`shared/music/`；音效从`SE`读取WAV、Ogg Vorbis或MP3，按原格式复制到`shared/sound-effects/`，不重新编码。音效导入不需要FFmpeg。分组只读取对应源目录；已有可播放音乐的复制也不依赖FFmpeg。命令针对内容根目录，独立剧本包使用该包目录作为输出根；两种组织方式统一引用根下的`shared/music/`与`shared/sound-effects/`，不重建世界、纹理或表现引用。

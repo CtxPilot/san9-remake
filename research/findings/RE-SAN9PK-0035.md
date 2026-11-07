@@ -4,7 +4,7 @@
 - 日期：2026-08-19
 - 分析者：Codex
 - 结论类型：事实、受限推断、待验证分开记录
-- 关联来源：[SRC-SAN9PK-TC-101](../SOURCES.md#src-san9pk-tc-101)、[SRC-KAODATA](../SOURCES.md#src-kaodata)
+- 关联来源：[SRC-SAN9PK-TC-101](../sources/SRC-SAN9PK-TC-101.md)、[SRC-KAODATA](../SOURCES.md)
 - 关联记录：[RE-SAN9PK-0005](RE-SAN9PK-0005.md)、[RE-SAN9PK-0006](RE-SAN9PK-0006.md)、[RE-SAN9PK-0030](RE-SAN9PK-0030.md)、[RE-SAN9PK-0032](RE-SAN9PK-0032.md)
 - IDA 样本：`research/analysis/San9PK-TC-101.i64`；本轮已同步 IDA 函数命名与证据注释，未修改函数类型、反编译逻辑或产品代码
 
@@ -162,7 +162,7 @@ Lanczos 结果：
 复现命令（仓库根目录，Python 依赖 NumPy/Pillow）：
 
 ```powershell
-uv run --with numpy --with pillow python research/scripts/compare_face_crops.py "private/游戏文件" local/generated/face-crop-analysis
+uv run --with numpy --with pillow python research/scripts/compare_face_crops.py "private/game-files" local/generated/face-crop-analysis
 ```
 
 脚本：[compare_face_crops.py](../scripts/compare_face_crops.py)。输出 `metrics.json` 保存全部指标及搜索坐标，`comparison.png` 和 `adjusted-comparison.png` 保存对照图；生成物不提交。本轮是文件像素实验，没有新增 IDA 写入，也未修改产品代码。

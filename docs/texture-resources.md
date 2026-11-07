@@ -40,11 +40,11 @@
 ## 转换与离线入口
 
 ```powershell
-dotnet run --project src/San9.Tools -- import-textures --game-dir "private/游戏文件" --output local/generated/content/textures-san9pk-tc101
-dotnet run --project src/San9.Tools -- import-client --game-dir "private/游戏文件" --scenario D_Sce002.S9 --texture-package local/generated/content/textures-san9pk-tc101 --output local/generated/content/scenario-190-live
+dotnet run --project src/San9.Tools -- import-textures --game-dir "private/game-files" --output local/generated/content/textures-san9pk-tc101
+dotnet run --project src/San9.Tools -- import-client --game-dir "private/game-files" --scenario D_Sce002.S9 --texture-package local/generated/content/textures-san9pk-tc101 --output local/generated/content/scenario-190-live
 dotnet run --project src/San9.Tools -- verify-textures --texture-package local/generated/content/textures-san9pk-tc101
 dotnet run --project src/San9.Tools -- verify-client --content-package local/generated/content/scenario-190-live
-python research/scripts/verify_texture_library.py --package local/generated/content/textures-san9pk-tc101 --source private/游戏文件
+python research/scripts/verify_texture_library.py --package local/generated/content/textures-san9pk-tc101 --source private/game-files
 ```
 
 验证入口供显式调用，不在游戏启动时扫描所有 PNG。Python 脚本用于转换器或源格式研究时，将转换包与原版索引像素、调色板及锚点独立对照；它不属于头像编辑器日常验证，不是产品运行依赖。仅在修改该脚本或对应纹理转换行为时运行相关检查。当前用户负责画面检查，不自动启动游戏。

@@ -135,6 +135,90 @@ class ValidateCoreDomainContractsTests(unittest.TestCase):
                 result = validate_contracts(contracts, behavior_dir, decision_dir, root, {"simulation"})
                 self.assertIn("invalid_behavior_status", result["validation"]["issues"])
 
+    def test_accepts_topic_sources_with_prose_and_table_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            contracts, behavior_dir, decision_dir = self.make_fixture(root)
+            spec = behavior_dir / "BEH-SIMULATION-0001-test.md"
+            spec.write_text("# 专题入口\n\n- 状态：已确认\n", encoding="utf-8")
+            # A behavior needs no separate DEC unless a declared gate requires it.
+            contracts["decision_gates"] = []
+            topic = root / "specs" / "simulation.md"
+            topic.write_text(
+                "# 模拟专题\n\n## 推进\n\n稳定边界发布下一日。\n"
+                "\n## 所有权\n\n只读查询不得改变世界。\n"
+                "\n## 验收\n\n相同初态和操作序列产生相同结果。\n\n"
+                "| 输入 | 结果 |\n| --- | --- |\n| 非法命令 | 无状态变化 |\n",
+                encoding="utf-8",
+            )
+            contracts["specification_sources"] = {"BEH-SIMULATION-0001": {
+                "behavior": "specs/simulation.md#推进",
+                "invariants": "specs/simulation.md#所有权",
+                "acceptance": "specs/simulation.md#验收",
+            }}
+            result = validate_contracts(contracts, behavior_dir, decision_dir, root, {"simulation"})
+        self.assertTrue(result["validation"]["valid"], result["validation"])
+        self.assertEqual(result["acceptance_criteria_count"], 2)
+
+    def test_rejects_broken_unsafe_and_empty_topic_sources(self):
+        cases = [
+            (None, "invalid_specification_source"),
+            ("specs/missing.md", "missing_specification_source"),
+            ("specs/topic.md#不存在", "missing_specification_content"),
+            ("specs/topic.md#空章节", "missing_specification_content"),
+            ("specs/topic.md#样例章节", "missing_specification_content"),
+            ("specs/../outside.md", "invalid_specification_source"),
+            ("specs/empty.md", "missing_specification_content"),
+        ]
+        for source, error in cases:
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                contracts, behavior_dir, decision_dir = self.make_fixture(root)
+                (root / "outside.md").write_text("outside", encoding="utf-8")
+                (root / "specs" / "topic.md").write_text(
+                    "# 主题\n\n```markdown\n## 样例章节\n样例不是正文。\n```\n"
+                    "\n## 空章节\n\n### 只有标题\n\n## 正文\n有效内容。\n",
+                    encoding="utf-8",
+                )
+                (root / "specs" / "empty.md").write_text(
+                    "# 空主题\n\n- 状态：已确认\n\n## 验收\n\n| 条件 | 结果 |\n| --- | --- |\n",
+                    encoding="utf-8",
+                )
+                contracts["specification_sources"] = {"BEH-SIMULATION-0001": {"acceptance": source}}
+                result = validate_contracts(contracts, behavior_dir, decision_dir, root, {"simulation"})
+                self.assertIn(error, result["validation"]["issues"])
+
+    def test_rejects_unknown_source_spec_and_role(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            contracts, behavior_dir, decision_dir = self.make_fixture(root)
+            contracts["specification_sources"] = {
+                "BEH-MISSING-0001": {},
+                "BEH-SIMULATION-0001": {"accceptance": "specs/topic.md"},
+            }
+            result = validate_contracts(contracts, behavior_dir, decision_dir, root, {"simulation"})
+        self.assertIn("unknown_source_spec", result["validation"]["issues"])
+        self.assertIn("invalid_specification_sources", result["validation"]["issues"])
+
+    def test_absent_question_section_is_not_a_contract_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            contracts, behavior_dir, decision_dir = self.make_fixture(root)
+            spec = behavior_dir / "BEH-SIMULATION-0001-test.md"
+            spec.write_text(spec.read_text(encoding="utf-8").split("## 未决问题")[0], encoding="utf-8")
+            result = validate_contracts(contracts, behavior_dir, decision_dir, root, {"simulation"})
+        self.assertTrue(result["validation"]["valid"])
+
+    def test_retired_decision_cannot_remain_an_active_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            contracts, behavior_dir, decision_dir = self.make_fixture(root)
+            decision = decision_dir / "DEC-SIM-0001-test.md"
+            decision.write_text("# 历史决策\n\n- 状态：已废弃\n", encoding="utf-8")
+            result = validate_contracts(contracts, behavior_dir, decision_dir, root, {"simulation"})
+        self.assertIn("unconfirmed_decision", result["validation"]["issues"])
+        self.assertIn("behavior_unconfirmed_decision", result["validation"]["issues"])
+
 
 if __name__ == "__main__":
     unittest.main()

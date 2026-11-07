@@ -101,4 +101,4 @@
 
 ## 未决问题
 
-无。未纳入适用范围的像素语义必须通过后续 `BEH-*` 单独确认。正式剧本头字段已经由 [`HEAD-01`](../../research/scenario-field-research-checklist.md#已关闭字段队列) 闭合；标题/说明的资源编号绑定已确认，替代文本的内容键设计仍归 [`CONTENT-01`](../../research/scenario-field-research-checklist.md#当前未决项)。
+无。未纳入适用范围的像素语义必须通过后续 `BEH-*` 单独确认。正式剧本头字段已经由 [`HEAD-01`](../../research/topics/scenario-field-evidence.md) 闭合；标题/说明的资源编号绑定已确认，替代文本的内容键设计仍归 [`CONTENT-01`](../../research/topics/scenario-field-evidence.md)。

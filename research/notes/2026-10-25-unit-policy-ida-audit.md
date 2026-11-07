@@ -2,7 +2,7 @@
 
 **记录：UNIT-POLICY-IDA-AUDIT-20261025，作者 Codex。** 本轮由三个子智能体直接读取项目 IDA 主库，主代理交叉核对输入位、调度、战力与控制权。范围是敌接近、自主撤退、追击、事后命令，以及各结果的摘要、地图喊话与专用提示。先完成只读审计，随后按用户明确授权实施；下文修复前诊断按发生时基线保留，当前完成状态见末节，不把已有测试通过视为原作一致。
 
-取证身份沿用 [RE-0081](../findings/RE-SAN9PK-0081.md)、[RE-0090](../findings/RE-SAN9PK-0090.md)、[RE-0087](../findings/RE-SAN9PK-0087.md)、[RE-0198](../findings/RE-SAN9PK-0198.md)。原作规则唯一权威正文仍为 [research/ai.md](../ai.md#responses)，本记录保留本轮复现方法、差异与验证边界。
+取证身份沿用 [RE-0081](../findings/RE-SAN9PK-0081.md)、[RE-0090](../findings/RE-SAN9PK-0090.md)、[RE-0087](../findings/RE-SAN9PK-0087.md)、[RE-0198](../findings/RE-SAN9PK-0198.md)。原作规则唯一权威正文仍为 [research/ai.md](../topics/ai/unit-responses.md#responses)，本记录保留本轮复现方法、差异与验证边界。
 
 ## 样本、方法与置信度
 
@@ -158,7 +158,7 @@
 本轮消息诊断入口为现有 Application 测试项目显式加载忽略目录的探针，不新建工程：
 
 ```powershell
-dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --no-restore --filter FullyQualifiedName~PolicyMessageAuditProbe -p:CustomAfterMicrosoftCommonTargets=C:/home/game/san9/remake/local/generated/research/unit-policy-audit/PolicyMessageAuditProbe.targets --logger 'trx;LogFileName=policy-message-audit.trx' --results-directory local/generated/research/unit-policy-audit
+dotnet test tests/San9.Application.Tests/San9.Application.Tests.csproj --no-restore --filter FullyQualifiedName~PolicyMessageAuditProbe "-p:CustomAfterMicrosoftCommonTargets=$PWD/local/generated/research/unit-policy-audit/PolicyMessageAuditProbe.targets" --logger 'trx;LogFileName=policy-message-audit.trx' --results-directory local/generated/research/unit-policy-audit
 ```
 
 源图、实值求值、投影、诊断源码和TRX保存在上述忽略目录；不提交私有原文或派生消息内容。复用上轮同基线的 Core 46项方针／42项生命周期及 Application 28项定向测试，没有为只读审计重跑全解决方案或 Headless。

@@ -1,6 +1,6 @@
 # 规格索引
 
-`specs/` 保存已采用的产品行为与重要决策，研究记录提供证据，实际实现进度见根目录 [README](../README.md)。
+`specs/` 保存已采用的产品行为与重要决策，研究记录提供证据，实际能力见根目录[README](../README.md)，实现和使用说明从[文档总览](../docs/README.md)进入。历史证据见[验收索引](../docs/history/README.md)，退出的方案见`specs/archive/`。
 
 ## 规格维护
 
@@ -11,25 +11,19 @@
 - BEH 描述最终行为与验收；DEC 仅记录需要独立解释的重要长期取舍、备选方案与代价，并链接相关 BEH。可在 BEH 内说明的选择、一般视觉差异与未来设想无需另立 DEC。
 - 区分原作事实与重制选择。与已采用重制行为无关的原作未知项不阻塞实现；影响当前资格、输入、时机或结果的证据缺口必须先核对。重制选择须说明产品理由和验收，不能为跳过研究而临时简化。未来规划与已采用行为分别标明。
 
-当前证据纠错、规格边界与待用户集中处理事项见[研究与规格疑点清单](../research/research-open-questions.md)。
+当前证据纠错、规格边界与待用户集中处理事项见[研究与规格疑点清单](../research/open-questions.md)。
 
-## 规范文件
+## 按目的进入
 
-- [整体路线图](roadmap.md)
-- [原版AI新规格](original-ai/README.md)（独立建立行为、实施和验收；研究只引用[唯一权威正文](../research/ai.md)）
-- [旧自主AI规格](ai/README.md)（冻结的增强路线与暂停实现记录，不继续追加原版AI规格）
-- [表现层后续接入规划](presentation-implementation-plan.md)（操作、消息、战场与剧情演出及整局收口）
-- [C#逻辑Mod接入规划](logic-mod-plan.md)（初步构思稿：参考杀戮尖塔2的加载底座、领域原生扩展、Harmony与分期验收）
-- [粗格导航设计](navigation-redesign.md)（已采用：粗格导航、细步执行与端点接驳）
-- [文字与翻译规范](text-and-translation.md)（解码、繁简转换、姓名与词汇校订唯一权威）
-- [项目与文档约定](project-conventions.md)
-- [研究与证据规范](research-method.md)
-- [逆向工程规范](reverse-engineering.md)
-- [工程与交付流程](engineering-workflow.md)
-- [UI 文档统一入口](../docs/ui/README.md)（界面实现、行为、决策与研究导航）
-- [行为规格目录](behavior/README.md)
-- [改良决策目录](decisions/README.md)
-- [记录模板](templates/README.md)
+| 内容 | 入口 |
+| --- | --- |
+| 采用行为与验收 | [行为规格](behavior/README.md)、[原版AI规格](original-ai/README.md) |
+| 长期取舍与替代关系 | [决策目录](decisions/README.md) |
+| 跨主题设计 | [粗格导航](navigation-redesign.md)、[文字与翻译](text-and-translation.md) |
+| 阶段、依赖与未来工作 | [计划目录](plans/README.md) |
+| 开发、文档与研究规则 | [开发规范](../docs/development/README.md) |
+| 文档结构 | [模板](templates/README.md) |
+| 退出的方案 | [设计归档](archive/autonomous-ai/README.md) |
 
 ## 约束词
 

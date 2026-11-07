@@ -73,4 +73,4 @@
 
 ## 未决问题
 
-无阻塞本规格的未决问题。库存外 `system_code`、编辑器保存差分和其他版本行为统一归入 [`EDITOR-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)；`D_Trst01.S9`–`D_Trst28.S9` 归入 [`EXT-SCENARIO-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)。导入器继续无损保留未知值。
+无阻塞本规格的未决问题。库存外 `system_code`、编辑器保存差分和其他版本行为统一归入 [`EDITOR-01`](../../research/topics/scenario-field-evidence.md)；`D_Trst01.S9`–`D_Trst28.S9` 归入 [`EXT-SCENARIO-01`](../../research/topics/scenario-field-evidence.md)。导入器继续无损保留未知值。

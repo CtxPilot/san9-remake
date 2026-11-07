@@ -41,7 +41,7 @@
 
 ## 样本与复现方法
 
-可执行文件 `private/游戏文件/San9PK.exe`：`2,636,800` 字节，x86 PE，基址 `0x400000`，SHA-256：
+可执行文件 `private/game-files/San9PK.exe`：`2,636,800` 字节，x86 PE，基址 `0x400000`，SHA-256：
 
 ```text
 d20794aeff67301ec2bf8c3becb1e9944c68c6c0588fbfd4bf04e8597f0e5028
@@ -49,7 +49,7 @@ d20794aeff67301ec2bf8c3becb1e9944c68c6c0588fbfd4bf04e8597f0e5028
 
 本轮使用 IDA `9.4`、Hex-Rays `9.4.0.260915`、IDA Domain API `0.5.1`，回读样本身份与主库路径一致。
 
-消息文件 `private/游戏文件/M_MsgPK.s9`：`373,739` 字节，SHA-256：
+消息文件 `private/game-files/M_MsgPK.s9`：`373,739` 字节，SHA-256：
 
 ```text
 3a8bb191de1a9f17ea95e9ec6cdd1443d6ef44a524ba6dbb7ce977df25900b5d

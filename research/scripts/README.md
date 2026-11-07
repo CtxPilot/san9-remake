@@ -1,13 +1,13 @@
 # 研究脚本
 
-IDA 主库加载故障的诊断与恢复见 [Root Node 恢复方法](../../docs/ida-database-recovery.md)。
+IDA 主库加载故障的诊断与恢复见 [Root Node 恢复方法](../tools/ida-database-recovery.md)。
 
-- `analyze_scenario_persons.py`：只读统计 20 个正式剧本的人物编号、能力、属性、熟练度、忠诚和标志位；原始样本哈希用于来源识别，逐值分布保存在忽略目录，不将库存极值转成产品拒绝规则。运行：`python research/scripts/analyze_scenario_persons.py private/游戏文件 local/generated/research/audit/person-profile.json`；验证：`python -m unittest discover -s research/scripts -p test_analyze_scenario_persons.py`。
+- `analyze_scenario_persons.py`：只读统计 20 个正式剧本的人物编号、能力、属性、熟练度、忠诚和标志位；原始样本哈希用于来源识别，逐值分布保存在忽略目录，不将库存极值转成产品拒绝规则。运行：`python research/scripts/analyze_scenario_persons.py private/game-files local/generated/research/audit/person-profile.json`；验证：`python -m unittest discover -s research/scripts -p test_analyze_scenario_persons.py`。
 
 - `build_source_catalog.py`：从本地源码和文档生成统一来源候选。
 - `build_program_analysis_close01.py`：汇总路线图、覆盖账本、San9PKHard 候选状态和 `EVT-01` 旧待验证项路由，验证已完成批次不再伪装为当前待办，并把唯一剩余核心项守恒到 `CLOSE-02`。
-- `validate_core_domain_contracts.py`：校验 `CLOSE-03` 的已确认行为规格分类、核心领域契约、无环依赖、决策门、实现入口、验收条款覆盖及产品契约逆向细节泄漏。
-- `validate_program_analysis_final_acceptance.py`：重放 `CLOSE-04` 历史验收，使用提交 `6cbbfba` 的完整工作树及其中脚本执行。其147份研究/419个符号和在线回读是固定历史快照，不能在当前工作树重跑并宣称当前全量通过；历史路线图现归档，当前复核见[疑点清单](../research-open-questions.md)。
+- `validate_core_domain_contracts.py`：校验当前已采用规格的领域登记、权威正文来源、无环依赖、有效决策门、实现入口和产品契约中的逆向细节泄漏。`specification_sources`可声明专题整页或章节，验收支持段落、列表和表格；不以复选框数量判定内容是否存在。声明方式见[契约边界](../../specs/behavior/core-domain-dependency-map.md#契约边界)，报告写入忽略的`local/generated/verification/`，不覆盖历史CLOSE批次证据。
+- `validate_program_analysis_final_acceptance.py`：重放 `CLOSE-04` 历史验收，使用提交 `6cbbfba` 的完整工作树及其中脚本执行。其147份研究/419个符号和在线回读是固定历史快照，不能在当前工作树重跑并宣称当前全量通过；历史路线图现归档，当前复核见[疑点清单](../open-questions.md)。
 - `build_formula_catalog.py`：把公式文档的 0–29 项原版主张、独立的优化主张、电子书交叉来源和明确映射的 San9PKHard 补丁点汇总为语义目录；可通过审阅后的状态文件合并当前 IDA 地址、目标函数、证据和待实验项，输出放在 `local/generated/research/ida/`。
 - `verify_patch_points.py`：把声明的旧字节按 PE32 映射回精确哈希样本，只读输出直接匹配与冲突；不加载或执行目标程序。
 - `build_san9pkhard_catalog.py`：线性扫描 San9PKHard 的地址符号/数组、`ASM_PATCH` 注册、代码与旧字节数组、`WriteProcessMemory` 调用、DDX 配置绑定和参数位域；完整账本输出到 `tmp/`，仓库只保存带分段哈希与问题清单的 `patch-points/san9pkhard-catalog-status.json`。可选 `--image` 只读校验静态旧字节。
@@ -36,7 +36,7 @@ IDA 导出放在被 Git 忽略的 `local/generated/research/ida/`，图像研究
 
 ```text
 python research/scripts/render_square_map.py \
-  private/游戏文件/D_Sce002.S9 private/游戏文件 \
+  private/game-files/D_Sce002.S9 private/game-files \
   local/generated/research/images/square-map/d_sce002-luoyang-building-info.png \
   --x 80 --y 55 --width 35 --height 30 --building-info \
   --building-info-font private/LXGWWenKaiMonoGBLite-Medium.ttf \

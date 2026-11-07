@@ -7,7 +7,7 @@
 
 ## 梯度旧规则并非只存在于注释
 
-修复前的`specs/navigation-redesign.md`已明确写“梯度右／下边缘遵循已确认的原作覆盖规则，不使用对称半开矩形深度替代”；`docs/pathfinding-original-parity-audit.md`的A4也讨论原作right／bottom边界与对称公式的差异。因此它曾同时存在于规格、代码与测试中，不能概括为只藏在代码注释里。
+修复前的`specs/navigation-redesign.md`已明确写“梯度右／下边缘遵循已确认的原作覆盖规则，不使用对称半开矩形深度替代”；`docs/history/audits/pathfinding-original-parity-audit.md`的A4也讨论原作right／bottom边界与对称公式的差异。因此它曾同时存在于规格、代码与测试中，不能概括为只藏在代码注释里。
 
 此前说明没有直白写出“每圈漏格会形成低费阶梯，以及可能导致聚集／往返”，原作事实到产品采用的理由也不足。用户要求修复后，现行导航规格已明确替代为完整对称半开矩形。研究事实仍见[RE-0136](../findings/RE-SAN9PK-0136.md#梯度边界漏绘修复与存档复验2026-11-03)。
 

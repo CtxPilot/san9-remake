@@ -4,7 +4,7 @@
 
 ## 输入和启动
 
-从仓库根目录运行 PowerShell。需要 Python、Godot 4 .NET（本机验证为 4.7.2）、私有 `private/游戏文件/{San9PK.exe,G_Flag.s9,G_Name.s9}`、Windows KaiU／SimKai 字体，以及保存的母材 `local/generated/research/flag-generation/imagegen/cloth-neutral-v1.png`。母材哈希见研究记录；它和字体、源资源均不在提交内，提示词不能保证重建同一图片。
+从仓库根目录运行 PowerShell。需要 Python、Godot 4 .NET（本机验证为 4.7.2）、私有 `private/game-files/{San9PK.exe,G_Flag.s9,G_Name.s9}`、Windows KaiU／SimKai 字体，以及保存的母材 `local/generated/research/flag-generation/imagegen/cloth-neutral-v1.png`。母材哈希见研究记录；它和字体、源资源均不在提交内，提示词不能保证重建同一图片。
 
 ```powershell
 $flagRoot = Join-Path $PWD 'local/generated/research/flag-generation'

@@ -81,4 +81,4 @@
 
 ## 未决问题
 
-无。编辑器是否允许用户修改三个无效/遗留槽位属于 [`EDITOR-01`](../../research/scenario-field-research-checklist.md#范围外与后续扩展)，不属于本运行时行为规格。
+无。编辑器是否允许用户修改三个无效/遗留槽位属于 [`EDITOR-01`](../../research/topics/scenario-field-evidence.md)，不属于本运行时行为规格。
