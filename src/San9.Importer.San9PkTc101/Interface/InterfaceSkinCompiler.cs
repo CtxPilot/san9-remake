@@ -398,6 +398,8 @@ public static partial class InterfaceSkinCompiler
         Extra("bar-durability-critical", 396, 52); Extra("bar-durability-warning", 397, 52);
         Extra("icon-construction", 1241, 3); Extra("icon-transport", 1242, 3);
         Extra("icon-emperor", 1243, 3); Extra("icon-training", 1244, 3); Extra("icon-merchant", 1245, 3);
+        // RE-0158: native 16x16 command check, including its transparent margins.
+        Extra("icon-commanded", 1253, 4);
         Dictionary<string, string> colors = [];
         for (int i = 0; i < 51; i++) colors.Add($"overview-force-{i}", Convert.ToHexString(overview.Palettes[8].AsSpan((i + 1) * 4, 3)));
         for (int i = 0; i < 52; i++) colors.Add($"city-marker-{i}", Convert.ToHexString(common.Palettes[49].AsSpan((i + 1) * 4, 3)));

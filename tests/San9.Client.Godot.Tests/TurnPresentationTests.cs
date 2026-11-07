@@ -75,18 +75,23 @@ public sealed class TurnPresentationTests
         Assert.Equal(SessionDisposition.Accepted, session.TakeOverForce(2).Disposition);
         var turn = new TurnPresentation(session);
         var clock = session.Snapshot.Clock;
+        Assert.Equal(1, turn.CommandMarkForceId);
         Assert.False(turn.ContinueAutomaticControls());
         Assert.True(turn.Request());
+        Assert.Equal(1, turn.CommandMarkForceId);
         turn.Confirm(); Ready(turn); turn.Update(2);
         Assert.Equal(TurnScreen.Returning, turn.Screen);
+        Assert.Null(turn.CommandMarkForceId);
         Assert.Equal(clock, session.Snapshot.Clock);
         Assert.Equal(2, session.View.PlayerForceId);
         turn.Update(2);
         Assert.True(turn.CanAdvance);
+        Assert.Equal(2, turn.CommandMarkForceId);
         Enter(turn); Finish(turn);
         Assert.Equal(TurnScreen.Strategy, turn.Screen);
         Assert.Equal(clock.DayNumber + 10, session.Snapshot.Clock.DayNumber);
         Assert.Equal(1, session.View.PlayerForceId);
+        Assert.Equal(1, turn.CommandMarkForceId);
     }
 
     [Fact]
@@ -97,12 +102,14 @@ public sealed class TurnPresentationTests
         var turn = new TurnPresentation(session);
         turn.Update(10);
         Assert.Equal(TurnScreen.Strategy, turn.Screen);
+        Assert.Null(turn.CommandMarkForceId);
         turn.StopAtStrategyBoundary();
         long started = session.Snapshot.Clock.DayNumber;
         Assert.True(turn.ContinueAutomaticControls());
         Assert.False(turn.ContinueAutomaticControls());
         Ready(turn); turn.Update(2); Ready(turn);
         Assert.Equal(TurnScreen.Playing, turn.Screen);
+        Assert.Null(turn.CommandMarkForceId);
         for (int i = 0; i < 40 && session.Snapshot.Clock.DayNumber < started + 11; i++)
         { Ready(turn); turn.Update(2); }
         Assert.True(session.Snapshot.Clock.DayNumber >= started + 11);

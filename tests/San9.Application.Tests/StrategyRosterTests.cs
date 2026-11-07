@@ -7,6 +7,41 @@ namespace San9.Application.Tests;
 
 public sealed class StrategyRosterTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void UnitRowsFollowCommandAndDailyCycleHistoryRatherThanPersistentOrders(bool awaitingPostAction, bool enteredDailyCycle)
+    {
+        var definition = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "unit-roster", 190, 1, 1, 5,
+            [new(5, "force", 5, 100) { LeaderId = 0 }],
+            [new(0, "city", 5, 1, 1, 1000, 1, 1, 50, []) { CorpsId = 5 }], [], [])
+        {
+            Officers = [new("ruler", new(0, 5, 0, new(50, 50, 50, 50), false))],
+            Information = new([], [], [], [new(5, 5, 0, new(100, 100)) { IsRoot = true }], [])
+        };
+        var initial = GameSession.Start(definition, 1).View.World;
+        var world = initial with
+        {
+            Officers = initial.Officers.Select(o => o with { SettlementId = null, UnitId = 7 }).ToArray(),
+            Units = new[] { 7, 8 }.Select(id => new UnitState(id, 5, new(10, 10), 1000)
+            {
+                CorpsId = 5, CommanderId = id == 7 ? 0 : null,
+                Order = new(MilitaryOrderKind.Move, new(20, 20), null), AwaitingPostAction = awaitingPostAction,
+                HasEnteredDailyCycle = enteredDailyCycle
+            }).ToArray()
+        };
+        var roster = new StrategyRoster();
+        foreach (bool commanded in new[] { false, true, false })
+        {
+            world = world with { Units = world.Units.Select(u => u with { CommandedThisXun = commanded }).ToArray() };
+            roster.Refresh(new(definition, world));
+            Assert.Equal(!commanded && enteredDailyCycle, roster.Units.Pinned!.IsAvailable);
+            Assert.Equal(!commanded && enteredDailyCycle, Assert.Single(roster.Units.Ordinary).IsAvailable);
+        }
+    }
+
     [Fact]
     public void OfficerPageFiltersCorpsPinsRulerAndKeepsIndependentScrollAndIdentity()
     {

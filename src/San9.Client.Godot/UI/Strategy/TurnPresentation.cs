@@ -55,6 +55,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
     public bool IsComputing => _pending is { IsCompleted: false };
     public double Progress { get; private set; }
     public bool IsStrategy => Screen is TurnScreen.Strategy or TurnScreen.Confirmation;
+    public int? CommandMarkForceId => IsStrategy ? session.View.PlayerForceId : null;
     public bool UsesExecutionMusic => Screen is not (TurnScreen.Initializing or TurnScreen.Strategy or TurnScreen.Confirmation or TurnScreen.Returning or TurnScreen.Terminal);
     public bool IsExecutionPresentation => Phase == ResolutionPhase.Daily && Screen is (TurnScreen.Playing or TurnScreen.Presenting);
     public bool CanAdvance => Screen == TurnScreen.Strategy && session.Snapshot.Simulation.Boundary == SimulationBoundary.Stable;

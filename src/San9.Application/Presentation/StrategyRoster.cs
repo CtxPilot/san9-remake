@@ -83,7 +83,7 @@ public sealed class StrategyRoster
         var officers = snapshot.Officers.ToDictionary(o => o.Id);
         RosterEntry Unit(San9.Core.Domain.UnitState u) => new(new(RosterPage.Units, u.Id),
             u.CommanderId is int commander && officers.TryGetValue(commander, out var leader) ? leader.NameKey : force.NameKey,
-            new RosterUnitLocation(u.Id), San9.Content.Text.NameMessages.Indented, u.Order is null && !u.AwaitingPostAction);
+            new RosterUnitLocation(u.Id), San9.Content.Text.NameMessages.Indented, !u.CommandedThisXun && u.HasEnteredDailyCycle);
         var units = snapshot.World.Units.Where(u => u.OwnerId == snapshot.PlayerForceId && !u.IsEmbedded && !u.IsPersonnel).ToArray();
         var rulerUnit = units.SingleOrDefault(u => u.Id == ruler?.UnitId);
         Units.Refresh(rulerUnit is null ? null : Unit(rulerUnit),

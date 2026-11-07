@@ -16,6 +16,19 @@ public partial class MapSceneView : Node2D
     public TextCatalog? Texts { get; set; }
     public Font? Font { get; set; }
     public bool ShowAnnotations { get; set; }
+    private int? _commandMarkForceId;
+    public int? CommandMarkForceId
+    {
+        get => _commandMarkForceId;
+        set
+        {
+            if (_commandMarkForceId == value) return;
+            _commandMarkForceId = value;
+            PrepareAnnotations();
+            AnnotationRevision++;
+            _annotations?.QueueRedraw();
+        }
+    }
     public MapObjectTarget? Hovered { get; set; }
     public MilitaryTargets? Targets { get; set; }
     public PersonnelDraft? PersonnelTargets { get; set; }
@@ -406,7 +419,7 @@ public partial class MapSceneView : Node2D
     private void PrepareAnnotations()
     {
         if (Presented is { } frame && Font is not null && Texts is not null)
-            _annotationLayout.Prepare(frame, Font, Texts);
+            _annotationLayout.Prepare(frame, Font, Texts, CommandMarkForceId, _ui.Assets["icon-commanded"].Width);
     }
     public void ConfigureAnnotations(Font font, TextCatalog texts)
     { Font = font; Texts = texts; PrepareAnnotations(); AnnotationRevision++; }

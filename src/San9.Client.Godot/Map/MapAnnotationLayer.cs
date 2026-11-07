@@ -8,10 +8,11 @@ namespace San9.Client.Godot;
 internal sealed class MapAnnotationLayer
 {
     private sealed record Entry(MapObjectTarget Target, Vector2 Position, double GroundDepth, string Name, uint Soldiers,
-        int Morale, int Durability, int MaxDurability, string[] Icons, Rect2? HitBounds, bool IsWork = false);
+        int Morale, int Durability, int MaxDurability, string[] Icons, Rect2? HitBounds, bool IsWork = false,
+        bool ShowCommandMark = false);
     private Entry[] _entries = [];
     public bool HasAnimatedBars { get; private set; }
-    public void Prepare(MapDisplayFrame frame, Font font, TextCatalog texts)
+    public void Prepare(MapDisplayFrame frame, Font font, TextCatalog texts, int? commandMarkForceId, int commandMarkWidth)
     {
         List<Entry> entries = [];
         foreach (var building in frame.Region.Buildings)
@@ -27,16 +28,18 @@ internal sealed class MapAnnotationLayer
         foreach (var unit in frame.Region.Units.Where(u => frame.Region.Scene.Playback.IsUnitVisible(u, frame.ViewportBounds)).Select(frame.Region.Scene.Playback.Sample))
         {
             string name = unit.CommanderNameKey is { } key ? texts.Resolve(key) + "队" : "部队";
-            float width = Math.Max(76, font.GetStringSize(name, fontSize: fontSize).X);
+            var state = units[unit.Id];
+            bool showCommandMark = state.OwnerId == commandMarkForceId && state.CommandedThisXun;
+            float width = Math.Max(76, font.GetStringSize(name, fontSize: fontSize).X + (showCommandMark ? commandMarkWidth : 0));
             var bounds = new Rect2(unit.LabelX, unit.LabelY, width, 47 + font.GetDescent(fontSize));
             if (!frame.Region.Bounds.Intersects(bounds)) continue;
             entries.Add(new(new(unit.Id, true), new(unit.LabelX, unit.LabelY), unit.Depth, name, unit.Soldiers,
-                unit.Morale, 0, 0, frame.Region.Scene.State.UnitPurpose(units[unit.Id]) switch
+                unit.Morale, 0, 0, frame.Region.Scene.State.UnitPurpose(state) switch
                 {
                     San9.Core.Domain.UnitPurpose.Construction => ["construction"],
                     San9.Core.Domain.UnitPurpose.Transport => ["transport"],
                     _ => []
-                }, bounds));
+                }, bounds, ShowCommandMark: showCommandMark));
         }
         // Both kinds share the same ground-depth scale (cell X + Y). Label offsets and elevation
         // affect placement, not overlap order; stable ties preserve the scene's insertion order.
@@ -72,6 +75,9 @@ internal sealed class MapAnnotationLayer
             if (!entry.Target.IsUnit) Bar("durability", entry.Durability, entry.MaxDurability, new(0, 16), entry.Target.Id);
             Bar("morale", entry.Morale, 100, new(0, entry.Target.IsUnit ? 20 : 29), entry.Target.Id);
             GameTextPresenter.Draw(target, font, entry.Name, new(0, entry.Target.IsUnit ? 47 : 53), style);
+            if (entry.ShowCommandMark)
+                target.DrawTexture(textures.Get("icon-commanded", target),
+                    new(font.GetStringSize(entry.Name, fontSize: style.FontSize).X, 31));
             foreach (string icon in entry.Icons) target.DrawTexture(textures.Get("icon-" + icon, target), entry.Target.IsUnit ? new(2, 0) : icon == "emperor" ? new(96, 17) : new(75, 17));
         }
         target.DrawSetTransform(Vector2.Zero);

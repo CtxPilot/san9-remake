@@ -112,6 +112,7 @@ public partial class StrategyHud
 
     private void UpdateTurnControls()
     {
+        if (World.Display is { } display) display.CommandMarkForceId = Turn.CommandMarkForceId;
         foreach (var control in _strategicHeader) control.Visible = Turn.IsStrategy && Session.View.PlayerForceId is not null && !SelectingTargets;
         _year.Visible = _date.Visible = _season.Visible = !SelectingTargets;
         _advanceButton.Disabled = !Interaction.CanAdvance;
