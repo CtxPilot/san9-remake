@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using San9.Core.Domain;
 
 namespace San9.Core.Simulation;
@@ -110,9 +109,8 @@ internal static class DomesticDevelopmentHandler
         foreach (var person in people)
         {
             int[] categories = activity == DomesticActivity.Train ? [0, 1, 2, 3, 4] : activity == DomesticActivity.Repair ? [5, 6] : [];
-            var proficiency = person.TacticProficiencies.ToBuilder();
-            foreach (int category in categories) proficiency[category] = Math.Min(1000, proficiency[category] + (person.MasteredCategories.Contains(category) ? 3 : 1));
-            world.Replace(person with { Acted = true, TacticProficiencies = proficiency.ToImmutable() });
+            world.Replace(person with { Acted = true });
+            foreach (int category in categories) OfficerTacticGrowth.Increase(world, person.Id, category, 1, events);
         }
         return new(DevelopmentRejection.None, increment, cost, bonus);
     }

@@ -1,9 +1,39 @@
+using System.Collections.Immutable;
 using San9.Core.Domain;
+using San9.Core.Simulation;
 
 namespace San9.Core.Tests;
 
 public sealed class DomesticDevelopmentTests
 {
+    [Theory]
+    [InlineData(DomesticActivity.Train)]
+    [InlineData(DomesticActivity.Repair)]
+    public void DomesticProficiencyUsesSharedGrowthAndPreservesAction(DomesticActivity activity)
+    {
+        var state = WorldState.Create(new(190, 1, 1), 7,
+            [new(1, 100) { LeaderId = 1 }],
+            [new(1, 1, 1000, 50, 100, 50, 500, 900, 1000, 500, 1000)],
+            [new OfficerState(1, 1, 1, new(50, 50, 50, 50), false)
+            {
+                Status = OfficerStatus.Ruler,
+                TacticProficiencies = Enumerable.Repeat(500, 9).ToImmutableArray(),
+                MasteredCategories = [0, 1, 2, 3, 4, 5, 6]
+            }], corps: [new CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }]);
+        var world = state.BeginMutation(companion: new() { DynamicTacticProficiencyGrowth = true });
+        var events = new List<DomainEvent>();
+
+        var result = DomesticDevelopmentHandler.Apply(world, new(1, 1, [1], activity), new EconomyRulebook([], []), null, events);
+
+        Assert.True(result.Accepted);
+        Assert.True(world.Officers[1].Acted);
+        int[] expected = activity == DomesticActivity.Train
+            ? [502, 502, 502, 502, 502, 500, 500, 500, 500]
+            : [500, 500, 500, 500, 500, 502, 502, 500, 500];
+        Assert.Equal(expected, world.Officers[1].TacticProficiencies);
+        Assert.Equal(activity == DomesticActivity.Train ? 5 : 2, events.OfType<TacticProficiencyGrownEvent>().Count());
+    }
+
     [Fact]
     public void RepairCanDoubleBeyondFundsWhileChargingOnlyPerParticipant()
     {
