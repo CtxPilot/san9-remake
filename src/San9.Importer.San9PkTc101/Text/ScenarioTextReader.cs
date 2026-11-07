@@ -122,7 +122,7 @@ public sealed class ScenarioTextReader(byte[] messages, byte[] executable) : IDi
     {
         if (code is >= 563 and <= 569) return null;
         int resource = code >= 570 ? code - 7 : code;
-        var value = _converter.Convert(biographies.MultilineText(resource));
+        var value = _converter.Convert(biographies.MultilineText(resource), resource, "biographies");
         if (string.IsNullOrWhiteSpace(value)) return null;
         _entries.TryAdd(key, value);
         return key;

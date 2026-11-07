@@ -25,6 +25,25 @@ public sealed class San9MessageTableTests
     }
 
     [Theory]
+    [InlineData(1, "正史\n中記載他字翼德。", "正史\n中记载他字益德。")]
+    [InlineData(159, "糜竺", "麋竺")]
+    [InlineData(163, "糜竺、傅士仁", "麋竺、士仁")]
+    [InlineData(178, "傅士仁", "士仁")]
+    [InlineData(430, "傅彤", "傅肜")]
+    public void BiographyAppliesEditorialRulesUsingItsSourceRecord(int resource, string original, string expected)
+    {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        var records = Enumerable.Range(0, 679).Select(_ => Array.Empty<byte>()).ToArray();
+        records[resource] = System.Text.Encoding.GetEncoding(950).GetBytes(original);
+        using var reader = new ScenarioTextReader(Archive(Table(Array.Empty<byte>())),
+            File.ReadAllBytes(typeof(ScenarioTextReader).Assembly.Location));
+        var biographies = new San9MessageTable(Archive(Table(records)));
+
+        Assert.Equal("person-biography", reader.Biography("person-biography", resource, biographies));
+        Assert.Equal(expected, reader.Catalog.Resolve("person-biography"));
+    }
+
+    [Theory]
     [InlineData(0, "Standard title")]
     [InlineData(1, "Standard title")]
     [InlineData(2, "Tutorial title")]
