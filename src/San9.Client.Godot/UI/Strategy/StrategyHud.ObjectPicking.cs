@@ -8,7 +8,7 @@ public partial class StrategyHud
     private MapObjectPicker _objectPicker = null!;
 
     private bool IsCommandSource(MapObjectTarget target) =>
-        (target.IsUnit ? MapCommandMenu.Unit(Scenario, target.Id) : MapCommandMenu.Settlement(Scenario, target.Id)).Count > 0;
+        target.IsUnit ? MapCommandMenu.CanOpenUnit(Scenario, target.Id) : MapCommandMenu.CanOpenSettlement(Scenario, target.Id);
 
     private bool HasObjectContext(MapObjectTarget target) =>
         (target.IsUnit ? UnitMapInteraction.Menu(Scenario, target.Id) : SettlementContextMenu.Read(Scenario, target.Id)).Count > 0;

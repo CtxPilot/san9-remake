@@ -34,10 +34,13 @@ internal sealed partial class MapCommandAvailability
         };
     }
 
-    private IEnumerable<FacilityRule> BuildableTypes()
+    private FacilityRule[]? _buildableTypes;
+    private IReadOnlyList<FacilityRule> BuildableTypes() => _buildableTypes ??= ReadBuildableTypes();
+
+    private FacilityRule[] ReadBuildableTypes()
     {
         if (view.MilitaryRules is not { } rules) return [];
-        return rules.Facilities.Values.Where(f => f.Buildable && !ConstructionLocations.Read(view, Owner, f.Id).IsEmpty);
+        return rules.Facilities.Values.Where(f => f.Buildable && ConstructionLocations.Any(view, Owner, f.Id)).ToArray();
     }
     private int MinimumConstructionCost(SettlementState home)
     {

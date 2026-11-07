@@ -388,7 +388,7 @@ public partial class StrategyHud : Control
         if (target.IsUnit) Selection.Clear(); else Selection.SelectBuilding(target.Id);
         _mapContext.Close();
         _commandMenu.Open(entries, target.IsUnit ? MapCommandSummary.Unit(Scenario, Texts, target.Id) : MapCommandSummary.Settlement(Scenario, Texts, target.Id), point);
-        World.HoverObject(null); _hoverCard.ShowInfo(null, point); _hoverTarget = null;
+        World.HoverObject(target); _hoverCard.ShowInfo(null, point); _hoverTarget = null;
     }
     private void ShowSettlementContext(int id, Vector2 point)
     {
@@ -590,7 +590,7 @@ public partial class StrategyHud : Control
                 { UpdateRegion(x, y); visible = true; }
             }
         }
-        World.HoverObject(hovered);
+        World.HoverObject(_commandMenu?.Visible == true ? _commandTarget : hovered);
         if (_built && (_hoverTarget != hovered || !ReferenceEquals(_hoverView, view) || _hoverContext != context))
         {
             _hoverView = view;

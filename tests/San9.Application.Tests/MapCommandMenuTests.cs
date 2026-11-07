@@ -51,6 +51,8 @@ public sealed class MapCommandMenuTests
         var hash = world;
         var selection = new StrategySelection(session);
         selection.SelectBuilding(2);
+        Assert.True(MapCommandMenu.CanOpenSettlement(view, 1));
+        Assert.True(MapCommandMenu.CanOpenUnit(view, 1));
         Assert.NotEmpty(MapCommandMenu.Settlement(view, 1).SelectMany(e => e.Children));
         Assert.All(MapCommandMenu.Unit(view, 1), entry => Assert.Empty(entry.Children));
         Assert.NotEmpty(MapCommandMenu.Unit(view, 1));
@@ -66,13 +68,23 @@ public sealed class MapCommandMenuTests
         var place = world.Settlements.Single(s => s.Id == 1);
         foreach (var unavailable in new[] { place with { OwnerId = 2 }, place with { OwnerId = null },
             place with { IsDormant = true }, place with { IsDestroyed = true }, place with { CanHostPersons = false } })
-            Assert.Empty(MapCommandMenu.Settlement(new(definition, world with {
-                Settlements = world.Settlements.Select(s => s.Id == unavailable.Id ? unavailable : s).ToArray() }), 1));
+        {
+            var view = new StrategySnapshot(definition, world with {
+                Settlements = world.Settlements.Select(s => s.Id == unavailable.Id ? unavailable : s).ToArray() });
+            Assert.False(MapCommandMenu.CanOpenSettlement(view, 1));
+            Assert.Empty(MapCommandMenu.Settlement(view, 1));
+        }
+        Assert.False(MapCommandMenu.CanOpenSettlement(new(definition, world), 999));
         Assert.Empty(MapCommandMenu.Settlement(new(definition, world), 999));
         var unit = new UnitState(1, 1, new(12, 12), 1000) { FormationId = 1 };
         foreach (var unavailable in new[] { unit with { OwnerId = 2 }, unit with { Soldiers = 0 },
             unit with { FormationId = null }, unit with { IsEmbedded = true }, unit with { IsPersonnel = true } })
-            Assert.Empty(MapCommandMenu.Unit(new(definition, world with { Units = [unavailable] }), 1));
+        {
+            var view = new StrategySnapshot(definition, world with { Units = [unavailable] });
+            Assert.False(MapCommandMenu.CanOpenUnit(view, 1));
+            Assert.Empty(MapCommandMenu.Unit(view, 1));
+        }
+        Assert.False(MapCommandMenu.CanOpenUnit(new(definition, world with { Units = [] }), 1));
         Assert.Empty(MapCommandMenu.Unit(new(definition, world with { Units = [] }), 1));
     }
 }

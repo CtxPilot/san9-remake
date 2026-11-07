@@ -69,6 +69,7 @@ public sealed class ConstructionSessionTests
         definition.FacilityNameSuffixKeys[9000] = "fort";
         Assert.Equal(3, building.X);
         Assert.Empty(ConstructionLocations.Read(session, 1, 9000));
+        Assert.False(ConstructionLocations.Any(session.View, 1, 9000));
         var restored = SaveService.Decode(SaveService.Encode(session), definition, GameSession.EngineFactory(definition));
         StateAssert.Equal(session.Snapshot, restored.Snapshot);
         for (int i = 0; i < 3; i++)
@@ -88,6 +89,7 @@ public sealed class ConstructionSessionTests
         Assert.True(session.View.Settlements.Single(s => s.Id == 8000).IsDestroyed);
         Assert.Equal(1, session.View.Officers.Single().SettlementId);
         Assert.Single(ConstructionLocations.Read(session, 1, 9001));
+        Assert.True(ConstructionLocations.Any(session.View, 1, 9001));
         Assert.True(session.Execute(new("player"), new ConstructFacilityCommand(Guid.NewGuid(), 1,
             session.Snapshot.Simulation.NextSequence, 1, [11], 5000, 8000, 9001, new(22, 2))).Submission.Accepted);
         var reconstruction = session.AdvanceXun();

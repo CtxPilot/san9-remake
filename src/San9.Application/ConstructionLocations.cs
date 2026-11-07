@@ -11,6 +11,13 @@ public static class ConstructionLocations
         => Read(session.View, forceId, facilityId);
 
     public static ImmutableArray<ConstructionSite> Read(StrategySnapshot view, int forceId, int facilityId)
+        => Candidates(view, forceId, facilityId).OrderBy(s => s.RegionId)
+            .ThenBy(s => s.Position.Y).ThenBy(s => s.Position.X).ToImmutableArray();
+
+    public static bool Any(StrategySnapshot view, int forceId, int facilityId)
+        => Candidates(view, forceId, facilityId).Any();
+
+    private static IEnumerable<ConstructionSite> Candidates(StrategySnapshot view, int forceId, int facilityId)
     {
         var world = view.World;
         if (view.MilitaryRules is not { } rules || !rules.Facilities.TryGetValue(facilityId, out var facility) ||
@@ -18,7 +25,6 @@ public static class ConstructionLocations
         var reserved = world.Units.Where(u => u.Order?.Construction is not null).Select(u => u.Order!.Construction!.RegionId).ToHashSet();
         reserved.UnionWith(world.Settlements.Where(s => s.IsDormant).Select(s => s.Id));
         return rules.ConstructionSites.Values.Where(s => !reserved.Contains(s.RegionId) && ConstructionPlacement.IsAvailable(s, facility, rules,
-            view.RegionCityIds, world.Settlements, world.Units)).OrderBy(s => s.RegionId)
-            .ThenBy(s => s.Position.Y).ThenBy(s => s.Position.X).ToImmutableArray();
+            view.RegionCityIds, world.Settlements, world.Units));
     }
 }

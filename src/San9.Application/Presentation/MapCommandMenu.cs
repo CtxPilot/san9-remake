@@ -31,12 +31,26 @@ public static class MapCommandMenu
         Group("attack", MapCommandTone.Green), Group("march", MapCommandTone.Green)
     });
 
+    public static bool CanOpenSettlement(StrategySnapshot view, int id) =>
+        CanOpenSettlement(view, view.World.Settlements.SingleOrDefault(s => s.Id == id));
+
+    private static bool CanOpenSettlement(StrategySnapshot view, SettlementState? place) =>
+        view.PlayerForceId is not null && place is not null && !place.IsDormant && !place.IsDestroyed &&
+        place.CanHostPersons && place.OwnerId == view.PlayerForceId;
+
+    public static bool CanOpenUnit(StrategySnapshot view, int id) =>
+        CanOpenUnit(view, view.World.Units.SingleOrDefault(u => u.Id == id));
+
+    private static bool CanOpenUnit(StrategySnapshot view, UnitState? unit) =>
+        unit is not null && UnitCatalog.IsListed(unit) && unit.FormationId is not null &&
+        unit.Soldiers > 0 && unit.OwnerId == view.PlayerForceId;
+
     public static IReadOnlyList<MapCommandEntry> Settlement(StrategySnapshot view, int id)
     {
         var place = view.World.Settlements.SingleOrDefault(s => s.Id == id);
-        if (view.PlayerForceId is null || place is null || place.IsDormant || place.IsDestroyed || !place.CanHostPersons || place.OwnerId != view.PlayerForceId) return [];
+        if (!CanOpenSettlement(view, place)) return [];
         var facilities = Facilities;
-        if (place.Kind != SettlementKind.City)
+        if (place!.Kind != SettlementKind.City)
         {
             bool removable = view.MilitaryRules is {} rules && rules.TryPlace(place, out var definition) && definition.CanDemolish;
             facilities = Facilities with { Children = removable
@@ -54,8 +68,8 @@ public static class MapCommandMenu
     public static IReadOnlyList<MapCommandEntry> Unit(StrategySnapshot view, int id)
     {
         var unit = view.World.Units.SingleOrDefault(u => u.Id == id);
-        if (unit is null || !UnitCatalog.IsListed(unit) || unit.FormationId is not int formation ||
-            unit.Soldiers == 0 || unit.OwnerId != view.PlayerForceId) return [];
+        if (!CanOpenUnit(view, unit)) return [];
+        int formation = unit!.FormationId!.Value;
         IReadOnlyList<MapCommandEntry> entries = view.MilitaryRules?.Purpose(formation) switch {
             UnitPurpose.Construction => [UnitEntries.Single(e => e.Id == "march")],
             UnitPurpose.Transport => [Group("redirect-transport", MapCommandTone.Green)],
