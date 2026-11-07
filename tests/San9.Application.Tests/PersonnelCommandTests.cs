@@ -394,7 +394,7 @@ public sealed class PersonnelCommandTests
         var rows = PersonnelCatalog.Officers(draft,CatalogTexts(session.View),0,targets:true);
         Assert.Equal(new[] { 102,101,100,103,5,6 }.OrderByDescending(draft.TargetAdvicePriority),rows.Select(r => r.Id));
         Assert.All(rows,row => Assert.Equal(draft.TargetAdviceSymbol(row.Id),row.Cells[0].Text));
-        Assert.Equal(new[] { "label.advice","武将","身分","忠诚","势力","所在","统率","武力","智力","政治","label.arrival" },
+        Assert.Equal(new[] { "建议","武将","身分","忠诚","势力","所在","统率","武力","智力","政治","label.arrival" },
             PersonnelCatalog.OfficerPages(draft,CatalogTexts(draft.View),targets:true)[0].Columns.Select(c => c.Title));
         var far = rows.Single(r => r.Id == 100);
         var near = rows.Single(r => r.Id == 103);
