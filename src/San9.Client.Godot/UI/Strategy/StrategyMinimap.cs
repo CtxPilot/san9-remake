@@ -28,10 +28,13 @@ public partial class StrategyMinimap : Control
     private double _pulseTime;
     private int _pulseFrame;
     private (Vector2 Position, float Zoom, Vector2 Size) _view;
+    private bool _dragging;
+    private Vector2? _navigationPoint;
     public override void _Ready()
     {
         MouseFilter = MouseFilterEnum.Stop; MouseDefaultCursorShape = CursorShape.PointingHand;
-        TooltipText = "点击小地图定位";
+        TooltipText = "点击或按住拖动小地图定位";
+        VisibilityChanged += CancelNavigation;
         var background = _background = new TextureRect { Texture = Textures.Service.MinimapTerrain, MouseFilter = MouseFilterEnum.Ignore,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize };
         AddChild(background);
@@ -56,11 +59,38 @@ public partial class StrategyMinimap : Control
     }
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left } b) Navigate(b.Position);
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left } b)
+        {
+            if (b.Pressed || _dragging)
+            {
+                _dragging = b.Pressed;
+                _navigationPoint = _HasPoint(b.Position) ? b.Position : null;
+            }
+        }
+        else if (_dragging && @event is InputEventMouseMotion motion)
+            _navigationPoint = _HasPoint(motion.Position) ? motion.Position : null;
         AcceptEvent();
+    }
+    private void CancelNavigation()
+    {
+        _dragging = false;
+        _navigationPoint = null;
+    }
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMWindowFocusOut || what == NotificationApplicationFocusOut) CancelNavigation();
     }
     public override void _Process(double delta)
     {
+        if (!IsVisibleInTree() || MouseFilter == MouseFilterEnum.Ignore || World.CanNavigate?.Invoke() == false ||
+            (_dragging && !Input.IsMouseButtonPressed(MouseButton.Left)))
+            CancelNavigation();
+        // Coalesce mouse events into one latest-target request per frame, including the release position.
+        if (_navigationPoint is { } point)
+        {
+            _navigationPoint = null;
+            Navigate(point);
+        }
         if (_recordLocations.Count > 0)
         {
             for (int i=0;i<_recordLocations.Count;i++)
