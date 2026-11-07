@@ -26,6 +26,8 @@ public partial class MapCommandPopup : ModalView
     private bool _conditionVisible;
     private Vector2 _anchor;
     private InformationMenuButton? _expandedButton;
+    private string? _expandedGroupId;
+    public (Vector2 Anchor, string? GroupId) Navigation => (_anchor, _expandedGroupId);
     public string Hint => _hovered is {} entry ? Texts.Resolve(entry.UnavailableReasonKey ?? CommandMenuSkin.HintKey(entry.Id)) : "";
 
     public bool HintEnabled => _hovered?.Enabled ?? true;
@@ -67,7 +69,7 @@ public partial class MapCommandPopup : ModalView
         for (int i = 0; i < _secondary.Count; i++) _secondary[i].Button.Position = new(x, y + 28 * i);
     }
 
-    public void Open(IReadOnlyList<MapCommandEntry> entries, MapCommandSummary summary, Vector2 point)
+    public void Open(IReadOnlyList<MapCommandEntry> entries, MapCommandSummary summary, Vector2 point, string? groupId = null)
     {
         Close();
         if (entries.Count == 0) return;
@@ -79,6 +81,8 @@ public partial class MapCommandPopup : ModalView
             else Activated?.Invoke(entry.Id);
         } };
         AddChild(_primaryMenu); _primaryMenu.SetEntries(entries);
+        if (_primary.FirstOrDefault(item => item.Entry.Id == groupId) is { Entry: { Children.Count: > 0 } group } item)
+            Expand(group, item.Button);
         Relayout(); Show();
     }
 
@@ -102,6 +106,7 @@ public partial class MapCommandPopup : ModalView
     {
         foreach (var item in _secondary) { RemoveChild(item.Button); item.Button.QueueFree(); }
         _secondary.Clear();
+        _expandedGroupId = entry.Id;
         _expandedButton = selected;
         for (int i = 0; i < entry.Children.Count; i++)
         {
@@ -116,7 +121,7 @@ public partial class MapCommandPopup : ModalView
     {
         Hide();
         foreach (Node child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
-        _primaryMenu = null; _secondary.Clear(); _submenu = null; _summary = null; _expandedButton = null;
+        _primaryMenu = null; _secondary.Clear(); _submenu = null; _summary = null; _expandedButton = null; _expandedGroupId = null;
         _hovered = _illustrated = null; _hoverTime = 0; _conditionVisible = false;
     }
 

@@ -38,6 +38,7 @@ public partial class StrategyHud : Control
     public StrategyOverlayHost OverlayHost { get; init; } = null!;
     public Node BackdropHost { get; init; } = null!;
     private MapObjectTarget? _commandTarget;
+    private (MapObjectTarget Target, Vector2 Anchor, string? GroupId)? _commandReturn;
     private StrategyMinimap? _minimap;
     public StrategyOverview Overview { get; } = new();
     public Settings.UiPreferencesSession Preferences { get; init; } = new();
@@ -372,12 +373,14 @@ public partial class StrategyHud : Control
     public override bool _HasPoint(Vector2 point) => IsBlockedPoint(point);
     public override void _GuiInput(InputEvent @event)
     {
-        if (_built && @event is InputEventMouseButton { Pressed: false, ButtonIndex: MouseButton.Right }) ShowContextMenu();
+        if (_built && _commandReturn is null && @event is InputEventMouseButton { Pressed: false, ButtonIndex: MouseButton.Right }) ShowContextMenu();
         AcceptEvent();
     }
     private MapObjectTarget? _contextTarget;
     private long _contextRevision;
-    private void ShowCommandMenu(MapObjectTarget target, Vector2 point)
+    private void ShowCommandMenu(MapObjectTarget target, Vector2 point) => OpenCommandMenu(target, point, null);
+
+    private void OpenCommandMenu(MapObjectTarget target, Vector2 point, string? groupId)
     {
         if (!CanIssueOrders) return;
         var entries = target.IsUnit ? MapCommandMenu.Unit(Scenario, target.Id) : MapCommandMenu.Settlement(Scenario, target.Id);
@@ -388,8 +391,22 @@ public partial class StrategyHud : Control
         _contextRevision = Session.Snapshot.Revision;
         if (target.IsUnit) Selection.Clear(); else Selection.SelectBuilding(target.Id);
         _mapContext.Close();
-        _commandMenu.Open(entries, target.IsUnit ? MapCommandSummary.Unit(Scenario, Texts, target.Id) : MapCommandSummary.Settlement(Scenario, Texts, target.Id), point);
+        _commandMenu.Open(entries, target.IsUnit ? MapCommandSummary.Unit(Scenario, Texts, target.Id) : MapCommandSummary.Settlement(Scenario, Texts, target.Id), point, groupId);
         UpdateHover(point);
+    }
+
+    private void ReturnToCommandMenu()
+    {
+        if (_commandReturn is not { } navigation) return;
+        var view = Session.View;
+        bool valid = navigation.Target.IsUnit ? MapCommandMenu.CanOpenUnit(view, navigation.Target.Id)
+            : MapCommandMenu.CanOpenSettlement(view, navigation.Target.Id);
+        if (!Turn.IsStrategy || !valid) { _commandReturn = null; return; }
+        // Finish the workflow, its result narration and the closing input gesture before returning.
+        if (!Interaction.CanAdvance || _presentation.HasQueuedNarration ||
+            Input.IsMouseButtonPressed(MouseButton.Right) || Input.IsKeyPressed(Key.Escape)) return;
+        _commandReturn = null;
+        OpenCommandMenu(navigation.Target, navigation.Anchor, navigation.GroupId);
     }
     private void ShowSettlementContext(int id, Vector2 point)
     {
@@ -410,6 +427,7 @@ public partial class StrategyHud : Control
         if (target.IsUnit)
         {
             if (command is not ("attack" or "march" or "redirect-transport")) return;
+            _commandReturn = (target, _commandMenu.Navigation.Anchor, _commandMenu.Navigation.GroupId);
             _commandMenu.Close(); Overview.Close();
             _flow.OpenUnit(target.Id, command switch
             {
@@ -420,6 +438,7 @@ public partial class StrategyHud : Control
             return;
         }
         if (command is not ("sortie" or "patrol" or "build" or "transport" or "demolish" or "delegate") && !MissionDraft.Supports(command) && !FacilityCommandDraft.Supports(command) && !AppointmentDraft.Supports(command) && !PersonnelDraft.Supports(command)) return;
+        _commandReturn = (target, _commandMenu.Navigation.Anchor, _commandMenu.Navigation.GroupId);
         _commandMenu.Close();
         Overview.Close();
         if (command == "patrol") _patrolFlow.Open(target.Id);
@@ -602,6 +621,7 @@ public partial class StrategyHud : Control
     {
         if (!_built && World.IsVisibleReady) Build();
         if (_built) { UpdateTurn(delta); UpdateUnitGroup(); }
+        if (_built) ReturnToCommandMenu();
         if (_commandMenu?.Visible == true && _contextRevision != Session.Snapshot.Revision) _commandMenu.Close();
         if (_mapContext?.Visible == true && _contextRevision != Session.Snapshot.Revision) _mapContext.Close();
         if (World.LoadError is not null) _message.Text = "地图加载失败 · F3 查看详情";
@@ -615,7 +635,7 @@ public partial class StrategyHud : Control
         }
         if (_built)
         {
-            var source = _flow.Source ?? _patrolFlow.Source ?? _facilityFlow.Source ?? _demolitionFlow.Source ?? _appointmentFlow.Source ?? _personnelFlow.Source ?? (_commandMenu!.Visible ? _commandTarget : null);
+            var source = _flow.Source ?? _patrolFlow.Source ?? _facilityFlow.Source ?? _demolitionFlow.Source ?? _appointmentFlow.Source ?? _personnelFlow.Source ?? _commandReturn?.Target ?? (_commandMenu!.Visible ? _commandTarget : null);
             _minimap!.SetCommandSources(_flow.Targets?.Sources.Select(t => new MapObjectTarget(t.Id, t.IsUnit)).ToArray() ?? (source is { } single ? [single] :
                 _unitGroup.UnitIds.Select(id => new MapObjectTarget(id, true)).ToArray()));
             UpdateSidebar(delta);
