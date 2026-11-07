@@ -4,6 +4,7 @@ using San9.Content.Maps;
 using San9.Rendering;
 using San9.Application.Presentation;
 using San9.Content.Interface;
+using San9.Core.Domain;
 
 namespace San9.Client.Godot;
 
@@ -233,23 +234,26 @@ public partial class MapSceneView : Node2D
             if (frame.Assets.TryGetReady(id, _water, out var texture)) _water.DrawTexture(texture, new(s.X, s.Y));
         }
     }
-    private readonly List<(string Asset, Vector2 Position, MapObjectTarget Target)> _hitSprites = [];
+    private sealed record ObjectHit(MapObjectTarget Target, double Depth, string? Asset = null,
+        Vector2 Position = default, UnitPickGeometry? Geometry = null);
+    private readonly List<ObjectHit> _hitObjects = [];
     public MapObjectTarget? ObjectAt(Vector2 point) => HitObjects(point).Select(target => (MapObjectTarget?)target).FirstOrDefault();
     public IReadOnlyList<MapObjectTarget> ObjectsAt(Vector2 point) => HitObjects(point).Distinct().ToArray();
     private IEnumerable<MapObjectTarget> HitObjects(Vector2 point)
     {
         foreach (var label in _annotationLayout.Hits(point)) yield return label;
-        for (int i = _hitSprites.Count - 1; i >= 0; i--)
+        for (int i = _hitObjects.Count - 1; i >= 0; i--)
         {
-            var sprite = _hitSprites[i];
-            if (Textures.Hit(Textures.MapAssets[sprite.Asset], (int)Math.Floor(point.X - sprite.Position.X),
-                (int)Math.Floor(point.Y - sprite.Position.Y))) yield return sprite.Target;
+            var hit = _hitObjects[i];
+            if (hit.Geometry is { } geometry ? geometry.Contains(point.X, point.Y) :
+                Textures.Hit(Textures.MapAssets[hit.Asset!], (int)Math.Floor(point.X - hit.Position.X),
+                    (int)Math.Floor(point.Y - hit.Position.Y))) yield return hit.Target;
         }
     }
     private void RebuildObjects()
     {
         if (Presented is not { } frame) return;
-        _hitSprites.Clear();
+        _hitObjects.Clear();
         ObjectDraws++; _objects.Begin(); _drawnHover = Hovered; _drawnPersonnelHoverPlace = PersonnelHoverPlace; _drawnAssetRevision = frame.Assets.Revision;
         if (_drawnTargets != Targets || _drawnPersonnelTargets != PersonnelTargets || _drawnCommandTargets != CommandTargets)
         {
@@ -313,7 +317,11 @@ public partial class MapSceneView : Node2D
         {
             if (!frame.Assets.TryGetReadyResource(id, out var texture)) return;
             if (!frame.ViewportBounds.Intersects(new Rect2(position, texture.GetSize()))) return;
-            if (building is {} target && blend == MapBlendMode.Alpha) _hitSprites.Add((id, position, target));
+            if (building is { IsUnit: false } target && blend == MapBlendMode.Alpha)
+            {
+                var value = frame.Region.Scene.Settlements[target.Id];
+                _hitObjects.Add(new(target, value.X + value.Y, id, position));
+            }
             bool candidate = building is {} mapObject && (CommandTargets?.Objects.Contains(new(mapObject.Id,mapObject.IsUnit)) == true || mapObject is { IsUnit: false } targetBuilding &&
                 (Targets?.Candidates.ContainsKey(new(targetBuilding.Id, false)) == true ||
                     PersonnelTargets is { Kind: "move" } movementCandidates && movementCandidates.Targets.Contains(targetBuilding.Id)));
@@ -411,6 +419,22 @@ public partial class MapSceneView : Node2D
                         _objects.Add(texture,position+new Vector2(sprite.X,sprite.Y),null,new Color(1,1,1,opacity));
             }
         }
+        // Query domain occupancy with the presented position and strength, including shore transitions.
+        var runtimeUnits = frame.Region.Scene.State.World.Units.ToDictionary(unit => unit.Id);
+        foreach (var unit in frame.Region.Units.Where(u => frame.Region.Scene.Playback.IsUnitVisible(u, frame.ViewportBounds))
+            .Select(frame.Region.Scene.Playback.Sample))
+        {
+            var position = new WorldPosition(
+                (int)Math.Round(unit.CellX * MapCoordinates.UnitsPerCell + MapCoordinates.UnitsPerCell / 2),
+                (int)Math.Round((unit.Depth - unit.CellX) * MapCoordinates.UnitsPerCell + MapCoordinates.UnitsPerCell / 2));
+            var runtime = runtimeUnits[unit.Id] with { Position = position, Soldiers = unit.Soldiers };
+            if (frame.Region.Scene.State.UnitFootprint(runtime) is { } footprint)
+                _hitObjects.Add(new(new(unit.Id, true), unit.Depth, Geometry:
+                    new(unit.AnchorX, unit.AnchorY, footprint)));
+        }
+        // Stable ground-depth ties retain insertion order; hover promotion affects drawing only.
+        var orderedHits = _hitObjects.OrderBy(hit => hit.Depth).ToArray();
+        _hitObjects.Clear(); _hitObjects.AddRange(orderedHits);
         _objects.End();
         PrepareAnnotations();
     }
