@@ -4,7 +4,7 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-internal sealed partial class MapScene
+internal sealed partial class MapPlayback
 {
     internal IEnumerable<MapSoundSource> SoundSources(MapAudioDefinition audio, IEnumerable<UnitVisual> visibleUnits)
     {
@@ -37,10 +37,11 @@ internal sealed partial class MapScene
             if (state.IsEngaged)
                 yield return new($"battle-unit:{unit.Id}", audio.BattleAmbience[0], sampled.AnchorX, sampled.AnchorY) { Kind = MapSoundKind.BattleAmbience };
         }
-        foreach (var building in Buildings)
+        foreach (var building in _inputs.Projection.Buildings)
         {
-            var place = Settlements[building.Id];
-            var anchor = Anchor(building);
+            var place = (MapFrame?.Settlements ?? _settlements)[building.Id];
+            var anchor = BuildingInfoGeometry.Anchor(building.X, building.Y, building.FixedType,
+                Map.Squares[building.Y * Map.Width + building.X].Elevation, Map.Height);
             if (place.IsUnderConstruction && place.FacilityTypeId is int type && place.BuilderUnitId is int builder &&
                 _unitStates.ContainsKey(builder) && _stateSampler(builder, LocalMotionTime) is {} worker && UnitVisuals.IsConstructing(worker))
                 yield return new($"construction:{building.Id}", audio.ConstructionSounds[type], anchor.X, anchor.Y) { Kind = MapSoundKind.Construction };

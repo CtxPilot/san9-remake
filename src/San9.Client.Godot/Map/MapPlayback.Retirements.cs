@@ -4,7 +4,7 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-internal sealed partial class MapScene
+internal sealed partial class MapPlayback
 {
     private readonly List<UnitRetirementPlayback> _retirements = [];
     internal bool HasRetirements => _retirements.Count > 0;
@@ -14,7 +14,7 @@ internal sealed partial class MapScene
     internal IEnumerable<UnitRetirementPlayback.Sound> TakeRetirementSounds(MapAudioDefinition audio) =>
         _retirements.SelectMany(r => r.TakeSounds(MotionVisualTime, audio));
 
-    private void PrepareRetirements(MapScene? previous)
+    private void PrepareRetirements(MapPlayback? previous)
     {
         if (previous is null || !ReferenceEquals(previous.Map, Map)) return;
         _retirements.AddRange(previous._retirements.Where(r => !r.IsComplete(MotionVisualTime)));
@@ -36,5 +36,4 @@ internal sealed partial class MapScene
         }
     }
 
-    internal MapScene PruneRetirements() => new(Map, Terrain, Season, State, _assets, _positionTime, this, Day, _projection);
 }

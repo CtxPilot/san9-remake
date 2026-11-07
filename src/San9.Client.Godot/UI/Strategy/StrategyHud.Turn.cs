@@ -24,6 +24,7 @@ public partial class StrategyHud
 
     private SceneSoundPlayer _sceneSounds = null!;
     private BattlePlaybackFlow _battle = null!;
+    private ExecutionPresentationCoordinator _execution = null!;
 
     private void BuildTurnControls()
     {
@@ -91,22 +92,8 @@ public partial class StrategyHud
 
     private void UpdateTurn(double delta)
     {
-        var previous = Turn.Screen;
         AdvanceSeasonChange(delta);
-        Turn.PlaybackSpeed = ReadSettings().PlaybackSpeed;
-        Turn.Update(delta);
-        if (previous == TurnScreen.Returning && Turn.Screen == TurnScreen.Strategy) _feedback.ResetRecords();
-        _presentation.Update();
-        World.Presentation = Turn.Display;
-        World.Day = Turn.Day;
-        UpdateSeasonPresentation();
-        _battle.Update();
-        _feedback.Advance(delta);
-        bool showPanels = Turn.Screen is TurnScreen.Preparing or TurnScreen.Playing or TurnScreen.AwaitingDecision or TurnScreen.Presenting ||
-            Turn.Screen == TurnScreen.Failed && _executionPanels.Expanded;
-        bool allowPanels = Turn.Phase == San9.Core.Simulation.ResolutionPhase.Daily || Turn.IsStrategy;
-        _executionPanels.Advance(allowPanels && (showPanels || _feedback.RecordsRequested), delta, _presentation?.HasDecision == true);
-        _executionPanels.Bind(Turn.Display ?? Session.View);
+        _execution.Advance(delta, ReadSettings().PlaybackSpeed);
         UpdateTurnControls();
     }
 

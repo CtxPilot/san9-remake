@@ -65,10 +65,10 @@ public sealed class MapDayPlanTests
             new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, day: day);
         var unit = Assert.Single(scene.Units);
         day.Advance(.5);
-        Assert.Equal(100u, scene.Sample(unit).Soldiers);
-        Assert.Equal(70, scene.Sample(unit).Morale);
+        Assert.Equal(100u, scene.Playback.Sample(unit).Soldiers);
+        Assert.Equal(70, scene.Playback.Sample(unit).Morale);
         day.Advance(.5);
-        var presented = scene.Sample(unit);
+        var presented = scene.Playback.Sample(unit);
         Assert.Equal(finalUnit.Soldiers, presented.Soldiers);
         Assert.Equal(finalUnit.Morale, presented.Morale);
         Assert.Equal(MapCoordinates.Cell(finalUnit.Position).X, presented.CellX, 6);
@@ -184,7 +184,7 @@ public sealed class MapDayPlanTests
         var day = new TurnDayPresentation(before, after, events, new MapDayPlan(map, before, events));
         MapScene Scene(San9.Application.Presentation.StrategySnapshot state, MapScene? previous = null, TurnDayPresentation? current = null) =>
             new(map, terrain, "spring", state, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, previous, current);
-        static bool HasVision(MapScene scene) => scene.Sample(Assert.Single(scene.Units)).MovementVision is not null;
+        static bool HasVision(MapScene scene) => scene.Playback.Sample(Assert.Single(scene.Units)).MovementVision is not null;
 
         var moving = Scene(before, current: day);
         var region = new MapSceneRegion(moving, new(-10000, -10000, 100000, 100000), [], moving.Units, [], [], [], []);
@@ -252,11 +252,11 @@ public sealed class MapDayPlanTests
         Assert.Equal(San9.Rendering.UnitVisualAction.Melee, plan.Attacks[1].Action);
         Assert.All(plan.Attacks, attack => Assert.Equal(5, day.PresentedShots(attack).Count));
         var unit = scene.Units.Single(u => u.Id == 10);
-        Assert.Equal(San9.Rendering.UnitVisualAction.Melee, scene.Sample(unit).Action);
-        string? attackId = scene.Sample(unit).AttackId;
+        Assert.Equal(San9.Rendering.UnitVisualAction.Melee, scene.Playback.Sample(unit).Action);
+        string? attackId = scene.Playback.Sample(unit).AttackId;
         day.Advance(.1);
-        Assert.Equal(attackId, scene.Sample(unit).AttackId);
-        Assert.Equal(100, scene.Sample(unit).AttackMilliseconds!.Value, 6);
+        Assert.Equal(attackId, scene.Playback.Sample(unit).AttackId);
+        Assert.Equal(100, scene.Playback.Sample(unit).AttackMilliseconds!.Value, 6);
         double blocking = Math.Max(plan.Admit(plan.Attacks[1], bounds).BodyBlockingDuration,
             plan.Attacks.Max(attack => plan.Admit(attack, bounds).ProjectileBlockingDuration));
         Assert.True(blocking < plan.Admit(plan.Attacks[0], bounds).BodyBlockingDuration);
@@ -381,7 +381,7 @@ public sealed class MapDayPlanTests
         Assert.Contains("arrow", scene.MotionAssets([], viewport));
         day.Advance(1);
         Assert.True(day.IsCombatBlocking);
-        var projectile = Assert.Single(scene.Projectiles(viewport));
+        var projectile = Assert.Single(scene.Playback.Projectiles(viewport));
         Assert.Equal((origin.X, origin.Y), (projectile.X, projectile.Y));
     }
 
@@ -474,11 +474,11 @@ public sealed class MapDayPlanTests
         {
             var published = new MapScene(map, terrain, "spring", session.View, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => clock, scene);
             clock = 300;
-            var continued = published.Sample(Assert.Single(published.Units));
+            var continued = published.Playback.Sample(Assert.Single(published.Units));
             Assert.Equal(San9.Rendering.UnitVisualAction.Melee, continued.Action);
             Assert.Equal(100, continued.AttackMilliseconds);
             clock = 1000;
-            Assert.Null(published.Sample(Assert.Single(published.Units)).AttackMilliseconds);
+            Assert.Null(published.Playback.Sample(Assert.Single(published.Units)).AttackMilliseconds);
         }
         day.Advance(1);
         Assert.True(day.IsComplete);

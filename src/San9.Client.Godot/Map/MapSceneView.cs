@@ -10,51 +10,6 @@ namespace San9.Client.Godot;
 // An independent camera's complete frame and leases. No input or simulation ownership.
 public partial class MapSceneView : Node2D
 {
-    internal sealed class Frame : IDisposable
-    {
-        private sealed record Target(MapViewport Camera, Vector2 Size, string[] Assets, TerrainChunkKey[] Terrain);
-        public MapSceneRegion Region { get; }
-        public MapViewport Camera => _target.Camera;
-        public Vector2 Size => _target.Size;
-        public Rect2 ViewportBounds => new(new Vector2((float)Camera.X, (float)Camera.Y) - Size / (2 * (float)Camera.Zoom), Size / (float)Camera.Zoom);
-        public bool Boundaries { get; }
-        public TextureScope Assets { get; }
-        public TerrainChunkCache<ImageTexture>.Lease Terrain { get; }
-        public HashSet<string> WaterClips { get; }
-        public HashSet<string> ObjectClips { get; }
-        private Target _target;
-        private Target? _candidate;
-        public Frame(MapSceneRegion region, MapViewport camera, Vector2 size, TextureScope assets,
-            TerrainChunkCache<ImageTexture>.Lease terrain, bool boundaries)
-        {
-            Region = region; Assets = assets; Terrain = terrain; Boundaries = boundaries;
-            WaterClips = region.Water.Select(s => s.ClipId).ToHashSet();
-            ObjectClips = region.ObjectAnimations.Select(s => s.ClipId).ToHashSet();
-            _target = Select(camera, size); Assets.Request(_target.Assets);
-        }
-        private Target Select(MapViewport camera, Vector2 size)
-        {
-            if (_candidate is { } existing && existing.Camera == camera && existing.Size == size) return existing;
-            Vector2 half = size / (2 * (float)camera.Zoom);
-            var bounds = new Rect2(new Vector2((float)camera.X, (float)camera.Y) - half, half * 2);
-            return _candidate = new(camera, size, Region.Select(bounds).Assets.ToArray(),
-                camera.Chunks(Region.Scene.Map.CanvasWidth, Region.Scene.Map.CanvasHeight, (int)Math.Ceiling(size.X), (int)Math.Ceiling(size.Y))
-                    .Select(k => new TerrainChunkKey(Region.Scene.Terrain, k.X, k.Y)).ToArray());
-        }
-        public void Move(MapViewport camera, Vector2 size)
-        { _target = Select(camera, size); Assets.Request(_target.Assets); }
-        private bool IsReady(Target target) => Assets.AreReady(target.Assets) && target.Terrain.All(Terrain.IsAvailable);
-        public bool Ready => IsReady(_target);
-        public bool CanPresent(MapViewport camera, Vector2 size)
-        {
-            var target = Select(camera, size);
-            // A probe must not start demand loads for a navigation that has not been committed.
-            Assets.RequestCached(target.Assets);
-            return IsReady(target);
-        }
-        public Exception? Error => Assets.ErrorFor(_target.Assets) ?? Terrain.Error;
-        public void Dispose() { Assets.Dispose(); Terrain.Dispose(); }
-    }
     public TextureService Textures { get; init; } = null!;
     public TerrainChunkCache<ImageTexture> Terrain { get; init; } = null!;
     public Func<double> AnimationTime { get; init; } = null!;
@@ -73,10 +28,8 @@ public partial class MapSceneView : Node2D
     private TextureScope? _previewAssets;
     private MapSprite[] _previewSprites = [];
     private long _previewRevision;
-    internal Frame? Presented => _transition.Presented;
-    private MapFrameTransition<Frame> _transition = null!;
-    private TextureScope? _prefetchAssets;
-    private TerrainChunkCache<ImageTexture>.Lease? _prefetchTerrain;
+    internal MapDisplayFrame? Presented => _presenter.Presented;
+    private MapFramePresenter _presenter = null!;
     private TextureScope _ui = null!;
     private Node2D _water = null!, _annotations = null!;
     private MapSpriteLayer _objects = null!;
@@ -109,18 +62,18 @@ public partial class MapSceneView : Node2D
     private long _drawnDayRevision = -1;
     private int _annotationFrame = -1;
     private long _annotationUiRevision = -1;
-    private (MapScene Scene, MapViewport Camera, Vector2 Size, bool Boundaries)? _lastRequest;
     public long Revision { get; private set; }
     public long AnnotationRevision { get; private set; }
     public long TerrainDraws { get; private set; }
     public long WaterDraws { get; private set; }
     public long ObjectDraws { get; private set; }
-    public string? Error { get; private set; }
-    public bool IsReady => Presented is not null && _transition.Pending is null && Error is null;
+    public string? Error => _presenter.Error;
+    public bool IsReady => _presenter.IsReady;
     public event Action? Committed;
     public override void _Ready()
     {
-        _transition = new(f => f.Ready, f => f.Error, f => Textures.Defer(f.Dispose));
+        _presenter = new(Textures, Terrain);
+        _presenter.Committed += RefreshCommittedFrame;
         _ui = Textures.CreateScope();
         _ui.RequestPrefixes("bar-", "icon-");
         _outlineMaterial = new ShaderMaterial { Shader = new Shader { Code = """
@@ -187,63 +140,14 @@ public partial class MapSceneView : Node2D
         _annotations.Draw += () => { if (ShowAnnotations && Font is not null && Texts is not null) DrawAnnotations(_annotations, Font, Texts, p => p, 1); };
         AddChild(_annotations);
     }
-    internal void Request(MapScene scene, MapViewport camera, Vector2 size, bool boundaries, bool prefetch = false)
+    internal void Request(MapScene scene, MapViewport camera, Vector2 size, bool boundaries, bool prefetch = false) =>
+        _presenter.Request(scene, camera, size, boundaries, prefetch);
+    private void RefreshCommittedFrame(MapFrameChange change)
     {
-        var request = (scene, camera, size, boundaries);
-        if (_lastRequest == request) return;
-        _lastRequest = request; Error = null;
-        Vector2 half = size / (2 * (float)camera.Zoom);
-        var rect = new Rect2(new Vector2((float)camera.X, (float)camera.Y) - half, half * 2);
-        // Camera motion inside a prepared region does not change resource ownership.
-        bool Covers(Frame frame) => ReferenceEquals(frame.Region.Scene, scene) && frame.Boundaries == boundaries &&
-            frame.Region.Bounds.Encloses(rect);
-        if (Presented is { } presented && Covers(presented) && presented.CanPresent(camera, size))
+        if (change == MapFrameChange.Camera)
         {
-            _transition.CancelPending();
-            presented.Move(camera, size);
             RebuildObjects(); _annotations.QueueRedraw();
             Revision++; Committed?.Invoke();
-            return;
-        }
-        if (_transition.Pending is { } pending && Covers(pending))
-        {
-            pending.Move(camera, size); TryCommit(); return;
-        }
-        // Main-map coverage has slack; stationary previews retain their exact clipping rectangle.
-        var coverage = prefetch ? rect.Grow(256) : rect;
-        var region = scene.Select(coverage, boundaries);
-        var assets = Textures.CreateScope(Textures.MapAssets);
-        var visible = camera.Chunks(scene.Map.CanvasWidth, scene.Map.CanvasHeight, (int)Math.Ceiling(size.X), (int)Math.Ceiling(size.Y)).ToHashSet();
-        var terrain = Terrain.Acquire(Keys(0).OrderBy(k => visible.Contains((k.X, k.Y)) ? 0 : 1));
-        var next = new Frame(region, camera, size, assets, terrain, boundaries);
-        _transition.Request(next);
-        var oldAssets = _prefetchAssets; var oldTerrain = _prefetchTerrain;
-        _prefetchAssets = null; _prefetchTerrain = null;
-        if (prefetch)
-        {
-            _prefetchAssets = Textures.CreateScope(Textures.MapAssets, true);
-            _prefetchAssets.Request(scene.Select(coverage.Grow(512), boundaries).Assets);
-            _prefetchTerrain = Terrain.Acquire(Keys(1).Except(terrain.Keys), true);
-        }
-        // Transfer shared requests before releasing the old leases, including in-flight prefetch.
-        oldAssets?.Dispose(); oldTerrain?.Dispose();
-        TryCommit();
-        IEnumerable<TerrainChunkKey> Keys(int margin) =>
-            new MapViewport(coverage.GetCenter().X, coverage.GetCenter().Y, 1)
-                .Chunks(scene.Map.CanvasWidth, scene.Map.CanvasHeight,
-                    (int)Math.Ceiling(coverage.Size.X), (int)Math.Ceiling(coverage.Size.Y), margin)
-                .Select(k => new TerrainChunkKey(scene.Terrain, k.X, k.Y));
-    }
-    private void TryCommit()
-    {
-        if (!_transition.TryCommit())
-        {
-            if (_transition.Error is { } error && Error != error.Message)
-            {
-                Error = error.Message; GD.PushError(Error);
-                _prefetchAssets?.Dispose(); _prefetchAssets = null;
-                _prefetchTerrain?.Dispose(); _prefetchTerrain = null;
-            }
             return;
         }
         Revision++; _frames.Clear();
@@ -252,15 +156,11 @@ public partial class MapSceneView : Node2D
         RebuildObjects();
         QueueRedraw(); _water.QueueRedraw(); _annotations.QueueRedraw(); Committed?.Invoke();
     }
-    internal void RetryFailedRequest() { if (Error is not null) _lastRequest = null; }
+    internal void RetryFailedRequest() => _presenter.Retry();
     private long _drawnUnitRevision = -1;
     public override void _Process(double delta)
     {
-        TryCommit();
-        if (_prefetchAssets is { IsReady: true } || _prefetchAssets?.Error is not null)
-        { _prefetchAssets.Dispose(); _prefetchAssets = null; }
-        if (_prefetchTerrain is { IsReady: true } || _prefetchTerrain?.Error is not null)
-        { _prefetchTerrain.Dispose(); _prefetchTerrain = null; }
+        _presenter.Pump();
         if (Presented is not { } frame) return;
         int readyTerrain = frame.Terrain.Keys.Count(frame.Terrain.IsAvailable);
         if (readyTerrain != _drawnTerrainCount) QueueRedraw();
@@ -279,7 +179,7 @@ public partial class MapSceneView : Node2D
         long unitRevision = frame.Region.UnitAnimationRevision(frame.ViewportBounds);
         bool membersChanged = _drawnUnitRevision != unitRevision;
         _drawnUnitRevision = unitRevision;
-        bool water = resourcesChanged, objects = frame.Region.Scene.HasRetirements || membersChanged || motion || hoverChanged || resourcesChanged || targetsChanged || markerChanged || _drawnUiRevision != _ui.Revision;
+        bool water = resourcesChanged, objects = frame.Region.Scene.Playback.HasRetirements || membersChanged || motion || hoverChanged || resourcesChanged || targetsChanged || markerChanged || _drawnUiRevision != _ui.Revision;
         foreach (string id in frame.WaterClips.Concat(frame.ObjectClips).Distinct())
         {
             int current = MapAnimationClock.Frame(frame.Region.Scene.Clips[id], AnimationTime());
@@ -515,7 +415,7 @@ public partial class MapSceneView : Node2D
     public override void _ExitTree()
     {
         _objects.Clear();
-        _transition.Dispose(); _prefetchAssets?.Dispose(); _prefetchTerrain?.Dispose(); _previewAssets?.Dispose(); _ui.Dispose();
+        _presenter.Dispose(); _previewAssets?.Dispose(); _ui.Dispose();
         var waterMaterial = _water.Material;
         Textures.Defer(() => {
             waterMaterial.Dispose(); _additiveMaterial.Dispose();

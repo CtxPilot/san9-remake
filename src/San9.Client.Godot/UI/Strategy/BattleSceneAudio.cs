@@ -1,11 +1,23 @@
 using Godot;
 using San9.Application.Presentation;
 using San9.Rendering;
+using San9.Core.Simulation;
 
 namespace San9.Client.Godot;
 
-public partial class BattlePresentationView
+internal partial class BattleSceneAudio : Node
 {
+    public string ContentRoot { get; init; } = "";
+    public IReadOnlyDictionary<string, string> Sounds { get; init; } = null!;
+    public Action<string>? PlaySound { get; init; }
+    public Action<string, Vector2>? PlayMapSound { get; init; }
+    public Func<bool> IsPaused { get; init; } = () => false;
+    public Func<bool> SoundEnabled { get; init; } = () => true;
+    public Func<BattleObjectContext, Vector2> Project { get; init; } = null!;
+    private BattleVisualCue? _zoom;
+    private DuelSceneCue? _duel;
+    private bool IsSceneActive;
+    private float SceneAudioGain;
     private AudioStreams _streams = null!;
     private AudioStreamPlayer _ambience = null!;
     private AudioStreamPlayer _numberRoll = null!;
@@ -16,14 +28,14 @@ public partial class BattlePresentationView
     private string? _actionSoundCue;
     private readonly List<AudioStreamPlayer?> _actionSounds = [];
 
-    private void InitializeSceneAudio()
+    public override void _Ready()
     {
         _streams = new(ContentRoot, Sounds);
         _ambience = new(); AddChild(_ambience);
         _numberRoll = new(); AddChild(_numberRoll);
     }
 
-    private void ResetSceneAudio()
+    public void Reset()
     {
         StopActionSounds();
         _sounds.Clear(); _startedSounds.Clear(); _reinforcementSounds.Clear();
@@ -32,10 +44,25 @@ public partial class BattlePresentationView
         if (_numberRoll is not null) { _numberRoll.Stop(); _numberRoll.Stream = null; }
     }
 
-    private void UpdateSceneAudio(TurnDayPresentation day, IEnumerable<BattleVisualCue> activeVisuals,
-        IEnumerable<BattleMapEffectCue> mapEffects)
+    public void Advance(TurnDayPresentation day, BattleVisualCue? zoom, DuelSceneCue? duel,
+        bool sceneActive, float sceneAudioGain)
     {
+        _zoom = zoom; _duel = duel; IsSceneActive = sceneActive; SceneAudioGain = sceneAudioGain;
+        var activeVisuals = day.Battle!.Visuals.Where(c => day.IsVisualReady(c) && (c.IsMapEffect
+            ? day.IsMapEffectPresented(c.Id) && day.MapEffectElapsed(c.Id) < c.End - c.Start
+            : day.Elapsed >= c.Start && day.Elapsed < c.End));
+        var mapEffects = day.Battle.MapEffects.Where(c => day.IsFactReady(c.FactIndex) && day.IsDialogueComplete(c.AfterDialogueId));
         double time = day.Elapsed;
+        if (_duel?.Sample(time) is { } stage)
+        {
+            int index = _duel.Stages.IndexOf(stage);
+            // A seek plays only the active stage, never sounds belonging to skipped strikes.
+            if (_sounds.Add((_duel.Id, index)))
+            {
+                if (stage.Sound is { } sound) PlaySound?.Invoke(sound);
+                if (stage.Effects.FirstOrDefault()?.Sound is { } effectSound && effectSound != stage.Sound) PlaySound?.Invoke(effectSound);
+            }
+        }
         foreach (var cue in activeVisuals)
         {
             if (_startedSounds.Add(cue.Id))
@@ -113,6 +140,8 @@ public partial class BattlePresentationView
             player.StreamPaused = IsPaused();
         }
     }
+
+    public override void _ExitTree() { Reset(); _streams.Dispose(); }
 
     private static void ReleaseActionSound(AudioStreamPlayer player)
     { player.Stop(); player.Stream = null; player.QueueFree(); }

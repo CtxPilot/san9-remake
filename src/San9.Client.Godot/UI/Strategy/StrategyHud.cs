@@ -113,12 +113,7 @@ public partial class StrategyHud : Control
             {
                 if (CommandPresentation.Progress is { } progress) _sceneSounds.Play(progress.StrategyTitleSound, SoundEnabled);
             },
-            CanContinue = publication => _presentation?.Publication == publication &&
-                Interaction.CanContinue,
-            CanPresentClosing = () => _executionPanels.IsCollapsed,
             PresentSeasonChange = PresentSeasonChange,
-            CanPlayDay = () => Interaction.CanPlay && _textures.IsReady && _feedback.ResourcesReady && _battle.Prepare(Turn.Day) && ReferenceEquals(World.Day, Turn.Day) && World.IsDayReady && _executionPanels.IsExpanded,
-            PresentDay = day => _battle.PresentDay(day),
             RetryPresentation = () => _battle.RetryResources(),
             CreateDay = (before, after, events) => new(before, after, events, World.PrepareDay(before, events),
                 battle: BattlePresentationPlan.Create(before, after, events, Session.Messages(Texts, before.World), Texts, CommandPresentation,
@@ -245,6 +240,8 @@ public partial class StrategyHud : Control
         BuildCommandFlows();
         BuildSessionPresentation();
         // Adding controls can trigger hit testing before the HUD is fully constructed.
+        _execution = new(Turn, World, _battle, _feedback, _executionPanels, _presentation, _textures,
+            () => Interaction, UpdateSeasonPresentation);
         _built = true;
         BuildSidebar();
         UpdateSelection(); QueueRedraw();

@@ -11,7 +11,7 @@ internal sealed class MapAnnotationLayer
         int Morale, int Durability, int MaxDurability, string[] Icons, Rect2? HitBounds, bool IsWork = false);
     private Entry[] _entries = [];
     public bool HasAnimatedBars { get; private set; }
-    public void Prepare(MapSceneView.Frame frame, Font font, TextCatalog texts)
+    public void Prepare(MapDisplayFrame frame, Font font, TextCatalog texts)
     {
         List<Entry> entries = [];
         foreach (var building in frame.Region.Buildings)
@@ -24,7 +24,7 @@ internal sealed class MapAnnotationLayer
         }
         var units = frame.Region.Scene.State.World.Units.ToDictionary(u => u.Id);
         int fontSize = GameTextStyles.Building(false).FontSize;
-        foreach (var unit in frame.Region.Units.Where(u => frame.Region.Scene.IsUnitVisible(u, frame.ViewportBounds)).Select(frame.Region.Scene.Sample))
+        foreach (var unit in frame.Region.Units.Where(u => frame.Region.Scene.Playback.IsUnitVisible(u, frame.ViewportBounds)).Select(frame.Region.Scene.Playback.Sample))
         {
             string name = unit.CommanderNameKey is { } key ? texts.Resolve(key) + "队" : "部队";
             float width = Math.Max(76, font.GetStringSize(name, fontSize: fontSize).X);

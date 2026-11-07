@@ -4,12 +4,13 @@ using San9.Core.Domain;
 
 namespace San9.Client.Godot;
 
-internal sealed partial class MapScene
+internal sealed partial class MapPlayback
 {
     private sealed record MotionSegment(double Start, double End, double VisualStart,
         TurnDayPresentation? Day, Func<int, double, UnitVisualState?> Sample,
         Dictionary<int, MapUnitMotion> Paths);
     private MotionSegment[] _history = [];
+    internal bool HasHistory => _history.Length > 0;
     private Func<int, double, UnitVisualState?> _stateSampler = null!;
     private double _motionStart, _visualStart, _idlePositionStart;
     private const double HistoryMilliseconds = 2000;
@@ -17,7 +18,7 @@ internal sealed partial class MapScene
     private double MotionTime => _motionStart + LocalMotionTime;
     private double MotionVisualTime => _visualStart + (Day?.VisualElapsed * 1000 ?? LocalMotionTime);
 
-    private void PrepareHistory(MapScene? previous)
+    private void PrepareHistory(MapPlayback? previous)
     {
         _stateSampler = previous is not null && ReferenceEquals(previous.Day, Day) && ReferenceEquals(previous.State, State) &&
             ReferenceEquals(previous._unitStates, _unitStates) ? previous._stateSampler : StateSampler(previous);

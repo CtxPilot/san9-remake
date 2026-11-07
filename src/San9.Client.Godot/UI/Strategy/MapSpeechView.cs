@@ -15,6 +15,7 @@ public partial class MapSpeechView : Control
     private AsyncPortrait _portrait = null!;
     private readonly GameTextPresenter _text = new();
     private MapSpeechPlacement _placement;
+    private readonly MapSpeechLayoutCache _layout = new();
     public float FrameWidth { get; private set; }
     public bool ResourcesReady => Textures.IsReady && _portrait.IsResourceReady;
 
@@ -49,7 +50,7 @@ public partial class MapSpeechView : Control
     public OverlayBounds Place(Vector2 anchor, OverlayBounds viewport, IReadOnlyList<OverlayBounds> occupied,
         MapSpeechPlacement? preferred = null)
     {
-        var layout = MapSpeechLayout.Place(anchor.X, anchor.Y, FrameWidth, preferred ?? _placement, viewport, occupied);
+        var layout = _layout.Place(anchor.X, anchor.Y, FrameWidth, preferred ?? _placement, viewport, occupied);
         bool changed = _placement != layout.Placement;
         _placement = layout.Placement;
         Position = new((float)layout.Bounds.X, (float)layout.Bounds.Y);

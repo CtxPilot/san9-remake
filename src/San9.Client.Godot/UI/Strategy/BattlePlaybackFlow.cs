@@ -27,13 +27,14 @@ public partial class BattlePlaybackFlow : Control
     private MapSoundPlayer _mapSounds = null!;
     private readonly MapAudioPlayback _mapAudioPlayback = new(Random.Shared.Next);
     private BattlePresentationView _battleView = null!;
-    private TurnDayPresentation? _battleMessagesDay;
-    private readonly HashSet<string> _battleMessagesPlayed = [];
+    private DayFeedbackDispatcher _feedback = null!;
     public bool IsSceneActive => _battleView.IsSceneActive;
+    public bool IsReadyFor(TurnDayPresentation? day) => _battleView.IsReadyFor(day);
     public bool Prepare(TurnDayPresentation? day) => _battleView.Prepare(day);
     public void RetryResources() => _battleView.RetryResources();
     public override void _Ready()
     {
+        _feedback = new(Narrate, Record, Speech, role => SceneSounds.Play(role, SoundEnabled()));
         _mapSounds = new() { ContentRoot = ContentRoot, Sounds = CommandPresentation.Sounds };
         AddChild(_mapSounds);
         _battleView = new()
@@ -66,6 +67,7 @@ public partial class BattlePlaybackFlow : Control
     {
         // Narration pauses the day clock, not projection: its opening frame may end the previous scene.
         _battleView.UpdatePlayback(Turn.Day);
+        _battleView.UpdateAudio(Turn.Day);
         _mapSounds.TransitionGain = _battleView.MapAudioGain;
         SceneSounds.SetTransitionGain(_battleView.SceneAudioGain);
         Music.SetMapTransitionGain(_battleView.MapAudioGain);
@@ -76,8 +78,7 @@ public partial class BattlePlaybackFlow : Control
     {
         Music.SetMapTransitionGain(1);
         SceneSounds.SetTransitionGain(1);
-        _battleMessagesDay = null;
-        _battleMessagesPlayed.Clear();
+        _feedback.Reset();
         _mapAudioPlayback.Clear();
     }
     private San9.Core.Domain.MapCell BattleCell(San9.Core.Simulation.BattleObjectContext obj)
@@ -89,53 +90,9 @@ public partial class BattlePlaybackFlow : Control
 
     public void PresentDay(TurnDayPresentation day)
     {
-        if (!ReferenceEquals(_battleMessagesDay, day))
-        {
-            _battleMessagesDay = day; _battleMessagesPlayed.Clear();
-            _dialogueSnapshot = null; _speechSnapshot = null; _recordSnapshot = null;
-        }
-        if (day.Battle is not { } plan) return;
-        // A complete day may be released by TurnPresentation in this same callback.
-        // Detach retirement poses before the before-world scene is replaced.
-        World.RefreshRuntimeObjects();
         _battleView.PublishMapFeedback(day);
-        var pending = day.PendingDialogues;
-        var dialogues = ReferenceEquals(_dialogueSnapshot, pending) ? [] : pending.Where(c => !_battleMessagesPlayed.Contains(c.Id)).ToArray();
-        if (dialogues.Length > 0)
-        {
-            Narrate(dialogues.Select(c => c.Message).ToArray(), day.Before,
-                () => { foreach (var cue in dialogues) day.CompleteDialogue(cue.Id); });
-            foreach (var cue in dialogues) _battleMessagesPlayed.Add(cue.Id);
-        }
-        _dialogueSnapshot = pending;
-        var speeches = day.ReadyMapSpeeches;
-        if (!ReferenceEquals(_speechSnapshot, speeches))
-        {
-            foreach (var cue in speeches)
-            {
-                if (!_battleMessagesPlayed.Add(cue.Id)) continue;
-                var message = cue.Message;
-                if (message.MapSpeech is { } speech) Speech(speech);
-                if (message.SoundRole is { } sound) SceneSounds.Play(sound, SoundEnabled());
-            }
-        }
-        _speechSnapshot = speeches;
-        var records = day.ReadyRecords;
-        if (!ReferenceEquals(_recordSnapshot, records))
-        {
-            foreach (var cue in records)
-            {
-                if (!_battleMessagesPlayed.Add(cue.Record.Id)) continue;
-                Record(cue.Record);
-                if (cue.SoundRole is { } sound) SceneSounds.Play(sound, SoundEnabled());
-            }
-        }
-        _recordSnapshot = records;
+        _feedback.Publish(day);
     }
-
-    private IReadOnlyList<BattleMessageCue>? _dialogueSnapshot;
-    private IReadOnlyList<BattleMessageCue>? _speechSnapshot;
-    private IReadOnlyList<BattleRecordCue>? _recordSnapshot;
 
     private void UpdateMapAudio()
     {
@@ -153,20 +110,20 @@ public partial class BattlePlaybackFlow : Control
         if (Turn.Day is null || frame is null || !World.IsDayReady || !ReferenceEquals(frame.Region.Scene.Day, Turn.Day)) return;
         _mapAudioPlayback.BeginDay(Turn.Day);
         var transform = GetGlobalTransformWithCanvas().AffineInverse() * World.GetGlobalTransformWithCanvas();
-        var sources = frame.Region.Scene.SoundSources(audio, frame.Region.Units).Select(source =>
+        var sources = frame.Region.Scene.Playback.SoundSources(audio, frame.Region.Units).Select(source =>
         {
             var p = transform * new Vector2((float)source.X, (float)source.Y);
             return source with { X = p.X, Y = p.Y, Resource = CommandPresentation.Sounds[source.Role] };
         });
         _mapSounds.UpdateVoices(_mapAudioPlayback.Update(sources, Size.X, Size.Y, audio.BattleAmbience,
-            frame.Region.Scene.PlaybackMilliseconds, Turn.Day.Elapsed * 1000 < MapMovementCadence.ArrivalMilliseconds), Turn.Day);
+            frame.Region.Scene.Playback.PlaybackMilliseconds, Turn.Day.Elapsed * 1000 < MapMovementCadence.ArrivalMilliseconds), Turn.Day);
     }
 
     private void UpdateRetirementAudio()
     {
         if (World.Display?.Presented is not {} frame || !World.IsVisibleReady || CommandPresentation.MapAudio is not {} audio) return;
         var transform = GetGlobalTransformWithCanvas().AffineInverse() * World.GetGlobalTransformWithCanvas();
-        var sources = frame.Region.Scene.TakeRetirementSounds(audio).Select((sound, i) =>
+        var sources = frame.Region.Scene.Playback.TakeRetirementSounds(audio).Select((sound, i) =>
         {
             var point = transform * new Vector2((float)sound.X, (float)sound.Y);
             return new MapSoundSource($"retirement:{i}", sound.Role, point.X, point.Y)

@@ -43,9 +43,9 @@ public sealed class MapSceneProjectionTests
         var scene = new MapScene(map, new TerrainRenderer(map, [], []), "spring", state,
             new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, day: day);
         var audio = new San9.Content.Interface.MapAudioDefinition("title", [], [], [], [], [], []) { ConstructionCompleteSound = "complete" };
-        Assert.Empty(scene.SoundSources(audio, []));
+        Assert.Empty(scene.Playback.SoundSources(audio, []));
         day.Advance(2);
-        var source = Assert.Single(scene.SoundSources(audio, []));
+        var source = Assert.Single(scene.Playback.SoundSources(audio, []));
         var anchor = BuildingInfoGeometry.Anchor(1, 0, 0, 1, map.Height);
         Assert.Equal((anchor.X, anchor.Y), (source.X, source.Y));
         Assert.Equal("complete", source.Role);
@@ -54,7 +54,7 @@ public sealed class MapSceneProjectionTests
         var voice = new MapSoundVoice(source.Key, source.Role, source.X, source.Y, 1) { Pulse = source.Pulse };
         pulses.MarkEmitted(voice);
         Assert.True(pulses.WasEmitted(voice));
-        Assert.Equal(source, Assert.Single(scene.RefreshMapFrame().SoundSources(audio, [])));
+        Assert.Equal(source, Assert.Single(scene.RefreshMapFrame().Playback.SoundSources(audio, [])));
     }
 
     [Fact]

@@ -49,6 +49,12 @@ public partial class BattlePresentationView : Control
     private BattleVisualCue? _zoom;
     private BattleVisualCue? _preludeFrame;
     public void RetryResources() { _duelUi?.RetryFailed(); _assets?.RetryFailed(); _flags?.RetryFailed(); _numberAssets?.RetryFailed(); foreach (var portrait in _portraits) portrait.RetryFailed(); }
+    private BattleSceneAudio _audio = null!;
+    public bool IsReadyFor(TurnDayPresentation? day) => ReferenceEquals(_day, day) && ResourcesReady;
+    public void UpdateAudio(TurnDayPresentation? day)
+    {
+        if (day?.Battle is not null && IsReadyFor(day)) _audio.Advance(day, _zoom, _duel, IsSceneActive, SceneAudioGain);
+    }
     public bool ResourcesReady => _duelUi?.IsReady != false && _assets?.IsReady != false && _flags?.IsReady != false && _portraits.All(p => p.IsReady);
 
     public bool Prepare(TurnDayPresentation? day)
@@ -63,7 +69,7 @@ public partial class BattlePresentationView : Control
             return ResourcesReady;
         }
         _day?.EndSceneFastForward();
-        ResetSceneAudio();
+        _audio.Reset();
         _assets?.Dispose(); _assets = null; _day = day;
         _flags?.Dispose(); _flags = null;
         _duel = null; _duelSpeechLayout = null; _duelPortraits.Clear(); _duelText?.Hide();
@@ -145,7 +151,6 @@ public partial class BattlePresentationView : Control
         _preludeFrame = visuals.FirstOrDefault(c => c.PreludeId is not null && Active(c));
         _zoom = visuals.FirstOrDefault(c => c.Zoom is not null && time >= c.Start && time < c.End);
         _mapLayer.Visible = !IsSceneActive;
-        UpdateSceneAudio(day, visuals.Where(Active), mapEffects);
         int slot = 0, mapSlot = 0;
         void Effect(BattleSprite asset, double elapsed, Vector2 point, float opacity = 1, int? frameIndex = null,
             bool sceneCoordinates = true, int zIndex = 0, bool mapEffect = false)
@@ -347,7 +352,10 @@ public partial class BattlePresentationView : Control
     }
     public override void _Ready()
     {
-        InitializeSceneAudio();
+        _audio = new() { ContentRoot = ContentRoot, Sounds = Sounds, SoundEnabled = SoundEnabled,
+            IsPaused = IsPaused, Project = obj => Project(obj), PlaySound = role => PlaySound?.Invoke(role),
+            PlayMapSound = (role, point) => PlayMapSound?.Invoke(role, point) };
+        AddChild(_audio);
         // Map feedback remains in the UI canvas for screen-space projection, but has
         // its own ordering below HUD controls (0) and map speeches (-1).
         _mapLayer = new() { Name = "MapEffects", ZAsRelative = false, ZIndex = -2 }; AddChild(_mapLayer);
@@ -369,8 +377,6 @@ public partial class BattlePresentationView : Control
         EndSceneFastForward();
         GetWindow().MouseExited -= EndSceneFastForward;
         GetViewport().SizeChanged -= ViewportChanged;
-        ResetSceneAudio();
-        _streams.Dispose();
         _duelUi?.Dispose(); _assets?.Dispose(); _flags?.Dispose(); _numberAssets?.Dispose();
         foreach (var portrait in _portraits) portrait.Dispose();
         Textures.Defer(_additive.Dispose);

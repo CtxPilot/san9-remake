@@ -4,14 +4,14 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-public sealed class TextureScope(TextureService service, IReadOnlyDictionary<string, ImageAsset> assets, bool prefetch = false)
+public sealed class TextureScope(TextureService service, IReadOnlyDictionary<string, ImageAsset> assets)
     : IDisposable
 {
-    private sealed class Binding(ImageAsset asset, AtlasTexture view, TextureCache<ImageTexture>.Lease lease)
+    private sealed class Binding(ImageAsset asset, TextureCache<ImageTexture>.Lease lease)
     {
         public readonly ImageAsset Asset = asset;
-        public readonly AtlasTexture View = view;
-        public TextureCache<ImageTexture>.Lease Lease = lease;
+        public readonly AtlasTexture View = new() { Region = new(asset.X, asset.Y, asset.Width, asset.Height), FilterClip = true };
+        public readonly TextureCache<ImageTexture>.Lease Lease = lease;
         public bool Installed;
         public Exception? Error;
     }
@@ -62,8 +62,7 @@ public sealed class TextureScope(TextureService service, IReadOnlyDictionary<str
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_bindings.ContainsKey(key)) return;
         var asset = assets[key];
-        var view = new AtlasTexture { Region = new(asset.X, asset.Y, asset.Width, asset.Height), FilterClip = true };
-        var binding = new Binding(asset, view, service.Cache.Acquire([asset.File], prefetch));
+        var binding = new Binding(asset, service.Cache.Acquire([asset.File]));
         _bindings.Add(key, binding); _remaining++;
         if (!Install(binding)) { _pending.Add(binding); service.ScheduleRefresh(this); }
     }
@@ -85,7 +84,7 @@ public sealed class TextureScope(TextureService service, IReadOnlyDictionary<str
     internal bool TryGetReadyResource(string key, out Texture2D texture)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_bindings.TryGetValue(key, out var binding) && binding.Installed && !prefetch)
+        if (_bindings.TryGetValue(key, out var binding) && binding.Installed)
         { texture = binding.View; return true; }
         texture = null!; return false;
     }
@@ -95,6 +94,19 @@ public sealed class TextureScope(TextureService service, IReadOnlyDictionary<str
             if (service.Cache.Contains(assets[key].File)) Request(key);
     }
     public void Request(IEnumerable<string> keys) { foreach (string key in keys) Request(key); }
+
+    /// <summary>After an atomic camera publication, retire bindings outside its new visible dependency set.</summary>
+    internal void Retain(IReadOnlySet<string> keys)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        foreach (string key in _bindings.Keys.Where(key => !keys.Contains(key)).ToArray())
+        {
+            var binding = _bindings[key];
+            _bindings.Remove(key); _pending.Remove(binding); _failed.Remove(binding);
+            if (!binding.Installed) _remaining--;
+            service.Defer(() => Release(binding));
+        }
+    }
     public void RetryFailed()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -107,12 +119,6 @@ public sealed class TextureScope(TextureService service, IReadOnlyDictionary<str
             var binding = _failed[i];
             if (!files.Contains(binding.Asset.File)) continue;
             binding.Error = null;
-            // A completed prefetch released its lease; a visible request still owns its failed lease.
-            if (prefetch)
-            {
-                binding.Lease = service.Cache.Acquire([binding.Asset.File], prefetch: true);
-                binding.Installed = false; _remaining++;
-            }
             _pending.Add(binding); _failed.RemoveAt(i);
         }
         if (NeedsRefresh) service.ScheduleRefresh(this);
@@ -132,14 +138,6 @@ public sealed class TextureScope(TextureService service, IReadOnlyDictionary<str
     // A binding leaves the pending set once installed or failed; ready leases never need polling.
     private bool Install(Binding binding)
     {
-        if (prefetch)
-        {
-            if (!binding.Lease.IsComplete) return false;
-            binding.Error = binding.Lease.Error;
-            if (binding.Error is not null) _failed.Add(binding);
-            binding.Installed = true; _remaining--; binding.Lease.Dispose();
-            return true;
-        }
         if (binding.Lease.IsReady)
         {
             binding.View.Atlas = service.Cache.Get(binding.Asset.File);
@@ -159,10 +157,15 @@ public sealed class TextureScope(TextureService service, IReadOnlyDictionary<str
         _consumers.Clear();
         service.Retire(this, () =>
         {
-            foreach (var b in _bindings.Values)
-            { b.View.Atlas = null; b.View.Dispose(); b.Lease.Dispose(); }
+            foreach (var b in _bindings.Values) Release(b);
             _bindings.Clear();
         });
         _pending.Clear(); _failed.Clear();
+    }
+
+    private static void Release(Binding binding)
+    {
+        binding.View.Atlas = null; binding.View.Dispose();
+        binding.Lease.Dispose();
     }
 }

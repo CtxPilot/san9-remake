@@ -7,7 +7,8 @@ namespace San9.Client.Godot;
 
 internal sealed partial class MapScene
 {
-    private Dictionary<int, string[]> _unitMotionAssets = [];
+    private readonly record struct MotionAssetKey(int? Formation, int? NavalFormation, int? ActiveFormation, int Color, int Glyph);
+    private Dictionary<MotionAssetKey, string[]> _unitMotionAssets = [];
     private IReadOnlyDictionary<int, UnitState> _runtimeUnits = null!;
     private string[] _sharedMotionAssets = [];
 
@@ -16,17 +17,17 @@ internal sealed partial class MapScene
         // Coverage is independent of damage and playback time: include every layout and facing.
         bool sameInputs = previous is not null && ReferenceEquals(previous.Map, Map) && ReferenceEquals(previous.State, State);
         _runtimeUnits = sameInputs ? previous!._runtimeUnits : State.World.Units.ToDictionary(u => u.Id);
-        _unitMotionAssets = sameInputs ? previous!._unitMotionAssets : [];
+        // Resource coverage follows appearance, not position, soldiers or snapshot identity.
+        // This map-owned catalog retains asset names only; camera leases own loaded resources.
+        _unitMotionAssets = previous is not null && ReferenceEquals(previous.Map, Map) ? previous._unitMotionAssets : [];
         _sharedMotionAssets = Day?.Battle?.Values.Select(v => v.Condition).OfType<UnitCondition>().Distinct()
             .Where(Map.Units.Conditions.ContainsKey).Select(c => Map.Units.Conditions[c].ClipId)
             .SelectMany(id => Clips[id].Frames).Distinct().ToArray() ?? [];
     }
 
-    private IEnumerable<string> UnitMotionAssets(int id)
+    private IEnumerable<string> UnitMotionAssets(MotionAssetKey key)
     {
-        var runtime = _runtimeUnits[id];
-        var state = _unitStates[id];
-        var formations = new[] { runtime.FormationId, runtime.NavalFormationId, State.FormationId(runtime) }.OfType<int>().ToHashSet();
+        var formations = new[] { key.Formation, key.NavalFormation, key.ActiveFormation }.OfType<int>().ToHashSet();
         var layouts = Map.Units.Formations.Where(f => formations.Contains(f.FormationId)).SelectMany(f => f.Layouts).ToArray();
         foreach (var layout in layouts)
             foreach (string frame in Clips[layout.Influence.ClipId].Frames) yield return frame;
@@ -40,9 +41,8 @@ internal sealed partial class MapScene
                 .Concat(body.Retirement?.DirectionClips ?? [])
                 .Concat(body.Retirement?.Effect is {} effect ? new[] { effect.ClipId } : []))
                 foreach (string frame in Clips[clip].Frames.Concat(Clips[clip].SeasonFrames.Values.SelectMany(frames => frames))) yield return frame;
-        int glyph = state.IsRulerCommander ? Map.Units.RulerFlagGlyph : state.Glyph;
         foreach (int direction in Enumerable.Range(0, 8))
-            foreach (string idClip in FlagVisuals.Layers(direction, state.Color, glyph))
+            foreach (string idClip in FlagVisuals.Layers(direction, key.Color, key.Glyph))
                 if (Clips.TryGetValue(idClip, out var clip))
                     foreach (string frame in clip.Frames) yield return frame;
     }
@@ -52,11 +52,15 @@ internal sealed partial class MapScene
         foreach (string frame in _sharedMotionAssets) yield return frame;
         foreach (var unit in units)
         {
-            if (!_unitMotionAssets.TryGetValue(unit.Id, out var frames))
-                _unitMotionAssets[unit.Id] = frames = UnitMotionAssets(unit.Id).Distinct().ToArray();
+            var runtime = _runtimeUnits[unit.Id];
+            var state = _unitStates[unit.Id];
+            var key = new MotionAssetKey(runtime.FormationId, runtime.NavalFormationId, State.FormationId(runtime),
+                state.Color, state.IsRulerCommander ? Map.Units.RulerFlagGlyph : state.Glyph);
+            if (!_unitMotionAssets.TryGetValue(key, out var frames))
+                _unitMotionAssets[key] = frames = UnitMotionAssets(key).Distinct().ToArray();
             foreach (string frame in frames) yield return frame;
         }
-        foreach (var attack in VisibleAttacks(bounds))
+        foreach (var attack in Playback.VisibleAttacks(bounds))
         {
             foreach (string frame in Map.Units.Projectiles[attack.Projectile].Frames) yield return frame;
             if (Map.Units.Projectiles[attack.Projectile].Impact is {} impact)

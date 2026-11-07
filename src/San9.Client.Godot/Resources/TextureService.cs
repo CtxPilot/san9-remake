@@ -129,9 +129,9 @@ public partial class TextureService : Node
         if (_portraits.TryGetValue(image.Id, out var portrait)) image = portrait.GetView(view);
         return CreateScope(new Dictionary<string, ImageAsset> { [role] = image });
     }
-    public TextureScope CreateScope(IReadOnlyDictionary<string, ImageAsset>? assets = null, bool prefetch = false)
+    public TextureScope CreateScope(IReadOnlyDictionary<string, ImageAsset>? assets = null)
     {
-        var scope = new TextureScope(this, assets ?? Roles, prefetch);
+        var scope = new TextureScope(this, assets ?? Roles);
         _scopes.Add(scope); return scope;
     }
     public bool ActiveReady => _scopes.All(s => s.IsReady);

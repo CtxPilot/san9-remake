@@ -142,8 +142,8 @@ public sealed class AftermathPlaybackTests
         day.Advance(1);
         Assert.True(day.IsCombatBlocking);
         scene = scene.RefreshMapFrame();
-        Assert.Equal(soldiers - 10, settlement ? scene.Settlements[2].Soldiers : scene.Sample(scene.Units.Single(u => u.Id == 20)).Soldiers);
-        if (!settlement) Assert.True(scene.Sample(scene.Units.Single(u => u.Id == 20)).Morale > 0);
+        Assert.Equal(soldiers - 10, settlement ? scene.Settlements[2].Soldiers : scene.Playback.Sample(scene.Units.Single(u => u.Id == 20)).Soldiers);
+        if (!settlement) Assert.True(scene.Playback.Sample(scene.Units.Single(u => u.Id == 20)).Morale > 0);
         Assert.DoesNotContain(20, day.MapFrame.RemovedUnits);
         Assert.Equal(2, day.MapFrame.Settlements[2].OwnerId);
         Assert.False(day.MapFrame.Settlements[2].IsDestroyed);
@@ -238,26 +238,26 @@ public sealed class AftermathPlaybackTests
         day.Advance(1);
         scene = scene.RefreshMapFrame();
         Assert.DoesNotContain(scene.Units, u => u.Id == 20);
-        Assert.Equal(retires, scene.HasRetirements);
-        if (!retires) { Assert.Empty(scene.RetiringSprites); return; }
-        Assert.NotEmpty(scene.RetiringSprites);
+        Assert.Equal(retires, scene.Playback.HasRetirements);
+        if (!retires) { Assert.Empty(scene.Playback.RetiringSprites); return; }
+        Assert.NotEmpty(scene.Playback.RetiringSprites);
         var targets = new List<MapObjectTarget?>();
         scene.Select(new(-100000, -100000, 200000, 200000), false)
             .Objects(0, (_, _, targetObject, _, _, _) => targets.Add(targetObject));
         Assert.DoesNotContain(new MapObjectTarget(20, true), targets);
-        var first = Assert.Single(scene.RetiringSprites);
+        var first = Assert.Single(scene.Playback.RetiringSprites);
         day.Advance(.4, paused: true);
-        Assert.True(Assert.Single(scene.RetiringSprites).Frame > first.Frame);
+        Assert.True(Assert.Single(scene.Playback.RetiringSprites).Frame > first.Frame);
         var published = new MapScene(map, terrain, "spring", after, assets, () => clock, scene);
-        Assert.Equal(scene.RetiringSprites.ToArray(), published.RetiringSprites.ToArray());
+        Assert.Equal(scene.Playback.RetiringSprites.ToArray(), published.Playback.RetiringSprites.ToArray());
         var nextDay = new TurnDayPresentation(after, after, [], new MapDayPlan(map, after, []));
         var next = new MapScene(map, terrain, "spring", after, assets, () => clock, published, nextDay);
         nextDay.Advance(1);
         Assert.True(nextDay.IsComplete);
-        Assert.NotEmpty(next.RetiringSprites);
+        Assert.NotEmpty(next.Playback.RetiringSprites);
         var stable = new MapScene(map, terrain, "spring", after, assets, () => clock, next);
         clock = 1000;
-        Assert.Empty(stable.RetiringSprites);
-        Assert.False(stable.PruneRetirements().HasRetirements);
+        Assert.Empty(stable.Playback.RetiringSprites);
+        Assert.False(stable.PruneRetirements().Playback.HasRetirements);
     }
 }

@@ -22,8 +22,9 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
     public Func<StrategySnapshot, StrategySnapshot, IReadOnlyList<DomainEvent>, TurnDayPresentation> CreateDay { get; init; } =
         (before, after, events) => new(before, after, events);
     public Func<bool>? CanPlayDay { get; set; }
-    public Func<bool>? CanPresentClosing { get; init; }
-    public Action<TurnDayPresentation>? PresentDay { get; init; }
+    public Func<bool>? CanPresentClosing { get; set; }
+    public Action<TurnDayPresentation>? PresentDay { get; set; }
+    public Action<TurnDayPresentation>? PrepareDay { get; set; }
     public Action? RetryPresentation { get; init; }
     public IReadOnlySet<string> LastPresentedFeedback { get; private set; } = new HashSet<string>();
     /// <summary>The host must consume this publication and finish its result UI before continuing.</summary>
@@ -216,7 +217,11 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
         {
             try
             {
-                if (Day is not null && CanPlayDay?.Invoke() != false) Day.Advance(seconds, paused: true);
+                if (Day is not null)
+                {
+                    PrepareDay?.Invoke(Day);
+                    if (CanPlayDay?.Invoke() != false) Day.Advance(seconds, paused: true);
+                }
             }
             catch (Exception error) { FailPresentation(error); }
             return;
@@ -234,6 +239,7 @@ public sealed class TurnPresentation(GameSession session, bool enterStrategy = f
             var closing = _pending.PreparedTransitions.FirstOrDefault(t => t.Phase == ResolutionPhase.XunClosing);
             Day ??= CreateDay(Display!, closing?.View ?? prepared,
                 closing is null ? events : events.Take(closing.EventIndex).ToArray());
+            PrepareDay?.Invoke(Day);
             if (CanPlayDay?.Invoke() == false) { Day.EndSceneFastForward(); return; }
             Day.Advance(seconds, readingSeconds: readingSeconds);
             PresentDay?.Invoke(Day);

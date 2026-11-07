@@ -5,6 +5,50 @@ namespace San9.Client.Godot.Tests;
 
 public sealed class OverlayLayoutTests
 {
+    [Fact]
+    public void DenseLayoutMinimizesOverlapBeforeDistance()
+    {
+        var viewport = new OverlayBounds(0, 0, 1024, 768);
+        OverlayBounds[] occupied = [new(0, 0, 1024, 90), new(700, 90, 324, 220),
+            new(0, 650, 1024, 118), new(180, 220, 280, 108), new(450, 360, 320, 108),
+            new(80, 480, 300, 108), new(650, 520, 280, 108)];
+        foreach (double x in new[] { 100, 250.25, 480.5, 1000 })
+        foreach (double y in new[] { 30, 230.75, 470.5, 740 })
+        {
+            var desired = new OverlayBounds(x, y, 280, 108);
+            var actual = OverlayLayout.Place(desired, viewport, occupied);
+            var xs = new[] { desired.Fit(viewport).X, 0, 744 }.Concat(occupied.SelectMany(o => new[] { o.X - 280, o.X + o.Width }));
+            var ys = new[] { desired.Fit(viewport).Y, 0, 660 }.Concat(occupied.SelectMany(o => new[] { o.Y - 108, o.Y + o.Height }));
+            (double Area, double Distance) Cost(OverlayBounds b) =>
+                (occupied.Sum(b.Overlap), Math.Abs(b.X - x) + Math.Abs(b.Y - y));
+            var expected = xs.SelectMany(cx => ys.Select(cy => new OverlayBounds(cx, cy, 280, 108).Fit(viewport)))
+                .Select(Cost).Order().First();
+            Assert.Equal(expected.Area, Cost(actual).Area, 6);
+            Assert.Equal(expected.Distance, Cost(actual).Distance, 6);
+        }
+    }
+
+    [Fact]
+    public void RetainedSpeechReflowsWhenItsAnchorViewportOrExistingObstaclesChange()
+    {
+        var cache = new MapSpeechLayoutCache();
+        var preferred = San9.Content.Interface.MapSpeechPlacement.RightBelow;
+        var viewport = new OverlayBounds(0, 0, 1024, 768);
+        var obstacles = new List<OverlayBounds> { new(200, 300, 280, 108) };
+        var first = cache.Place(254, 300, 280, preferred, viewport, obstacles);
+        Assert.Equal(0, first.Bounds.Overlap(obstacles[0]));
+        Assert.Equal(first, cache.Place(254, 300, 280, preferred, viewport, obstacles));
+        obstacles.Clear();
+        var released = cache.Place(254, 300, 280, preferred, viewport, obstacles);
+        Assert.Equal(MapSpeechLayout.Bounds(254, 300, 280, preferred), released.Bounds);
+        var moved = cache.Place(500, 400, 280, preferred, viewport, obstacles);
+        Assert.Equal(MapSpeechLayout.Bounds(500, 400, 280, preferred), moved.Bounds);
+        var resized = cache.Place(500, 400, 350, preferred, new(0, 0, 400, 300), obstacles);
+        Assert.InRange(resized.Bounds.X, 0, 50);
+        Assert.InRange(resized.Bounds.Y, 0, 192);
+        Assert.Equal(350, resized.Bounds.Width);
+    }
+
     [Theory]
     [InlineData(1024)]
     [InlineData(1365.333)]

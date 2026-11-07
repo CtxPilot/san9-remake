@@ -9,6 +9,13 @@ namespace San9.Client.Godot;
 // Display inputs shared by cameras; sampling caches and the playback clock are explicit dependencies.
 internal sealed partial class MapScene
 {
+    public MapPlayback Playback { get; }
+    public TurnDayPresentation? Day { get; }
+    private readonly Dictionary<int, UnitVisualState> _unitStates;
+    private readonly Func<double> _positionTime;
+    private double ElevationAt(double x, double y) => MapGeometry.SampleElevation(x, y, Map.Width, Map.Height, Map.Squares);
+    internal bool HasExpiredRetirements => Playback.HasExpiredRetirements;
+    internal MapScene PruneRetirements() => new(Map, Terrain, Season, State, _assets, _positionTime, this, Day, _projection);
     public MapPackage Map { get; }
     public TerrainRenderer Terrain { get; }
     public string Season { get; }
@@ -71,14 +78,10 @@ internal sealed partial class MapScene
             .Where(p => !p.Second.PaletteAlpha).Select(p => p.First.AssetId)).ToHashSet();
         Animations = _projection.Animations.GroupBy(s => s.BuildingId).ToDictionary(g => g.Key, g => g.ToArray());
         Day = day;
-        _motions = day?.Plan?.Motions ?? new();
-        _attacks = day?.Plan?.Attacks.ToArray() ?? [];
         PrepareMotionAssets(previous);
-        PrepareHistory(previous);
-        PrepareRetirements(previous);
-        PrepareUnitPlayback(previous is not null && ReferenceEquals(previous.Map, Map) ? previous : null);
         Units = previous is not null && ReferenceEquals(previous.Map, map) && ReferenceEquals(previous._unitStates, _unitStates)
             ? previous.Units : _unitStates.Values.Select(s => UnitVisuals.Resolve(s, map.Units, Clips, elevationAt: ElevationAt)).ToArray();
+        Playback = new(new(Map, State, _projection, _runtimeUnits, Clips, _assets, MapFrame), previous?.Playback, positionTime, Day);
     }
     public MapScene RefreshMapFrame()
     {
@@ -93,6 +96,7 @@ internal sealed partial class MapScene
 
         // Numeric feedback changes annotations; unchanged geometry keeps its resource leases and member playback.
         _projection = projection; MapFrame = frame; Settlements = frame.Settlements;
+        Playback.UpdateMapFrame(frame);
         PresentationRevision++;
         return this;
     }
@@ -122,7 +126,7 @@ internal sealed partial class MapScene
         BuildingAnimations(building.Id, true).Any(s => bounds.Intersects(Bounds(s))) ||
         bounds.Intersects(AnnotationBounds(building));
     public bool Intersects(UnitVisual unit, Rect2 bounds) =>
-        Day is not null || _history.Length > 0 ? MotionBounds(unit).Intersects(bounds) :
+        Day is not null || Playback.HasHistory ? Playback.MotionBounds(unit).Intersects(bounds) :
         unit.Animations.Any(s => bounds.Intersects(Bounds(s))) ||
         unit.MovementVision is { } vision && bounds.Intersects(new Rect2(
             (float)(vision.X - vision.HalfWidth), (float)(vision.Y - vision.HalfHeight),
@@ -160,11 +164,11 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
     private long _unitRevision;
     public long UnitAnimationRevision(Rect2 viewport)
     {
-        Scene.AdvanceUnitPlayback();
+        Scene.Playback.AdvanceUnitPlayback();
         bool changed = false;
         for (int i = 0; i < Units.Length; i++)
         {
-            var revision = Scene.UnitAnimationRevision(Units[i], viewport);
+            var revision = Scene.Playback.UnitAnimationRevision(Units[i], viewport);
             changed |= _unitRevisions[i] != revision;
             _unitRevisions[i] = revision;
         }
@@ -183,7 +187,7 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
         .Where(s => Bounds.Intersects(Scene.Bounds(s)))
         .Concat(Units.SelectMany(u => u.Animations));
     public IEnumerable<string> Assets => new[] { "cloud-fill" }
-        .Concat(Scene.RetirementAssets)
+        .Concat(Scene.Playback.RetirementAssets)
         .Concat(Bridges.Concat(Boundaries).Concat(Clouds).Concat(Buildings.SelectMany(b => b.Sprites))
             .Where(s => Bounds.Intersects(Scene.Bounds(s))).Select(s => s.AssetId))
         .Concat(Water.Concat(ObjectAnimations).SelectMany(Scene.Frames))
@@ -216,7 +220,7 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
                     MapBlendMode.Alpha, Scene.HighlightableBuildingAssets.Contains(sprite.AssetId)));
             foreach (var sprite in Scene.BuildingAnimations(building.Id)) Animated(sprite, null, time, false);
         }
-        foreach (var unit in Units.Where(u => Scene.IsUnitVisible(u, viewport ?? Bounds)).Select(Scene.Sample))
+        foreach (var unit in Units.Where(u => Scene.Playback.IsUnitVisible(u, viewport ?? Bounds)).Select(Scene.Playback.Sample))
         {
             if (unit.MovementVision is { } vision)
                 _draws.Add(new(vision.Depth, _draws.Count, null, default, Vision: vision));
@@ -227,9 +231,9 @@ internal sealed record MapSceneRegion(MapScene Scene, Rect2 Bounds, MapBuilding[
                 Animated(sprite, new(unit.Id, true), clock, sprite.IsBody);
             }
         }
-        foreach (var sprite in Scene.RetiringSprites) Animated(sprite, null, time, false);
+        foreach (var sprite in Scene.Playback.RetiringSprites) Animated(sprite, null, time, false);
         if (objectOverlay is {} overlay) _draws.Add(new(16 * overlay.Depth + 128 + 30000, _draws.Count, null, default));
-        foreach (var projectile in Scene.Projectiles(viewport ?? Bounds))
+        foreach (var projectile in Scene.Playback.Projectiles(viewport ?? Bounds))
             _draws.Add(new(projectile.Depth, _draws.Count, projectile.AssetId, new((float)projectile.X, (float)projectile.Y)));
         bool outlined = false;
         void Outlines()

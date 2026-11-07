@@ -7,16 +7,13 @@ using San9.Rendering;
 
 namespace San9.Client.Godot;
 
-internal sealed partial class MapScene
+internal sealed partial class MapPlayback
 {
-    public TurnDayPresentation? Day { get; }
-    private readonly Dictionary<int, UnitVisualState> _unitStates;
     private Dictionary<int, MapUnitMotion> _motions = [];
     private MapAttackMotion[] _attacks = [];
     private Dictionary<int, UnitVisual> _sampledUnits = [];
     private readonly Dictionary<int, (long Revision, UnitVisual Visual)> _stationarySamples = [];
     private Dictionary<int, UnitMotionPlayback> _unitPlayback = [];
-    private readonly Func<double> _positionTime;
     private double _sampleTime = -1, _sampleVisualTime = -1;
 
     private double ElevationAt(double groundX, double groundY) =>
@@ -30,7 +27,7 @@ internal sealed partial class MapScene
         return new((float)gx, (float)(gy - 10 * (ElevationAt(gx, gy) - 1)));
     }
     // Captures immutable motion inputs, never the scene or its retained history.
-    private Func<int, double, UnitVisualState?> StateSampler(MapScene? previous)
+    private Func<int, double, UnitVisualState?> StateSampler(MapPlayback? previous)
     {
         var states = _unitStates; var motions = _motions;
         var snapshot = State; var map = Map; var day = Day;
@@ -152,7 +149,7 @@ internal sealed partial class MapScene
         if (stationary) _stationarySamples[unit.Id] = (playback.Revision, visual);
         return _sampledUnits[unit.Id] = visual;
     }
-    private void PrepareUnitPlayback(MapScene? previous)
+    private void PrepareUnitPlayback(MapPlayback? previous)
     {
         // Building-only display revisions retain the same unit inputs and playback clock.
         // A new world snapshot or unit set still receives independent member state.
@@ -221,7 +218,7 @@ internal sealed partial class MapScene
                     segment.End - segment.Start)) bounds = bounds.Expand(Project(p.X, p.Y));
         return bounds.Grow(256);
     }
-    private IEnumerable<MapAttackMotion> VisibleAttacks(Rect2 bounds)
+    internal IEnumerable<MapAttackMotion> VisibleAttacks(Rect2 bounds)
     {
         var viewport = new MapPresentationBounds(bounds.Position.X, bounds.Position.Y, bounds.Size.X, bounds.Size.Y);
         return _attacks.Where(a => a.Projectile != MapProjectileKind.None &&

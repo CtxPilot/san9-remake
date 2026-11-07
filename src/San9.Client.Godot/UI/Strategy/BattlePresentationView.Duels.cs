@@ -71,13 +71,7 @@ public partial class BattlePresentationView
                 SceneOffset + _duelSpeechPosition + new Vector2(_assets.Get(layout.StartAsset, this).GetWidth() + layout.TextOffset.X, layout.TextOffset.Y), font, 24);
             _duelText.AddThemeConstantOverride("line_separation", layout.LineHeight - Mathf.CeilToInt(font.GetHeight(24)));
         }
-        int index = _duel.Stages.IndexOf(stage);
-        // A seek plays only the active stage, never sounds belonging to skipped strikes.
-        if (_sounds.Add((_duel.Id, index)))
-        {
-            if (stage.Sound is { } sound) PlaySound?.Invoke(sound);
-            if (stage.Effects.FirstOrDefault()?.Sound is { } effectSound && effectSound != stage.Sound) PlaySound?.Invoke(effectSound);
-        }
+
     }
 
     private double DuelTime(DuelStage stage) => stage.Dialogue is null ? _day!.Elapsed : Math.Min(stage.End, _day!.Elapsed + _day.DuelDialogueElapsed);

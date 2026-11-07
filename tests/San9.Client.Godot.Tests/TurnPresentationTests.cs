@@ -273,11 +273,12 @@ public sealed class TurnPresentationTests
     public void ChangingSpeedKeepsDayContinuousAndRespectsPauseAndResourceWait()
     {
         var session = Session();
-        bool ready = true;
+        bool ready = true, prepared = false;
         var turn = new TurnPresentation(session)
         {
             CreateDay = (before, after, events) => new(before, after, events, duration: 10),
-            CanPlayDay = () => ready
+            PrepareDay = _ => prepared = true,
+            CanPlayDay = () => { Assert.True(prepared); prepared = false; return ready; }
         };
         Enter(turn); Ready(turn);
         var initial = session.Snapshot;
@@ -589,17 +590,29 @@ public sealed class TurnPresentationTests
         var plan = San9.Application.Presentation.BattlePresentationPlan.Create(session.View, session.View, facts,
             session.Messages(texts), texts, content);
         var day = new TurnDayPresentation(session.View, session.View, facts, battle: plan);
+        int narrations = 0, speeches = 0, records = 0;
+        Action? acknowledge = null;
+        var dispatcher = new DayFeedbackDispatcher((_, _, completed) => { narrations++; acknowledge = completed; },
+            _ => { records++; return true; }, _ => { speeches++; return true; }, _ => { });
         day.Advance(100);
         Assert.Single(day.ReadyRecords);
         Assert.Empty(day.ReadyMapSpeeches);
-        day.CompleteDialogue(Assert.Single(day.PendingDialogues).Id);
+        dispatcher.Publish(day); dispatcher.Publish(day);
+        Assert.Equal(1, narrations);
+        Assert.Equal(1, records);
+        acknowledge!();
         var firstSpeeches = day.ReadyMapSpeeches;
         Assert.Equal(new[] { "action", "hit" }, firstSpeeches.Select(c => c.Message.Message.Key));
         Assert.Equal(2, day.ReadyRecords.Count);
         Assert.False(day.IsComplete);
-        day.CompleteDialogue(Assert.Single(day.PendingDialogues).Id);
+        dispatcher.Publish(day); dispatcher.Publish(day);
+        Assert.Equal(2, narrations);
+        acknowledge!();
         Assert.True(day.IsComplete);
         Assert.Equal(4, day.ReadyMapSpeeches.Count);
+        dispatcher.Publish(day); dispatcher.Publish(day);
+        Assert.Equal(2, records);
+        Assert.Equal(4, speeches);
 
         var playback = new MapSpeechPlayback();
         foreach (var cue in firstSpeeches) playback.Publish(cue.Message.MapSpeech!);

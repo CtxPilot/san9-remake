@@ -49,6 +49,8 @@ public sealed class ExecutionCommandsTests
             (rows[0].OfficerId, rows[0].Command, rows[0].Target, rows[0].RemainingDays, rows[0].FinishesThisXun));
         if (secondKind == ControllerKind.Player)
             Assert.Equal((4, "探索", "city.1", 7L), (rows[1].OfficerId, rows[1].Command, rows[1].Target, rows[1].RemainingDays));
+        Assert.Equal(rows.TakeLast(1), ExecutionCommands.Read(view, texts, 1));
+        Assert.Empty(ExecutionCommands.Read(view, texts, 0));
         var catalog = Assert.Single(OfficerCatalog.Read(view, texts, 2, null, null, 1).Rows);
         Assert.Equal(view.PlayerForceId == 1 ? "交还" : "＊＊", catalog.Cells[1].Text);
     }

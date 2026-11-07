@@ -18,7 +18,7 @@ public partial class ExecutionPanels : Control
     private readonly GameTextPresenter _text = new();
     private Control _recordsMotion = null!, _commandsMotion = null!;
     private Control _headers = null!;
-    private Control _rows = null!;
+    private readonly ExecutionCommandRowView[] _commandRows = new ExecutionCommandRowView[5];
     public MapMessageLog RecordsLog { get; init; } = null!;
     public event Action<MapCell>? LocationRequested;
     private long _revision = -1;
@@ -55,7 +55,11 @@ public partial class ExecutionPanels : Control
         layout.Resized += QueueRedraw;
         _headers = new Control { MouseFilter = MouseFilterEnum.Ignore };
         _commandsMotion.AddChild(_headers);
-        _rows=new Control { MouseFilter=MouseFilterEnum.Ignore }; _commandsMotion.AddChild(_rows);
+        for (int i = 0; i < _commandRows.Length; i++)
+        {
+            var row = new ExecutionCommandRowView { Textures = Textures, Skin = Skin, Visible = false };
+            _commandsMotion.AddChild(row); _commandRows[i] = row;
+        }
         int[] x = [28, 88, 124, 184];
         for (int i = 0; i < ExecutionPanelSkin.Columns.Count; i++)
         {
@@ -118,35 +122,17 @@ public partial class ExecutionPanels : Control
     {
         if (_revision==view.World.Revision || !IsNodeReady()) return;
         _revision=view.World.Revision;
-        foreach (var child in _rows.GetChildren()) { _rows.RemoveChild(child); child.QueueFree(); }
-        var rows=ExecutionCommands.Read(view,Texts).TakeLast(5).ToArray();
-        int[] x=[14,74,110,166], widths=[60,36,56,74];
-        for(int row=0;row<rows.Length;row++)
+        var rows = ExecutionCommands.Read(view, Texts, _commandRows.Length);
+        for (int i = 0; i < _commandRows.Length; i++)
         {
-            var value=rows[row];
-            var force = view.World.Forces.Single(f => f.Id == view.World.Officers.Single(p => p.Id == value.OfficerId).OwnerId);
-            // Columns and decorations are local to the row surface, inset from the panel.
-            var origin = Commands.Position + new Vector2(14,35+16*(5-rows.Length+row));
-            var container = new Control { Position=origin,Size=new(244,16),MouseFilter=MouseFilterEnum.Ignore };
-            _rows.AddChild(container);
-            container.AddChild(new ColorRect { Position=new(2,2),Size=new(12,12),Color=new Color("080808"),MouseFilter=MouseFilterEnum.Ignore });
-            container.AddChild(new ColorRect { Position=new(3,3),Size=new(10,10),Color=new Color(Skin.Colors[$"overview-force-{force.ColorCode}"]),MouseFilter=MouseFilterEnum.Ignore });
-            bool bar=value.FinishesThisXun;
-            string[] cells=[value.Officer,value.Command,value.Target,bar ? "" : "-------"];
-            for(int column=0;column<cells.Length;column++)
-            {
-                var label=new Label { Text=cells[column],Position=new(x[column],0),Size=new(widths[column],16),
-                    HorizontalAlignment=column==3 ? HorizontalAlignment.Center : HorizontalAlignment.Left,
-                    ClipText=true,MouseFilter=MouseFilterEnum.Ignore };
-                container.AddChild(label); _text.Apply(label,GameTextStyles.CatalogRow with { FontSize=12 });
-            }
-            if(bar)
-            {
-                container.AddChild(new TextureRect { Texture=Textures.Get("turn-command-remaining-frame", this),Position=new(166,3),MouseFilter=MouseFilterEnum.Ignore });
-                var fill=Textures.Get("turn-command-remaining-fill", this);
-                int width=(int)(fill.GetWidth()*Math.Min(10,value.RemainingDays)/10);
-                if(width>0) container.AddChild(new TextureRect { Texture=new AtlasTexture { Atlas=fill,Region=new(0,0,width,3) },Position=new(169,6),MouseFilter=MouseFilterEnum.Ignore });
-            }
+            var row = _commandRows[i];
+            row.Visible = i < rows.Count;
+            if (!row.Visible) continue;
+            var value = rows[i];
+            var person = view.World.Officers.Single(p => p.Id == value.OfficerId);
+            var force = view.World.Forces.Single(f => f.Id == person.OwnerId);
+            row.Bind(value, force.ColorCode);
+            row.Position = Commands.Position + new Vector2(14, 35 + 16 * (5 - rows.Count + i));
         }
     }
 

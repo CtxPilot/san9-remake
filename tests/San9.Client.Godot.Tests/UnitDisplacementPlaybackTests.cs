@@ -96,7 +96,7 @@ public sealed class UnitDisplacementPlaybackTests
         var terrain = new TerrainRenderer(map, [], []);
         var day = new TurnDayPresentation(before, after, facts, new MapDayPlan(map, before, facts), battle: battle);
         var scene = new MapScene(map, terrain, "spring", before, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, day: day);
-        UnitVisual Sample() => scene.Sample(scene.Units.Single(u => u.Id == 20));
+        UnitVisual Sample() => scene.Playback.Sample(scene.Units.Single(u => u.Id == 20));
         day.Advance(5);
         var inside = Sample();
         Assert.Equal(relocations[0].Time, day.Elapsed);
@@ -128,7 +128,7 @@ public sealed class UnitDisplacementPlaybackTests
         Assert.True(outside.AnchorX < moving.AnchorX);
         AssertWholeFormationMoves(start, outside);
         var published = new MapScene(map, terrain, "spring", after, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, scene);
-        var next = published.Sample(published.Units.Single(u => u.Id == 20));
+        var next = published.Playback.Sample(published.Units.Single(u => u.Id == 20));
         Assert.Equal(outside.AnchorX, next.AnchorX);
         Assert.Equal(outside.Animations.Where(a => a.IsBody).Select(a => (a.X, a.Y)),
             next.Animations.Where(a => a.IsBody).Select(a => (a.X, a.Y)));

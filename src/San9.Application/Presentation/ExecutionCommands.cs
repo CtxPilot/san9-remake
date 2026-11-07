@@ -7,16 +7,22 @@ public sealed record ExecutionCommandRow(int OfficerId, string Officer, string C
 
 public static class ExecutionCommands
 {
-    public static IReadOnlyList<ExecutionCommandRow> Read(StrategySnapshot view, TextCatalog texts)
+    public static IReadOnlyList<ExecutionCommandRow> Read(StrategySnapshot view, TextCatalog texts, int? limit = null)
     {
+        if (limit is < 0) throw new ArgumentOutOfRangeException(nameof(limit));
         // Execution has no active issuing seat. Each listed player's force owns its command visibility.
         var players = view.World.Simulation.Controls.Where(c => c.Kind == San9.Core.Simulation.ControllerKind.Player)
             .Select(c => c.ForceId).ToHashSet();
+        IEnumerable<San9.Core.Simulation.PersistentTask> tasks = view.World.Simulation.Tasks
+            .Where(t => players.Contains(t.ForceId)).OrderBy(t => t.Sequence);
+        if (limit is int count) tasks = tasks.TakeLast(count);
+        var visible = tasks.ToArray();
+        if (visible.Length == 0) return [];
         var commands = new OfficerCommands(view, texts);
         var people = view.World.Officers.ToDictionary(p => p.Id);
         // Daily commands resolve on the displayed date before the clock advances.
         int daysInXun = 10 - (view.World.Clock.Day - 1) % 10;
-        return view.World.Simulation.Tasks.Where(t => players.Contains(t.ForceId)).OrderBy(t => t.Sequence).Select(task =>
+        return visible.Select(task =>
         {
             var person = people[task.OfficerId];
             var (order, target) = commands.ReadProgress(task);

@@ -47,7 +47,7 @@ public partial class MapWorld : Node2D
         var scene = _display?.Presented?.Region.Scene;
         var unit = scene?.Units.FirstOrDefault(unit => unit.Id == id);
         if (scene is null || unit is null) { anchor = default; direction = 0; return false; }
-        var sampled = scene.Sample(unit);
+        var sampled = scene.Playback.Sample(unit);
         anchor = new(sampled.AnchorX,sampled.AnchorY);
         direction = sampled.Direction;
         return true;

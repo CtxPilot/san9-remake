@@ -46,11 +46,11 @@ public sealed class MapFacingTests
         var day = new TurnDayPresentation(before.View, after.View, events, new MapDayPlan(map, before.View, events));
         var assets = new Dictionary<string, San9.Content.Images.ImageAsset>();
         var initial = new MapScene(map, terrain, "spring", before.View, assets, () => 0);
-        var baseline = initial.Sample(Assert.Single(initial.Units));
+        var baseline = initial.Playback.Sample(Assert.Single(initial.Units));
         var execution = new MapScene(map, terrain, "spring", before.View, assets, () => 0, initial, day);
         void AssertWaitingPose()
         {
-            var waiting = execution.Sample(Assert.Single(execution.Units));
+            var waiting = execution.Playback.Sample(Assert.Single(execution.Units));
             Assert.Equal((baseline.AnchorX, baseline.AnchorY, baseline.Direction, UnitVisualAction.Idle),
                 (waiting.AnchorX, waiting.AnchorY, waiting.Direction, waiting.Action));
             Assert.Equal(baseline.Animations.Select(a => (a.ClipId, a.X, a.Y)),
@@ -61,12 +61,12 @@ public sealed class MapFacingTests
         execution = new MapScene(map, terrain, "spring", before.View, assets, () => 0, execution, day);
         AssertWaitingPose();
         day.Advance(.01);
-        var started = execution.Sample(Assert.Single(execution.Units));
+        var started = execution.Playback.Sample(Assert.Single(execution.Units));
         Assert.True(started.AnchorX > baseline.AnchorX);
         Assert.Equal(UnitVisualAction.Moving, started.Action);
         Assert.Contains(started.Animations, a => a.ClipId == "influence");
         day.Advance(2);
-        var final = execution.Sample(Assert.Single(execution.Units));
+        var final = execution.Playback.Sample(Assert.Single(execution.Units));
         Assert.Equal(2, final.Direction);
         var strategy = new MapScene(map, terrain, "spring", after.View, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0, execution);
         var idleDay = new TurnDayPresentation(after.View, after.View, [], new MapDayPlan(map, after.View, []));
@@ -77,7 +77,7 @@ public sealed class MapFacingTests
         var loaded = new MapScene(map, terrain, "winter", restored.View, new Dictionary<string, San9.Content.Images.ImageAsset>(), () => 0);
         foreach (var scene in new[] { strategy, idle, winter, loaded })
         {
-            var sample = scene.Sample(Assert.Single(scene.Units));
+            var sample = scene.Playback.Sample(Assert.Single(scene.Units));
             Assert.Equal(final.Direction, sample.Direction);
             Assert.Equal(UnitVisualAction.Idle, sample.Action);
             Assert.Contains(sample.Animations, a => a.IsBody && a.ClipId == "body-2");
