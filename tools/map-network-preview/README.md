@@ -33,13 +33,7 @@ python tools/map-network-preview/serve.py
 
 ## 研究统计
 
-```powershell
-python tools/map-network-preview/analyze.py --scenario 19 --days 65
-```
-
-输出 `local/generated/map-network-preview/analysis-19-65.json`，保存输入／脚本哈希、节点及关系数量、现有进攻来源静态范围对照、差异示例、搜索工作量和连续数组内存估算。统计复用预览估时函数，不维护另一套求路算法；另做不限时搜索解释超限的旧候选，该部分不计入有界建表耗时。
-
-预览本身只提取地理定义；统计脚本额外读取当前军事城市关系及建筑身份、类别、启用／拆除、耐久、驻人资格，用于近似现有 `AttackSources` 的结构范围。它不读取势力、控制权、兵力、士气、武将或任务，不代表现有AI在某个局面会实际出兵，也不是严格的出兵资格上界。内存估算是假定的C#连续存储布局，不是Python进程内存；Python局部计时不代表正式AI整旬性能。
+旧`analyze.py`依赖已退出的军事城市表，现随该表删除，不再从当前内容包生成旧进攻来源对照。历史统计结果与证据保留在[EXP-0002](../../research/experiments/EXP-SAN9PK-0002.md#facility-travel)；复现当时的统计须使用对应Git版本及其内容格式，不为历史工具保留产品字段。
 
 全量建表初步计时：
 

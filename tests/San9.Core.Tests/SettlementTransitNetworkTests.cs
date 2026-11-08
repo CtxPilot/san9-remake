@@ -101,7 +101,7 @@ public sealed class SettlementTransitNetworkTests
             [new(17, new(2, 2), new(1, 1)), new(501, new(3002, 2), new(1, 1)), new(9001, new(3052, 2), new(1, 1))]);
         var network = SettlementTransitNetwork.Build(new(map), Places());
         Assert.Equal(50, SettlementTransitNetwork.ReferenceDailyBudget);
-        Assert.Equal(60, SettlementTransitNetwork.HorizonDays);
+        Assert.Equal(60, SettlementTransitNetwork.ReferenceHorizonDays);
         Assert.Equal(60, network.Find(17, 501)!.Reference.Days);
         Assert.Equal(new RouteTerrainCost(3000, 0), network.Find(17, 501)!.Reference.TerrainCost);
         Assert.Null(network.Find(17, 9001));

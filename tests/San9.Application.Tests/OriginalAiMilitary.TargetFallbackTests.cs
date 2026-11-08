@@ -53,7 +53,6 @@ public sealed partial class OriginalAiMilitaryTests
         var content = basis with
         {
             Settlements = [.. basis.Settlements, basis.Settlements[1] with { Id = 3, X = 1, Y = 13 }],
-            MilitaryCityConnections = [new(1, 2), new(2, 1), new(1, 3), new(3, 1)],
             CityConnections = [new(1, 2), new(2, 1), new(1, 3), new(3, 1)],
             RegionCityIds = new(basis.RegionCityIds) { [3] = 3 },
             RegionNameKeys = new(basis.RegionNameKeys) { [3] = "reachable" },
@@ -96,7 +95,6 @@ public sealed partial class OriginalAiMilitaryTests
                 basis.Settlements[1] with { Id = 4, Kind = SettlementKind.Facility, X = 9 },
                 basis.Settlements[1] with { Id = 5, X = 13, Y = 18, Soldiers = 0, Morale = 0 },
                 basis.Settlements[1] with { Id = 6, X = 1, Y = 13 }],
-            MilitaryCityConnections = [new(1, 2), new(2, 1), new(1, 6), new(6, 1)],
             CityConnections = [new(1, 2), new(2, 1), new(1, 6), new(6, 1)],
             RegionCityIds = new(basis.RegionCityIds) { [3] = 1, [4] = 5, [5] = 5, [6] = 6 },
             RegionNameKeys = new(basis.RegionNameKeys) { [3] = "transit", [4] = "interception", [5] = "other-city", [6] = "alternative" },

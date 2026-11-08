@@ -6,7 +6,8 @@ namespace San9.Application.AI;
 
 internal sealed partial class OriginalAiMilitary
 {
-    private const int AttackHorizonDays = 60;
+    // Actual ordinary-sortie limit, independent of the reference graph's build horizon.
+    private const int MaximumAttackTravelDays = 60;
     private readonly Dictionary<int, HashSet<int>> attackConnections = [];
 
     private HashSet<int> AttackConnections(SettlementState source)
@@ -59,7 +60,7 @@ internal sealed partial class OriginalAiMilitary
         if (route.HostileBuilding || pair.Naval is null && summary.TerrainCost.Water > 0)
             route = RouteFrom(source, pair.Land, pair.Naval,
                 new(MilitaryOrderKind.AttackSettlement, null, target.Id), Policies());
-        return route is { Days: <= AttackHorizonDays, HostileBuilding: false } ? route : null;
+        return route is { Days: <= MaximumAttackTravelDays, HostileBuilding: false } ? route : null;
     }
 
     private bool ConstructionConflict(int region) => MilitaryIndex.ConstructionRegions.Contains(region);
@@ -107,7 +108,7 @@ internal sealed partial class OriginalAiMilitary
         paths++;
         var estimate = Navigation.Estimate(unit, null);
         if (estimate.Status == RouteReachability.Incomplete) incomplete = true;
-        if (estimate.Status != RouteReachability.Reachable || estimate.Days > AttackHorizonDays ||
+        if (estimate.Status != RouteReachability.Reachable || estimate.Days > MaximumAttackTravelDays ||
             estimate.Days is null) return Send(null);
         var buildings = World.Settlements.ToDictionary(s => s.Id);
         var route = new Route(estimate.Days.Value, estimate.Cells, false, false, World, rules,

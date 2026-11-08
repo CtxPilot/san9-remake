@@ -19,7 +19,7 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
     private OriginalAiMilitaryDefinition Policy => content.OriginalAi.Military;
     private GovernanceRulebook Governance => scenarioRules.Governance;
     private TreasureRulebook Treasures => scenarioRules.Treasures;
-    private MilitaryCityNetwork CityNeighbors => scenarioRules.MilitaryCities;
+    private SettlementTransitNetwork Transit => terrainRoutes.TransitNetwork(rules, World);
     private WorldSnapshot? projected;
     private ImmutableDictionary<int, OfficerAbilities>? abilities;
     private CorpsState? currentCorps;
@@ -149,7 +149,6 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
         content.Information.Ranks.FirstOrDefault(r => r.Id == Force.RankId)?.CommandCapacity,
         content.Information.Offices.FirstOrDefault(o => o.Id == p.OfficeId)?.CommandCapacity);
     private int City(int place) => content.RegionCityIds.GetValueOrDefault(place, place);
-    private bool Near(int first, int second) => City(first) == City(second) || CityNeighbors.AreNeighbors(City(first), City(second));
     private bool Opponent(int? owner) => owner is int id && (World.Forces.FirstOrDefault(f => f.Id == id)?.IsBarbarian == true
         ? id != Owner : OriginalAiStrategy.IsOpponent(World, Owner, id));
     private bool Target(SettlementState s) => !s.IsDormant && !s.IsDestroyed && s.OwnerId != Owner &&

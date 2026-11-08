@@ -18,7 +18,6 @@ public sealed partial class OriginalAiMilitaryTests
                 s with { Soldiers = 300000 }).Append(c.Settlements[0] with { Id = 3, X = 3, Soldiers = 100000 }).ToArray(),
             Officers = c.Officers.Select(p => p.State.Id is >= 2 and <= 6 ? p with { State = p.State with { SettlementId = 3 } } : p).ToArray(),
             CityConnections = [new(1, 2), new(2, 1), new(3, 1)],
-            MilitaryCityConnections = [new(1, 2), new(2, 1), new(3, 1)],
             RegionCityIds = new(c.RegionCityIds) { [3] = 3 }, RegionNameKeys = new(c.RegionNameKeys) { [3] = "rear" },
             Military = c.Military! with { Places = c.Military.Places.Add(new(3, new(17, 7), new(1, 1))),
                 RegionIds = Enumerable.Range(0, 60).Select(i => (int?)(i % 20 == 3 ? 3 : i % 20 < 10 ? 1 : 2)).ToImmutableArray() }

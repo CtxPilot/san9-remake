@@ -24,7 +24,8 @@ public sealed record SettlementTransitRoute(int SourceId, TransitRoute Reference
 public sealed class SettlementTransitNetwork
 {
     public const int ReferenceDailyBudget = 50;
-    public const int HorizonDays = 60;
+    // Candidate coverage only; callers own the actual travel limits of each work.
+    public const int ReferenceHorizonDays = 60;
     public static Footprint ReferenceLandShape { get; } = new(5, 5);
     public static Footprint ReferenceWaterShape { get; } = new(4, 4);
 
@@ -64,7 +65,7 @@ public sealed class SettlementTransitNetwork
             // A finite map and time bound define construction work. Do not publish a partly
             // built graph merely because an optional AI forecast budget was exhausted.
             var field = SettlementTransitField.Build(travel, source.Area.Position,
-                nodes.Where(n => n.Id != source.Id), HorizonDays, new(int.MaxValue));
+                nodes.Where(n => n.Id != source.Id), ReferenceHorizonDays, new(int.MaxValue));
             BuildSearches++;
             BuildExpanded += field.Expanded;
             rows.Add(source.Id, field.Routes.Where(r => r.Status == TransitReachability.Reachable).Select(route =>

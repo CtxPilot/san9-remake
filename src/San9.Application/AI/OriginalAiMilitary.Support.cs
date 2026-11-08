@@ -135,10 +135,11 @@ internal sealed partial class OriginalAiMilitary
                     var people = Commanders(People(source.Id));
                     var basic = Basic([people[0]]);
                     if (basic is null) continue;
+                    var regions = InterceptionRegions(source);
                     var targets = World.Units.Where(u => DeploymentCandidate(u) && Opponent(u.OwnerId) &&
                         (group == 0 ? ProjectedOrder(u) is { Kind: MilitaryOrderKind.AttackSettlement, SettlementId: int home } && home == source.Id
                             : u.EffectiveOrder?.Kind == MilitaryOrderKind.Construct) &&
-                        rules.RegionAt(u.Position) is int region && Near(source.Id, region))
+                        rules.RegionAt(u.Position) is int region && regions.Contains(region))
                         .Select(u => (Unit: u, Route: group == 0 ? UnitTo(u, source.Id) :
                             RouteFrom(source, u.FormationId!.Value, u.NavalFormationId,
                                 new(MilitaryOrderKind.AttackUnit, null, null) { UnitId = u.Id })))
@@ -194,7 +195,7 @@ internal sealed partial class OriginalAiMilitary
                 .Select(s => (Place: s, Pressure: PressureNear(s.Id, 20) - ReliefDefense(s)))
                 .Where(c => c.Pressure > 0).OrderByDescending(c => c.Pressure + (c.Place.Kind == SettlementKind.City ? 500000 : 0)))
             {
-                var candidates = Places.Where(s => s.Id != target.Place.Id && Near(s.Id, target.Place.Id) && s.Soldiers > 1000 &&
+                var candidates = Places.Where(s => Transit.Find(s.Id, target.Place.Id) is not null && s.Soldiers > 1000 &&
                     People(s.Id).Length > 0)
                     .Select(s => (Place: s, Basic: Basic([Commanders(People(s.Id))[0]], true))).Where(c => c.Basic is not null)
                     .Select(c => (c.Place, Route: RouteFrom(c.Place, c.Basic!.Value.Land, c.Basic.Value.Naval,
@@ -247,7 +248,7 @@ internal sealed partial class OriginalAiMilitary
     }
     private void Transport()
     {
-        bool Front(SettlementState s) => Related(s.Id).Any(p => p.OwnerId != Owner && p.OwnerId is int id &&
+        bool Front(SettlementState s) => ReinforcementArea(s.Id).Any(p => p.OwnerId != Owner && p.OwnerId is int id &&
             !World.Forces.Single(f => f.Id == id).IsBarbarian);
         var geography = Geography;
         var receivers = World.Settlements.Where(s => s.OwnerId == Owner && !s.IsDormant && !s.IsDestroyed &&
@@ -272,7 +273,8 @@ internal sealed partial class OriginalAiMilitary
             if (source is null) continue;
             var person = People(home).OrderBy(p => (long)Ability(p).War + Ability(p).Intelligence + Ability(p).Politics + Ability(p).Leadership).FirstOrDefault();
             if (person is null) continue;
-            foreach (int destination in targets.OrderBy(id => Near(home, id) ? 0 : 1).ToArray())
+            foreach (int destination in targets.Where(id => Transit.Find(home, id) is not null)
+                .OrderBy(id => Transit.Find(home, id)!.Reference.Days).ToArray())
             {
                 uint soldiers = (uint)Math.Min(capacity[destination], Math.Min(10000, source.Soldiers));
                 bool fallback = source.Kind != SettlementKind.City && soldiers == source.Soldiers;

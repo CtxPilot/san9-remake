@@ -10,9 +10,8 @@ internal sealed partial class OriginalAiMilitary
     private long Defense(SettlementState target) => target.Soldiers + MilitaryIndex.UndeployedAt.GetValueOrDefault(target.Id);
     private long Demand(SettlementState target) => target.OwnerId is not null
         ? (long)target.Soldiers * (1000 - Math.Max(0, 200 - target.Durability)) / 1000
-        : Related(target.Id).Where(s => s.OwnerId != Owner).Select(s => (long)s.Soldiers).DefaultIfEmpty(0).Sum() /
-            Math.Max(1, Related(target.Id).Count(s => s.OwnerId != Owner)) * 40 / 100;
-    private IEnumerable<SettlementState> Related(int place) => World.Settlements.Where(s => !s.IsDormant && !s.IsDestroyed && Near(place, s.Id));
+        : ReinforcementArea(target.Id).Where(s => s.OwnerId != Owner).Select(s => (long)s.Soldiers).DefaultIfEmpty(0).Sum() /
+            Math.Max(1, ReinforcementArea(target.Id).Count(s => s.OwnerId != Owner)) * 40 / 100;
 
     private SettlementState[] AttackSources(SettlementState target)
     {
@@ -37,7 +36,7 @@ internal sealed partial class OriginalAiMilitary
                 !s.IsDormant && !s.IsDestroyed && s.Durability > 0 && s.Facility?.BuilderUnitId is null &&
                 s.OwnerId is int owner && opponents.Contains(owner) &&
                 (!rules.TryPlace(s, out var place) || place.FacilityTypeId is not int type || !Policy.RouteObstacleFacilityIds.Contains(type)))
-                .GroupBy(s => City(s.Id)).ToDictionary(g => g.Key, g => g.Max(s => (long)s.Soldiers) / 2);
+                .ToDictionary(s => s.Id, s => (long)s.Soldiers / 2);
         }
         return sources.Sum(source =>
         {
@@ -45,8 +44,8 @@ internal sealed partial class OriginalAiMilitary
             // A weak source may still contribute its defensive shortfall.
             long reserve = Reserve(source);
             if (enemyReserves is not null && Fortified(source))
-                reserve = Math.Max(reserve, CityNeighbors.NearbyCities(City(source.Id))
-                    .Max(city => enemyReserves.GetValueOrDefault(city)));
+                reserve = Math.Max(reserve, ReinforcementArea(source.Id)
+                    .Select(s => enemyReserves.GetValueOrDefault(s.Id)).DefaultIfEmpty(0).Max());
             return source.Soldiers - reserve;
         });
     }
@@ -107,7 +106,7 @@ internal sealed partial class OriginalAiMilitary
             var origins = WorkSources.Where(s => City(s.Id) == city && s.Soldiers > 0 && s.Morale >= 90 &&
                 People(s.Id).Length > 0).OrderByDescending(s => s.Soldiers).ToArray();
             var connected = request ? [] : origins.SelectMany(s => AttackConnections(s)).ToHashSet();
-            var all = World.Settlements.Where(s => Target(s) && (request ? Near(city, s.Id) : connected.Contains(s.Id)) &&
+            var all = World.Settlements.Where(s => Target(s) && connected.Contains(s.Id) &&
                 !ConstructionConflict(s.Id)).ToArray();
             IEnumerable<SettlementState> targets;
             if (request) targets = World.Settlements.Where(s => Target(s) && s.Id == obligation!.TargetSettlementId);
@@ -120,8 +119,8 @@ internal sealed partial class OriginalAiMilitary
             {
                 bool Desired(SettlementState s) => s.OwnerId == strategy.TargetForceId && strategy.TargetForceId is not null;
                 targets = all.Where(s => s.Id == strategy.TargetSettlementId)
-                    .Concat(all.Where(s => s.Kind == SettlementKind.City && Desired(s)).OrderBy(s => Related(s.Id).Where(Target).Sum(Defense)))
-                    .Concat(all.Where(s => s.Kind == SettlementKind.City && s.OwnerId is not null && !Desired(s)).OrderBy(s => Related(s.Id).Where(Target).Sum(Defense)))
+                    .Concat(all.Where(s => s.Kind == SettlementKind.City && Desired(s)).OrderBy(s => ReinforcementArea(s.Id).Where(Target).Sum(Defense)))
+                    .Concat(all.Where(s => s.Kind == SettlementKind.City && s.OwnerId is not null && !Desired(s)).OrderBy(s => ReinforcementArea(s.Id).Where(Target).Sum(Defense)))
                     .Concat(all.Where(s => s.Kind == SettlementKind.City && s.OwnerId is null))
                     .Concat(all.Where(s => s.Kind != SettlementKind.City && (s.OwnerId is null || FrontContact(s))).OrderBy(Defense));
             }
@@ -136,7 +135,7 @@ internal sealed partial class OriginalAiMilitary
                     target = ResolveAttackTarget(target, origins);
                     if (target is null || !evaluated.Add(target.Id)) continue;
                 }
-                var sources = request ? WorkSources.Where(s => Near(s.Id, target.Id) && s.Soldiers >= 10000 &&
+                var sources = request ? WorkSources.Where(s => Transit.Find(s.Id, target.Id) is not null && s.Soldiers >= 10000 &&
                     s.Morale >= 70 && People(s.Id).Length >= 2).OrderByDescending(s => s.Soldiers).ToArray() : AttackSources(target);
                 // City requests may reinforce an existing attack; other buildings reject an existing friendly assignment.
                 if (request && sources.Length > 0 && target.Kind != SettlementKind.City && World.Units.Any(u =>

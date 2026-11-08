@@ -353,7 +353,7 @@ public sealed record MilitaryGeographyDefinition
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ScenarioGeography
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
     [JsonRequired] public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     [JsonRequired] public required Dictionary<int, string> RegionNameKeys { get; init; }
     [JsonRequired] public required Dictionary<int, int> RegionCityIds { get; init; }
@@ -361,7 +361,6 @@ public sealed record ScenarioGeography
     [JsonRequired] public required Dictionary<int, string> ProvinceNameKeys { get; init; }
     [JsonRequired] public required Dictionary<int, int> CityProvinceIds { get; init; }
     [JsonRequired] public required ImmutableArray<CityConnection> CityConnections { get; init; }
-    [JsonRequired] public required ImmutableArray<CityConnection> MilitaryCityConnections { get; init; }
     [JsonRequired] public required MilitaryGeographyDefinition? Military { get; init; }
 
     public static ScenarioGeography From(ScenarioInitialState value) => new()
@@ -372,7 +371,6 @@ public sealed record ScenarioGeography
         ProvinceNameKeys = value.ProvinceNameKeys,
         CityProvinceIds = value.CityProvinceIds,
         CityConnections = value.CityConnections,
-        MilitaryCityConnections = value.MilitaryCityConnections,
         Military = value.Military is { } military ? MilitaryGeographyDefinition.From(military) : null,
     };
 }
@@ -492,7 +490,6 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
             ProvinceNameKeys = geography.ProvinceNameKeys,
             CityProvinceIds = geography.CityProvinceIds,
             CityConnections = geography.CityConnections,
-            MilitaryCityConnections = geography.MilitaryCityConnections,
             Officers = OfficerComposition.Compile(Officers, [.. officers, .. AdditionalOfficerDefaults]),
             Information = definitions.Information.Compile(Information),
             Military = definitions.Military?.Compile(geography.Military!, MilitaryPlaces),

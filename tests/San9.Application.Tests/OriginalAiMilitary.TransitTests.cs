@@ -35,7 +35,6 @@ public sealed partial class OriginalAiMilitaryTests
                 basis.Settlements[1] with { Id = 4, X = 7, Soldiers = 3000, Kind = SettlementKind.Facility }],
             Officers = basis.Officers.Select(p => p.State.OwnerId == 1
                 ? p with { State = p.State with { SettlementId = 3 } } : p).ToArray(),
-            MilitaryCityConnections = [],
             CityConnections = [],
             RegionCityIds = new() { [1] = 1, [2] = 2, [3] = 1, [4] = 2, [5] = 1 },
             RegionNameKeys = new() { [1] = "home", [2] = "enemy-city", [3] = "source-port", [4] = "enemy-port", [5] = "gap" },
@@ -56,7 +55,6 @@ public sealed partial class OriginalAiMilitaryTests
     {
         var content = HarborTransitFixture();
         var h = new Harness(content);
-        Assert.Empty(content.MilitaryCityConnections);
         Assert.Equal(1, h.Run(OriginalAiWork.Attack).Submitted);
         var command = Assert.IsType<DeployUnitCommand>(Assert.Single(h.Commands));
         Assert.Equal(3, command.SettlementId);
@@ -105,11 +103,16 @@ public sealed partial class OriginalAiMilitaryTests
             }
         };
         var h = new Harness(content);
-        Assert.Equal(1, h.Military.Run(OriginalAiWork.Attack, 20, h.State,
-            new(1, OriginalAiMode.TargetSettlement, null, 2)).Submitted);
-        var command = Assert.IsType<DeployUnitCommand>(Assert.Single(h.Commands));
-        Assert.Equal(3, command.SettlementId);
-        Assert.Equal(expectedTarget, command.Order.SettlementId);
+        var report = h.Military.Run(OriginalAiWork.Attack, 20, h.State,
+            new(1, OriginalAiMode.TargetSettlement, null, 2));
+        Assert.True(report.Submitted > 0);
+        // Incoming hostile reserves now affect the neutral target's demand too.
+        Assert.All(h.Commands, c =>
+        {
+            var command = Assert.IsType<DeployUnitCommand>(c);
+            Assert.Equal(3, command.SettlementId);
+            Assert.Equal(expectedTarget, command.Order.SettlementId);
+        });
     }
 
     [Fact]
