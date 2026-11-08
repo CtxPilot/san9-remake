@@ -72,7 +72,7 @@ public sealed partial class UnitPolicyTests
         world.Replace(world.Units[2] with { Position = new(21, 10) });
         world.Replace(world.Units[1] with { Order = null, AwaitingPostAction = true });
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events);
+        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events, null);
         Assert.Equal(UnitCondition.Normal, world.Units[1].Condition);
         Assert.Equal(0, world.Units[1].ConditionDaysRemaining);
         Assert.Equal(order, world.Units[1].Order!.Kind);
@@ -88,7 +88,7 @@ public sealed partial class UnitPolicyTests
         world.Replace(world.Units[1] with { Order = null, AwaitingPostAction = true });
         world.Replace(world.Units[2] with { HasEnteredDailyCycle = false });
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events);
+        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events, null);
         Assert.Equal(MilitaryOrderKind.Return, world.Units[1].Order!.Kind);
         Assert.Equal(UnitPolicyResponse.PostActionNoTarget, Assert.Single(events.OfType<UnitPolicyRespondedEvent>()).Response);
     }
@@ -105,7 +105,7 @@ public sealed partial class UnitPolicyTests
             [new(0, 1, null), new(1, null, null)], standard.Formations.Values.ToImmutableArray(),
             standard.Places.Values.ToImmutableArray()) { PolicyRadius = 15 });
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(world, world.Units[1], rules, events);
+        MilitaryPolicies.ResolvePostAction(world, world.Units[1], rules, events, null);
         Assert.Equal(MilitaryOrderKind.Return, world.Units[1].Order!.Kind);
         Assert.Equal(UnitPolicyResponse.PostActionNoTarget, Assert.Single(events.OfType<UnitPolicyRespondedEvent>()).Response);
     }

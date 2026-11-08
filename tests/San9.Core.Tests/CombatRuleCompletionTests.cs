@@ -144,7 +144,7 @@ public sealed class CombatRuleCompletionTests
     {
         var (world, rules) = Create(); var m = world.BeginMutation(); List<DomainEvent> events = [];
         m.Replace(m.Officers[11] with { UnitId = null, SettlementId = 1, BaseAbilities = new(150, 70, 70, 70) });
-        UnitTerminationService.Complete(m, 1, null, 1, rules.Governance, events);
+        UnitDefeatTestHelper.Complete(m, 1, null, 1, rules.Governance, events);
         m.Replace(m.Settlements[1] with { Soldiers = 0 });
         m.Replace(m.Settlements[3] with { Kind = remainingCity ? SettlementKind.City : SettlementKind.Facility });
         m.Replace(m.Units[2] with { Position = rules.Military!.Places[1].Position,
@@ -168,7 +168,7 @@ public sealed class CombatRuleCompletionTests
         Assert.Equal(0, m.Officers[11].TacticCooldown);
         var task = Assert.Single(m.Simulation.Tasks);
         Assert.Equal(14, task.Journey!.ReturnLeg!.CountdownDays);
-        UnitTerminationService.Complete(m, 1, null, 1, rules.Governance, events);
+        UnitDefeatTestHelper.Complete(m, 1, null, 1, rules.Governance, events);
         world.Commit(m);
         SimulationEngine Engine(WorldState state) => new(state, rules.Economy, rules.Personnel, rules.Treasures, military: rules.Military);
         var engine = Engine(world);

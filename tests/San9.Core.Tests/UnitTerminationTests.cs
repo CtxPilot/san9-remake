@@ -12,14 +12,37 @@ public sealed class UnitTerminationTests
             units: [new(0, 1, new(2, 2), 3) { Wounded = 2, ServicePlaceId = home ? 1 : null, CargoMoney = 100 },
                 new(1, 2, new(3, 2), 10) { Wounded = winnerWounded, Morale = 95 }], corps: [new San9.Core.Domain.CorpsState(1, 1, null, new(1000, 1000)) { IsRoot = true }, new San9.Core.Domain.CorpsState(2, 2, null, new(0, 0)) { IsRoot = true }]);
 
+    [Theory]
+    [InlineData(60, 0u, 70, 2u)]
+    [InlineData(95, 49999u, 100, 1u)]
+    [InlineData(100, 50000u, 100, 0u)]
+    public void DefeatStagesKeepActualWoundedAndMoraleIndependentOfReporting(int morale, uint wounded, int expected, uint accepted)
+    {
+        var world = World(winnerWounded: wounded);
+        var state = world.BeginMutation();
+        state.Replace(state.Units[1] with { Morale = morale });
+        List<DomainEvent> events = [];
+        var settlement = UnitTerminationService.SettleResources(state, 0, new(1, false), 1, events);
+        Assert.IsType<UnitDefeatedEvent>(events[0]);
+        Assert.Equal(morale, state.Units[1].Morale);
+        Assert.Equal(accepted == 0 ? 0 : 1, events.OfType<BattleWoundedCapturedEvent>().Count());
+        if (accepted > 0) Assert.Equal(accepted, Assert.Single(events.OfType<BattleWoundedCapturedEvent>()).Received);
+        UnitTerminationService.Complete(state, settlement, new([]), events);
+        var reward = Assert.Single(events.OfType<BattleVictoryMoraleChangedEvent>());
+        Assert.Equal((morale, expected), (reward.Previous, reward.Current));
+        Assert.IsType<UnitTerminatedEvent>(events[^1]);
+        world.Commit(state);
+        Assert.Equal(expected, world.CreateSnapshot().Units.Single().Morale);
+    }
+
     [Fact]
     public void VictoryTransfersTreasuryAndCargoAndDeletesDefeatedIdentityOnce()
     {
         var world = World();
         var mutation = world.BeginMutation();
         var events = new List<DomainEvent>();
-        UnitTerminationService.Complete(mutation, 0, new(1, false), 1, new([]), events);
-        Assert.Throws<InvalidOperationException>(() => UnitTerminationService.Complete(mutation, 0, new(1, false), 1, new([]), events));
+        UnitDefeatTestHelper.Complete(mutation, 0, new(1, false), 1, new([]), events);
+        Assert.Throws<InvalidOperationException>(() => UnitDefeatTestHelper.Complete(mutation, 0, new(1, false), 1, new([]), events));
         world.Commit(mutation);
         var state = world.CreateSnapshot();
         var winner = Assert.Single(state.Units);
@@ -44,7 +67,7 @@ public sealed class UnitTerminationTests
         var world = World(home);
         var mutation = world.BeginMutation();
         var events = new List<DomainEvent>();
-        UnitTerminationService.Complete(mutation, 0, null, 1, new([]), events);
+        UnitDefeatTestHelper.Complete(mutation, 0, null, 1, new([]), events);
         world.Commit(mutation);
         var city = Assert.Single(world.CreateSnapshot().Settlements);
         Assert.Equal(wounded, city.Wounded);
@@ -62,7 +85,7 @@ public sealed class UnitTerminationTests
         var world = World(homeWounded: 49999, winnerWounded: 49999, draft: 499999);
         var mutation = world.BeginMutation();
         var events = new List<DomainEvent>();
-        UnitTerminationService.Complete(mutation, 0, winner ? new BattleSource(1, false) : null, 1, new([]), events);
+        UnitDefeatTestHelper.Complete(mutation, 0, winner ? new BattleSource(1, false) : null, 1, new([]), events);
         world.Commit(mutation);
         var state = world.CreateSnapshot();
         Assert.Equal(50000u, state.Settlements[0].Wounded);
@@ -79,8 +102,8 @@ public sealed class UnitTerminationTests
         var mutation = world.BeginMutation();
         var events = new List<DomainEvent>();
         var original = mutation.Units[0];
-        Assert.Throws<ArgumentException>(() => UnitTerminationService.Complete(mutation, 0, new(0, false), 1, new([]), events));
-        Assert.Throws<ArgumentException>(() => UnitTerminationService.Complete(mutation, 0, new(900, false), 1, new([]), events));
+        Assert.Throws<ArgumentException>(() => UnitDefeatTestHelper.Complete(mutation, 0, new(0, false), 1, new([]), events));
+        Assert.Throws<ArgumentException>(() => UnitDefeatTestHelper.Complete(mutation, 0, new(900, false), 1, new([]), events));
         Assert.Equal(original, mutation.Units[0]);
         Assert.Equal(1000u, mutation.Corps.Values.Single(c => c.IsRoot && c.OwnerId == 1).Treasury.Money);
         Assert.Empty(events);

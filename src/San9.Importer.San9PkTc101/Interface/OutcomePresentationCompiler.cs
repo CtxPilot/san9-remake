@@ -38,6 +38,9 @@ internal static class OutcomePresentationCompiler
         Prompt("treasury-captured", 7196, bindings: [("force.0", "force"), ("force.1", "enemy-force"), ("number.0", "amount"), ("number.1", "food")]);
         Prompt("prisoner-escape-speech", 6179, "actor", "decision-announcement", ("person.0", "actor"));
         Prompt("prisoner-escape-result", 6225, bindings: [("person.0", "actor"), ("building.0", "place")]);
+        Record("battle-wounded-captured", 9995, ("unit.0", "unit"));
+        Record("battle-wounded-lost", 10087, ("unit.0", "unit"), ("force.0", "force"));
+        Record("battle-victory-morale", 10031, ("unit.0", "unit"));
         Record("battle-captured", 10022, ("unit.0", "unit"), ("force.0", "force"), ("person.0", "actor"), ("number.0", "count"));
         Record("battle-persons-lost", 10086, ("force.0", "force"), ("person.0", "actor"), ("number.0", "count"));
         Record("battle-persons-retreated", 10068, ("person.0", "actor"), ("number.0", "count"));

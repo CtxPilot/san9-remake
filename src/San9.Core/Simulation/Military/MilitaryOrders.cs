@@ -57,7 +57,7 @@ internal static class MilitaryOrders
                 MovementRemainder = 0, DepartureDaysRemaining = 0 };
             world.Replace(unit);
         }
-        MilitaryPolicies.ResolvePostAction(world, unit, rules, events);
+        MilitaryPolicies.ResolvePostAction(world, unit, rules, events, changedTarget);
     }
 
     // A persistent mission may require the other member of the land/naval pair later in its route.

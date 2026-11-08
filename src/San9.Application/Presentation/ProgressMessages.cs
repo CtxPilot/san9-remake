@@ -29,6 +29,9 @@ public static class ProgressMessages
     {
         List<MapMessageRecord> result = [];
         bool Player(int? force) => force is int id && before.World.Simulation.Controls.Any(c => c.ForceId == id && c.Kind == ControllerKind.Player);
+        bool DirectPlayer(BattleObjectContext? obj) => obj is { ForceId: int force } && Player(force) &&
+            !before.World.Corps.Any(c => c.OwnerId == force && (obj.CorpsId is int corps ? c.Id == corps : c.IsRoot) &&
+                c.ControlMode == CorpsControlMode.Automatic);
         MapCell? PlaceLocation(int id) => after.Settlements.Concat(before.Settlements).FirstOrDefault(s => s.Id == id) is { } place
             ? new(place.X, place.Y) : null;
         int? DetentionOwner(int? settlement, int? unit) => settlement is int place
@@ -81,23 +84,39 @@ public static class ProgressMessages
                     values["unit"] = MessageBinding.Reference(MessageEntityKind.Unit, waypoint.Unit.Id);
                     role = "waypoint-reached";
                     break;
-                case UnitTerminatedEvent lost when lost.Reason is UnitTerminationReason.Defeated or UnitTerminationReason.MoraleCollapsed && lost.Target is { } target:
+                case UnitDefeatedEvent lost when lost.Reason is UnitTerminationReason.Defeated or UnitTerminationReason.MoraleCollapsed && lost.Target is { } target:
                     clock = lost.Clock; objects.Add(target); location = target.Position is { } point ? MapCoordinates.Cell(point) : target.ServicePlaceId is int home ? PlaceLocation(home) : null;
                     colorForce = target.ForceId;
                     values["unit"] = MessageBinding.Reference(target.IsSettlement ? MessageEntityKind.Settlement : MessageEntityKind.Unit, target.Id);
                     role = "unit-lost";
-                    if (lost.Reason == UnitTerminationReason.MoraleCollapsed && Player(target.ForceId))
+                    if (lost.Reason == UnitTerminationReason.MoraleCollapsed && DirectPlayer(target))
                     { role = "unit-morale-collapsed"; break; }
-                    if (!Player(target.ForceId) && !Player(lost.Source?.ForceId))
+                    if (!DirectPlayer(target) && !DirectPlayer(lost.Source))
                     {
                         if (target.ForceId is not int owner) { role = null; break; }
-                        Force("enemy-force", owner); role = "unit-lost-other"; importance = MapReportImportance.Detailed;
+                        Force("enemy-force", owner); role = "unit-lost-other"; colorForce = null; importance = MapReportImportance.Detailed;
                     }
-                    else if (!Player(target.ForceId) && lost.Source is { } source && target.CommanderId is int commander)
+                    else if (lost.Source is { } source && DirectPlayer(source) && target.CommanderId is int commander)
                     {
                         objects.Add(source); values["unit"] = MessageBinding.Reference(source.IsSettlement ? MessageEntityKind.Settlement : MessageEntityKind.Unit, source.Id);
                         Person("other", commander); Force("enemy-force", target.ForceId!.Value); role = "unit-defeated"; colorForce = source.ForceId;
                     }
+                    break;
+                case BattleWoundedCapturedEvent wounded when wounded.Received > 0 &&
+                    (DirectPlayer(wounded.Captor) || DirectPlayer(wounded.Defeated)):
+                    clock = wounded.Clock; objects.Add(wounded.Defeated); objects.Add(wounded.Captor);
+                    location = wounded.Defeated.Position is { } defeatPosition ? MapCoordinates.Cell(defeatPosition) : PlaceLocation(wounded.Defeated.Id);
+                    values["unit"] = MessageBinding.Reference(wounded.Defeated.IsSettlement ? MessageEntityKind.Settlement : MessageEntityKind.Unit, wounded.Defeated.Id);
+                    colorForce = DirectPlayer(wounded.Captor) ? wounded.Captor.ForceId : wounded.Defeated.ForceId;
+                    Force("force", wounded.Captor.ForceId!.Value);
+                    role = DirectPlayer(wounded.Captor) ? "battle-wounded-captured" : "battle-wounded-lost";
+                    importance = MapReportImportance.Detailed;
+                    break;
+                case BattleVictoryMoraleChangedEvent morale when DirectPlayer(morale.Victor):
+                    clock = morale.Clock; objects.Add(morale.Victor); colorForce = morale.Victor.ForceId;
+                    location = morale.Victor.Position is { } victoryPosition ? MapCoordinates.Cell(victoryPosition) : PlaceLocation(morale.Victor.Id);
+                    values["unit"] = MessageBinding.Reference(morale.Victor.IsSettlement ? MessageEntityKind.Settlement : MessageEntityKind.Unit, morale.Victor.Id);
+                    role = "battle-victory-morale"; importance = MapReportImportance.Detailed;
                     break;
                 case SettlementCapturedEvent captured when captured.Attacker is { ForceId: not null } attackingSource:
                 {

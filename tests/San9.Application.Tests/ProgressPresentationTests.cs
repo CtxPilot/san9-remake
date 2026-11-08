@@ -11,6 +11,60 @@ namespace San9.Application.Tests;
 
 public sealed class ProgressPresentationTests
 {
+    [Theory]
+    [InlineData(true, false, "unit-defeated", "battle-wounded-captured", 1)]
+    [InlineData(true, true, "unit-defeated", "battle-wounded-captured", 1)]
+    [InlineData(false, true, "unit-lost", "battle-wounded-lost", 2)]
+    [InlineData(false, false, "unit-lost-other", null, 0)]
+    public void VictoryAndWoundedReportsFollowTheReportingSideWithTwoPlayers(bool winnerPlayer, bool loserPlayer,
+        string defeatRole, string? woundedRole, int color)
+    {
+        var session = GameSession.Start(Scenario(), 42);
+        var world = session.Snapshot;
+        var before = session.View.ForWorld(world with { Simulation = world.Simulation with
+        { Controls = world.Simulation.Controls.Select(c => c with { Kind =
+            c.ForceId == 1 && winnerPlayer || c.ForceId == 2 && loserPlayer ? ControllerKind.Player : ControllerKind.Automatic }).ToImmutableArray() } });
+        var victor = new BattleObjectContext(10, false, 1, 2, new(62,12), 1, false);
+        var defeated = new BattleObjectContext(20, false, 2, 23, new(67,12), 2, false);
+        var roles = ProgressPresentationDefinition.RecordRoles;
+        var texts = MissionScenario.Texts(before) with { Messages = roles.ToDictionary(r=>r, r=>new MessageDefinition([new MessageLiteral(r)])) };
+        var content = new ProgressPresentationDefinition(roles.ToDictionary(r=>r, r=>new DecisionMessageDefinition(r, [])), []);
+        DomainEvent[] facts = [new UnitDefeatedEvent(world.Clock, defeated, victor, UnitTerminationReason.Defeated),
+            new BattleWoundedCapturedEvent(world.Clock, defeated, victor, 50),
+            new BattleVictoryMoraleChangedEvent(world.Clock, victor, 100, 100)];
+        var records = ProgressMessages.Read(before, before, session.Messages(texts), texts, content, facts);
+        var expected = new List<string> { defeatRole };
+        if (woundedRole is not null) expected.Add(woundedRole);
+        if (winnerPlayer) expected.Add("battle-victory-morale");
+        Assert.Equal(expected, records.Select(r=>r.Message.Key));
+        Assert.Equal(color == 0 ? null : (int?)color, records[0].ForceColorCode);
+        Assert.All(records.Skip(1), r=>Assert.Equal(MapReportImportance.Detailed, r.Importance));
+        Assert.DoesNotContain(ProgressMessages.Read(before, before, session.Messages(texts), texts, content,
+            [new BattleWoundedCapturedEvent(world.Clock, defeated, victor, 0)]), r=>r.Message.Key.StartsWith("battle-wounded", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DelegatedVictoryKeepsItsMoraleStateWithoutPublishingDirectPlayerRewardReports()
+    {
+        var session = GameSession.Start(Scenario(), 42);
+        var before = session.View.ForWorld(session.Snapshot with
+        { Corps = session.Snapshot.Corps.Select(c=>c.OwnerId==1 ? c with { ControlMode=CorpsControlMode.Automatic } : c).ToImmutableArray() });
+        var victor = new BattleObjectContext(10, false, 1, 2, new(62,12), 1, false);
+        var defeated = new BattleObjectContext(20, false, 2, 23, new(67,12), 2, false);
+        var roles = ProgressPresentationDefinition.RecordRoles;
+        var texts = MissionScenario.Texts(before) with { Messages = roles.ToDictionary(r=>r, r=>new MessageDefinition([new MessageLiteral(r)])) };
+        var content = CommandPresentation.Empty with { Progress = new(roles.ToDictionary(r=>r, r=>new DecisionMessageDefinition(r, [])), [])
+        { MapSpeeches = new() { ["unit-defeat"] = new("unit-lost", [], "actor") } } };
+        DomainEvent[] facts = [new UnitDefeatedEvent(before.World.Clock, defeated, victor, UnitTerminationReason.Defeated),
+            new BattleWoundedCapturedEvent(before.World.Clock, defeated, victor, 100),
+            new BattleVictoryMoraleChangedEvent(before.World.Clock, victor, 60, 70)];
+        var records = ExecutionPublication.Read(before,before,session.Messages(texts),texts,content,facts).Records;
+        Assert.Equal("unit-lost-other", Assert.Single(records).Message.Key);
+        Assert.Null(records[0].ForceColorCode);
+        var plan = BattlePresentationPlan.Create(before,before,facts,session.Messages(texts),texts,content);
+        Assert.Equal(10, Assert.Single(plan.Values).Morale);
+    }
+
     [Fact]
     public void ContactAndWaypointFactsPublishIndependentSpeechesAndRecordsOnceAtTheirLocations()
     {
@@ -502,18 +556,15 @@ public sealed class ProgressPresentationTests
             new MessageValue(new("property","military-target.commander-name",Arguments:[new("binding","unit.0")]))]) } };
         var content = new ProgressPresentationDefinition(new() { ["unit-defeated"] = new("defeat",new()
             { ["person.0"]="other",["unit.0"]="unit" }) },[]);
-        DomainEvent[] events = [new UnitTerminatedEvent(clock,20,new(10,false),5000)
-        { Reason = UnitTerminationReason.Defeated,
-            Target = new(20,false,2,23,new(67,12),2,false),
-            Source = new(10,false,1,2,new(62,12),1,false)
-        }];
+        DomainEvent[] events = [new UnitDefeatedEvent(clock, new(20,false,2,23,new(67,12),2,false),
+            new(10,false,1,2,new(62,12),1,false), UnitTerminationReason.Defeated)];
         var record = Assert.Single(ProgressMessages.Read(before,after,session.Messages(texts,before.World),texts,content,events));
         Assert.Equal(clock,record.Message.Clock);
         Assert.Equal("enemy-commander/actor",record.Message.BbCode);
         Assert.Equal(1,record.ForceColorCode);
         Assert.Equal(MapCoordinates.Cell(new(67,12)),record.Location);
         Assert.Equal(record,Assert.Single(ProgressMessages.Read(before,after,session.Messages(texts,before.World),texts,content,events)));
-        var foreign = ((UnitTerminatedEvent)events[0]) with { Source = new(30,false,3,31,new(62,12),3,false) };
+        var foreign = ((UnitDefeatedEvent)events[0]) with { Source = new(30,false,3,31,new(62,12),3,false) };
         texts.Messages["foreign-loss"] = new([new MessageLiteral("foreign-loss")]);
         content.Records.Add("unit-lost-other", new("foreign-loss", []));
         var detailed = Assert.Single(ProgressMessages.Read(before,after,session.Messages(texts,before.World),texts,content,[foreign]));
@@ -533,8 +584,7 @@ public sealed class ProgressPresentationTests
         var content = CommandPresentation.Empty with
             { Progress = new(new() { ["unit-lost"] = new("loss",[]) },[])
                 { MapSpeeches = new() { ["unit-defeat"] = new("loss", [], "actor") } } };
-        var loss = new UnitTerminatedEvent(clock,10,null,5000)
-            { Reason = UnitTerminationReason.Defeated, Target = new(10,false,1,2,new(62,12),1,false), Source = null };
+        var loss = new UnitDefeatedEvent(clock, new(10,false,1,2,new(62,12),1,false), null, UnitTerminationReason.Defeated);
         var surrender = new ForceSurrenderedEvent(clock,1,2,0,0,0,0,[],[]);
         IReadOnlyList<MapMessageRecord> Read(params DomainEvent[] events) =>
             ExecutionPublication.Read(before,before,session.Messages(texts),texts,content,events).Records;
@@ -545,7 +595,6 @@ public sealed class ProgressPresentationTests
         Assert.Single(Read(loss,surrender));
         Assert.Single(Read(loss,surrender with { ForceId = 3 }));
         Assert.Single(Read(loss,surrender with { Clock = clock.NextDay() }));
-        Assert.Single(Read(loss with { Winner = new(20,false),
-            Source = new(20,false,2,23,new(67,12),2,false) },surrender));
+        Assert.Single(Read(loss with { Source = new(20,false,2,23,new(67,12),2,false) },surrender));
     }
 }

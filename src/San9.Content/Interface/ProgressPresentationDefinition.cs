@@ -32,6 +32,7 @@ public sealed record ProgressPresentationDefinition(Dictionary<string, DecisionM
         "false-report-victim-blocked", "disorder-victim-success", "disorder-victim-blocked", "disorder-other-success", "inspire-other-success", "rescue-other-result",
         "morale-gained", "reinforcement-arrived", "tactic-learned", "tactic-learned-other", "injury-worsened", "place-commander-changed",
         "unit-commander-changed", "corps-leader-changed", "corps-reorganized", "high-spirits-expired", "morale-lost", "unit-morale-collapsed",
+        "battle-wounded-captured", "battle-wounded-lost", "battle-victory-morale",
         "treasury-captured", "treasury-lost", "battle-captured", "battle-persons-lost", "battle-persons-retreated",
         "diplomacy-units-returned", "diplomacy-corps-cleared",
         "policy-construction-aborted", "policy-transport-aborted", "policy-return-target-changed", "policy-enter-captured-place", "policy-return-after-action",

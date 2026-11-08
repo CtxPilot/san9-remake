@@ -34,12 +34,17 @@ internal static class BattleAftermath
         if (cause == UnitDefeatCause.DoubledMartialTactic && winner is { } source && source.IsCombatant(world))
             MeleeDeaths.Apply(world, unit, rules, events);
         var shape = MilitaryCombat.Area(unit, rules.Military!);
-        ResolvePeople(world, world.UnitMembers(id), shape, unit, winner, unit.ServicePlaceId, rules, events, BattleObjectContext.Capture(unit));
         int? city = unit.ServicePlaceId is int home ?
             world.Settlements.GetValueOrDefault(home)?.Kind == SettlementKind.City ? home : rules.Personnel.RegionCities.GetValueOrDefault(home, -1) : null;
         if (city is int cityId && (!world.Settlements.TryGetValue(cityId, out var s) || s.Kind != SettlementKind.City)) city = null;
-        UnitTerminationService.Complete(world, id, winner, city, rules.Governance, events, repairCorps: false,
-            target: BattleObjectContext.Capture(unit));
+        var settlement = UnitTerminationService.SettleResources(world, id, winner, city, events);
+        var completedAttacks = world.OrderedUnits.Where(u => u.Order is { Kind: MilitaryOrderKind.AttackUnit } order && order.UnitId == id)
+            .Select(u => u.Id).ToArray();
+        MilitaryOrders.RemoveTarget(world, id, false, events);
+        foreach (int attackerId in completedAttacks)
+            MilitaryPolicies.ResolvePostAction(world, world.Units[attackerId], rules.Military!, events, new(id, false));
+        ResolvePeople(world, world.UnitMembers(id), shape, unit, winner, unit.ServicePlaceId, rules, events, settlement.Target);
+        UnitTerminationService.Complete(world, settlement, rules.Governance, events, repairCorps: false);
         if (victorForce is int victorId) GovernanceLifecycle.EliminateIfDefeated(world, unit.OwnerId, rules, events, world.CurrentDateCountdownConsumed, victorId);
     }
 

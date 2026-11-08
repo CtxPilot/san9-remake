@@ -7,6 +7,28 @@ namespace San9.Core.Tests;
 
 public sealed class BattleRoutingTests
 {
+    [Fact]
+    public void DefeatOrdersVictoryWoundedPostActionPersonnelAndMoraleBeforeRemoval()
+    {
+        var (world, military) = Fixture(80, false, 10000);
+        var state = world.BeginMutation();
+        state.Replace(state.Forces[1] with { IsBarbarian = true });
+        state.Replace(state.Units[1] with { Soldiers = 0, Wounded = 200 });
+        List<DomainEvent> events = [];
+        var rules = new SimulationRules { Military = military };
+        BattleAftermath.TerminateUnit(state, 1, new(0, false), rules, events);
+        int defeat = events.FindIndex(e => e is UnitDefeatedEvent);
+        int wounded = events.FindIndex(e => e is BattleWoundedCapturedEvent);
+        int policy = events.FindIndex(e => e is UnitPolicyRespondedEvent);
+        int personnel = events.FindIndex(e => e is BattlePersonnelResolvedEvent);
+        int morale = events.FindIndex(e => e is BattleVictoryMoraleChangedEvent);
+        int removal = events.FindIndex(e => e is UnitTerminatedEvent);
+        Assert.True(defeat >= 0 && wounded > defeat && policy > wounded && personnel > policy && morale > personnel && removal > morale,
+            $"defeat={defeat}, wounded={wounded}, policy={policy}, personnel={personnel}, morale={morale}, removal={removal}");
+        Assert.DoesNotContain(state.Units.Values, u => u.Id == 1);
+        Assert.Contains(22, Assert.Single(events.OfType<BattlePersonnelResolvedEvent>()).RetreatedIds);
+    }
+
     [Theory]
     [InlineData(39, false, 80000u, true)]
     [InlineData(41, false, 80000u, false)]

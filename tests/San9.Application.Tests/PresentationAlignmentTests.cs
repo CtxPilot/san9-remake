@@ -26,6 +26,38 @@ public sealed class PresentationAlignmentTests
         return (session, texts, CommandPresentation.Empty with { Progress = progress });
     }
 
+    [Theory]
+    [InlineData(60, 70)]
+    [InlineData(100, 100)]
+    public void TwoPlayerBattlePublishesTheOriginalRecordSequenceOnceAndUpdatesMoraleAtTheReward(int previous, int current)
+    {
+        var (session, texts, content) = Fixture();
+        var world = session.Snapshot;
+        var before = session.View.ForWorld(world with { Simulation = world.Simulation with
+        { Controls = world.Simulation.Controls.Select(c=>c with { Kind = ControllerKind.Player }).ToImmutableArray() } });
+        var victor = new BattleObjectContext(10, false, 1, 2, new(32,7), 1, false);
+        var defeated = new BattleObjectContext(20, false, 2, 23, new(33,7), 2, false);
+        var clock = world.Clock;
+        DomainEvent[] facts = [new UnitDefeatedEvent(clock, defeated, victor, UnitTerminationReason.Defeated),
+            new BattleWoundedCapturedEvent(clock, defeated, victor, 100),
+            new UnitPolicyRespondedEvent(clock, victor, UnitPolicyResponse.PostActionNoTarget, null, 1) { ReportEligible = true },
+            new BattlePersonnelResolvedEvent(clock, defeated, victor, [], [23], null),
+            new BattleVictoryMoraleChangedEvent(clock, victor, previous, current),
+            new UnitTerminatedEvent(clock, 20, new(10,false), 0) { Reason=UnitTerminationReason.Defeated, Target=defeated, Source=victor }];
+        var output = ExecutionPublication.Read(before, before, session.Messages(texts), texts, content, facts);
+        string[] expected = ["unit-defeated", "battle-wounded-captured", "policy-post-action-no-target", "battle-persons-retreated", "battle-victory-morale"];
+        Assert.Equal(expected, output.Records.Select(r=>r.Message.Key));
+        Assert.Equal(new[] { MapReportImportance.Summary, MapReportImportance.Detailed, MapReportImportance.Summary,
+            MapReportImportance.Summary, MapReportImportance.Detailed }, output.Records.Select(r=>r.Importance));
+        var plan = BattlePresentationPlan.Create(before, before, facts, session.Messages(texts), texts, content);
+        Assert.Equal(expected, plan.Records.Select(r=>r.Record.Message.Key));
+        var value = Assert.Single(plan.Values);
+        Assert.Equal((victor.Id, current-previous, 4), (value.TargetId, value.Morale, value.FactIndex));
+        Assert.Equal(20, Assert.Single(plan.MapChanges).RemovedUnitId);
+        Assert.Empty(ExecutionPublication.Read(before, before, session.Messages(texts), texts, content,
+            facts, presentedFeedback: plan.PresentedFeedback).Records);
+    }
+
     [Fact]
     public void RecruitmentDialogueHasAPlayableChannelAndIsNotRepublished()
     {
@@ -216,8 +248,7 @@ public sealed class PresentationAlignmentTests
             Officers = before.World.Officers.Select(p => p.UnitId == unit.Id
                 ? p with { UnitId = null, SettlementId = unit.ServicePlaceId } : p).ToImmutableArray()
         });
-        DomainEvent[] facts = [new UnitTerminatedEvent(before.World.Clock, unit.Id, null, 0)
-        { Reason = UnitTerminationReason.MoraleCollapsed, Target = target }];
+        DomainEvent[] facts = [new UnitDefeatedEvent(before.World.Clock, target, null, UnitTerminationReason.MoraleCollapsed)];
         var output = ExecutionPublication.Read(before, after, session.Messages(texts), texts, content, facts);
         var record = Assert.Single(output.Records);
         Assert.Equal("unit-morale-collapsed", record.Message.Key);
@@ -261,7 +292,12 @@ public sealed class PresentationAlignmentTests
         var victim = new StrategyAudience(enemy.Id, own, new(own, place, null), actor, 1000, 1000, 71, 150, 90);
         var other = victim with { TargetForceId = third.Id, CommanderId = third.LeaderId, Target = new(third.Id, place, null) };
         var unit = new BattleObjectContext(999, false, own, actor, new(32, 7), place, false);
-        DomainEvent[] samples = [new TacticLearnedEvent(clock, actor, tactic) { Origin = TacticLearningOrigin.Practice, Occurrence = new(own, place, null) },
+        var defeatedUnit = unit with { Id = 998, ForceId = enemy.Id, CommanderId = enemy.LeaderId };
+        DomainEvent[] samples = [new UnitDefeatedEvent(clock, defeatedUnit, unit, UnitTerminationReason.Defeated),
+            new BattleWoundedCapturedEvent(clock, defeatedUnit, unit, 100),
+            new BattleWoundedCapturedEvent(clock, unit, defeatedUnit, 100),
+            new BattleVictoryMoraleChangedEvent(clock, unit, 60, 70),
+            new TacticLearnedEvent(clock, actor, tactic) { Origin = TacticLearningOrigin.Practice, Occurrence = new(own, place, null) },
             new OfficerInjuryWorsenedEvent(clock, actor, 0, 5, new(own, place, null)),
             new CommanderChangedEvent(clock, place, actor) { PreviousId = enemy.LeaderId, ForceId = own },
             new UnitCommanderChangedEvent(clock, unit, enemy.LeaderId!.Value, actor),

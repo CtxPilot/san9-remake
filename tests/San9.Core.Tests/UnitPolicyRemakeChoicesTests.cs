@@ -118,7 +118,7 @@ public sealed partial class UnitPolicyTests
         world.Replace(world.Units[2] with { Position = new(21, 10), Order = new(MilitaryOrderKind.Return, null, 2),
             AutonomousReturn = true });
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events);
+        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events, null);
         Assert.Equal(UnitPolicyResponse.PostActionAttackOrdered, Assert.Single(events.OfType<UnitPolicyRespondedEvent>()).Response);
         Assert.Equal(Attack(2), world.Units[1].Order);
     }
@@ -147,7 +147,7 @@ public sealed partial class UnitPolicyTests
         world.Replace(world.Units[2] with { Position = new(21, 10) });
         world.Replace(world.Settlements[1] with { CanHostPersons = false });
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events);
+        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events, null);
         Assert.Equal(Attack(2), world.Units[1].Order);
         Assert.False(world.Units[1].AwaitingPostAction);
         Assert.Equal(UnitPolicyResponse.PostActionAttackOrdered, Assert.Single(events.OfType<UnitPolicyRespondedEvent>()).Response);
@@ -164,7 +164,7 @@ public sealed partial class UnitPolicyTests
         world.Replace(world.Units[2] with { Position = new(80, 10) });
         world.Replace(world.Settlements[1] with { CanHostPersons = false });
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events);
+        MilitaryPolicies.ResolvePostAction(world, world.Units[1], Rules(), events, null);
         var failed = Assert.Single(events.OfType<UnitPolicyRespondedEvent>());
         Assert.Equal(UnitPolicyResponse.PostActionNoTarget, failed.Response);
         Assert.Equal(UnitPolicyReturnOutcome.NoDestination, failed.ReturnOutcome);

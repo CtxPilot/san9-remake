@@ -11,14 +11,25 @@ public sealed record UnitTerminatedEvent(GameClock Clock, int UnitId, BattleSour
     [System.Text.Json.Serialization.JsonRequired] public BattleObjectContext? Source { get; init; }
 }
 
-/// <summary>Final resource and identity commit after personnel outcomes have been settled by the battle transaction.</summary>
+public sealed record UnitDefeatedEvent(GameClock Clock, BattleObjectContext Target, BattleObjectContext? Source,
+    UnitTerminationReason Reason) : DomainEvent;
+
+public sealed record BattleWoundedCapturedEvent(GameClock Clock, BattleObjectContext Defeated, BattleObjectContext Captor,
+    uint Received) : DomainEvent;
+
+public sealed record BattleVictoryMoraleChangedEvent(GameClock Clock, BattleObjectContext Victor, int Previous, int Current) : DomainEvent;
+
+internal sealed record UnitDefeatSettlement(UnitState Unit, BattleSource? Winner, BattleObjectContext Target,
+    BattleObjectContext? Source, long UnrecoveredSoldiers, UnitTerminationReason Reason);
+
+/// <summary>Stages battle resources before personnel, then commits victory morale and identity removal.</summary>
 internal static class UnitTerminationService
 {
-    internal static void Complete(WorldMutation world, int unitId, BattleSource? winner, int? associatedCityId,
-        GovernanceRulebook governance, List<DomainEvent> events, bool repairCorps = true, BattleObjectContext? target = null)
+    internal static UnitDefeatSettlement SettleResources(WorldMutation world, int unitId, BattleSource? winner,
+        int? associatedCityId, List<DomainEvent> events)
     {
-        if (!world.Units.TryGetValue(unitId, out var defeated) || world.Officers.Values.Any(p => p.UnitId == unitId))
-            throw new InvalidOperationException("Unit termination requires resolved personnel and a live unit.");
+        if (!world.Units.TryGetValue(unitId, out var defeated))
+            throw new InvalidOperationException("Unit defeat requires a live unit.");
         if (winner is { } captor && (!captor.IsCombatant(world) || captor.Owner(world) == defeated.OwnerId))
             throw new ArgumentException("Invalid battle winner.");
         SettlementState? city = associatedCityId is int cityId && world.Settlements.TryGetValue(cityId, out var place) &&
@@ -26,6 +37,10 @@ internal static class UnitTerminationService
         if (associatedCityId is not null && city is null) throw new ArgumentException("Invalid associated city.");
         SettlementState? home = defeated.ServicePlaceId is int homeId && world.Settlements.TryGetValue(homeId, out var origin) &&
             origin.OwnerId == defeated.OwnerId && origin.CanHostPersons && origin.Durability > 0 ? origin : null;
+        var target = BattleObjectContext.Capture(defeated);
+        var source = winner is { } participant ? BattleObjectContext.Capture(world, participant) : null;
+        var reason = winner is null && defeated.Morale == 0 ? UnitTerminationReason.MoraleCollapsed : UnitTerminationReason.Defeated;
+        events.Add(new UnitDefeatedEvent(world.Clock, target, source, reason));
         long pool = (long)defeated.Soldiers + defeated.Wounded;
         long recovered = 0;
         if (winner is { } victor)
@@ -35,7 +50,8 @@ internal static class UnitTerminationService
             if (home is not null) recovered += Wounded(world, home, half, unitId, events);
             uint wounded = victor.IsSettlement ? world.Settlements[victor.Id].Wounded : world.Units[victor.Id].Wounded;
             uint accepted = (uint)Math.Min(half, MilitaryRulebook.WoundedCapacity - wounded);
-            victor.Reward(world, accepted, 10);
+            victor.Reward(world, accepted, 0);
+            if (accepted > 0) events.Add(new BattleWoundedCapturedEvent(world.Clock, target, source!, accepted));
             ResourceAccounts.Report(world, victor.Account, ResourceKind.Wounded,
                 "unit-defeated", unitId, half, accepted, events);
             recovered += accepted;
@@ -52,14 +68,30 @@ internal static class UnitTerminationService
                 recovered += population;
             }
         }
+        return new(defeated, winner, target, source, pool - recovered, reason);
+    }
+
+    internal static void Complete(WorldMutation world, UnitDefeatSettlement settlement,
+        GovernanceRulebook governance, List<DomainEvent> events, bool repairCorps = true)
+    {
+        var defeated = settlement.Unit;
+        int unitId = defeated.Id;
+        if (!world.Units.ContainsKey(unitId) || world.Officers.Values.Any(p => p.UnitId == unitId))
+            throw new InvalidOperationException("Unit termination requires resolved personnel and a live unit.");
+        var winner = settlement.Winner;
+        if (winner is { } victor)
+        {
+            int previous = victor.Morale(world);
+            victor.Reward(world, 0, 10);
+            events.Add(new BattleVictoryMoraleChangedEvent(world.Clock, BattleObjectContext.Capture(world, victor),
+                previous, victor.Morale(world)));
+        }
         Remove(world, defeated, winner, "unit-defeated", events);
         if (repairCorps && defeated.CorpsId is int corps && GovernanceMaintenance.RepairCorps(world, corps, governance, events) != CommandRejection.None)
             throw new InvalidOperationException("Battle transaction cannot settle the defeated corps.");
-        events.Add(new UnitTerminatedEvent(world.Clock, unitId, winner, pool - recovered)
+        events.Add(new UnitTerminatedEvent(world.Clock, unitId, winner, settlement.UnrecoveredSoldiers)
         {
-            Reason = winner is null && defeated.Morale == 0 ? UnitTerminationReason.MoraleCollapsed : UnitTerminationReason.Defeated,
-            Target = target ?? BattleObjectContext.Capture(defeated),
-            Source = winner is { } source ? BattleObjectContext.Capture(world, source) : null
+            Reason = settlement.Reason, Target = settlement.Target, Source = settlement.Source
         });
     }
 

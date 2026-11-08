@@ -138,13 +138,17 @@ internal sealed partial class BattlePresentationBuilder(StrategySnapshot before,
                 case TacticLearnedEvent or OfficerInjuryWorsenedEvent or CommanderChangedEvent or UnitCommanderChangedEvent or
                     CorpsLeaderChangedEvent or CorpsDissolvedEvent or OfficerAppearedEvent or
                     TreasuryCapturedEvent or PrisonerEscapedEvent or BattlePersonnelResolvedEvent or DiplomaticConflictsEndedEvent: PresentOutcome(); break;
+                case BattleVictoryMoraleChangedEvent victory:
+                    PresentAftermath();
+                    _stateValues.Add(new(MapTime(_cursor), victory.Victor.Id, victory.Victor.IsSettlement, 0, victory.Current - victory.Previous, 0));
+                    break;
                 case TacticMoraleChangedEvent morale: PresentMorale(morale); break;
                 case LeaderInspiredEvent inspired: PresentLeaderInspiration(inspired); break;
                 case TacticDefectionEvent defection: PresentDefection(defection); break;
                 case TacticHealingEvent healing: PresentHealing(healing); break;
                 case BurnResolvedEvent or SeizeResolvedEvent or UnitStrategyResolvedEvent or AlienateResolvedEvent or GossipResolvedEvent:
                     PresentMission(events[_index]); break;
-                case UnitTerminatedEvent or SettlementCapturedEvent or FacilityDestroyedEvent or OfficerCapturedEvent or TacticPrisonerRescuedEvent:
+                case UnitDefeatedEvent or BattleWoundedCapturedEvent or SettlementCapturedEvent or FacilityDestroyedEvent or OfficerCapturedEvent or TacticPrisonerRescuedEvent:
                     PresentAftermath(); break;
                 case TacticActivatedEvent or IntelligenceEffectResolvedEvent: PresentTactic(events[_index]); break;
                 case TacticSecondaryPreventedEvent prevented: PresentSecondaryPrevention(prevented); break;

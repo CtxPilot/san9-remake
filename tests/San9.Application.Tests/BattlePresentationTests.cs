@@ -129,7 +129,8 @@ public sealed class BattlePresentationTests
             Units = session.View.World.Units.Where(u => u.Id != lost.UnitId).ToImmutableArray(),
             Officers = session.View.World.Officers.Select(o => o.UnitId == lost.UnitId ? o with { UnitId = null, SettlementId = 2 } : o).ToImmutableArray()
         });
-        var plan = BattlePresentationPlan.Create(session.View, after, [lost], session.Messages(texts), texts, content);
+        var defeat = new UnitDefeatedEvent(lost.Clock, lost.Target, lost.Source, lost.Reason);
+        var plan = BattlePresentationPlan.Create(session.View, after, [defeat, lost], session.Messages(texts), texts, content);
         var cue = Assert.Single(plan.Messages);
         var speech = Assert.IsType<MapSpeechMessage>(cue.Message.MapSpeech);
         Assert.Equal(lost.Target.CommanderId, speech.SpeakerId);
@@ -142,10 +143,10 @@ public sealed class BattlePresentationTests
         Assert.NotNull(Assert.Single(plan.MapChanges).Retirement);
         var spectator = session.View.ForWorld(session.View.World with
             { Simulation = session.View.World.Simulation with { Controls = [] } });
-        Assert.Single(BattlePresentationPlan.Create(spectator, after, [lost], session.Messages(texts), texts, content).Messages);
+        Assert.Single(BattlePresentationPlan.Create(spectator, after, [defeat, lost], session.Messages(texts), texts, content).Messages);
         Assert.Empty(ExecutionPublication.Read(session.View, after, session.Messages(texts), texts, content,
-            [lost], presentedFeedback: plan.PresentedFeedback).Messages);
-        var noWinner = lost with { Winner = null, Source = null };
+            [defeat, lost], presentedFeedback: plan.PresentedFeedback).Messages);
+        var noWinner = defeat with { Source = null };
         Assert.Empty(BattlePresentationPlan.Create(session.View, after, [noWinner], session.Messages(texts), texts, content).Messages);
     }
 

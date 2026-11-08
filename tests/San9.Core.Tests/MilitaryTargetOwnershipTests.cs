@@ -162,8 +162,16 @@ public sealed partial class MilitaryCommandLifecycleTests
         Assert.Equal(9, world.Units[1].ConditionDaysRemaining);
         Assert.Equal(condition == UnitCondition.HighSpirits, world.Units[1].HighSpiritsMoralePenaltyPending);
         Assert.DoesNotContain(events.OfType<BattleConditionChangedEvent>(), e => e.ObjectId == 1 && !e.IsSettlement);
-        Assert.Null(world.Units[1].Order);
-        Assert.True(world.Units[1].AwaitingPostAction);
+        if (condition == UnitCondition.HighSpirits)
+        {
+            Assert.Equal(MilitaryOrderKind.Return, world.Units[1].Order!.Kind);
+            Assert.False(world.Units[1].AwaitingPostAction);
+        }
+        else
+        {
+            Assert.Null(world.Units[1].Order);
+            Assert.True(world.Units[1].AwaitingPostAction);
+        }
         WorldInvariants.Validate(world);
     }
 

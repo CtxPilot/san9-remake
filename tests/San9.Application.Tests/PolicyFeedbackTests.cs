@@ -109,7 +109,7 @@ public sealed partial class ProgressFeedbackTests
         var view = new StrategySnapshot(definition, world);
         var mutation = WorldState.Restore(world).BeginMutation();
         List<DomainEvent> events = [];
-        MilitaryPolicies.ResolvePostAction(mutation, mutation.Units[10], new(definition.Military), events);
+        MilitaryPolicies.ResolvePostAction(mutation, mutation.Units[10], new(definition.Military), events, null);
         var fact = Assert.Single(events.OfType<UnitPolicyRespondedEvent>());
         Assert.Equal(response, fact.Response);
         var after = new StrategySnapshot(definition, mutation.CapturePresentation());

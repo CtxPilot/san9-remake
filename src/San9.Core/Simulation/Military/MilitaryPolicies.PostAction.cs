@@ -6,7 +6,8 @@ internal static partial class MilitaryPolicies
 {
     private const int MaximumPostActionTravelDays = 8;
 
-    internal static void ResolvePostAction(WorldMutation world, UnitState unit, MilitaryRulebook rules, List<DomainEvent> events)
+    internal static void ResolvePostAction(WorldMutation world, UnitState unit, MilitaryRulebook rules, List<DomainEvent> events,
+        MapObjectReference? completedTarget)
     {
         if (!unit.AwaitingPostAction || unit.IsEmbedded || unit.IsPersonnel || unit.FormationId is null ||
             unit.Condition is not (UnitCondition.Normal or UnitCondition.HighSpirits)) return;
@@ -18,7 +19,8 @@ internal static partial class MilitaryPolicies
         var route = new MilitaryRouteQueryContext(world.CapturePresentation(), rules);
         var area = MilitaryCombat.Area(unit, rules);
         var candidate = UnitPolicyQueries.ActiveFieldUnits(world)
-            .Where(other => other.Id != unit.Id && MilitaryDiplomacy.AutomaticEnemy(world, unit.OwnerId, other.OwnerId) &&
+            .Where(other => other.Id != unit.Id && (completedTarget is not { IsSettlement: false } completed || other.Id != completed.Id) &&
+                other.Soldiers > 0 && other.Morale > 0 && MilitaryDiplomacy.AutomaticEnemy(world, unit.OwnerId, other.OwnerId) &&
                 area.IntersectsExpanded(MilitaryCombat.Area(other, rules), rules.PolicyRadius) &&
                 MilitaryOrders.ValidMission(world, unit, Attack(other), rules))
             .Select(other => (Unit: other, Distance: area.DistanceTo(MilitaryCombat.Area(other, rules))))
