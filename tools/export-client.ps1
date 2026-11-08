@@ -15,7 +15,7 @@ $target = @{
     macos = @{ Preset = 'macOS'; Directory = 'macos-arm64'; File = 'San9R.zip'; Template = 'macos_release.arm64.mono.zip' }
 }[$Platform]
 $outputRoot = Join-Path $repoRoot "local/generated/export/$($target.Directory)"
-$template = Join-Path $repoRoot "local/generated/release-tools/templates/4.7.2-slim.2/$($target.Template)"
+$template = Join-Path $repoRoot "local/generated/release-tools/templates/current/$($target.Template)"
 
 if (-not $GodotPath) {
     $editor = Get-Command 'Godot*_mono_win64.exe' -ErrorAction SilentlyContinue | Select-Object -First 1

@@ -2,51 +2,52 @@
 param(
     [Parameter(Mandatory)]
     [ValidateSet('windows', 'linux', 'macos')]
-    [string] $Platform
+    [string] $Platform,
+    [long] $TemplateReleaseId
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $toolsRoot = Join-Path $repoRoot 'local/generated/release-tools'
-$templateRoot = Join-Path $toolsRoot 'templates/4.7.2-slim.2'
+$templateRoot = Join-Path $toolsRoot 'templates/current'
 $editorRoot = Join-Path $toolsRoot "editors/4.7.2/$Platform"
-$templateUrl = 'https://github.com/cdd1037/godot-template/releases/download/4.7.2-slim.2'
+$releaseEndpoint = if ($TemplateReleaseId) { "$TemplateReleaseId" } else { 'latest' }
+$templateRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/cdd1037/godot-template/releases/$releaseEndpoint"
+Write-Host "Export templates: $($templateRelease.tag_name) ($($templateRelease.html_url))"
 $editorUrl = 'https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable'
 $targets = @{
     windows = @{
         Archive = 'Godot_v4.7.2-stable_mono_win64.zip'
         Hash = 'a2a48473a7414c5f19fab690518caebb738c09ef9601f6bd2388676a7f53b3c0'
         Executable = 'Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64.exe'
-        Templates = @{
-            'windows_release_x86_64.exe' = '31b0afa709be64daf0f340ddfc59ba16af39a22fd2d198540f8ca99e5af89388'
-            'windows_release_x86_64.console.exe' = '85da8f5b7bd751465ec4249db2646a386ebbe0926775ea020255e6d020e57960'
-        }
+        Templates = @('windows_release_x86_64.exe', 'windows_release_x86_64.console.exe')
     }
     linux = @{
         Archive = 'Godot_v4.7.2-stable_mono_linux_x86_64.zip'
         Hash = '129f82db7bafd54ae14bb5bb284041c73860e8c7a009a3a026ca5e946cbff247'
         Executable = 'Godot_v4.7.2-stable_mono_linux_x86_64/Godot_v4.7.2-stable_mono_linux.x86_64'
-        Templates = @{ 'linux_release.x86_64' = '1ec99d80e574a374edb4520582571f3719e83bd9dc50494636f5e41dd9c96494' }
+        Templates = @('linux_release.x86_64')
     }
     macos = @{
         Archive = 'Godot_v4.7.2-stable_mono_macos.universal.zip'
         Hash = '8af3977b60d2c59802f7c8ff1914b3ca02a5e294f7381fc1104ee777e33cbbd8'
         Executable = 'Godot_mono.app/Contents/MacOS/Godot'
-        Templates = @{ 'macos_release.arm64.mono.zip' = 'b15b7898c57fab01bb82bed738e17a9dd87bbef1b76846dbb8360d07328d2806' }
+        Templates = @('macos_release.arm64.mono.zip')
     }
 }
 
 function Get-ReleaseAsset([string] $Url, [string] $Destination, [string] $Sha256) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash -ne $Sha256) {
         Write-Host "Downloading: $Url"
         $temporary = "$Destination.download"
         Invoke-WebRequest -Uri $Url -OutFile $temporary
         if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash -ne $Sha256) {
             throw "SHA256 mismatch: $Url"
         }
-        Move-Item -LiteralPath $temporary -Destination $Destination
+        Move-Item -LiteralPath $temporary -Destination $Destination -Force
     }
     if ((Get-FileHash -LiteralPath $Destination -Algorithm SHA256).Hash -ne $Sha256) {
         throw "SHA256 mismatch in existing file: $Destination"
@@ -54,8 +55,13 @@ function Get-ReleaseAsset([string] $Url, [string] $Destination, [string] $Sha256
 }
 
 $target = $targets[$Platform]
-foreach ($entry in $target.Templates.GetEnumerator()) {
-    Get-ReleaseAsset "$templateUrl/$($entry.Key)" (Join-Path $templateRoot $entry.Key) $entry.Value
+foreach ($name in $target.Templates) {
+    $assets = @($templateRelease.assets | Where-Object name -CEQ $name)
+    if ($assets.Count -ne 1 -or $assets[0].digest -cnotmatch '^sha256:([0-9a-f]{64})$') {
+        throw "Missing template or SHA256 digest in release $($templateRelease.tag_name): $name"
+    }
+    $sha256 = $Matches[1]
+    Get-ReleaseAsset $assets[0].browser_download_url (Join-Path $templateRoot $name) $sha256
 }
 Get-ReleaseAsset 'https://github.com/lxgw/LxgwWenkaiGB-Lite/releases/download/v1.522/LXGWWenKaiMonoGBLite-Medium.ttf' `
     (Join-Path $repoRoot 'src/San9.Client.Godot/assets/LXGWWenKaiMonoGBLite-Medium.ttf') `

@@ -28,6 +28,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       commit: ${{ steps.version.outputs.commit }}
+      template-release-id: ${{ steps.templates.outputs.release-id }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -54,6 +55,14 @@ jobs:
           }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "commit=$commit" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Resolve latest upstream export templates
+        id: templates
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/cdd1037/godot-template/releases/latest'
+          Write-Host "Export templates: $($release.tag_name) ($($release.html_url))"
+          "release-id=$($release.id)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
   validate:
     needs: prepare
@@ -93,6 +102,7 @@ jobs:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       EXPORT_PLATFORM: ${{ matrix.platform }}
       EXPORT_TARGET: ${{ matrix.target }}
+      TEMPLATE_RELEASE_ID: ${{ needs.prepare.outputs.template-release-id }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -101,10 +111,10 @@ jobs:
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.x'
-      - name: Download pinned editor, templates and font
+      - name: Download editor, resolved upstream templates and font
         id: tools
         run: |
-          $godotPath = ./tools/setup-release.ps1 -Platform $env:EXPORT_PLATFORM
+          $godotPath = ./tools/setup-release.ps1 -Platform $env:EXPORT_PLATFORM -TemplateReleaseId $env:TEMPLATE_RELEASE_ID
           "godot-path=$godotPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Set application version
         run: |

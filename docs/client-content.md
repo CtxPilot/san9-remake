@@ -202,7 +202,7 @@ $godotPath = ./tools/setup-release.ps1 -Platform windows
 ./tools/export-client.ps1 -Platform windows -GodotPath $godotPath
 ```
 
-`-Platform` 支持 `windows`、`linux`、`macos`。依赖固定为 Godot 4.7.2 .NET 编辑器、[godot-template 4.7.2-slim.2](https://github.com/cdd1037/godot-template/releases/tag/4.7.2-slim.2) 和霞鹜文楷等宽 GB Lite v1.522，下载校验 SHA256；编辑器与模板放在忽略的 `local/generated/release-tools/`，字体放入已有忽略路径。macOS 自定义模板保持 ZIP 原样。Windows 同时下载并保留 `.console.exe` 模板包装器，但不导出额外控制台包装器。
+`-Platform` 支持 `windows`、`linux`、`macos`。编辑器固定为 Godot 4.7.2 .NET，字体固定为霞鹜文楷等宽 GB Lite v1.522；导出模板每次准备时解析 [godot-template 最新正式 Release](https://github.com/cdd1037/godot-template/releases/latest)，按该 Release 资产的 SHA256 digest 校验并更新 `templates/current/`。自动发布在 prepare 阶段统一解析 Release ID，三个平台使用同一 Release，并在日志中记录版本与来源；本地可用 `-TemplateReleaseId` 指定同一 Release。所有下载均校验 SHA256；编辑器与模板放在忽略的 `local/generated/release-tools/`，字体放入已有忽略路径。macOS 自定义模板保持 ZIP 原样。Windows 同时下载并保留 `.console.exe` 模板包装器，但不导出额外控制台包装器。
 
 全新检出没有字体导入缓存，而 Godot 在导入开始前会初始化全局字体。导出脚本先使用不加载全局字体的工程配置完成资源导入，再按原配置导出；导入成功或失败都按原始字节恢复 `project.godot`，保留本次构建版本号及作者设置。导入与导出均检查退出码及错误日志，不依赖已有 `.godot/` 缓存。
 
