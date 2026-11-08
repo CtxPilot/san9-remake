@@ -22,7 +22,8 @@ internal static class PersonnelPresentationCompiler
         (string, string)[] arrival = [("person.0", "ruler"), ("person.1", "actor"), ("person.2", "second"),
             ("person.3", "third"), ("building.0", "home"), ("number.0", "count"), ("number.1", "remaining"), ("return-kind.0", "return-kind")];
         Add("journey-arrived", 7404, null, null, arrival);
-        Add("journey-arrived-record", 10073, null, null, arrival);
+        Add("journey-arrived-record", 10073, null, null, ("person.0", "actor"),
+            ("building.0", "home"), ("number.0", "count"), ("return-kind.0", "return-kind"));
         Add("cargo-money", 7401, null, null, ("person.0", "actor"), ("number.0", "amount"));
         Add("cargo-food", 7402, null, null, ("person.0", "actor"), ("number.0", "amount"));
         Add("cargo-money-record", 10018, null, null, ("person.0", "actor"), ("number.0", "amount"));

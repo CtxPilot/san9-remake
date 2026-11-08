@@ -133,6 +133,17 @@ public sealed class PersonnelJourneyPresentationTests
         int home = members[0].SettlementId!.Value;
         int? corps = before.World.Settlements.Single(s => s.Id == home).CorpsId;
         var context = session.Messages(package.Text);
+        var returningMembers = members.Where(p => p.Id != ruler).Take(2).ToArray();
+        DomainEvent[] separateReturns = returningMembers.Select((p, i) => (DomainEvent)new PersonnelReturnedEvent(
+            clock, p.Id, home, new(force, ruler, 20 + i, true, corps))).ToArray();
+        var separateOutput = ExecutionPublication.Read(before, before, context, package.Text, package.Presentation, separateReturns);
+        Assert.Equal(2, separateOutput.Records.Count);
+        for (int i = 0; i < returningMembers.Length; i++)
+        {
+            string text = separateOutput.Records[i].Message.BbCode;
+            Assert.Contains(package.Text.Resolve(before.MessageSpeaker(returningMembers[i].Id).NameKey), text);
+            Assert.DoesNotContain(package.Text.Resolve(before.MessageSpeaker(ruler).NameKey), text);
+        }
         foreach (string kind in new[] { "personnel-move", "personnel-search", "personnel-recruit", "tactic-study",
             "strategy-alienate", "strategy-burn", "strategy-seize", "strategy-gossip", "diplomacy-gift",
             "diplomacy-attack-request", "diplomacy-prisoner-return", "diplomacy-surrender", "unit-strategy" })
