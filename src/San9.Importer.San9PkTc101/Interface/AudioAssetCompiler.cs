@@ -221,7 +221,8 @@ internal static class AudioAssetCompiler
         Dictionary<string, string> files = new(StringComparer.OrdinalIgnoreCase);
         foreach (string directory in directories.Length == 0 ? ["BGM", "SE"] : directories)
         {
-            string[] paths = Directory.GetFiles(System.IO.Path.Combine(root, directory));
+            string folder = System.IO.Path.Combine(root, directory);
+            string[] paths = Directory.Exists(folder) ? Directory.GetFiles(folder) : [];
             // Original BGM is authoritative; prepared siblings are not dependencies.
             var originals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (directory == "BGM")
@@ -248,5 +249,5 @@ internal static class AudioAssetCompiler
 
     internal static string Resolve(IReadOnlyDictionary<string, string> files, string source) =>
         files.TryGetValue(System.IO.Path.ChangeExtension(source, null), out string? file) ? file :
-        throw new InvalidDataException("Missing prepared audio asset: " + source);
+        System.IO.Path.HasExtension(source) ? source : source + (source.StartsWith("BGM/", StringComparison.OrdinalIgnoreCase) ? ".wma" : ".wav");
 }

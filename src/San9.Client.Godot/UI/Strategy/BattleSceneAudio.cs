@@ -92,7 +92,7 @@ internal partial class BattleSceneAudio : Node
         {
             _ambience.Stream ??= _streams.Get(ambience, loop: true);
             _ambience.VolumeDb = Mathf.LinearToDb(SceneAudioGain);
-            if (!_ambience.Playing) _ambience.Play();
+            if (_ambience.Stream is not null && !_ambience.Playing) _ambience.Play();
         }
         else _ambience.Stop();
         if (_zoom?.Playback?.Numbers is { } rolling && rolling.IsRolling(time - _zoom.Start) && SoundEnabled() && !IsPaused())
@@ -100,7 +100,7 @@ internal partial class BattleSceneAudio : Node
             var stream = _streams.Get(rolling.Definition.RollSound, loop: true);
             if (_numberRoll.Stream != stream) { _numberRoll.Stop(); _numberRoll.Stream = stream; }
             _numberRoll.VolumeDb = Mathf.LinearToDb(SceneAudioGain);
-            if (!_numberRoll.Playing) _numberRoll.Play();
+            if (stream is not null && !_numberRoll.Playing) _numberRoll.Play();
         }
         else _numberRoll.Stop();
     }
@@ -132,7 +132,8 @@ internal partial class BattleSceneAudio : Node
             bool starting = player is null;
             if (player is null)
             {
-                player = new() { Stream = _streams.Get(sound.Role, loop: true) };
+                if (_streams.Get(sound.Role, loop: true) is not { } stream) continue;
+                player = new() { Stream = stream };
                 AddChild(player); _actionSounds[i] = player;
             }
             player.VolumeDb = Mathf.LinearToDb(SceneAudioGain * sound.Gain(elapsed));

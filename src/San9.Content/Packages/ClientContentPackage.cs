@@ -131,8 +131,7 @@ public static class ClientContentFiles
         await Task.WhenAll(scenarioTask, texturesTask);
         var instance = await scenarioTask;
         var content = Resolve(instance, await texturesTask, textureRoot) with { ContentRoot = instance.ResourceRoot };
-        foreach (string path in content.Presentation.Sounds.Values)
-            if (!File.Exists(PackageFiles.Resolve(content.ContentRoot, path))) throw new InvalidDataException($"Missing sound file: {path}.");
+        _ = AudioCatalogFiles.Load(content.ContentRoot);
         return content;
     }
 

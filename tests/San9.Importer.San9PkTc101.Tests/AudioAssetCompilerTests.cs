@@ -102,9 +102,12 @@ public sealed class AudioAssetCompilerTests
     }
 
     [Fact]
-    public void MissingMusicSourceIsRejectedWithoutInventingABinding()
+    public void MissingMediaStillCompilesReferencesWithoutInstallingFiles()
     {
-        Assert.Throws<InvalidDataException>(() => AudioAssetCompiler.Resolve(new Dictionary<string, string>(), "BGM/BGM_04"));
+        var files = AudioAssetCompiler.Discover(System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString("N")));
+        Assert.Empty(files);
+        Assert.Equal("shared/music/map-spring.ogg", AudioAssetCompiler.Path(AudioAssetCompiler.Resolve(files, "BGM/BGM_04")));
+        Assert.Equal("shared/sound-effects/construction.wav", AudioAssetCompiler.Path(AudioAssetCompiler.Resolve(files, "SE/SE_M000.WAV")));
     }
 
     [Fact]

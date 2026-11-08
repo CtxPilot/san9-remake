@@ -59,12 +59,13 @@ public sealed class MediaConversionTests
         Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(root, source))!);
         try
         {
-            byte[] bytes = [1, 2, 3, 4];
+            byte[] bytes = "RIFF\x04\0\0\0WAVE"u8.ToArray();
             await File.WriteAllBytesAsync(Path.Combine(root, source), bytes);
             string output = Path.Combine(root, "content");
             await AudioLibraryImporter.ImportAsync(root, output, group);
             Assert.Equal(bytes, await File.ReadAllBytesAsync(Path.Combine(output, destination)));
-            Assert.Single(Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories));
+            Assert.Contains(destination, San9.Content.Packages.AudioCatalogFiles.Load(output));
+            Assert.Equal(2, Directory.EnumerateFiles(output, "*", SearchOption.AllDirectories).Count());
         }
         finally { Directory.Delete(root, true); }
     }

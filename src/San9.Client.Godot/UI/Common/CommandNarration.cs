@@ -174,7 +174,8 @@ public partial class CommandNarration : FixedPage
     private void PlaySound(string role)
     {
         if (!SoundEnabled) return;
-        _audio.Stream = _streams.Get(role, loop: false);
+        if (_streams.Get(role, loop: false) is not { } stream) return;
+        _audio.Stream = stream;
         _audio.Play();
     }
     private float LayoutResult(GamePagedText message)

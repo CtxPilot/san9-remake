@@ -30,8 +30,7 @@ public static class ContentVerification
                 scenario.Scenario, scenario.Text, scenario.IllustrationRoles);
             if (preview.CityColors.Any(p => !forces.CityColors.TryGetValue(p.Key, out var color) || color != p.Value))
                 throw new InvalidDataException($"Scenario preview ownership differs from world: {entry.Id}; rebuild opening content.");
-            foreach (string path in scenario.Presentation.Sounds.Values)
-                if (!File.Exists(PackageFiles.Resolve(scenario.ResourceRoot, path))) throw new InvalidDataException($"Missing sound: {path}");
+            _ = AudioCatalogFiles.Load(scenario.ResourceRoot);
             var session = San9.Application.GameSession.Start(scenario.Scenario, 42);
             if (!session.Snapshot.Forces.Select(f => f.Id).Order().SequenceEqual(scenario.Scenario.Forces.Select(f => f.Id).Order()) ||
                 !session.Snapshot.Settlements.Select(s => s.Id).Order().SequenceEqual(scenario.Scenario.Settlements.Select(s => s.Id).Order()) ||

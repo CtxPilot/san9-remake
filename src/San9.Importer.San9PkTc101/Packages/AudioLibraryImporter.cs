@@ -28,6 +28,7 @@ public static class AudioLibraryImporter
         var sources = AudioAssetCompiler.Discover(gameDirectory, directories).Values;
         if (group is AudioLibraryGroup.Bgm or AudioLibraryGroup.All)
         {
+            var installed = AudioCatalogFiles.Read(output, AudioCatalog.MusicPath, requireFiles: false).Files.ToHashSet(StringComparer.Ordinal);
             var encoder = ffmpegPath is null ? FfmpegEncoder.Find() : new FfmpegEncoder(Path.GetFullPath(ffmpegPath));
             MediaConversion? conversion = encoder is null ? null : new(output, encoder);
             foreach (string source in sources.Where(p => p.StartsWith("BGM/", StringComparison.OrdinalIgnoreCase)))
@@ -36,21 +37,31 @@ public static class AudioLibraryImporter
                 if (Path.GetExtension(source).Equals(".wma", StringComparison.OrdinalIgnoreCase))
                 {
                     if (conversion is null)
+                    {
                         progress?.Invoke("Skipped BGM: ffmpeg was not found on PATH: " + source);
+                        continue;
+                    }
                     else
                         await conversion.ConvertAsync(Path.Combine(gameDirectory, source), path, FfmpegEncoder.AudioOptions, progress, token);
                 }
                 else
                     await CopyAsync(Path.Combine(gameDirectory, source), output, path, token);
+                installed.Add(path);
             }
+            await AudioCatalogFiles.WriteAsync(output, AudioCatalog.MusicPath, new(AudioCatalog.CurrentSchemaVersion, installed.Order(StringComparer.Ordinal).ToArray()), token);
         }
         if (group is AudioLibraryGroup.Effects or AudioLibraryGroup.All)
+        {
+            var installed = AudioCatalogFiles.Read(output, AudioCatalog.EffectsPath, requireFiles: false).Files.ToHashSet(StringComparer.Ordinal);
             foreach (string source in sources.Where(p => p.StartsWith("SE/", StringComparison.OrdinalIgnoreCase)))
             {
                 string path = AudioAssetCompiler.Path(source);
                 await CopyAsync(Path.Combine(gameDirectory, source), output, path, token);
+                installed.Add(path);
                 progress?.Invoke("Copied: " + path);
             }
+            await AudioCatalogFiles.WriteAsync(output, AudioCatalog.EffectsPath, new(AudioCatalog.CurrentSchemaVersion, installed.Order(StringComparer.Ordinal).ToArray()), token);
+        }
     }
 
     private static async Task CopyAsync(string source, string output, string path, CancellationToken token)

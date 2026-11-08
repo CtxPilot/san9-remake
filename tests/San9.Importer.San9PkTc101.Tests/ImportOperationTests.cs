@@ -17,6 +17,8 @@ public sealed class ImportOperationTests : IDisposable
             await Assert.ThrowsAnyAsync<IOException>(() => AudioLibraryImporter.ImportAsync(_root, _root, AudioLibraryGroup.Effects));
             await Assert.ThrowsAnyAsync<IOException>(() => MovieLibraryImporter.ImportAsync(_root, _root));
         }
+        Directory.CreateDirectory(Path.Combine(_root, "SE"));
+        await File.WriteAllBytesAsync(Path.Combine(_root, "SE", "broken.wav"), []);
         await Assert.ThrowsAnyAsync<IOException>(() => AudioLibraryImporter.ImportAsync(_root, _root, AudioLibraryGroup.Effects));
         using var reacquired = ImportOperation.Acquire(_root);
     }

@@ -22,21 +22,22 @@ public partial class SceneSoundPlayer : Node
     public void Play(string role, bool enabled)
     {
         if (!enabled) return;
-        var stream = _streams.Get(role, loop: false);
+        if (_streams.Get(role, loop: false) is not { } stream) return;
         if (_player.Stream != stream) _player.Stream = stream;
         _player.Play();
     }
     public void PlayAndFree(string role, bool enabled)
     {
-        if (!enabled) { QueueFree(); return; }
+        if (!enabled || _streams.Get(role, loop: false) is null) { QueueFree(); return; }
         _player.Finished += QueueFree;
         Play(role, enabled: true);
     }
     public void PlayOverlapping(string role, bool enabled)
     {
         if (!enabled) return;
+        if (_streams.Get(role, loop: false) is not { } stream) return;
         var player = new AudioStreamPlayer
-        { Stream = _streams.Get(role, loop: false), VolumeDb = Mathf.LinearToDb(_transitionGain) };
+        { Stream = stream, VolumeDb = Mathf.LinearToDb(_transitionGain) };
         _overlapping.Add(player); AddChild(player);
         player.Finished += () => { _overlapping.Remove(player); player.QueueFree(); };
         player.Play();

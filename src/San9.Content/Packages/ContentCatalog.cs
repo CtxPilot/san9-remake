@@ -19,11 +19,11 @@ public sealed record ContentCatalog(int SchemaVersion, string Textures, string O
 
 public sealed record OpeningAudioDefinition(string Music, string GameStartSound, Dictionary<string, string> Sounds)
 {
-    public void Validate(string root, bool requireFiles = true)
+    public void Validate(string root)
     {
         foreach (string role in new[] { Music, GameStartSound })
             if (string.IsNullOrWhiteSpace(role) || !Sounds.TryGetValue(role, out string? path) ||
-                AudioFileFormats.Identify(PackageFiles.Resolve(root, path)) is null || (requireFiles && !File.Exists(PackageFiles.Resolve(root, path))))
+                AudioFileFormats.Identify(PackageFiles.Resolve(root, path)) is null)
                 throw new InvalidDataException("Missing or invalid opening audio asset: " + role);
     }
 }
@@ -98,6 +98,7 @@ public static class ContentCatalogFiles
         var opening = await PackageFiles.ReadAsync<OpeningContent>(PackageFiles.Resolve(root, catalog.Opening), token);
         if (opening.Audio is null) throw new InvalidDataException("Missing opening audio definition.");
         opening.Audio.Validate(root);
+        _ = AudioCatalogFiles.Load(root);
         return opening with { Selection = opening.Selection with { Entries = await LoadPreviewsAsync(root, catalog, token) } };
     }
 }

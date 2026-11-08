@@ -9,11 +9,14 @@ internal sealed class AudioStreams(string root, IReadOnlyDictionary<string, stri
 {
     private readonly Dictionary<(string Path, bool Loop), AudioStream> _streams = [];
 
-    internal AudioStream Get(string role, bool loop)
-        => GetFile(sounds[role], loop);
+    private readonly HashSet<string> _installed = AudioCatalogFiles.Load(root, requireFiles: false);
 
-    internal AudioStream GetFile(string path, bool loop)
+    internal AudioStream? Get(string role, bool loop)
+        => sounds.TryGetValue(role, out string? path) ? GetFile(path, loop) : null;
+
+    internal AudioStream? GetFile(string path, bool loop)
     {
+        if (!_installed.Contains(path)) return null;
         var key = (Path: path, Loop: loop);
         if (_streams.TryGetValue(key, out var stream)) return stream;
         stream = Load(PackageFiles.Resolve(root, key.Path), loop);

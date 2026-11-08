@@ -12,7 +12,7 @@ public sealed class ContentCatalogTests
     [InlineData("shared/music.png", "start")]
     [InlineData("../music.wav", "start")]
     [InlineData("shared/music.wav", "missing")]
-    public void OpeningAudioRequiresSupportedFilesAndBothRolesInsideThePackage(string musicPath, string startRole)
+    public void OpeningAudioRequiresSupportedReferencesAndBothRolesInsideThePackage(string musicPath, string startRole)
     {
         string root = Path.Combine(Path.GetTempPath(), "san9-opening-audio-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "shared"));
@@ -21,7 +21,7 @@ public sealed class ContentCatalogTests
             File.WriteAllBytes(Path.Combine(root, "shared", "music.wav"), [0]);
             File.WriteAllBytes(Path.Combine(root, "shared", "music.png"), [0]);
             var audio = new OpeningAudioDefinition("setup", startRole, new() { ["setup"] = musicPath, ["start"] = "shared/music.wav" });
-            if (musicPath == "shared/music.wav" && startRole == "start") audio.Validate(root);
+            if (musicPath is "shared/music.wav" or "shared/missing.wav" && startRole == "start") audio.Validate(root);
             else Assert.Throws<InvalidDataException>(() => audio.Validate(root));
         }
         finally { Directory.Delete(root, true); }

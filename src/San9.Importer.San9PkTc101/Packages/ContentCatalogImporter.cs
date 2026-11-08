@@ -79,7 +79,7 @@ public static class ContentCatalogImporter
         }
         var opening = new OpeningContent(StartMenuPresentationCompiler.Compile(textures.Library, text), selection with { Entries = [] })
             { Audio = new("setup", "game-start", sounds) };
-        opening.Audio.Validate(output, requireFiles: false);
+        opening.Audio.Validate(output);
         await Publish("shared/opening.json", opening);
         using (var names = new ScenarioTextReader(messageBytes, exe))
         {

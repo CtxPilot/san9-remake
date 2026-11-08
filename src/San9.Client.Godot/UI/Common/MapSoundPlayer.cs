@@ -17,8 +17,9 @@ public partial class MapSoundPlayer : Node2D
     public void PlayOnce(string role, Vector2 point, bool enabled, double gain = 1)
     {
         if (!enabled) return;
+        if (_streams.Get(role, loop: false) is not { } stream) return;
         var player = new AudioStreamPlayer2D { Position = point, MaxDistance = 1000000, Attenuation = 0,
-            Stream = _streams.Get(role, loop: false), VolumeDb = Mathf.LinearToDb((float)gain * TransitionGain) };
+            Stream = stream, VolumeDb = Mathf.LinearToDb((float)gain * TransitionGain) };
         _oneShots.Add(player, gain); AddChild(player);
         player.Finished += () => { _oneShots.Remove(player); player.QueueFree(); };
         player.Play();
@@ -28,13 +29,15 @@ public partial class MapSoundPlayer : Node2D
     {
         foreach (var (player, gain) in _oneShots) player.VolumeDb = Mathf.LinearToDb((float)gain * TransitionGain);
         _pulses.Begin(day);
-        var retained = voices.Select(v => v.Key).ToHashSet();
+        var retained = voices.Where(v => _streams.Get(v.Role, loop: v.Pulse is null) is not null)
+            .Select(v => v.Key).ToHashSet();
         foreach (string key in _voices.Keys.Where(k => !retained.Contains(k)).ToArray())
         {
             var old = _voices[key]; old.Stop(); RemoveChild(old); old.QueueFree(); _voices.Remove(key);
         }
         foreach (var voice in voices)
         {
+            if (_streams.Get(voice.Role, loop: voice.Pulse is null) is not { } stream) continue;
             if (!_voices.TryGetValue(voice.Key, out var player))
             {
                 player = new AudioStreamPlayer2D { MaxDistance = 1000000, Attenuation = 0 };
@@ -43,7 +46,6 @@ public partial class MapSoundPlayer : Node2D
             player.Position = new((float)voice.X, (float)voice.Y);
             player.VolumeDb = Mathf.LinearToDb((float)voice.Gain * TransitionGain);
             if (_pulses.WasEmitted(voice)) continue;
-            var stream = _streams.Get(voice.Role, loop: voice.Pulse is null);
             if (voice.Pulse is null && player.Stream == stream && player.Playing) continue;
             player.Stop(); player.Stream = stream; player.Play();
             _pulses.MarkEmitted(voice);

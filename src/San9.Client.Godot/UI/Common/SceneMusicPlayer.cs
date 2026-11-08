@@ -47,7 +47,8 @@ public partial class SceneMusicPlayer : Node
         {
             if (!_players.TryGetValue(track, out var player))
             {
-                player = new() { Stream = _streams.GetFile(track.Resource, track.Loop) };
+                if (_streams.GetFile(track.Resource, track.Loop) is not { } stream) continue;
+                player = new() { Stream = stream };
                 AddChild(player); _players.Add(track, player);
             }
             bool audible = ReferenceEquals(track, _state.Audible);
