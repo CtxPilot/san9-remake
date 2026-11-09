@@ -80,6 +80,7 @@ public static class CorpsControl
         bool permitted = command switch
         {
             WaitCommand => true,
+            StartResearchCommand research => ControlsPlace(research.SettlementId),
             ExecutePrisonerCommand execute => world.Officers.FirstOrDefault(p => p.Id == execute.OfficerId)?.UnitId is int detention
                 ? ControlsUnit(detention) : OwnPerson(execute.OfficerId),
             SelectTacticCommand tactic => world.Officers.FirstOrDefault(p => p.Id == tactic.OfficerId)?.UnitId is int unit

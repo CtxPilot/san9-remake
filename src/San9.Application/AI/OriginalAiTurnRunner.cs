@@ -23,6 +23,7 @@ internal static class OriginalAiTurnRunner
         if (cursor is null)
         {
             state = OriginalAiStrategy.PrepareGlobal(engine.Snapshot, state);
+            OriginalAiResearch.TryStart(engine, definition.MilitaryRules, seat, events);
             PlayerDomesticAutomation.Run(engine, definition, seat, state, events, reports);
             cursor = new(seat, engine.Snapshot.Corps.Where(c => c.OwnerId == seat.ForceId)
                 .OrderByDescending(c => c.IsRoot).Select(c => c.Id).ToImmutableArray(), [], 0, false, 0,

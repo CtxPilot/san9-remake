@@ -122,7 +122,20 @@ public static class ScenarioContentCompiler
                 .Select(f => new FormationCatalogDefinition(f.Id, text.Formation(f.Id)) { Description = text.FormationDescription(f.Id),
                     Presentation = new(3, 3, Enumerable.Range(0, f.DeploymentSlotCodes.Count).Select(f.GetDeploymentSlotPosition)
                         .Where(p => p is not null).Select(p => new FormationSlot(p!.Value.Column, p.Value.Row)).ToImmutableArray(),
-                        f.VisionRadius, f.VisionAngleDegrees, $"formation-diagram-{f.Id}", $"formation-available-{f.Id}") }).ToArray(),
+                        f.VisionRadius, f.VisionAngleDegrees, $"formation-diagram-{f.Id}", $"formation-available-{f.Id}") })
+                .Concat(new[] { (Id: 28, Name: "偃月", Source: 7), (Id: 29, Name: "衡轭", Source: 4),
+                    (Id: 30, Name: "钩行", Source: 1), (Id: 31, Name: "车悬", Source: 2) }
+                    .Select(item =>
+                    {
+                        var f = formations.Single(formation => formation.Id == item.Source);
+                        return new FormationCatalogDefinition(item.Id, item.Name)
+                        {
+                            MapAppearanceId = item.Source,
+                            Presentation = new(3, 3, MixedTroopPreset.FormationPositions(item.Id - 28)
+                                .Select(p => new FormationSlot(p.Column, (int)p.Rank)).ToImmutableArray(),
+                                f.VisionRadius, f.VisionAngleDegrees, null, null)
+                        };
+                    })).ToArray(),
             CountryTitles = PoliticalContentCompiler.Titles(countryTitles, persons, officers.Select(o => o.State.Id),
                 id => text.CountryTitle($"country-title.{id}", id),
                 id => System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(exe.AsSpan(0x253bb0 + id * 4, 4))),

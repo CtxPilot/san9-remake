@@ -79,6 +79,7 @@ internal static class FacilityConstruction
     {
         foreach (var place in world.Settlements.Values.Where(s => s.Facility?.BuilderUnitId == unitId).ToArray())
         {
+            MilitaryResearch.CancelAt(world, place.Id, events);
             world.Replace(place with { IsDestroyed = true, OwnerId = null, CorpsId = null, Durability = 0, Soldiers = 0,
                 Wounded = 0, Morale = 0, ConfusionDaysRemaining = 0, Facility = place.Facility! with { BuilderUnitId = null } });
             events.Add(new FacilityConstructionChangedEvent(world.Clock, place.Id, unitId, "cancelled", 0, null) { Result = world.Settlements[place.Id] });

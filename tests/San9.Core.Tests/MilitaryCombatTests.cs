@@ -8,6 +8,129 @@ namespace San9.Core.Tests;
 public sealed class MilitaryCombatTests
 {
     [Fact]
+    public void SiegeEquipmentIsSharedByTargetEligibilityAndArrivalForecast()
+    {
+        var original = Rules();
+        var land = original.Formations[7] with { Attack = null };
+        var siege = original.Formations[7] with { Id = 8, Attack = new(20, true) { RangedSiege = true } };
+        var rules = new MilitaryRulebook(new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [land, siege], original.Places.Values.OrderBy(place => place.Id).ToImmutableArray())
+        {
+            ResearchProjects = [new("siege", 0, 1, [])],
+            SiegeEquipment = [new(1, "冲车", "siege", 8, 0)]
+        });
+        var state = World(defenders: 100000);
+        var mutation = state.BeginMutation();
+        mutation.Replace(mutation.Units[0] with { SiegeEquipmentId = 1 });
+        state.Commit(mutation);
+        var snapshot = state.CreateSnapshot();
+        var order = new MilitaryOrder(MilitaryOrderKind.AttackSettlement, null, 2);
+        Assert.True(new MilitaryOrderQuery(snapshot, rules).CanAssign(0, order));
+        Assert.False(new MilitaryOrderQuery(snapshot with { Units = snapshot.Units.Select(u => u with { SiegeEquipmentId = null }).ToArray() }, rules)
+            .CanAssign(0, order));
+        var forecast = new MilitaryArrivalForecast(snapshot, rules);
+        var request = new DeploymentArrivalRequest(1, 7, null, order, new(), Soldiers: 10000);
+        Assert.Equal(ArrivalEstimateStatus.NotApplicable, forecast.EstimateDeployment(request).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, forecast.EstimateDeployment(request with { SiegeEquipmentId = 1 }).Status);
+        Assert.Equal(ArrivalEstimateStatus.NotApplicable, forecast.EstimateDeployment(request with { SiegeEquipmentId = 99 }).Status);
+        Assert.Equal(ArrivalEstimateStatus.Known, forecast.Estimate(0).Status);
+    }
+
+    [Fact]
+    public void ShieldCoverReducesDeclaredRangedFacilityDamage()
+    {
+        var baseline = Rules();
+        var formation = baseline.Formations[7] with { SupportsShieldCover = true };
+        var rules = new MilitaryRulebook(new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [formation], baseline.Places.Values.OrderBy(place => place.Id).ToImmutableArray())
+        {
+            TroopTypes = [new(1, "盾兵", 1, ImmutableDictionary<int, int>.Empty) { SupportsShieldCover = true }],
+            MixedTroopCombat = new(20, 15, 15, 10)
+        });
+        var world = World().BeginMutation();
+        world.Replace(world.Units[0] with { Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11, new(1, 1, 10000)) });
+        Assert.Equal(85u, MixedTroopCombat.Adjust(world, new(2, true), new(0, false), 100, rules, rangedSource: true));
+        Assert.Equal(100u, MixedTroopCombat.Adjust(world, new(2, true), new(0, false), 100, rules));
+    }
+
+    [Fact]
+    public void MixedOrdinaryLossUsesFrontForMeleeAndProportionForRanged()
+    {
+        var world = World().BeginMutation();
+        var unit = world.Units[0] with
+        {
+            MemberPositions = new Dictionary<int, FormationPosition>
+            { [11] = new(0, BattleRank.Front), [12] = new(0, BattleRank.Rear) }.ToImmutableDictionary(),
+            Detachments = new Dictionary<int, DetachmentState>
+            { [11] = new(1, 1, 2000), [12] = new(2, 1, 8000) }.ToImmutableDictionary()
+        };
+        world.Replace(unit);
+        MilitaryCombat.ApplyUnitLoss(world, unit, 4000, 0, Profile, new(2, true), [], rangedDamage: 2000);
+        Assert.Equal(0u, world.Units[0].Detachments[11].Soldiers);
+        Assert.Equal(6000u, world.Units[0].Detachments[12].Soldiers);
+        Assert.Equal(6000u, world.Units[0].Soldiers);
+    }
+
+    [Fact]
+    public void OrdinaryDamageBreakdownRoundTripsAndLegacyPayloadDefaultsToUnspecified()
+    {
+        var original = new CombatExchangeDamage(120, 75) { OutgoingRanged = 80, IncomingRanged = 20 };
+        string json = System.Text.Json.JsonSerializer.Serialize(original);
+        var restored = System.Text.Json.JsonSerializer.Deserialize<CombatExchangeDamage>(json);
+        Assert.Equal(original, restored);
+        Assert.Equal(20u, restored.Reverse().OutgoingRanged);
+        var legacy = System.Text.Json.JsonSerializer.Deserialize<CombatExchangeDamage>("{\"Outgoing\":120,\"Incoming\":75}");
+        Assert.Null(legacy.OutgoingRanged);
+        Assert.Null(legacy.IncomingRanged);
+    }
+
+    [Fact]
+    public void SpearDefenseAppliesToMountedDetachmentOnlyWhileFormationIsReady()
+    {
+        var baseline = Rules();
+        var formation = baseline.Formations[7] with { SupportsSpearDefense = true };
+        var rules = new MilitaryRulebook(new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [formation], baseline.Places.Values.OrderBy(place => place.Id).ToImmutableArray())
+        {
+            TroopTypes = [new(1, "骑兵", 1, ImmutableDictionary<int, int>.Empty) { IsMountedMelee = true },
+                new(2, "枪兵", 1, ImmutableDictionary<int, int>.Empty) { SupportsSpearDefense = true }],
+            MixedTroopCombat = new(20, 15, 15, 10)
+        });
+        var world = World().BeginMutation();
+        world.Replace(world.Units[0] with { Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11, new(1, 1, 10000)) });
+        world.AddUnit(new(1, 2, new(36, 7), 10000)
+        {
+            FormationId = 7, Morale = 90,
+            MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty.Add(22, new(0, BattleRank.Front)),
+            Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(22, new(2, 1, 10000))
+        });
+        Assert.Equal(80u, MixedTroopCombat.Adjust(world, new(0, false), new(1, false), 100, rules, 11));
+        world.Replace(world.Units[1] with { Condition = UnitCondition.Confused });
+        Assert.Equal(100u, MixedTroopCombat.Adjust(world, new(0, false), new(1, false), 100, rules, 11));
+    }
+
+    [Fact]
+    public void AttachedSiegeEquipmentUsesItsWallAttackDuringCombat()
+    {
+        var original = Rules();
+        var land = original.Formations[7] with { Attack = new(1, false) };
+        var siege = original.Formations[7] with { Id = 8, Attack = new(1, true), Combat = Profile };
+        var rules = new MilitaryRulebook(new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [land, siege], original.Places.Values.OrderBy(place => place.Id).ToImmutableArray())
+        {
+            ResearchProjects = [new("siege", 0, 1, [])],
+            SiegeEquipment = [new(1, "冲车", "siege", 8, 0)]
+        });
+        var state = World(defenders: 100000);
+        var mutation = state.BeginMutation();
+        mutation.Replace(mutation.Units[0] with { SiegeEquipmentId = 1 });
+        state.Commit(mutation);
+        var engine = Engine(state, rules);
+        var result = engine.AdvanceXun();
+        Assert.Contains(result.Events.OfType<BattleDamageEvent>(), damage => damage.AttackerId == 0 && damage.DurabilityLoss > 0);
+    }
+
+    [Fact]
     public void OpeningCombatPersistsMovementEngagementThroughDamage()
     {
         var state = World(defenders: 100000);

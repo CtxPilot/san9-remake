@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using San9.Core.Domain;
 
 namespace San9.Core.Simulation;
@@ -12,7 +13,8 @@ internal static class PersonnelTransitions
     };
 
     internal static void RelocateAllegiance(WorldMutation world, int personId, int recipient, int loyalty,
-        int? settlementId, int? unitId, SimulationRules rules, List<DomainEvent> events, string reason, bool afterDailyCommands)
+        int? settlementId, int? unitId, SimulationRules rules, List<DomainEvent> events, string reason, bool afterDailyCommands,
+        UnitState? preparedFieldUnit = null)
     {
         if ((settlementId is null) == (unitId is null)) throw new ArgumentException("Expected one personnel destination.");
         var person = world.Officers[personId];
@@ -33,6 +35,7 @@ internal static class PersonnelTransitions
         }
         int? previousCorps = PersonnelLocations.Corps(world, person);
         TransferAllegiance(world, personId, recipient, loyalty, geographicPlace, reason, rules.Personnel, events, afterDailyCommands);
+        if (preparedFieldUnit is not null) world.Replace(preparedFieldUnit);
         world.Replace(world.Officers[personId] with { SettlementId = settlementId, UnitId = unitId, RegionId = null });
         if (person.UnitId is int previousUnit && world.Units.ContainsKey(previousUnit) &&
             !world.Officers.Values.Any(p => p.UnitId == previousUnit && p.IsServing))
@@ -43,6 +46,33 @@ internal static class PersonnelTransitions
         if (person.OwnerId is int previousForce) GovernanceLifecycle.Reconcile(world, new HashSet<int> { previousForce }, rules, events, afterDailyCommands, reason);
         world.MaintainLeadership(events);
         ResolutionPipeline.CheckConquest(world, events);
+    }
+
+    internal static bool PrepareMixedFieldJoin(WorldMutation world, int personId, int unitId,
+        MilitaryRulebook military, out UnitState? prepared)
+    {
+        prepared = null;
+        var unit = world.Units[unitId];
+        if (!world.Simulation.NewGame.MixedTroopsEnabled || unit.Detachments.IsEmpty ||
+            unit.Detachments.ContainsKey(personId)) return true;
+        if (unit.FormationId is not int land || !military.Formations.TryGetValue(land, out var formation)) return false;
+        int capacity = unit.NavalFormationId is int naval
+            ? Math.Min(formation.OfficerCapacity, military.Formations[naval].OfficerCapacity) : formation.OfficerCapacity;
+        if (unit.Detachments.Count >= capacity) return false;
+        var options = formation.Positions.IsEmpty
+            ? Enumerable.Range(0, capacity).Select(column => new FormationPosition(column, BattleRank.Middle))
+            : formation.Positions.AsEnumerable();
+        var position = options.OrderBy(slot => unit.MemberPositions.Values.Count(existing => existing == slot))
+            .ThenBy(slot => slot.Rank).ThenBy(slot => slot.Column).First();
+        var tactic = world.Officers[personId].EquippedTacticId;
+        var choice = DetachmentAllocation.CreateDefault([personId],
+            ImmutableDictionary<int, int?>.Empty.Add(personId, tactic), 1, world.Forces[unit.OwnerId], military);
+        if (choice.IsEmpty) return false;
+        uint soldiers = unit.Soldiers / (uint)(unit.Detachments.Count + 1);
+        var remaining = DetachmentAllocation.Resize(unit.Detachments, unit.Soldiers - soldiers);
+        prepared = unit with { MemberPositions = unit.MemberPositions.SetItem(personId, position),
+            Detachments = remaining.Add(personId, choice[personId] with { Soldiers = soldiers }) };
+        return true;
     }
 
     internal static void TransferAllegiance(WorldMutation world, int personId, int recipient, int loyalty, int place,

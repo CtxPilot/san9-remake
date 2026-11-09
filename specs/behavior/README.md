@@ -80,6 +80,7 @@
 - [BEH-WAR-0004：普通战斗与兵员损失](BEH-WAR-0004-normal-combat.md)
 - [BEH-WAR-0005：兵法配置、机会与效果](BEH-WAR-0005-tactics.md)
 - [BEH-WAR-0006：设施内容、选址与建设](BEH-WAR-0006-facility-construction.md)
+- [BEH-WAR-0007：混编兵种、阵形与研究（草案）](BEH-WAR-0007-troop-formations-research.md)
 
 ## 界面与显示
 

@@ -554,6 +554,10 @@ public sealed partial class SimulationEngine
                     break;
                 case WaitCommand:
                     break;
+                case StartResearchCommand research:
+                    var researchRejection = MilitaryResearch.Start(mutation, research, _rules, events);
+                    if (researchRejection != CommandRejection.None) return Reject(researchRejection);
+                    break;
                 case BurnCommand burn:
                     var burnRejection = BurnStrategies.Start(mutation, context, burn, _rules, events);
                     if (burnRejection != CommandRejection.None) return Reject(burnRejection);

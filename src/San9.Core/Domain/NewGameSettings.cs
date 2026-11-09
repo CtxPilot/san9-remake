@@ -8,6 +8,7 @@ public enum GameMode { Historical, Fictional }
 /// <summary>Confirmed new-game choices. Resource additions are applied once before first-xun preparation.</summary>
 public sealed record NewGameSettings
 {
+    public bool MixedTroopsEnabled { get; init; }
     [JsonRequired] public GameDifficulty Difficulty { get; init; }
     [JsonRequired] public GameMode Mode { get; init; }
     [JsonRequired] public int MoneyBonus { get; init; }

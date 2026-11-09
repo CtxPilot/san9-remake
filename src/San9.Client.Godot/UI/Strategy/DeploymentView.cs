@@ -91,6 +91,11 @@ public partial class DeploymentView : FixedPage
         Button("阵形", "edit", new(136, FormationRowY, 104, 40), () => SelectFormation(false), selected && Draft.Formations(false).Count > 1);
         AddTacticControls(selected);
         Button("船", "edit", new(136, ShipRowY, 104, 40), () => SelectFormation(true), selected && Draft.Formations(true).Count > 1);
+        if (Draft.View.World.Simulation.NewGame.MixedTroopsEnabled)
+            Button("兵种", "edit", new(296, ShipRowY, 72, 40), () => OpenChild(new DeploymentDetachmentsView
+            {
+                Draft = Draft, Texts = Texts, Closed = CloseChild
+            }), selected && Draft.Detachments.Count == Draft.Members.Length);
         Button("士兵", "edit", new(136, SoldiersRowY, 104, 40), SelectSoldiers, selected && Draft.MaximumSoldiers > 0);
         Label("大将", new(136, 188, 96, 32)); Field(Person(Draft.CommanderId), new(240, 188, 80, 32));
         Field(Formation(Draft.FormationId), new(240, FormationRowY, 48, 32)); Field(Formation(Draft.NavalFormationId), new(240, ShipRowY, 48, 32));

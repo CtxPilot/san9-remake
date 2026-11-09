@@ -374,6 +374,12 @@ internal sealed partial class WorldMutation : IWorldQuery
             previous.BaseAbilities.Leadership != value.BaseAbilities.Leadership) LeadershipChanged(previous.SettlementId, value.SettlementId, value.Id);
         AllOfficers = Replace(AllOfficers, value.Id, value);
         UpdateMember(previous, value);
+        if (previous.UnitId is int oldUnitId && (value.UnitId != oldUnitId || !value.IsServing) &&
+            Units.TryGetValue(oldUnitId, out var oldUnit) && oldUnit.Detachments.ContainsKey(value.Id))
+        {
+            var remaining = oldUnit.Detachments.Remove(value.Id);
+            Replace(oldUnit with { Detachments = DetachmentAllocation.Resize(remaining, oldUnit.Soldiers) });
+        }
         Officers = value.IsDormant ? Officers.Remove(value.Id) : Officers.SetItem(value.Id, value);
         if (previous.IsDormant != value.IsDormant) InvalidateParticipationQueries();
         if (courtChanged)
@@ -406,6 +412,9 @@ internal sealed partial class WorldMutation : IWorldQuery
     private void StoreUnit(UnitState value)
     {
         var previous = Units[value.Id];
+        if (!value.Detachments.IsEmpty && previous.Soldiers != value.Soldiers &&
+            ReferenceEquals(previous.Detachments, value.Detachments))
+            value = value with { Detachments = DetachmentAllocation.Resize(value.Detachments, value.Soldiers) };
         if (previous.OwnerId != value.OwnerId || previous.CorpsId != value.CorpsId || previous.ServicePlaceId != value.ServicePlaceId ||
             previous.IsEmbedded != value.IsEmbedded || TransportDestination(previous) != TransportDestination(value))
             GovernanceConsistent = false;

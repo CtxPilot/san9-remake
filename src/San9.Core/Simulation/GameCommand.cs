@@ -15,6 +15,7 @@ public sealed record RespondDailyTaskCommand(Guid CommandId, int IssuerId, long 
 
 [System.Text.Json.Serialization.JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(WaitCommand), "wait")]
+[JsonDerivedType(typeof(StartResearchCommand), "start-research")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(RespondDailyTaskCommand), "respond-daily-task")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(GiftCommand), "gift")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(RequestAttackCommand), "request-attack")]

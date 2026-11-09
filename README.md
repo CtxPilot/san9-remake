@@ -54,6 +54,14 @@ dotnet run --project src/San9.Tools -- import-content --game-dir "private/game-f
 dotnet run --project src/San9.Tools -- verify-content --content-root "local/generated/content"
 ```
 
+已有旧版重制内容包可离线升级，无需再次读取原版文件：
+
+```powershell
+dotnet run --project src/San9.Tools -- upgrade-legacy-content --source "E:/San9R/content" --output "local/generated/upgraded-content" --show-officer-ages true
+```
+
+该入口支持旧目录版本 4、剧本版本 243、状态版本 151 和纹理版本 5；输出必须是不存在的新目录。旧内容包未保存剧本的年龄显示开关，`--show-officer-ages` 必须显式指定 `true` 或 `false`，并应用于所有剧本。升级结果包含原有游戏资源，不随仓库分发。
+
 音频和影片另按[音频准备](docs/audio-preparation.md)及[电影准备](docs/movie-preparation.md)处理；完整流程、最小转换范围与发行版内置准备入口见[内容管线](docs/client-content.md)。普通游戏加载只消费转换包。
 
 ### 运行客户端

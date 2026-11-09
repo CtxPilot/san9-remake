@@ -245,6 +245,11 @@ public sealed record ScenarioInformationState(CorpsState[] Corps, TreasureState[
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record MilitaryRulesDefinition
 {
+    public ImmutableArray<TroopTypeDefinition> TroopTypes { get; init; } = [];
+    public ImmutableArray<NavalTrainingDefinition> NavalTraining { get; init; } = [];
+    public ImmutableArray<SiegeEquipmentDefinition> SiegeEquipment { get; init; } = [];
+    public MixedTroopCombatProfile? MixedTroopCombat { get; init; }
+    public ImmutableArray<ResearchProjectDefinition> ResearchProjects { get; init; } = [];
     [JsonRequired] public required ImmutableArray<TerrainPassage> Terrains { get; init; }
     [JsonRequired] public required ImmutableArray<FormationRule> Formations { get; init; }
     [JsonRequired] public required CompanionCombatDefinition? CompanionCombat { get; init; }
@@ -269,6 +274,11 @@ public sealed record MilitaryRulesDefinition
 
     public static MilitaryRulesDefinition From(MilitaryDefinition value) => new()
     {
+        TroopTypes = value.TroopTypes,
+        NavalTraining = value.NavalTraining,
+        SiegeEquipment = value.SiegeEquipment,
+        MixedTroopCombat = value.MixedTroopCombat,
+        ResearchProjects = value.ResearchProjects,
         Terrains = value.Terrains,
         Formations = value.Formations,
         CompanionCombat = value.CompanionCombat,
@@ -295,6 +305,11 @@ public sealed record MilitaryRulesDefinition
     public MilitaryDefinition Compile(MilitaryGeographyDefinition geography, ImmutableArray<BattlefieldPlace> places) =>
         new(geography.Width, geography.Height, geography.TerrainIds, Terrains, Formations, places)
         {
+            TroopTypes = TroopTypes,
+            NavalTraining = NavalTraining,
+            SiegeEquipment = SiegeEquipment,
+            MixedTroopCombat = MixedTroopCombat,
+            ResearchProjects = ResearchProjects,
             CompanionCombat = CompanionCombat,
             CompanionTactics = CompanionTactics,
             ConstructionFormations = ConstructionFormations,

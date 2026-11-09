@@ -40,6 +40,11 @@ internal static class WorldInvariants
             if (force.FormationGrants.IsDefault || force.FormationGrants.Any(g => g is null || g.FormationId < 0 || !Enum.IsDefined(g.Condition)) ||
                 force.FormationGrants.Select(g => g.FormationId).Distinct().Count() != force.FormationGrants.Length)
                 throw new ArgumentException("Invalid force formation grants.");
+            if (force.CompletedResearch.IsDefault || force.CompletedResearch.Any(string.IsNullOrWhiteSpace) ||
+                !force.CompletedResearch.SequenceEqual(force.CompletedResearch.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)) ||
+                force.ActiveResearch is { } research && (string.IsNullOrWhiteSpace(research.ProjectId) || research.SettlementId < 0 ||
+                    research.DaysRemaining <= 0 || force.CompletedResearch.Contains(research.ProjectId)))
+                throw new ArgumentException("Invalid force research.");
             if (force.Id < 0 || force.Trust is < 0 or > 1000 || force.BaseTrust is < 0 or > 1000 || force.ProvidedTactics.IsDefault || force.ProvidedTactics.Any(t => t < 0) || force.ProvidedTactics.Distinct().Count() != force.ProvidedTactics.Length) throw new ArgumentException("Invalid force.");
         }
         foreach (var settlement in state.AllSettlements.Values)

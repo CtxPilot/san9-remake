@@ -218,7 +218,10 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
     }
     private FormationRule[] AvailableFormations(OfficerState[] people, bool naval, long money) => rules.Formations.Values
         .Where(f => f.TravelMode == (naval ? TravelMode.Water : TravelMode.Land) && f.Id != rules.UnformedFormationId &&
-            rules.CanSelectFormation(Force, f.Id) && f.DeploymentCost <= money && f.OfficerCapacity >= people.Length &&
+            rules.CanSelectFormation(Force, f.Id) && (!f.MixedTroopsOnly || World.Simulation.NewGame.MixedTroopsEnabled) &&
+            (!World.Simulation.NewGame.MixedTroopsEnabled || !rules.SiegeEquipment.Values.Any(item => item.FormationId == f.Id)) &&
+            (!World.Simulation.NewGame.MixedTroopsEnabled || f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)) &&
+            f.DeploymentCost <= money && f.OfficerCapacity >= people.Length &&
             (f.RequiredTacticId is not int required || TacticAvailability.HasForMembers(required, people, Force, World.Treasures, Treasures)))
         .OrderBy(f => f.Id).ToArray();
     private UnitPolicies Policies(bool fallback = false) => fallback ? new(false, false, false, true) :

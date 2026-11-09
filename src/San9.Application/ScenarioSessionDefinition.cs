@@ -79,10 +79,19 @@ internal sealed class ScenarioSessionDefinition
         return new StrategySnapshotSource(Content, Rules, Definitions).Project(world);
     }
     internal WorldState CreateWorld(ulong seed, int computerDamageBonusPercent = 0, bool battleDeathsEnabled = false,
-        ControllerKind playerForceController = ControllerKind.Player, NewGameSettings? settings = null) => WorldState.Create(new(Content.Year, Content.Month, Content.Day), seed,
+        ControllerKind playerForceController = ControllerKind.Player, NewGameSettings? settings = null)
+    {
+        if (settings?.MixedTroopsEnabled == true &&
+            (MilitaryRules is null || MilitaryRules.TroopTypes.IsEmpty || MilitaryRules.ResearchProjects.IsEmpty))
+            throw new InvalidDataException("当前内容包缺少兵种与研究定义，请使用新版转换器重新准备游戏内容");
+        if (settings?.MixedTroopsEnabled == true && MilitaryRules is { } military &&
+            military.Formations.Values.Any(formation => formation.TravelMode == TravelMode.Water) &&
+            !military.NavalTraining.Values.Any(training => training.ResearchProjectId is null))
+            throw new InvalidDataException("当前内容包缺少基础水军训练，请使用新版转换器重新准备游戏内容");
+        return WorldState.Create(new(Content.Year, Content.Month, Content.Day), seed,
         Forces(),
         BarbarianStartup.CreateSettlements(Forces(), Settlements(), Content.Officers.Select(o => o.State)),
-        Content.Officers.Select(o => o.CreateState(Content.Year)), Content.Units, Content.Information.Corps,
+        Content.Officers.Select(o => o.CreateState(Content.Year)), InitialUnits(settings), Content.Information.Corps,
         Content.Information.TreasureStates, Content.Information.Relations,
         Content.Forces.Where(f => !f.IsDormant).OrderBy(f => _playerForces.Contains(f.Id) ? 0 : 1).ThenBy(f => f.Id)
             .Select(f => new ControlSeat(_playerForces.Contains(f.Id) && playerForceController == ControllerKind.Player ? "player" : $"ai:{f.Id}", f.Id,
@@ -91,6 +100,55 @@ internal sealed class ScenarioSessionDefinition
             Content.Settlements.Single(s => s.Id == r.TargetSettlementId).OwnerId!.Value, r.RemainingXun)), Content.AnnualAppearancesEnabled, Content.NaturalDeathsEnabled, Content.FreeOfficerMigrationEnabled, battleDeathsEnabled, Content.OfficeRequestsEnabled, Content.ConsumedEventKeys, Content.ForceConsolidationEnabled, Content.ForceEmergenceEnabled, Content.CityIndependenceEnabled, Content.ImperialCourtEnded, Content.ThreeVisitsStarted, Content.FoodExchangeRate, Content.SettlementDefectionsEnabled, Content.UnitDefectionsEnabled,
         settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces,
         Definitions.Forces.Select(f => f.Id).ToHashSet(), Definitions.Officers.Select(p => p.Id).ToHashSet(), Content.DefaultLoyalty);
+    }
+
+    private IEnumerable<UnitState> InitialUnits(NewGameSettings? settings)
+    {
+        if (settings?.MixedTroopsEnabled != true) return Content.Units;
+        var military = MilitaryRules!;
+        var forces = Forces().ToDictionary(force => force.Id);
+        var officers = Content.Officers.Select(o => o.CreateState(Content.Year)).ToArray();
+        return Content.Units.Select(unit =>
+        {
+            if (unit.IsPersonnel || unit.IsEmbedded || unit.FormationId is not int formation ||
+                military.Purpose(formation) != UnitPurpose.Combat) return unit;
+            var siege = military.SiegeEquipment.Values.FirstOrDefault(item => item.FormationId == formation);
+            if (siege is not null)
+            {
+                int count = officers.Count(person => person.IsServing && person.UnitId == unit.Id && person.OwnerId == unit.OwnerId);
+                var replacement = military.Formations.Values.Where(candidate => candidate.TravelMode == TravelMode.Land &&
+                        military.Purpose(candidate.Id) == UnitPurpose.Combat &&
+                        !military.SiegeEquipment.Values.Any(item => item.FormationId == candidate.Id) &&
+                        candidate.IsCommon && !candidate.MixedTroopsOnly && candidate.ResearchProjectId is null &&
+                        candidate.SoldierCapacity >= unit.Soldiers && candidate.OfficerCapacity >= count &&
+                        military.ValidFormationPair(candidate.Id, unit.NavalFormationId))
+                    .OrderBy(candidate => candidate.Id == military.DefaultDeploymentFormationId ? 0 : 1)
+                    .ThenBy(candidate => candidate.Id).FirstOrDefault();
+                if (replacement is null) throw new InvalidDataException("初始攻城部队缺少容量足够的基础陆阵");
+                if (unit.SiegeEquipmentId is int existing && existing != siege.Id)
+                    throw new InvalidDataException("初始攻城阵与攻城器械不一致");
+                unit = unit with { FormationId = replacement.Id, SiegeEquipmentId = siege.Id };
+                formation = replacement.Id;
+            }
+            if (unit.NavalFormationId is not null || military.Formations[formation].TravelMode == TravelMode.Water)
+            {
+                int? training = military.NavalTraining.Values.Where(value => value.ResearchProjectId is null)
+                    .OrderBy(value => value.Id).Select(value => (int?)value.Id).FirstOrDefault();
+                if (training is null) throw new InvalidDataException("当前内容包缺少基础水军训练，请使用新版转换器重新准备游戏内容");
+                unit = unit with { NavalTrainingId = unit.NavalTrainingId ?? training };
+            }
+            if (!unit.Detachments.IsEmpty) return unit;
+            var members = officers.Where(person => person.IsServing && person.UnitId == unit.Id && person.OwnerId == unit.OwnerId)
+                .OrderBy(person => unit.MemberPositions.TryGetValue(person.Id, out var position) ? position.Rank : BattleRank.Middle)
+                .ThenBy(person => person.Id).ToArray();
+            if (members.Length == 0) return unit;
+            var tactics = members.ToDictionary(person => person.Id, person => person.EquippedTacticId);
+            var initial = DetachmentAllocation.CreateDefault(members.Select(person => person.Id), tactics,
+                Math.Max(unit.Soldiers, (uint)members.Length), forces[unit.OwnerId], military);
+            if (initial.IsEmpty) throw new InvalidDataException("无法为初始部队分配兵种，请检查内容定义");
+            return unit with { Detachments = DetachmentAllocation.Resize(initial, unit.Soldiers) };
+        }).ToArray();
+    }
 
     private IEnumerable<ForceState> Forces() => Content.Forces.Select(f => new ForceState(f.Id, f.Trust)
     {

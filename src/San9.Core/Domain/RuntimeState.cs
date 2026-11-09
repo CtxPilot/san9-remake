@@ -14,6 +14,8 @@ public sealed record ForceOrigin(
 
 public sealed record ForceState(int Id, int Trust)
 {
+    public System.Collections.Immutable.ImmutableArray<string> CompletedResearch { get; init; } = [];
+    public ResearchProgress? ActiveResearch { get; init; }
     [JsonRequired] public int ColorCode { get; init; }
     [JsonRequired] public System.Collections.Immutable.ImmutableArray<San9.Core.Domain.FormationGrant> FormationGrants { get; init; } = [];
     [JsonRequired] public bool IsDormant { get; init; }

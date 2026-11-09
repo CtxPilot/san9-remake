@@ -7,9 +7,15 @@ public enum DeploymentTacticMode { Formation, Infantry, Cavalry, MountedArchery,
 
 public sealed partial class DeploymentDraft
 {
+    private bool FormationSupportsTactic(TacticRule tactic) => FormationId is int formation &&
+        Rules.Formations[formation].Tactics is not null && tactic.CompatibleFormations.Contains(formation);
+
+    private bool DetachmentSupportsTactic(int officerId, TacticRule tactic) =>
+        !View.World.Simulation.NewGame.MixedTroopsEnabled || tactic.Effect != TacticEffect.Martial ||
+        Detachments.TryGetValue(officerId, out var detachment) && Rules.SupportsDetachmentTactic(detachment, tactic);
+
     public bool IsTacticCompatible(int officerId) => Tactics.TryGetValue(officerId, out var id) && id is int tactic &&
-        FormationId is int formation && Rules.Formations[formation].Tactics is not null &&
-        Rules.Tactics[tactic].CompatibleFormations.Contains(formation);
+        FormationSupportsTactic(Rules.Tactics[tactic]) && DetachmentSupportsTactic(officerId, Rules.Tactics[tactic]);
 
     /// <summary>Applies one explicit batch to this draft, without issuing commands or evaluating combat targets.</summary>
     public void ConfigureTactics(DeploymentTacticMode mode = DeploymentTacticMode.Formation)
@@ -27,7 +33,7 @@ public sealed partial class DeploymentDraft
         // Keep a martial family when equally favored; power is comparable only within that family.
         int? currentCategory = before is int current ? Rules.Tactics[current].Category : null;
         return AvailableTactics(officerId)
-            .Where(t => t.CompatibleFormations.Contains(formationId) && MatchesMode(t, mode))
+            .Where(t => t.CompatibleFormations.Contains(formationId) && MatchesMode(t, mode) && DetachmentSupportsTactic(officerId, t))
             .OrderBy(t => mode == DeploymentTacticMode.Formation &&
                 t.Category is int category && formation.FavoredCategories.Contains(category) ? 0 : 1)
             .ThenBy(t => t.Effect == TacticEffect.Martial ? 0 : 1 + IntelligencePreference(t.Effect))

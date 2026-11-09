@@ -18,6 +18,7 @@ public partial class OpeningSettingsView : ModalView
     private Label _hint = null!;
     public bool Advanced { get; private set; } = true;
     public bool Fictional { get; private set; }
+    public bool MixedTroopsEnabled { get; private set; }
     private int[] _values = new int[6];
     private readonly List<Label> _summary = [];
     private readonly GameTextPresenter _text = new();
@@ -45,6 +46,9 @@ public partial class OpeningSettingsView : ModalView
         Label("模式", new(100, 240), new(360, 24), OpeningSettingsTextStyles.Field);
         Choice("Historical", "史实", new(80, 259), () => Fictional = false, () => !Fictional);
         Choice("Fictional", "虚拟", new(200, 259), () => Fictional = true, () => Fictional);
+        Label("兵种与研究", new(550, 156), new(360, 24), OpeningSettingsTextStyles.Field);
+        Choice("MixedTroopsOff", "关闭", new(530, 175), () => MixedTroopsEnabled = false, () => !MixedTroopsEnabled);
+        Choice("MixedTroopsOn", "开启", new(650, 175), () => MixedTroopsEnabled = true, () => MixedTroopsEnabled);
         Button(Art.Combat, "Combat", "电脑的战力设定", EditCombat, textStyle: OpeningSettingsTextStyles.Combat);
         for (int i = 0; i < OpeningCombatSettingsDialog.Fields.Length; i++)
         {
@@ -71,6 +75,7 @@ public partial class OpeningSettingsView : ModalView
             {
                 Difficulty = Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner,
                 Mode = Fictional ? GameMode.Fictional : GameMode.Historical,
+                MixedTroopsEnabled = MixedTroopsEnabled,
                 MoneyBonus = MoneyBonus, FoodBonus = FoodBonus, DomesticBonus = DomesticBonus,
                 SoldierBonus = SoldierBonus, MoraleBonus = MoraleBonus
             }, DamageBonusPercent);

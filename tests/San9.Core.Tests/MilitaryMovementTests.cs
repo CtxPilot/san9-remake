@@ -7,6 +7,34 @@ namespace San9.Core.Tests;
 
 public sealed class MilitaryMovementTests
 {
+    [Fact]
+    public void MixedDeploymentRequiresResearchAndPreservesAllocatedSoldiers()
+    {
+        var definition = new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [new(7, 1, 50, 10000, 5, new(1, 1), TravelMode.Land)],
+            [new(1, new(2, 7), new(1, 1)), new(2, new(37, 7), new(1, 1))])
+        {
+            TroopTypes = [new(1, "枪兵", 2, ImmutableDictionary<int, int>.Empty)
+                { LevelResearchProjects = new Dictionary<int, string> { [2] = "advanced" }.ToImmutableDictionary() }],
+            ResearchProjects = [new("advanced", 100, 1, [])]
+        };
+        var rules = new MilitaryRulebook(definition);
+        var original = Engine(World(), rules).Snapshot;
+        var enabled = original with { Simulation = original.Simulation with
+            { NewGame = original.Simulation.NewGame with { MixedTroopsEnabled = true } } };
+        var engine = Engine(WorldState.Restore(enabled), rules);
+        var command = new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 400, 7,
+            new(MilitaryOrderKind.Move, new(32, 7), null))
+        { Detachments = new Dictionary<int, DetachmentState> { [11] = new(1, 2, 400) }.ToImmutableDictionary() };
+        Assert.Equal(CommandRejection.InvalidTask, engine.Execute(Player, command).Submission.Rejection);
+        var ready = enabled with { Forces = enabled.Forces.Select(force => force with { CompletedResearch = ["advanced"] }).ToArray() };
+        engine = Engine(WorldState.Restore(ready), rules);
+        Assert.True(engine.Execute(Player, command).Submission.Accepted);
+        var unit = Assert.Single(engine.Snapshot.Units);
+        Assert.Equal(400u, unit.Detachments[11].Soldiers);
+        Assert.Equal((long)unit.Soldiers, unit.Detachments.Values.Sum(detachment => (long)detachment.Soldiers));
+    }
+
     private static WorldState DeploymentPlanningWorld(uint money)
     {
         var snapshot = Engine(World(), Rules()).Snapshot;

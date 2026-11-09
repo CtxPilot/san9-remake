@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using System.Reflection;
+using San9.Core.Domain;
 using San9.Core.Simulation;
 
 namespace San9.Application.Persistence;
@@ -21,7 +23,7 @@ public static class StrictJson
             {
                 bool omitsNull = property.AttributeProvider?.GetCustomAttributes(typeof(JsonIgnoreAttribute), true)
                     .OfType<JsonIgnoreAttribute>().Any(a => a.Condition == JsonIgnoreCondition.WhenWritingNull) == true;
-                if (property.Get is not null && !omitsNull) property.IsRequired = true;
+                if (property.Get is not null && !omitsNull && !IsLegacyOptional(type.Type, property)) property.IsRequired = true;
             }
         });
         var options = new JsonSerializerOptions(CanonicalJson.Options)
@@ -32,6 +34,16 @@ public static class StrictJson
         };
         options.Converters.Add(new DefinedEnumConverterFactory());
         return options;
+    }
+
+    private static bool IsLegacyOptional(Type type, JsonPropertyInfo property)
+    {
+        string? name = (property.AttributeProvider as MemberInfo)?.Name;
+        return type == typeof(NewGameSettings) && name == nameof(NewGameSettings.MixedTroopsEnabled) ||
+            type == typeof(ForceState) && name is nameof(ForceState.CompletedResearch) or nameof(ForceState.ActiveResearch) ||
+            type == typeof(UnitState) && name is nameof(UnitState.Detachments) or nameof(UnitState.NavalTrainingId) or nameof(UnitState.SiegeEquipmentId) ||
+            type == typeof(DeploymentPreset) && name is nameof(DeploymentPreset.NavalTrainingId) or nameof(DeploymentPreset.SiegeEquipmentId) ||
+            type == typeof(DeploymentPresetMember) && name == nameof(DeploymentPresetMember.Detachment);
     }
 
     public static T Deserialize<T>(ReadOnlyMemory<byte> bytes)

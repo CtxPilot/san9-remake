@@ -55,6 +55,9 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         ReplacePage(new FunctionsMenuView { AnchorControl = MenuAnchor, Textures = _textures, Texts = Texts, Open = Open,
             OpenEnvironment = OpenEnvironment, OpenPkSettings = OpenPkSettings, OpenExit = OpenExit, Closed = Close,
             OpenCompanionSettings = OpenCompanionSettings, CanConfigureCompanion = () => Session.CanEditWorld,
+            OpenResearch = OpenResearch, CanResearch = () => Session.CanEditWorld && Session.View.PlayerForceId is not null &&
+                Session.Snapshot.Simulation.NewGame.MixedTroopsEnabled,
+            ShowResearch = Session.Snapshot.Simulation.NewGame.MixedTroopsEnabled,
             ReturnToOpening = RequestReturnToOpening,
             OpenEditor = OpenEditor, CanEdit = kind => Session.CanEditWorld && WorldEditing.Candidates(Session.Snapshot, kind).Count > 0 });
     }
@@ -65,6 +68,10 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         ReplacePage(new WorldEditorView { Textures = _textures, Preferences = Preferences, Service = Service, Skin = Skin, Texts = Texts, Draft = new WorldEditorDraft(Session, kind, Texts),
             MapPreview = (id, readView) => World.CreateInformationPreview(id, Texts, readView: readView),
             Apply = edit => Session.Apply(Session.Request(edit)), Closed = Close });
+    }
+    private void OpenResearch()
+    {
+        ReplacePage(new ResearchView { Session = Session, Texts = Texts, Closed = Close });
     }
     private void OpenEnvironment()
     {
@@ -239,6 +246,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
             null => null,
             FunctionsMenuView => page,
             CompanionSettingsView => page,
+            ResearchView => page,
             _ => OverlayPage.Create(page, page is SaveLoadView ? Colors.Black : Colors.Transparent)
         };
         if (_pageRoot is not null) AddChild(_pageRoot);
@@ -248,7 +256,7 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     {
         if (!IsVisibleInTree()) return;
         if (_busy) { GetViewport().SetInputAsHandled(); return; }
-        if (_page is WorldEditorView or CompanionSettingsView) return;
+        if (_page is WorldEditorView or CompanionSettingsView or ResearchView) return;
         if (_page is SettingsView settingsPage && input is InputEventMouseButton { ButtonIndex: MouseButton.Right } right)
         {
             GetViewport().SetInputAsHandled();
