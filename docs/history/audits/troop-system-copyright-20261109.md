@@ -118,3 +118,7 @@ tests/San9.Importer.San9PkTc101.Tests/MilitaryContentCompilerTests.cs
 ## 运行验证后的追加变更（2026-11-09）
 
 追加修改仅涉及 `DeploymentDetachmentsView.cs`、`DeploymentTacticMenu.cs` 与 `DeploymentView.cs`：调整自有界面样式、类别名称和帮助文字，沿用仓库现有主题与控件；未引入图片、字体、游戏资源、第三方代码或依赖。运行时临时下载的 Godot 编辑器与字体、测试存档和内容包均不进入提交。此前原版权利和授权不确定性的说明继续适用。
+
+## 阵形列表提示与预览补充（2026-11-09）
+
+后续变更仅增加自有阵位格子绘制、解锁提示及相关测试，使用已存在的阵位数据，不引入图片或其他第三方素材。验证使用隔离的本地升级内容包与存档，均不包含在提交中；原版权利和授权的限制仍同前述。

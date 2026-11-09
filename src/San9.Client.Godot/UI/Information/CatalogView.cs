@@ -15,6 +15,7 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
     public TextureService Service { get; init; } = null!;
     public Func<int, bool>? PortraitDeceased { get; init; }
     public Func<int, string?>? Portrait { get; init; }
+    public Action<CanvasItem, Rect2, int>? PortraitPlaceholder { get; init; }
     public TextureScope Textures { get; init; } = null!;
     public Action<CanvasItem, Rect2>? WindowPainter { get; init; }
     public int MinimumBodyWidth { get; init; }
@@ -502,7 +503,12 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
             if (pressed || currentRow || selected)
                 DrawRow(_tableOrigin + new Vector2(SelectionWidth,28+r*24), width-SelectionWidth, pressed ? 2 : currentRow ? 1 : 3);
         }
-        if(_portrait is { Visible: true }) DrawTextureRect(Textures.Get(PortraitFrameRole, this), new(_portrait.Position - new Vector2(12,12), PortraitSize + new Vector2(24,24)), false);
+        if (_portrait is { Visible: true })
+        {
+            DrawTextureRect(Textures.Get(PortraitFrameRole, this), new(_portrait.Position - new Vector2(12, 12), PortraitSize + new Vector2(24, 24)), false);
+            if (_state.Current is { } selectedRow && (_portrait.Role is not string role || !Service.Roles.ContainsKey(role)))
+                PortraitPlaceholder?.Invoke(this, new(_portrait.Position, PortraitSize), selectedRow.Id);
+        }
     }
     private void DrawRow(Vector2 point, int width, int frame)
     {

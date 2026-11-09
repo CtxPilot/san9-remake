@@ -8,6 +8,37 @@ namespace San9.Application.Tests;
 
 public sealed class DeploymentDraftTests
 {
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    public void ResearchedFormationRequiresMixedRulesAndCompletedProject(bool mixed, bool completed, bool available)
+    {
+        var view = View(world => world with
+        {
+            Simulation = world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = mixed } },
+            Forces = world.Forces.Select(f => f.Id == 1 ? f with
+                { CompletedResearch = completed ? ["formation-test"] : [] } : f).ToArray()
+        }, configure: definition => definition with
+        {
+            Military = definition.Military! with
+            {
+                Formations = definition.Military.Formations.Add(definition.Military.Formations.Single(f => f.Id == 100) with
+                    { Id = 901, MixedTroopsOnly = true, ResearchProjectId = "formation-test" }),
+                ResearchProjects = [new("formation-test", 100, 30, [])]
+            },
+            Information = definition.Information with
+            {
+                Formations = [.. definition.Information.Formations, new(901, "新阵形")
+                    { Presentation = definition.Information.Formations.Single(f => f.Id == 100).Presentation }]
+            }
+        });
+        var draft = new DeploymentDraft(view, 1);
+        Assert.True(draft.SetMembers([1]));
+        Assert.Equal(available, draft.Formations(false).Any(f => f.Id == 901));
+        Assert.Equal(available, draft.SetFormation(901, false));
+    }
+
     [Fact]
     public void UnitAttackAndMarchSplitCandidatesAndPreserveExistingIntentions()
     {

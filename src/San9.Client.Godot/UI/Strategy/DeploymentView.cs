@@ -232,7 +232,8 @@ public partial class DeploymentView : FixedPage
         var view = new CatalogView
         {
             Title = naval ? "选择船" : "选择阵形",
-            HintText = naval ? "请选择船。" : "请选择阵形。",
+            HintText = naval ? "请选择船。" : Draft.View.World.Simulation.NewGame.MixedTroopsEnabled
+                ? "请选择阵形；新阵形需在功能→兵种研究中解锁。" : "请选择阵形。",
             CloseTitle = "中止",
             Pages = ForceCapabilityCatalog.Pages(category),
             Textures = Textures,
@@ -240,6 +241,22 @@ public partial class DeploymentView : FixedPage
             PortraitSize = new(120, 120),
             PortraitFrameRole = "catalog-formation-frame",
             Portrait = id => $"catalog-formation-{id}",
+            PortraitPlaceholder = (canvas, rect, id) =>
+            {
+                var presentation = Draft.View.Information.Formations.FirstOrDefault(f => f.Id == id)?.Presentation;
+                if (presentation is null || presentation.Columns <= 0 || presentation.Rows <= 0) return;
+                var cell = rect.Size / new Vector2(presentation.Columns, presentation.Rows);
+                canvas.DrawRect(rect, new Color("22292b"));
+                foreach (var slot in presentation.Slots)
+                {
+                    var position = rect.Position + cell * new Vector2(slot.Column, slot.Row);
+                    canvas.DrawRect(new Rect2(position + new Vector2(2, 2), cell - new Vector2(4, 4)), new Color("8a3030"));
+                }
+                for (int x = 1; x < presentation.Columns; x++)
+                    canvas.DrawLine(rect.Position + new Vector2(x * cell.X, 0), rect.Position + new Vector2(x * cell.X, rect.Size.Y), new Color("82918b"));
+                for (int y = 1; y < presentation.Rows; y++)
+                    canvas.DrawLine(rect.Position + new Vector2(0, y * cell.Y), rect.Position + new Vector2(rect.Size.X, y * cell.Y), new Color("82918b"));
+            },
             InitialCurrentId = naval ? Draft.NavalFormationId : Draft.FormationId,
             ReadRows = page => ForceCapabilityCatalog.Read(Session, Texts, category, Draft.Force.Id, page).Rows.Where(r => candidates.Contains(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id, r.Cells.ToArray())).ToArray(),
             Activated = id => { if (Draft.SetFormation(id, naval)) CloseChild(); },
