@@ -23,12 +23,17 @@ public partial class DeploymentDetachmentsView : Control
         Position = Vector2.Zero;
         Size = new(1024, 768);
         MouseFilter = MouseFilterEnum.Stop;
+        Theme = CompanionPanelStyle.Create(GetThemeFont("font"));
         var shade = new ColorRect { Color = new Color(0, 0, 0, .75f), Size = Size, MouseFilter = MouseFilterEnum.Stop };
         AddChild(shade);
         var panel = new PanelContainer { Position = new(220, 140), Size = new(584, 480) };
         AddChild(panel);
+        var margin = new MarginContainer();
+        foreach (string side in new[] { "left", "right", "top", "bottom" })
+            margin.AddThemeConstantOverride($"margin_{side}", 12);
+        panel.AddChild(margin);
         var layout = new VBoxContainer();
-        panel.AddChild(layout);
+        margin.AddChild(layout);
         layout.AddChild(new Label { Text = "分队兵种", HorizontalAlignment = HorizontalAlignment.Center });
         layout.AddChild(new Label { Text = $"分队兵力合计须为 {Draft.Soldiers}" });
         if (Draft.NavalFormationId is not null)
