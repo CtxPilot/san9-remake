@@ -75,6 +75,15 @@ public sealed class TacticCombatTests
     }
 
     [Fact]
+    public void DeputyFormationProficiencyChangesTheirLinkedDamage()
+    {
+        uint Damage(int skill) => Engine(members: 2, seed: 22, linkMultiplier: 4, mixed: true,
+                deputyFormationProficiency: skill).AdvanceXun().Events.OfType<BattleDamageEvent>()
+            .First(e => e.AttackerId == 0 && e.TacticId is not null).CalculatedSoldierLoss!.Value;
+        Assert.True(Damage(1000) > Damage(0));
+    }
+
+    [Fact]
     public void FullShieldCoverBlocksRealRangedTacticDamage()
     {
         var result = Engine(fullShield: true).AdvanceXun();
@@ -110,7 +119,7 @@ public sealed class TacticCombatTests
     private static SimulationEngine Engine(int members = 1, bool water = false, bool settlement = false,
         int power = 13, bool equipped = true, int injury = 0, int cooldown = 0, bool allowedFacility = true, bool counter = false,
         int primaryProficiency = 0, int linkedProficiency = 0, ulong seed = 42, int linkMultiplier = 2, TacticLinkRules? links = null,
-        int? vulnerableCategory = null, int defenderProficiency = 0, CityInfluenceRule? influence = null, int opportunityChance = 100, int computerBonus = 0, bool normalPower = false, bool waterLearning = false, bool differentCommander = false, WorldSnapshot? restoredState = null, bool distinctLinkedTactic = false, bool mixed = false, bool fullShield = false)
+        int? vulnerableCategory = null, int defenderProficiency = 0, CityInfluenceRule? influence = null, int opportunityChance = 100, int computerBonus = 0, bool normalPower = false, bool waterLearning = false, bool differentCommander = false, WorldSnapshot? restoredState = null, bool distinctLinkedTactic = false, bool mixed = false, bool fullShield = false, int? deputyFormationProficiency = null)
     {
         var combat = normalPower ? new CombatProfile(10, 10, 0, 10, 50) : new CombatProfile(0, 0, 0, 1000, 50);
         var mode = water ? TravelMode.Water : TravelMode.Land;
@@ -143,6 +152,7 @@ public sealed class TacticCombatTests
         if (members == 2) officers.Add(new(12, 1, null, new(80, 70, 70, 70), false)
         {
             UnitId = 0,
+            FormationProficiencies = deputyFormationProficiency is int skill ? ImmutableSortedDictionary<int, int>.Empty.Add(100, skill) : null,
             LearnedTactics = [distinctLinkedTactic ? 9001 : 9000],
             EquippedTacticId = distinctLinkedTactic ? 9001 : 9000,
             TacticProficiencies = [linkedProficiency, 0, 0, 0, waterLearning ? 1000 : 0, 0, 0, 0, 0]

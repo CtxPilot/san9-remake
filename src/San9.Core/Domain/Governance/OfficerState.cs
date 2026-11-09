@@ -27,6 +27,8 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     /// <summary>兵法与单挑共用的剩余冷却天数；限制兵法发动、单挑发起及追加参战，
     /// 不限制单挑首发接受者或普通攻击。</summary>
     [JsonRequired] public int TacticCooldown { get; init; }
+    /// <summary>Known formation IDs and individual proficiency; null denotes legacy data awaiting migration.</summary>
+    public ImmutableSortedDictionary<int, int>? FormationProficiencies { get; init; }
     public ImmutableArray<int> TacticProficiencies { get; init; } = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     public int? StatusStartYear { get; init; }
     public int? ParentId { get; init; }
@@ -84,6 +86,7 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
             ForceLoyalties.Any(p => p.Key < 0 || p.Value is < 0 or > 255)) return false;
         if (Affinity is < 0 or >= 150 || TacticLinkBonus is < 0 or > 100 || MasteredCategories.IsDefault ||
             MasteredCategories.Any(c => c is < 0 or > 8) || MasteredCategories.Distinct().Count() != MasteredCategories.Length) return false;
+        if (FormationProficiencies is not null && FormationProficiencies.Any(p => p.Key < 0 || p.Value is < 0 or > 1000)) return false;
         if (EquippedTacticId < 0 || TacticCooldown < 0 || LearnedTactics is null || TacticProficiencies.IsDefault || TacticProficiencies.Length != 9 ||
             TacticProficiencies.Any(v => v < 0) || LearnedTactics.Any(v => v < 0) ||
             ParentId < 0 || BloodlineId < 0 || AppearanceYear < 0 || LifespanTier < 0 || SuccessionPriority < 0 || Personality is < 0 or > 3) return false;

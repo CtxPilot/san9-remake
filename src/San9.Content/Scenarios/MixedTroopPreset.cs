@@ -21,6 +21,15 @@ public static class MixedTroopPreset
         new(1, "水军二级", "naval-training", 500, [arrowRain, arrowStorm, assault, attack])
     ];
 
+    public static string FormationDescription(int index) => index switch
+    {
+        0 => "枪盾列前掩护后方，可应对骑兵与远程攻击的守备用阵形。",
+        1 => "枪兵列前掩护弓弩，利于弓弩兵法的阵形。",
+        2 => "利于步兵系兵法，兼顾进攻与防守的阵形。",
+        3 => "利于骑兵和弓骑兵法，机动力较高的阵形。",
+        _ => throw new ArgumentOutOfRangeException(nameof(index))
+    };
+
     public static ImmutableArray<FormationPosition> FormationPositions(int index) => index switch
     {
         0 => [new(0, BattleRank.Front), new(2, BattleRank.Front), new(1, BattleRank.Middle),

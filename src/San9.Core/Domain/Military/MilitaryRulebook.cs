@@ -136,6 +136,15 @@ public sealed partial class MilitaryRulebook
     public bool DuelCapturesAllowed { get; }
     public CompanionCombatDefinition? CompanionCombat { get; }
     public CompanionTacticPresets? CompanionTactics { get; }
+    /// <summary>Recognizes obsolete formation-only projects retained for older saves.</summary>
+    public bool IsLegacyFormationResearch(string id) =>
+        Formations.Values.Any(f => f.MixedTroopsOnly && f.ResearchProjectId == id) &&
+        !Formations.Values.Any(f => !f.MixedTroopsOnly && f.ResearchProjectId == id) &&
+        !TroopTypes.Values.Any(t => t.LevelResearchProjects.Values.Contains(id)) &&
+        !NavalTraining.Values.Any(t => t.ResearchProjectId == id) &&
+        !SiegeEquipment.Values.Any(e => e.ResearchProjectId == id) &&
+        !ResearchProjects.Values.Any(p => p.Prerequisites.Contains(id));
+
     public MilitaryRulebook(MilitaryDefinition definition)
     {
         MixedTroopCombat = definition.MixedTroopCombat;

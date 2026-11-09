@@ -140,6 +140,8 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
                 throw new InvalidDataException("Unknown battlefield region reference.");
             if (rules.ConstructionSites.Values.Any(site => !RegionNameKeys.ContainsKey(site.RegionId) || !RegionCityIds.ContainsKey(site.RegionId)))
                 throw new InvalidDataException("Unknown construction region.");
+            if (Officers.Any(o => o.State.FormationProficiencies?.Keys.Any(id => !rules.Formations.ContainsKey(id)) == true))
+                throw new InvalidDataException("Unknown officer formation reference.");
             if (Officers.Any(o => o.State.EquippedTacticId is int id && !rules.Tactics.ContainsKey(id)))
                 throw new InvalidDataException("Unknown equipped tactic reference.");
             if (!places.Keys.Order().SequenceEqual(Settlements.Select(s => s.Id).Order()) ||

@@ -41,6 +41,7 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
         // Deployment and transport remain available under siege; ordinary missions do not.
         if (command is not ("sortie" or "build" or "transport") && view.IsSettlementEngaged(id)) return "engaged";
         if (command == "demolish") return null;
+        if (command == "research") return view.World.Simulation.NewGame.MixedTroopsEnabled ? null : "unavailable";
         if (command == "move" && !OtherHomes(home).Any()) return "no-move-destination";
         if (command == "transport" && !OtherHomes(home, directOnly: false).Any()) return "no-other-facility";
         if (command == "build" && !BuildableTypes().Any()) return "no-construction-site";

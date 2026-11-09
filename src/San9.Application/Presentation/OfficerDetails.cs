@@ -3,7 +3,7 @@ using San9.Core.Domain;
 
 namespace San9.Application.Presentation;
 
-public enum OfficerDetailPage { Status, Tactics }
+public enum OfficerDetailPage { Status, Tactics, Formations }
 public sealed class OfficerDetailState
 {
     public const int VisibleRows = 18;
@@ -51,7 +51,12 @@ public sealed class OfficerDetailState
 
 public sealed record OfficerDetailData(string Name, string Biography, string PortraitRole, OfficerAbilities RadarAbilities,
     string[] AbilityValues, InformationField[][] Fields, OfficerTacticGroup[] Tactics, int[] Treasures)
-{ public bool IsDeceased { get; init; } }
+{
+    public bool IsDeceased { get; init; }
+    public bool FormationRulesEnabled { get; init; }
+    public OfficerFormation[] Formations { get; init; } = [];
+}
+public sealed record OfficerFormation(string Name, int? Proficiency);
 public sealed record OfficerTacticGroup(string Name, int Proficiency, OfficerTactic[] Tactics);
 public sealed record OfficerTactic(string Name, bool Available);
 
@@ -93,6 +98,17 @@ public static class OfficerDetails
         var abilityValues = Base(person.BaseAbilities).Select((value, i) => current[i] == value ? $"{value}" : $"{value}{current[i] - value:+0;-0}").ToArray();
         return new(name, officer.BiographyKey is string bio ? texts.ResolveRich(bio) : "", $"information-person-{id}",
             officer.Abilities, abilityValues, FieldIds.Select(column => column.Select(key => values[key]).ToArray()).ToArray(),
-            tactics.ToArray(), view.World.Treasures.Where(t => t.Discovered && t.HolderId == id).Select(t => t.Id).ToArray()) { IsDeceased = person.Status == OfficerStatus.Dead };
+            tactics.ToArray(), view.World.Treasures.Where(t => t.Discovered && t.HolderId == id).Select(t => t.Id).ToArray())
+        {
+            IsDeceased = person.Status == OfficerStatus.Dead,
+            FormationRulesEnabled = view.World.Simulation.NewGame.MixedTroopsEnabled,
+            Formations = view.World.Simulation.NewGame.MixedTroopsEnabled && view.MilitaryRules is { } military
+                ? view.Information.Formations.Where(formation => military.Formations.TryGetValue(formation.Id, out var rule) &&
+                    rule.TravelMode == TravelMode.Land && !military.IsFixedFormation(rule.Id) &&
+                    rule.Id != military.UnformedFormationId && !military.SiegeEquipment.Values.Any(e => e.FormationId == rule.Id))
+                    .OrderBy(formation => formation.Id).Select(formation => new OfficerFormation(formation.Name,
+                        person.FormationProficiencies?.TryGetValue(formation.Id, out int value) == true ? value : null)).ToArray()
+                : []
+        };
     }
 }

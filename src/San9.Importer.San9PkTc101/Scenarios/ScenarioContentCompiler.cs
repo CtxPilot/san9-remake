@@ -130,6 +130,7 @@ public static class ScenarioContentCompiler
                         var f = formations.Single(formation => formation.Id == item.Source);
                         return new FormationCatalogDefinition(item.Id, item.Name)
                         {
+                            Description = MixedTroopPreset.FormationDescription(item.Id - 28),
                             MapAppearanceId = item.Source,
                             Presentation = new(3, 3, MixedTroopPreset.FormationPositions(item.Id - 28)
                                 .Select(p => new FormationSlot(p.Column, (int)p.Rank)).ToImmutableArray(),

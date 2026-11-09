@@ -7,6 +7,36 @@ namespace San9.Core.Tests;
 
 public sealed class MilitaryMovementTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedDeploymentRequiresCommanderKnowledgeInsteadOfFormationResearch(bool knows)
+    {
+        var definition = new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [new(7, 1, 50, 10000, 5, new(1, 1), TravelMode.Land)
+                { IsCommon = false, MixedTroopsOnly = true, ResearchProjectId = "old-formation" }],
+            [new(1, new(2, 7), new(1, 1)), new(2, new(37, 7), new(1, 1))])
+        {
+            TroopTypes = [new(1, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("old-formation", 100, 30, [])]
+        };
+        var rules = new MilitaryRulebook(definition);
+        var original = Engine(World(), rules).Snapshot;
+        var enabled = original with
+        {
+            Simulation = original.Simulation with { NewGame = original.Simulation.NewGame with { MixedTroopsEnabled = true } },
+            Officers = original.Officers.Select(o => o.Id == 11 ? o with
+            { FormationProficiencies = knows ? ImmutableSortedDictionary<int, int>.Empty.Add(7, 250) : ImmutableSortedDictionary<int, int>.Empty } : o).ToArray()
+        };
+        var engine = Engine(WorldState.Restore(enabled), rules);
+        var command = new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 400, 7,
+            new(MilitaryOrderKind.Move, new(32, 7), null))
+        { Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11, new(1, 1, 400)) };
+        var result = engine.Execute(Player, command);
+        Assert.Equal(knows, result.Submission.Accepted);
+        if (!knows) Assert.Equal(CommandRejection.MissingFormationTactic, result.Submission.Rejection);
+    }
+
     [Fact]
     public void MixedDeploymentRequiresResearchAndPreservesAllocatedSoldiers()
     {

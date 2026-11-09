@@ -82,6 +82,8 @@ internal static class MilitaryMovement
         }
         if (world.Forces.Any(f => f.FormationGrants.Any(g => rules is null || !rules.Formations.ContainsKey(g.FormationId))))
             throw new ArgumentException("Unknown force formation grant.");
+        if (world.Officers.Any(p => p.FormationProficiencies?.Keys.Any(id => rules is null || !rules.Formations.ContainsKey(id)) == true))
+            throw new ArgumentException("Unknown officer formation reference.");
         if (world.Officers.Any(p => p.EquippedTacticId is int id && (rules is null || !rules.Tactics.ContainsKey(id))))
             throw new ArgumentException("Unknown equipped tactic.");
         if (rules is not null && world.Settlements.Any(s => s.IsDestroyed &&
@@ -149,8 +151,8 @@ internal static class MilitaryMovement
     }
 
     internal static CommandRejection TransportEligibility(WorldMutation world, TransportUnitCommand command,
-        MilitaryRulebook? rules, TreasureRulebook treasures) => rules?.TransportFormations is not { } pair
-        ? CommandRejection.UnsupportedCommand : PrepareDeployment(world, TransportDeployment(command, pair), rules, treasures,
+        MilitaryRulebook? rules, GovernanceRulebook governance, TreasureRulebook treasures) => rules?.TransportFormations is not { } pair
+        ? CommandRejection.UnsupportedCommand : PrepareDeployment(world, TransportDeployment(command, pair), rules, governance, treasures,
             UnitPurpose.Transport, command.CargoMoney, command.CargoFood, out _);
 
     private static DeployUnitCommand TransportDeployment(TransportUnitCommand command, FixedUnitFormations pair) =>
@@ -162,7 +164,7 @@ internal static class MilitaryMovement
         GovernanceRulebook governance, TreasureRulebook treasures, List<DomainEvent> events,
         UnitPurpose purpose = UnitPurpose.Combat, uint cargoMoney = 0, uint cargoFood = 0)
     {
-        var rejection = PrepareDeployment(world, command, rules, treasures, purpose, cargoMoney, cargoFood, out var prepared);
+        var rejection = PrepareDeployment(world, command, rules, governance, treasures, purpose, cargoMoney, cargoFood, out var prepared);
         if (rejection != CommandRejection.None) return rejection;
         return ApplyDeployment(world, command, governance, events, prepared!, cargoMoney, cargoFood);
     }
@@ -209,7 +211,7 @@ internal static class MilitaryMovement
         WorldPosition Start, ResourceAccount Account, long Cost);
 
     internal static CommandRejection PrepareDeployment(WorldMutation world, DeployUnitCommand command,
-        MilitaryRulebook? rules, TreasureRulebook treasures, UnitPurpose purpose, uint cargoMoney, uint cargoFood,
+        MilitaryRulebook? rules, GovernanceRulebook governance, TreasureRulebook treasures, UnitPurpose purpose, uint cargoMoney, uint cargoFood,
         out DeploymentPreparation? prepared, DeploymentPlan? plan = null)
     {
         prepared = null;
@@ -222,7 +224,9 @@ internal static class MilitaryMovement
             ? command.NavalFormationId ?? rules.NavalFormationForDeployment(formation.Id) : command.NavalFormationId;
         if (!rules.ValidUnitFormations(formation.Id, navalId)) return CommandRejection.InvalidTask;
         var naval = navalId is int selected ? rules.Formations[selected] : null;
-        if (purpose == UnitPurpose.Combat && (!rules.CanSelectFormation(world.Forces[command.IssuerId], formation.Id) ||
+        if (purpose == UnitPurpose.Combat &&
+            (!(world.Simulation.NewGame.MixedTroopsEnabled && formation.TravelMode == TravelMode.Land) &&
+                !rules.CanSelectFormation(world.Forces[command.IssuerId], formation.Id) ||
             naval is not null && !rules.CanSelectFormation(world.Forces[command.IssuerId], naval.Id)))
             return CommandRejection.FormationUnavailable;
         var travel = rules.Travel(formation.Id, navalId, command.Soldiers);
@@ -273,7 +277,13 @@ internal static class MilitaryMovement
         foreach (var (person, tacticId) in command.Tactics)
             if (tacticId is int tactic && (!rules.Tactics.TryGetValue(tactic, out var definition) || !definition.Selectable ||
                 !MilitaryTactics.HasTactic(world, command.IssuerId, [person], tactic, treasures))) return CommandRejection.TacticUnavailable;
-        if (!FormationEligibility.CanUse(world, command.IssuerId, command.OfficerIds, formation, treasures) ||
+        int? selectedCommander = LeadershipMaintenance.SelectUnitCommander(world, command.OfficerIds, governance);
+        var commander = selectedCommander is int commanderId ? world.Officers[commanderId] : null;
+        if (purpose == UnitPurpose.Combat && world.Simulation.NewGame.MixedTroopsEnabled &&
+            formation.TravelMode == TravelMode.Land && commander?.FormationProficiencies is null &&
+            !rules.CanSelectFormation(world.Forces[command.IssuerId], formation.Id)) return CommandRejection.FormationUnavailable;
+        if (!FormationEligibility.CanUse(world, command.IssuerId, command.OfficerIds, formation, treasures,
+                commander, personalFormation: purpose == UnitPurpose.Combat) ||
             naval is not null && !FormationEligibility.CanUse(world, command.IssuerId, command.OfficerIds, naval, treasures) ||
             command.SiegeEquipmentId is int siegeIdForEligibility &&
             !FormationEligibility.CanUse(world, command.IssuerId, command.OfficerIds,

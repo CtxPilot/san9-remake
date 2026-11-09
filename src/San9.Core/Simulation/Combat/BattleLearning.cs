@@ -43,7 +43,20 @@ internal static class BattleLearning
 
     internal static void Daily(WorldMutation world, MilitaryRulebook? military, List<DomainEvent> events)
     {
-        if (military is null || world.Companion.DisableDailyCombatProficiencyGain) return;
+        if (military is null) return;
+        if (world.Simulation.NewGame.MixedTroopsEnabled)
+            foreach (var unit in world.Units.Values.OrderBy(u => u.Id).ToArray())
+            {
+                if (unit.FormationId is not int formationId || unit.Detachments.IsEmpty ||
+                    military.Map.IsWater(unit.Position) || unit.Condition is not (UnitCondition.Normal or UnitCondition.HighSpirits) ||
+                    unit.EffectiveOrderClass != UnitOrderClass.Military || !MilitaryEngagements.Engaged(world, unit, military)) continue;
+                foreach (var officer in world.ServingUnitMembers(unit.Id).OrderBy(p => p.Id).ToArray())
+                    if (unit.Detachments.TryGetValue(officer.Id, out var detachment) && detachment.Soldiers > 0 &&
+                        officer.FormationProficiencies?.TryGetValue(formationId, out int current) == true &&
+                        current < FormationKnowledge.MaximumProficiency)
+                        world.Replace(officer with { FormationProficiencies = officer.FormationProficiencies.SetItem(formationId, current + 1) });
+            }
+        if (world.Companion.DisableDailyCombatProficiencyGain) return;
         foreach (var unit in world.Units.Values.OrderBy(u => u.Id))
         {
             if (unit.FormationId is not int id || !military.Formation(unit).GainsDailyCombatProficiency ||

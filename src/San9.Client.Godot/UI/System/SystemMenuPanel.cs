@@ -55,9 +55,6 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         ReplacePage(new FunctionsMenuView { AnchorControl = MenuAnchor, Textures = _textures, Texts = Texts, Open = Open,
             OpenEnvironment = OpenEnvironment, OpenPkSettings = OpenPkSettings, OpenExit = OpenExit, Closed = Close,
             OpenCompanionSettings = OpenCompanionSettings, CanConfigureCompanion = () => Session.CanEditWorld,
-            OpenResearch = OpenResearch, CanResearch = () => Session.CanEditWorld && Session.View.PlayerForceId is not null &&
-                Session.Snapshot.Simulation.NewGame.MixedTroopsEnabled,
-            ShowResearch = Session.Snapshot.Simulation.NewGame.MixedTroopsEnabled,
             ReturnToOpening = RequestReturnToOpening,
             OpenEditor = OpenEditor, CanEdit = kind => Session.CanEditWorld && WorldEditing.Candidates(Session.Snapshot, kind).Count > 0 });
     }
@@ -69,9 +66,13 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
             MapPreview = (id, readView) => World.CreateInformationPreview(id, Texts, readView: readView),
             Apply = edit => Session.Apply(Session.Request(edit)), Closed = Close });
     }
-    private void OpenResearch()
+    public void OpenResearchAt(int? settlementId)
     {
-        ReplacePage(new ResearchView { Session = Session, Texts = Texts, Closed = Close });
+        if (_busy) return;
+        Browser.Close();
+        ReplacePage(null);
+        Show();
+        ReplacePage(new ResearchView { Session = Session, Texts = Texts, Closed = Close, InitialSettlementId = settlementId });
     }
     private void OpenEnvironment()
     {

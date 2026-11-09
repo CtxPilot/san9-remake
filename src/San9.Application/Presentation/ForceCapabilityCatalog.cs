@@ -35,7 +35,7 @@ public static class ForceCapabilityCatalog
         throw new ArgumentOutOfRangeException(nameof(category));
     }
 
-    public static InformationTable Read(GameSession session, TextCatalog texts, InformationCategory category, int forceId, int pageIndex = 0)
+    public static InformationTable Read(GameSession session, TextCatalog texts, InformationCategory category, int forceId, int pageIndex = 0, bool personalFormations = false)
     {
         var pages = Pages(category);
         if ((uint)pageIndex >= pages.Count) throw new ArgumentOutOfRangeException(nameof(pageIndex));
@@ -78,9 +78,11 @@ public static class ForceCapabilityCatalog
             rows = view.Information.Formations.Where(f =>
             {
                 var rule = military.Formations[f.Id];
-                return military.CanSelectFormation(force, rule.Id) &&
+                bool personal = personalFormations && category == InformationCategory.Formations &&
+                    view.World.Simulation.NewGame.MixedTroopsEnabled;
+                return (personal ? !military.IsFixedFormation(rule.Id) : military.CanSelectFormation(force, rule.Id)) &&
                     (rule.TravelMode == TravelMode.Water) == (category == InformationCategory.Ships) &&
-                    (rule.RequiredTacticId is not int tactic || HasTactic(tactic));
+                    (personal || rule.RequiredTacticId is not int tactic || HasTactic(tactic));
             }).Select(f =>
             {
                 var rule = military.Formations[f.Id];

@@ -49,7 +49,7 @@ internal static class OriginalAiResearch
                 score += fieldUnits.Count(unit => unit.NavalFormationId is not null && military.Map.IsWater(unit.Position)) * 6;
             return score;
         }
-        var project = military.ResearchProjects.Values.Where(p => !force.CompletedResearch.Contains(p.Id) &&
+        var project = military.ResearchProjects.Values.Where(p => !military.IsLegacyFormationResearch(p.Id) && !force.CompletedResearch.Contains(p.Id) &&
                 p.Prerequisites.All(force.CompletedResearch.Contains) && p.Cost <= root.Treasury.Money / 2)
             .OrderByDescending(Demand).ThenBy(p => p.Cost).ThenBy(p => p.Id, StringComparer.Ordinal).FirstOrDefault();
         if (project is null) return;

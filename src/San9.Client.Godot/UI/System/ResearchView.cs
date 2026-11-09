@@ -10,6 +10,7 @@ public partial class ResearchView : ModalView
     public GameSession Session { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
     public Action Closed { get; init; } = null!;
+    public int? InitialSettlementId { get; init; }
     private VBoxContainer _projects = null!;
     private OptionButton _settlements = null!;
     private Label _status = null!;
@@ -40,6 +41,9 @@ public partial class ResearchView : ModalView
             foreach (var place in Session.View.Settlements.Where(s => validPlaces.Contains(s.Id)).OrderBy(s => s.Id))
                 _settlements.AddItem(Texts.Resolve(place.NameKey), place.Id);
         }
+        if (InitialSettlementId is int selected)
+            for (int i = 0; i < _settlements.ItemCount; i++)
+                if (_settlements.GetItemId(i) == selected) { _settlements.Select(i); break; }
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         column.AddChild(scroll);
         _projects = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; scroll.AddChild(_projects);

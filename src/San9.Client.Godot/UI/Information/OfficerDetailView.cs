@@ -23,7 +23,7 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
     private Control? _overlay;
     private readonly List<DetailNameButton> _names = [];
     private SkinnedScrollBar _scroll = null!;
-    private DetailActionButton _status = null!, _tactics = null!, _treasure = null!;
+    private DetailActionButton _status = null!, _tactics = null!, _formations = null!, _treasure = null!;
     private bool _refreshing;
     private GameMessageBar _message = null!;
     private DetailActionButton? _hintButton;
@@ -51,9 +51,11 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
         _scroll.Up.MouseEntered += ClearNameFocus; _scroll.Down.MouseEntered += ClearNameFocus;
         _scroll.Range.ValueChanged += value => { if (!_refreshing) { State.Scroll((int)value); RefreshNames(); } };
         _message = new GameMessageBar { Textures = Textures }; AddChild(_message);
-        _treasure = Action("宝物", "treasure", new(888,533), new(120,40), ShowTreasures, hint: "officer-detail-treasures");
-        _status = Action("状态", "tab", new(888,585), new(120,40), () => SelectPage(OfficerDetailPage.Status), hint: "officer-detail-status");
-        _tactics = Action("兵法", "tab", new(888,629), new(120,40), () => SelectPage(OfficerDetailPage.Tactics), hint: "officer-detail-tactics");
+        _treasure = Action("宝物", "treasure", new(888,493), new(120,40), ShowTreasures, hint: "officer-detail-treasures");
+        _status = Action("状态", "tab", new(888,540), new(120,40), () => SelectPage(OfficerDetailPage.Status), hint: "officer-detail-status");
+        _tactics = Action("兵法", "tab", new(888,584), new(120,40), () => SelectPage(OfficerDetailPage.Tactics), hint: "officer-detail-tactics");
+        _formations = Action("阵形", "tab", new(888,628), new(120,40), () => SelectPage(OfficerDetailPage.Formations));
+        _formations.Name = "FormationTab";
         Action("关闭", "close", new(875,687), new(108,44), Closed, hint: "detail-close");
         Icon("close-icon",new(964,56), Closed);
         Icon("help",new(934,33), ShowHelp);
@@ -141,7 +143,7 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
             _body.AddChild(biography); biography.Present(_data.Biography, GameTextStyles.CatalogRow);
             biography.AutowrapMode=TextServer.AutowrapMode.Arbitrary;
         }
-        else
+        else if (State.Page == OfficerDetailPage.Tactics)
         {
             Label("兵法",new(96,404,64,24),16,HorizontalAlignment.Center);
             for(int i=0;i<_data.Tactics.Length;i++)
@@ -153,7 +155,32 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
                     Label(group.Tactics[j].Name,new(298+72*j,y,68,24),16,HorizontalAlignment.Center,color:new Color(group.Tactics[j].Available?"f0f0f0":"a4a4a4"));
             }
         }
+        else
+        {
+            Label("阵形", new(96, 404, 64, 24), 16, HorizontalAlignment.Center);
+            if (!_data.FormationRulesEnabled)
+                Label("本局未启用兵种与阵形规则。", new(180, 404, 600, 24));
+            else
+            {
+                Label("掌握的阵形与熟练度（未掌握显示为 —）", new(180, 404, 600, 24));
+                var scroll = new ScrollContainer { Position = new(176, 440), Size = new(660, 256),
+                    HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, MouseFilter = MouseFilterEnum.Stop };
+                _body.AddChild(scroll);
+                var grid = new GridContainer { Columns = 3, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+                grid.AddThemeConstantOverride("h_separation", 12); grid.AddThemeConstantOverride("v_separation", 6);
+                scroll.AddChild(grid);
+                foreach (var formation in _data.Formations)
+                {
+                    var label = new Label { Text = $"{formation.Name}　{(formation.Proficiency is int value ? value.ToString() : "—")}",
+                        CustomMinimumSize = new(196, 28), VerticalAlignment = VerticalAlignment.Center };
+                    grid.AddChild(label);
+                    _text.Apply(label, GameTextStyles.CatalogRow with
+                    { Foreground = new Color(formation.Proficiency is null ? "a4a4a4" : "f0f0f0") });
+                }
+            }
+        }
         _status.Selected=State.Page==OfficerDetailPage.Status; _tactics.Selected=State.Page==OfficerDetailPage.Tactics;
+        _formations.Selected=State.Page==OfficerDetailPage.Formations;
         _treasure.Disabled=_data.Treasures.Length==0;
         RefreshHint();
         QueueRedraw();
@@ -175,7 +202,7 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
     {
         var panel=Overlay();
         Label("武将情报",new(20,12,480,36),24,parent:panel);
-        Label("单击右侧姓名或按回车切换武将。\n上下键移动名单焦点，滚轮翻阅名单。\n状态、兵法页在切换武将后保持。\n宝物显示当前武将持有的可见宝物。\nEsc 或右键返回。",new(24,68,472,230),18,parent:panel);
+        Label("单击右侧姓名或按回车切换武将。\n上下键移动名单焦点，滚轮翻阅名单。\n状态、兵法、阵形页在切换武将后保持。\n宝物显示当前武将持有的可见宝物。\nEsc 或右键返回。",new(24,68,472,230),18,parent:panel);
         Action("关闭","close",new(206,330),new(108,44),CloseOverlay,panel);
     }
     private void ShowTreasures()
@@ -229,12 +256,17 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
             foreach(int x in new[]{278,454,630})DrawLine(new(x,404),new(x,588),new Color("79683e"));
             Strip("label",new(96,636,64,24));
         }
-        else
+        else if (State.Page == OfficerDetailPage.Tactics)
         {
             Panel(new(76,384,536,324));DrawTexture(Textures.Get("detail-tactics-field", this),new(168,404));Strip("label",new(96,404,64,24));
             for(int i=0;i<9;i++)
             {int y=412+32*i;Strip("tactic-category",new(176,y,52,24));Strip("field",new(232,y,48,24));
                 for(int j=0;j<_data.Tactics[i].Tactics.Length;j++)DrawTexture(Textures.Get($"detail-tactic-{i}"+(_data.Tactics[i].Tactics[j].Available?"":"-1"), this),new(298+72*j,y));}
+        }
+        else
+        {
+            Panel(new(76,384,792,324));
+            Strip("label",new(96,404,64,24));
         }
     }
     public override void _ExitTree()=>_text.Dispose();

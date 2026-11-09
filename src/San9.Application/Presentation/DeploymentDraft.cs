@@ -140,15 +140,21 @@ public sealed partial class DeploymentDraft
 
     public IReadOnlyList<FormationRule> Formations(bool naval) => Members.IsEmpty ? [] : Formations(naval, Members);
     private IEnumerable<FormationRule> CandidateFormations(bool naval) => Rules.Formations.Values.Where(f =>
-        f.TravelMode == (naval ? TravelMode.Water : TravelMode.Land) && f.Id != Rules.UnformedFormationId && Rules.CanSelectFormation(Force, f.Id) &&
+        f.TravelMode == (naval ? TravelMode.Water : TravelMode.Land) && f.Id != Rules.UnformedFormationId &&
+        (!naval && View.World.Simulation.NewGame.MixedTroopsEnabled ? !Rules.IsFixedFormation(f.Id) : Rules.CanSelectFormation(Force, f.Id)) &&
         (!f.MixedTroopsOnly || View.World.Simulation.NewGame.MixedTroopsEnabled) &&
-        (!View.World.Simulation.NewGame.MixedTroopsEnabled || !Rules.SiegeEquipment.Values.Any(item => item.FormationId == f.Id)) &&
-        (!View.World.Simulation.NewGame.MixedTroopsEnabled || f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)));
+        (!View.World.Simulation.NewGame.MixedTroopsEnabled || !Rules.SiegeEquipment.Values.Any(item => item.FormationId == f.Id)));
     private IReadOnlyList<FormationRule> Formations(bool naval, ImmutableArray<int> members)
     {
         var people = View.World.Officers.Where(o => members.Contains(o.Id)).ToArray();
+        var commander = View.World.Officers.Single(o => o.Id == members[0]);
         return CandidateFormations(naval).Where(f => f.OfficerCapacity >= members.Length &&
-            (f.RequiredTacticId is not int tactic || TacticAvailability.HasForMembers(tactic, people, Force, View.World.Treasures, _treasures)))
+            (!View.World.Simulation.NewGame.MixedTroopsEnabled ||
+                (!naval && commander.FormationProficiencies is not null
+                    ? FormationKnowledge.Knows(commander, f.Id)
+                    : Rules.CanSelectFormation(Force, f.Id) && (f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)))) &&
+            (View.World.Simulation.NewGame.MixedTroopsEnabled && !naval && commander.FormationProficiencies is not null ||
+                f.RequiredTacticId is not int tactic || TacticAvailability.HasForMembers(tactic, people, Force, View.World.Treasures, _treasures)))
             .OrderBy(f => f.Id).ToArray();
     }
     public bool SetFormation(int id, bool naval)
@@ -214,7 +220,11 @@ public sealed partial class DeploymentDraft
                 TacticAvailable = Tactics[id] is null || compatible,
                 HoverText = $"武力{person.Abilities.War}、智力{person.Abilities.Intelligence}、兵法数{AvailableTactics(id).Count}" +
                     (Tactics[id] is null ? "\n尚未配置兵法" : compatible ? "" :
-                        !FormationSupportsTactic(Rules.Tactics[Tactics[id]!.Value]) ? "\n当前兵法不适配陆上阵形" : "\n当前兵种或等级无法发动该兵法")
+                        !FormationSupportsTactic(Rules.Tactics[Tactics[id]!.Value]) ? "\n当前兵法不适配陆上阵形" : "\n当前兵种或等级无法发动该兵法") +
+                    (View.World.Simulation.NewGame.MixedTroopsEnabled && FormationId is int formation
+                        ? View.World.Officers.Single(o => o.Id == id).FormationProficiencies?.TryGetValue(formation, out int proficiency) == true
+                            ? $"\n阵形熟练 {proficiency}" : "\n未掌握此阵形"
+                        : "")
             };
         }).ToArray());
     public CatalogCell[] Combat(bool naval) => UnitCombatPreview.Read(new(0, Force.Id, new(0, 0), Soldiers)

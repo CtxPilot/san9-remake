@@ -229,13 +229,18 @@ public partial class DeploymentView : FixedPage
     {
         var category = naval ? InformationCategory.Ships : InformationCategory.Formations;
         var candidates = Draft.Formations(naval).Select(f => f.Id).ToHashSet();
+        bool showProficiency = !naval && Draft.View.World.Simulation.NewGame.MixedTroopsEnabled && Draft.CommanderId is not null;
+        var commander = Draft.CommanderId is int commanderId ? Draft.View.World.Officers.Single(o => o.Id == commanderId) : null;
+        var pages = ForceCapabilityCatalog.Pages(category);
+        if (showProficiency)
+            pages = pages.Select(page => page with { Columns = [.. page.Columns, new("formation-proficiency", "熟练", 6, CatalogAlignment.Right)] }).ToArray();
         var view = new CatalogView
         {
             Title = naval ? "选择船" : "选择阵形",
             HintText = naval ? "请选择船。" : Draft.View.World.Simulation.NewGame.MixedTroopsEnabled
-                ? "请选择阵形；新阵形需在功能→兵种研究中解锁。" : "请选择阵形。",
+                ? "请选择主将掌握的阵形；武将熟练度影响各自分队。" : "请选择阵形。",
             CloseTitle = "中止",
-            Pages = ForceCapabilityCatalog.Pages(category),
+            Pages = pages,
             Textures = Textures,
             Service = Service,
             PortraitSize = new(120, 120),
@@ -258,7 +263,10 @@ public partial class DeploymentView : FixedPage
                     canvas.DrawLine(rect.Position + new Vector2(0, y * cell.Y), rect.Position + new Vector2(rect.Size.X, y * cell.Y), new Color("82918b"));
             },
             InitialCurrentId = naval ? Draft.NavalFormationId : Draft.FormationId,
-            ReadRows = page => ForceCapabilityCatalog.Read(Session, Texts, category, Draft.Force.Id, page).Rows.Where(r => candidates.Contains(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id, r.Cells.ToArray())).ToArray(),
+            ReadRows = page => ForceCapabilityCatalog.Read(Session, Texts, category, Draft.Force.Id, page, personalFormations: showProficiency).Rows
+                .Where(r => candidates.Contains(r.Key.Id)).Select(r => new CatalogRow(r.Key.Id, showProficiency
+                    ? [.. r.Cells, commander?.FormationProficiencies?.TryGetValue(r.Key.Id, out int value) == true ? (CatalogCell)value : CatalogCell.Unavailable]
+                    : r.Cells.ToArray())).ToArray(),
             Activated = id => { if (Draft.SetFormation(id, naval)) CloseChild(); },
             Closed = CloseChild
         };

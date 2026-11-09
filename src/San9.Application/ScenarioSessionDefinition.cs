@@ -88,10 +88,15 @@ internal sealed class ScenarioSessionDefinition
             military.Formations.Values.Any(formation => formation.TravelMode == TravelMode.Water) &&
             !military.NavalTraining.Values.Any(training => training.ResearchProjectId is null))
             throw new InvalidDataException("当前内容包缺少基础水军训练，请使用新版转换器重新准备游戏内容");
+        var forces = Forces().ToArray();
+        var initialUnits = InitialUnits(settings).ToArray();
+        var people = Content.Officers.Select(o => o.CreateState(Content.Year)).ToArray();
+        if (settings?.MixedTroopsEnabled == true && MilitaryRules is { } formationRules)
+            people = FormationKnowledgeMigration.Initialize(people, forces, initialUnits, formationRules);
         return WorldState.Create(new(Content.Year, Content.Month, Content.Day), seed,
-        Forces(),
-        BarbarianStartup.CreateSettlements(Forces(), Settlements(), Content.Officers.Select(o => o.State)),
-        Content.Officers.Select(o => o.CreateState(Content.Year)), InitialUnits(settings), Content.Information.Corps,
+        forces,
+        BarbarianStartup.CreateSettlements(forces, Settlements(), people),
+        people, initialUnits, Content.Information.Corps,
         Content.Information.TreasureStates, Content.Information.Relations,
         Content.Forces.Where(f => !f.IsDormant).OrderBy(f => _playerForces.Contains(f.Id) ? 0 : 1).ThenBy(f => f.Id)
             .Select(f => new ControlSeat(_playerForces.Contains(f.Id) && playerForceController == ControllerKind.Player ? "player" : $"ai:{f.Id}", f.Id,

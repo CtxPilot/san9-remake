@@ -437,11 +437,12 @@ public partial class StrategyHud : Control
             });
             return;
         }
-        if (command is not ("sortie" or "patrol" or "build" or "transport" or "demolish" or "delegate") && !MissionDraft.Supports(command) && !FacilityCommandDraft.Supports(command) && !AppointmentDraft.Supports(command) && !PersonnelDraft.Supports(command)) return;
+        if (command is not ("sortie" or "patrol" or "build" or "transport" or "demolish" or "delegate" or "research") && !MissionDraft.Supports(command) && !FacilityCommandDraft.Supports(command) && !AppointmentDraft.Supports(command) && !PersonnelDraft.Supports(command)) return;
         _commandReturn = (target, _commandMenu.Navigation.Anchor, _commandMenu.Navigation.GroupId);
         _commandMenu.Close();
         Overview.Close();
-        if (command == "patrol") _patrolFlow.Open(target.Id);
+        if (command == "research") SystemMenu.OpenResearchAt(target.Id);
+        else if (command == "patrol") _patrolFlow.Open(target.Id);
         else if (command == "demolish") _demolitionFlow.Open(target.Id);
         else if (command == "delegate") _corpsFlow.Open();
         else if (MissionDraft.Supports(command)) _missionFlow.Open(target.Id,command);

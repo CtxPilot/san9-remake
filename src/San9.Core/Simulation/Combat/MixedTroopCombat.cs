@@ -7,10 +7,11 @@ internal static class MixedTroopCombat
     internal static uint Adjust(WorldMutation world, BattleSource source, BattleSource target,
         uint damage, MilitaryRulebook rules, int? actorId = null, bool tactic = true, bool rangedSource = false)
     {
-        if (rules.MixedTroopCombat is not { } profile || damage == 0) return damage;
+        if (damage == 0) return damage;
+        var profile = rules.MixedTroopCombat;
         if (source.IsSettlement)
         {
-            if (!rangedSource || target.IsSettlement || !world.Units.TryGetValue(target.Id, out var unit) ||
+            if (profile is null || !rangedSource || target.IsSettlement || !world.Units.TryGetValue(target.Id, out var unit) ||
                 unit.Detachments.IsEmpty || rules.Map.IsWater(unit.Position) ||
                 unit.Condition is not (UnitCondition.Normal or UnitCondition.HighSpirits) ||
                 !rules.Formation(unit).SupportsShieldCover) return damage;
@@ -25,6 +26,11 @@ internal static class MixedTroopCombat
         int ranged = Share(attacker, rules, type => type.IsRangedAttack, actorId);
         int rangedInfantry = Share(attacker, rules, type => type.IsRangedInfantry, actorId);
         ulong adjusted = damage;
+        if (actorId is int participant && attacker.FormationId is int activeFormation &&
+            world.Officers.TryGetValue(participant, out var officer) &&
+            officer.FormationProficiencies?.TryGetValue(activeFormation, out int experience) == true)
+            adjusted = adjusted * (10000u + (uint)experience) / 10000;
+        if (profile is null) return (uint)Math.Min(adjusted, uint.MaxValue);
         if (tactic && actorId is not null && attackingFormation.SupportsSpearBowSynergy &&
             (attacker.Condition is UnitCondition.Normal or UnitCondition.HighSpirits) && rangedInfantry > 0 &&
             attacker.MemberPositions.TryGetValue(actorId.Value, out var actorPosition) && actorPosition.Rank == BattleRank.Rear)

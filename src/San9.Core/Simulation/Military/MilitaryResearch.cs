@@ -24,7 +24,7 @@ internal static class MilitaryResearch
     internal static CommandRejection Start(WorldMutation world, StartResearchCommand command, SimulationRules rules, List<DomainEvent> events)
     {
         if (!world.Simulation.NewGame.MixedTroopsEnabled || rules.Military is not { } military ||
-            string.IsNullOrWhiteSpace(command.ProjectId) || !military.ResearchProjects.TryGetValue(command.ProjectId, out var project) ||
+            string.IsNullOrWhiteSpace(command.ProjectId) || military.IsLegacyFormationResearch(command.ProjectId) || !military.ResearchProjects.TryGetValue(command.ProjectId, out var project) ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsEliminated || force.IsDormant ||
             !world.Settlements.TryGetValue(command.SettlementId, out var place) || place.OwnerId != force.Id ||
             place.IsDormant || place.IsDestroyed || !place.CanHostPersons || force.ActiveResearch is not null ||
@@ -57,6 +57,17 @@ internal static class MilitaryResearch
             else
             {
                 world.Replace(force with { ActiveResearch = null, CompletedResearch = force.CompletedResearch.Add(progress.ProjectId).Order(StringComparer.Ordinal).ToImmutableArray() });
+                if (military.IsLegacyFormationResearch(progress.ProjectId))
+                {
+                    var formations = military.Formations.Values.Where(f => f.MixedTroopsOnly && f.ResearchProjectId == progress.ProjectId).ToArray();
+                    foreach (var officer in world.Officers.Values.Where(o => o.OwnerId == force.Id && o.FormationProficiencies is not null).ToArray())
+                    {
+                        var skills = officer.FormationProficiencies!;
+                        foreach (var formation in formations)
+                            if (!skills.ContainsKey(formation.Id)) skills = skills.Add(formation.Id, 0);
+                        world.Replace(officer with { FormationProficiencies = skills });
+                    }
+                }
                 events.Add(new ResearchCompletedEvent(world.Clock, force.Id, progress.ProjectId));
             }
         }

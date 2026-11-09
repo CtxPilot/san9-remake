@@ -1,9 +1,34 @@
+using System.Collections.Immutable;
 using San9.Application.Presentation;
+using San9.Content.Text;
 
 namespace San9.Application.Tests;
 
 public sealed class OfficerDetailTests
 {
+    [Fact]
+    public void FormationPageShowsPersonalKnowledgeAndDistinguishesZeroFromUnknown()
+    {
+        var definition = G01ScenarioTests.Fixture();
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion,
+            definition.Officers.Select(o => o.NameKey).Concat(definition.Settlements.Select(s => s.NameKey))
+                .Distinct().ToDictionary(key => key, key => key));
+        var view = DeploymentDraftTests.View(world => world with
+        {
+            Simulation = world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = true } },
+            Officers = world.Officers.Select(person => person.Id == 1
+                ? person with { FormationProficiencies = ImmutableSortedDictionary<int, int>.Empty.Add(100, 0) }
+                : person).ToArray()
+        });
+        var detail = OfficerDetails.Read(view, texts, 1);
+        Assert.True(detail.FormationRulesEnabled);
+        Assert.Equal(0, Assert.Single(detail.Formations, f => f.Name == "fish").Proficiency);
+        Assert.Null(Assert.Single(detail.Formations, f => f.Name == "snake").Proficiency);
+        var state = new OfficerDetailState();
+        state.Open([1, 2], 1); state.SelectPage(OfficerDetailPage.Formations); state.Activate(2);
+        Assert.Equal(OfficerDetailPage.Formations, state.Page);
+    }
+
     [Fact]
     public void CallerOrderFocusDisplayedPersonAndPageAreIndependent()
     {

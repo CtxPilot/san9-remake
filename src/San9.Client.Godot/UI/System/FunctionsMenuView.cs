@@ -16,14 +16,11 @@ public partial class FunctionsMenuView : HudDropdown
     public Action OpenPkSettings { get; init; } = null!;
     public Action OpenCompanionSettings { get; init; } = null!;
     public Func<bool> CanConfigureCompanion { get; init; } = null!;
-    public Action OpenResearch { get; init; } = null!;
-    public Func<bool> CanResearch { get; init; } = null!;
-    public bool ShowResearch { get; init; }
     public Action OpenExit { get; init; } = null!;
     public Action ReturnToOpening { get; init; } = null!;
     public Action<WorldEditorKind> OpenEditor { get; init; } = null!;
     public Func<WorldEditorKind, bool> CanEdit { get; init; } = null!;
-    protected override Vector2 MenuSize => new(120, ShowResearch ? 344 : 320);
+    protected override Vector2 MenuSize => new(120, 320);
     protected override bool AlignRight => true;
     public override void _Ready()
     {
@@ -31,9 +28,9 @@ public partial class FunctionsMenuView : HudDropdown
         (string Title, string Role)[] allEntries = [("储存", "save"), ("载入", "load"),
             ("编辑武将", "edit-officers"), ("编辑军团", "edit-corps"), ("编辑都市", "edit-cities"),
             ("编辑设施", "edit-facilities"), ("编辑障碍物", "edit-obstacles"),
-            ("兵种研究", "research"), ("优化伴侣", "companion"), ("PK设定", "pk"),
+            ("优化伴侣", "companion"), ("PK设定", "pk"),
             ("设定环境", "environment"), ("初始设定", "initial"), ("结束游戏", "exit")];
-        var entries = allEntries.Where(entry => ShowResearch || entry.Role != "research").ToArray();
+        var entries = allEntries;
         for (int i = 0; i < entries.Length; i++)
         {
             Action? action = entries[i].Role switch
@@ -43,7 +40,6 @@ public partial class FunctionsMenuView : HudDropdown
                 "environment" => OpenEnvironment,
                 "pk" => OpenPkSettings,
                 "companion" when CanConfigureCompanion() => OpenCompanionSettings,
-                "research" when CanResearch() => OpenResearch,
                 "exit" => OpenExit,
                 "initial" => ReturnToOpening,
                 "edit-officers" when CanEdit(WorldEditorKind.Officers) => () => OpenEditor(WorldEditorKind.Officers),
@@ -54,7 +50,7 @@ public partial class FunctionsMenuView : HudDropdown
                 _ => null
             };
             var button = new InformationMenuButton { Title = entries[i].Title, Textures = Textures,
-                HintText = entries[i].Role == "research" ? "研究兵种与装备。" : entries[i].Role == "companion" ? "设置辅助功能、势力、成长与战斗规则。快捷键：Tab。" :
+                HintText = entries[i].Role == "companion" ? "设置辅助功能、势力、成长与战斗规则。快捷键：Tab。" :
                     Texts.ResolveRich(StrategyHintText.Key($"functions-{entries[i].Role}")),
                 Position = new(16, 16 + i * 24), Size = new(88, 24), Disabled = action is null };
             if (action is not null) button.Pressed += action;
