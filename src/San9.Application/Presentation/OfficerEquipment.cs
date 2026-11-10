@@ -47,20 +47,25 @@ public static class OfficerEquipment
         {
             var definition = rules.Items[instance.DefinitionId];
             bool inventory = instance.InventoryForceId is not null;
-            bool compatible = true;
+            string? incompatibility = null;
             if (definition.Slot is EquipmentSlot.MainHand or EquipmentSlot.OffHand)
             {
                 var otherSlot = definition.Slot == EquipmentSlot.MainHand ? EquipmentSlot.OffHand : EquipmentSlot.MainHand;
                 var other = world.Equipment.FirstOrDefault(e => e.OfficerId == officerId && e.Equipped && rules.Items[e.DefinitionId].Slot == otherSlot);
-                if (other is not null) compatible = definition.Slot == EquipmentSlot.MainHand
-                    ? EquipmentRules.Compatible(definition, rules.Items[other.DefinitionId])
-                    : EquipmentRules.Compatible(rules.Items[other.DefinitionId], definition);
+                if (other is not null)
+                {
+                    var otherDefinition = rules.Items[other.DefinitionId];
+                    bool compatible = definition.Slot == EquipmentSlot.MainHand
+                        ? EquipmentRules.Compatible(definition, otherDefinition)
+                        : EquipmentRules.Compatible(otherDefinition, definition);
+                    if (!compatible) incompatibility = $"与已装备的{SlotName(otherSlot)}「{Name(otherDefinition)}」不兼容，请先更换或卸下。";
+                }
             }
-            bool allowed = own && compatible && session.Validate(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), player!.Value,
+            bool allowed = own && incompatibility is null && session.Validate(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), player!.Value,
                 world.Simulation.NextSequence, officerId, definition.Slot, instance.Id)).Accepted;
             return new(instance.Id, Name(definition), definition.Slot, definition.Rarity, instance.Level, instance.Experience,
                 instance.Equipped, inventory, instance.LegacyTreasureId is not null, Effect(definition, instance.Level), allowed,
-                !compatible ? "与当前武器不兼容。" : !allowed ? "当前无法操作此装备。" : null);
+                incompatibility ?? (!allowed ? "当前无法操作此装备。" : null));
         }
         var visible = world.Equipment.Where(e => e.OfficerId == officerId || own && e.InventoryForceId == player)
             .Select(Item).OrderByDescending(e => e.Equipped).ThenBy(e => e.Name, StringComparer.Ordinal).ThenBy(e => e.Id).ToArray();

@@ -29,7 +29,7 @@ public sealed class GiftSessionTests
         var offered = Assert.Single(San9.Application.Presentation.OfficerEquipment.Read(session, texts, 11)
             .Slots.Single(slot => slot.Slot == EquipmentSlot.OffHand).Items);
         Assert.False(offered.CanEquip);
-        Assert.Contains("不兼容", offered.UnavailableReason);
+        Assert.Contains("主武器「枪」不兼容", offered.UnavailableReason);
         Assert.False(session.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
             session.Snapshot.Simulation.NextSequence, 11, EquipmentSlot.OffHand, offered.Id)).Submission.Accepted);
         var unchanged = session.Snapshot.Equipment.Single(item => item.Id == offered.Id);
