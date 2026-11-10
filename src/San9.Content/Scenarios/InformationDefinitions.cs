@@ -78,6 +78,8 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
                 throw new ArgumentException("Unknown legacy treasure reference.");
             if (Tactics is null || Equipment.Any(e => e.TacticId is int id && !Tactics.Any(t => t is not null && t.Id == id)))
                 throw new ArgumentException("Unknown equipment tactic reference.");
+            if (scenario.Military is { } military && Treasures.Any(e => e.TacticId is int id && !military.Tactics.Any(t => t.Id == id)))
+                throw new ArgumentException("Unknown treasure tactic reference.");
         }
         catch (ArgumentException error) { throw new InvalidDataException("Invalid equipment catalog.", error); }
         if (MapContextExcludedFacilityIds.IsDefault ||

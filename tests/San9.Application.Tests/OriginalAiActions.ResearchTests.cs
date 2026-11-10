@@ -56,6 +56,16 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void MigratedTreasureWithUnknownTacticReferenceIsRejected()
+    {
+        var basis = Fixture();
+        var treasure = new TreasureDefinition(99, "legacy-item", 1, 2, 0, 999999);
+        var state = new TreasureState(99, 1, TreasureDiscovery.Discovered, null);
+        var content = basis with { Information = basis.Information with { Treasures = [treasure], TreasureStates = [state] } };
+        Assert.Throws<InvalidDataException>(() => content.Validate());
+    }
+
+    [Fact]
     public void PlayerResearchesMakesEquipsAndRestoresEquipment()
     {
         var basis = Fixture();
