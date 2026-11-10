@@ -70,6 +70,7 @@ public sealed partial class DeploymentDraft
                     project.Key <= pair.Value.Level && !Force.CompletedResearch.Contains(project.Value))) ||
             value.Values.Aggregate(0UL, (sum, d) => sum + d.Soldiers) != Soldiers) return false;
         _detachments = value;
+        ClearIncompatibleDetachmentTactics();
         return true;
     }
     public int? CommanderId => Members.IsEmpty ? null : Members[0];
@@ -135,6 +136,7 @@ public sealed partial class DeploymentDraft
         Tactics = members.ToImmutableDictionary(id => id, id => Tactics.TryGetValue(id, out var selectedTactic) ? selectedTactic :
             AvailableTactics(id).FirstOrDefault(t => t.Id == View.World.Officers.Single(o => o.Id == id).EquippedTacticId)?.Id);
         Arrange(sameFormation); Soldiers = MaximumSoldiers;
+        ClearIncompatibleDetachmentTactics();
         return true;
     }
 
@@ -205,7 +207,7 @@ public sealed partial class DeploymentDraft
     }
     public bool SetTactic(int officerId, int? tacticId)
     {
-        if (!Members.Contains(officerId) || tacticId is int tactic && !AvailableTactics(officerId).Any(t => t.Id == tactic)) return false;
+        if (!Members.Contains(officerId) || tacticId is int tactic && !SelectableTactics(officerId).Any(t => t.Id == tactic)) return false;
         Tactics = Tactics.SetItem(officerId, tacticId); return true;
     }
     public FormationBoardData Board(TextCatalog texts) => new(Presentation(false) is { Slots.IsEmpty: false } presentation

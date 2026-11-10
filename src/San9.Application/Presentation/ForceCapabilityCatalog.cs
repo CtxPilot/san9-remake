@@ -13,7 +13,7 @@ public static class ForceCapabilityCatalog
         CatalogColumn Column(string title, int width = 8) => new(title, title, width, CatalogAlignment.Center);
         if (category == InformationCategory.Offices)
         {
-            CatalogColumn Name() => new("name", "爵位", 8, CatalogAlignment.Left);
+            CatalogColumn Name() => new("name", "官职", 8, CatalogAlignment.Left);
             CatalogColumn Number(string title, int width = 6) => new(title, title, width, CatalogAlignment.Right);
             return [new("特征", [Name(), new("holder", "武将", 8, CatalogAlignment.Center), Number("指挥"), Number("俸禄"),
                 Number("统率"), Number("武力"), Number("智力"), Number("政治"), Number("忠诚上升", 10)]),
@@ -61,7 +61,7 @@ public static class ForceCapabilityCatalog
         else if (session.MilitaryRules is not { } military) rows = [];
         else if (category == InformationCategory.Tactics)
         {
-            string[] categories = ["步兵", "骑兵", "弓骑", "弩兵", "水军", "攻城", "智略", "谋略", "策略"];
+            string[] categories = ["步兵", "骑兵", "弓骑", "弓弩", "水军", "攻城", "智略", "谋略", "策略"];
             rows = view.Information.Tactics.Where(t => military.Tactics[t.Id].Selectable && HasTactic(t.Id)).Select(t =>
             {
                 var rule = military.Tactics[t.Id];
@@ -107,7 +107,7 @@ public static class ForceCapabilityCatalog
     }
     private static string FormationEffect(FormationRule rule)
     {
-        string[] categories = ["步兵", "骑兵", "弓骑", "弩兵", "水军", "攻城", "智略", "谋略", "策略"];
+        string[] categories = ["步兵", "骑兵", "弓骑", "弓弩", "水军", "攻城", "智略", "谋略", "策略"];
         List<string> effects = [];
         if (rule.Tactics is { FavoredCategories.Length: > 0 } tactics)
             effects.Add("易于发动" + string.Join("、", tactics.FavoredCategories.Select(c => categories[c])) + "系兵法");

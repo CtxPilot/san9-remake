@@ -78,6 +78,9 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
                 throw new ArgumentException("Unknown legacy treasure reference.");
             if (Tactics is null || Equipment.Any(e => e.TacticId is int id && !Tactics.Any(t => t is not null && t.Id == id)))
                 throw new ArgumentException("Unknown equipment tactic reference.");
+            if (Equipment.Any(e => e.PurchaseResearchProjectId is string project &&
+                project != EquipmentPreset.ResearchId && scenario.Military?.ResearchProjects.Any(r => r.Id == project) != true))
+                throw new ArgumentException("Unknown equipment purchase research reference.");
             if (scenario.Military is { } military && Treasures.Any(e => e.TacticId is int id && !military.Tactics.Any(t => t.Id == id)))
                 throw new ArgumentException("Unknown treasure tactic reference.");
         }

@@ -19,6 +19,7 @@ public sealed record RespondDailyTaskCommand(Guid CommandId, int IssuerId, long 
 [JsonDerivedType(typeof(ConfigureEquipmentCommand), "configure-equipment")]
 [JsonDerivedType(typeof(TransferEquipmentCommand), "transfer-equipment")]
 [JsonDerivedType(typeof(StartEquipmentProductionCommand), "start-equipment-production")]
+[JsonDerivedType(typeof(PurchaseEquipmentCommand), "purchase-equipment")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(RespondDailyTaskCommand), "respond-daily-task")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(GiftCommand), "gift")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(RequestAttackCommand), "request-attack")]

@@ -137,9 +137,6 @@ public sealed partial class DeploymentDraft
             return Result(DeploymentPresetFailure.ShipUnavailable);
         if (View.World.Simulation.NewGame.MixedTroopsEnabled && !prepared.SetSiegeEquipment(preset.SiegeEquipmentId))
             return Result(DeploymentPresetFailure.FormationUnavailable);
-        foreach (var member in members)
-            if (!prepared.SetTactic(member.OfficerId, member.TacticId))
-                return Result(DeploymentPresetFailure.TacticUnavailable, member.OfficerId);
         prepared.Positions = members.ToImmutableDictionary(m => m.OfficerId, m => m.Position);
         uint maximum = prepared.MaximumSoldiers;
         uint soldiers = preset.SoldierMode == DeploymentSoldierMode.Maximum ? maximum : Math.Min(preset.Soldiers, maximum);
@@ -152,6 +149,9 @@ public sealed partial class DeploymentDraft
             if (!prepared.SetDetachments(DetachmentAllocation.Resize(saved, soldiers)))
                 return Result(DeploymentPresetFailure.InvalidPreset);
         }
+        foreach (var member in members)
+            if (!prepared.SetTactic(member.OfficerId, member.TacticId))
+                return Result(DeploymentPresetFailure.TacticUnavailable, member.OfficerId);
         if (prepared.Cost > Money) return Result(DeploymentPresetFailure.InsufficientMoney);
         candidate = prepared;
         return Result(DeploymentPresetFailure.None, maximumSoldiers: maximum);

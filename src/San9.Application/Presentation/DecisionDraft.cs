@@ -340,7 +340,8 @@ public sealed class DecisionDraft
             {
                 "disaster-relief" => presentation.Decisions.Subjects["disaster." + community.Season],
                 "monument" or "homecoming-sacrifice" => presentation.Decisions.Subjects[community.EventId + "." + community.PlaceId],
-                "training-site" => presentation.Decisions.Subjects["tactic-category." + community.TacticCategory],
+                "training-site" => community.TacticCategory == 3 && presentation.Decisions.Subjects["tactic-category.3"] == "弩兵"
+                    ? "弓弩" : presentation.Decisions.Subjects["tactic-category." + community.TacticCategory],
                 "bribe" => presentation.Decisions.Subjects["civic-person." + Random.Shared.Next(2)],
                 _ => ""
             };

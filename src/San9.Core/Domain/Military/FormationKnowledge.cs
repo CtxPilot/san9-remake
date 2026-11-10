@@ -6,6 +6,19 @@ namespace San9.Core.Domain;
 public static class FormationKnowledge
 {
     public const int MaximumProficiency = 1000;
+    public const int PracticeDaysToLearn = 20;
+
+    public static OfficerState Practice(OfficerState officer, int formationId)
+    {
+        if (formationId < 0) throw new ArgumentOutOfRangeException(nameof(formationId));
+        if (officer.FormationProficiencies is null || Knows(officer, formationId)) return officer;
+        var practice = officer.FormationPractice ?? ImmutableSortedDictionary<int, int>.Empty;
+        int next = practice.GetValueOrDefault(formationId) + 1;
+        if (next < PracticeDaysToLearn) return officer with { FormationPractice = practice.SetItem(formationId, next) };
+        practice = practice.Remove(formationId);
+        return officer with { FormationProficiencies = officer.FormationProficiencies.Add(formationId, 0),
+            FormationPractice = practice.IsEmpty ? null : practice };
+    }
 
     public static OfficerState InitializeLegacy(OfficerState officer, ForceState? force, MilitaryRulebook rules, int? currentFormation = null)
     {

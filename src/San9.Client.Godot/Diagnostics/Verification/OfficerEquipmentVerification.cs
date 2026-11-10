@@ -37,30 +37,36 @@ public partial class OfficerEquipmentVerification : Node
             { Equipment = [.. saved.World.Equipment, new EquipmentInstance(itemId, "basic-spear", null, player, false)] } });
             var service = new TextureService(); service.Initialize(package, package.TextureRoot); AddChild(service);
             using var textures = service.CreateScope();
-            textures.RequestPrefixes("detail-", "message-", "catalog-", "scroll-", "roster-");
+            textures.RequestPrefixes("detail-", "message-", "catalog-", "information-", "scroll-", "roster-", "dialog-");
             var state = new OfficerDetailState(); state.Open([officer.Id], officer.Id);
             var page = new OfficerDetailView { State = state, Session = session, Textures = textures, Texts = package.Text, Service = service,
                 Read = id => OfficerDetails.Read(session.View, package.Text, id),
                 ReadName = id => package.Text.Resolve(session.View.Officers.Single(o => o.Id == id).NameKey),
-                OpenTreasures = _ => { }, CurrentChanged = _ => { }, Closed = () => { } };
+                CurrentChanged = _ => { }, Closed = () => { } };
             AddChild(page);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             page.GetNode<DetailActionButton>("EquipmentOpen").EmitSignal(BaseButton.SignalName.Pressed);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             var equipment = Descendants<OfficerEquipmentView>(page).Single();
             var labels = Descendants<Label>(equipment).Select(label => label.Text).ToHashSet();
-            foreach (string slot in new[] { "主武器", "副武器", "头盔", "铠甲", "坐骑", "宝物" })
+            foreach (string slot in new[] { "主武器", "副武器", "头盔", "铠甲", "坐骑", "宝物", "兵符", "暗器", "书籍" })
                 if (!labels.Contains(slot)) throw new InvalidOperationException("Missing slot: " + slot);
-            var choice = Descendants<OptionButton>(equipment).Single(node => node.Name == "EquipmentChoice_MainHand");
-            int index = Enumerable.Range(0, choice.ItemCount).Single(i => choice.GetItemText(i).Contains("制式长枪", StringComparison.Ordinal));
-            choice.Select(index); choice.EmitSignal(OptionButton.SignalName.ItemSelected, (long)index);
-            var apply = Descendants<Button>(equipment).Single(node => node.Name == "EquipmentApply_MainHand");
-            if (apply.Disabled) throw new InvalidOperationException("Inventory equipment cannot be selected.");
-            apply.EmitSignal(BaseButton.SignalName.Pressed);
+            var slots = OfficerEquipment.Read(session, package.Text, officer.Id).Slots;
+            int slotIndex = Array.FindIndex(slots, s => s.Slot == EquipmentSlot.MainHand);
+            Descendants<CatalogView>(equipment).Single().Activated!(slotIndex);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            var items = OfficerEquipment.Read(session, package.Text, officer.Id).Slots[slotIndex].Items;
+            int itemIndex = Array.FindIndex(items, item => item.Id == itemId);
+            if (itemIndex < 0 || !items[itemIndex].CanEquip) throw new InvalidOperationException("Inventory equipment cannot be selected.");
+            Descendants<CatalogView>(equipment).Single().Activated!(itemIndex);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            Descendants<CatalogView>(equipment).Single().Activated!(0);
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+            Descendants<StrategyButton>(equipment).Single(button => button.Title == "是").EmitSignal(BaseButton.SignalName.Pressed);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             var equipped = session.Snapshot.Equipment.Single(e => e.Id == itemId);
             if (equipped.OfficerId != officer.Id || !equipped.Equipped) throw new InvalidOperationException("Equipment command did not apply.");
-            GD.Print($"OFFICER_EQUIPMENT_OK officer={officer.Id} slots=6");
+            GD.Print($"OFFICER_EQUIPMENT_OK officer={officer.Id} slots=9");
             page.Free(); service.Free(); GetTree().Quit();
         }
         catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }

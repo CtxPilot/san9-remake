@@ -94,7 +94,7 @@ public partial class DeploymentView : FixedPage
         if (Draft.View.World.Simulation.NewGame.MixedTroopsEnabled)
             Button("兵种", "edit", new(296, ShipRowY, 72, 40), () => OpenChild(new DeploymentDetachmentsView
             {
-                Draft = Draft, Texts = Texts, Closed = CloseChild
+                Draft = Draft, Texts = Texts, Textures = Textures, Service = Service, Closed = CloseChild
             }), selected && Draft.Detachments.Count == Draft.Members.Length);
         Button("士兵", "edit", new(136, SoldiersRowY, 104, 40), SelectSoldiers, selected && Draft.MaximumSoldiers > 0);
         Label("大将", new(136, 188, 96, 32)); Field(Person(Draft.CommanderId), new(240, 188, 80, 32));
@@ -274,12 +274,11 @@ public partial class DeploymentView : FixedPage
     }
     private void SelectTactic(int person)
     {
-        var tactics = Draft.AvailableTactics(person).Select(t => t.Id).ToHashSet();
-        if (tactics.Count == 0) { Notice("没学得兵法。 "); return; }
+        var tactics = Draft.SelectableTactics(person).Select(t => t.Id).ToHashSet();
         OpenChild(new CatalogView
         {
             Title = "选择兵法",
-            HintText = "选择武将使用的兵法。",
+            HintText = "仅显示武将掌握且当前兵种和等级可使用的兵法。",
             CloseTitle = "中止",
             Pages = ForceCapabilityCatalog.Pages(InformationCategory.Tactics),
             Textures = Textures,

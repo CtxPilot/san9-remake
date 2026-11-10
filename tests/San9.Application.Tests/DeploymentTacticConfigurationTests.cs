@@ -50,8 +50,9 @@ public sealed class DeploymentTacticConfigurationTests
         Assert.True(draft.SetMembers([1]));
         Assert.True(draft.SetFormation(100, false));
         Assert.True(draft.SetDetachments(ImmutableDictionary<int, DetachmentState>.Empty.Add(1, new(1, 1, draft.Soldiers))));
-        Assert.True(draft.SetTactic(1, 6103));
-        Assert.False(draft.IsTacticCompatible(1));
+        Assert.False(draft.SetTactic(1, 6103));
+        Assert.DoesNotContain(draft.SelectableTactics(1), t => t.Id == 6103);
+        Assert.Contains(draft.SelectableTactics(1), t => t.Id == 6500);
         draft.ConfigureTactics(DeploymentTacticMode.Infantry);
         Assert.Equal(6101, draft.Tactics[1]);
         Assert.True(draft.IsTacticCompatible(1));
@@ -59,6 +60,8 @@ public sealed class DeploymentTacticConfigurationTests
         draft.ConfigureTactics(DeploymentTacticMode.Infantry);
         Assert.Equal(6103, draft.Tactics[1]);
         Assert.True(draft.IsTacticCompatible(1));
+        Assert.True(draft.SetDetachments(ImmutableDictionary<int, DetachmentState>.Empty.Add(1, new(1, 1, draft.Soldiers))));
+        Assert.Null(draft.Tactics[1]);
     }
 
     [Fact]

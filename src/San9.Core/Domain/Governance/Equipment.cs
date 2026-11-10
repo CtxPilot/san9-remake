@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace San9.Core.Domain;
 
-public enum EquipmentSlot { MainHand, OffHand, Helmet, Armor, Mount, Treasure }
+public enum EquipmentSlot { MainHand, OffHand, Helmet, Armor, Mount, Treasure, Tally, HiddenWeapon, Book }
 public enum EquipmentRarity { Ordinary, Precious, Rare }
 public enum EquipmentUse { Attack, Defense }
 
@@ -14,16 +14,28 @@ public sealed record EquipmentDefinition(string Id, EquipmentSlot Slot, Equipmen
     public int? TacticId { get; init; }
     public bool EscapeMount { get; init; }
     public string Name { get; init; } = "";
+    /// <summary>Fixed item grade, independent of rarity and experience level.</summary>
+    public int Grade { get; init; } = 1;
+    /// <summary>Minimum innate officer abilities; equipped bonuses never count.</summary>
+    public OfficerAbilities MinimumAbilities { get; init; }
     public string? ResearchProjectId { get; init; }
     public int ProductionCost { get; init; }
     public int ProductionDays { get; init; }
+    /// <summary>Null means this item cannot be purchased; purchase and manufacture are independent.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? PurchaseCost { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PurchaseResearchProjectId { get; init; }
     // Empty means no restrictions. Values are definition IDs, not source-game numeric slots.
     public ImmutableArray<string> CompatibleWeapons { get; init; } = [];
     [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => !string.IsNullOrWhiteSpace(Id) && Enum.IsDefined(Slot) && Enum.IsDefined(Rarity) &&
         LegacyTreasureId is not < 0 && TacticId is not < 0 && (!EscapeMount || Slot == EquipmentSlot.Mount) &&
-        Name is not null && ProductionCost >= 0 && ProductionDays >= 0 &&
+        Name is not null && Grade is >= 1 and <= 5 && MinimumAbilities.IsNonnegative && ProductionCost >= 0 && ProductionDays >= 0 && PurchaseCost is not < 0 &&
+        (PurchaseCost is not null || PurchaseResearchProjectId is null) &&
+        (PurchaseResearchProjectId is null || !string.IsNullOrWhiteSpace(PurchaseResearchProjectId)) &&
+        (PurchaseCost is null || LegacyTreasureId is null && Rarity == EquipmentRarity.Ordinary && Slot != EquipmentSlot.Treasure) &&
         (ResearchProjectId is null ? ProductionCost == 0 && ProductionDays == 0 :
-            !string.IsNullOrWhiteSpace(ResearchProjectId) && ProductionDays > 0 && LegacyTreasureId is null && Slot != EquipmentSlot.Treasure) &&
+            !string.IsNullOrWhiteSpace(ResearchProjectId) && ProductionDays > 0 && LegacyTreasureId is null && Slot is not (EquipmentSlot.Treasure or EquipmentSlot.Tally or EquipmentSlot.Book)) &&
         BaseBonuses.IsNonnegative && BonusPerLevel.IsNonnegative && !CompatibleWeapons.IsDefault &&
         CompatibleWeapons.All(id => !string.IsNullOrWhiteSpace(id)) &&
         CompatibleWeapons.Distinct(StringComparer.Ordinal).Count() == CompatibleWeapons.Length &&
@@ -71,6 +83,10 @@ public sealed class EquipmentRulebook
 
 public static class EquipmentRules
 {
+    public static bool MeetsRequirements(EquipmentDefinition definition, OfficerAbilities abilities) =>
+        abilities.War >= definition.MinimumAbilities.War && abilities.Intelligence >= definition.MinimumAbilities.Intelligence &&
+        abilities.Politics >= definition.MinimumAbilities.Politics && abilities.Leadership >= definition.MinimumAbilities.Leadership;
+
     public static bool ValidInventory(IEnumerable<EquipmentInstance> items,
         IReadOnlyDictionary<string, EquipmentDefinition> definitions)
     {
@@ -174,7 +190,7 @@ public static class EquipmentRules
             throw new ArgumentException("Invalid equipment use.");
         bool earns = item.Equipped && item.Level < 5 && (use switch
         {
-            EquipmentUse.Attack => definition.Slot is EquipmentSlot.MainHand or EquipmentSlot.OffHand,
+            EquipmentUse.Attack => definition.Slot is EquipmentSlot.MainHand or EquipmentSlot.OffHand or EquipmentSlot.HiddenWeapon,
             EquipmentUse.Defense => definition.Slot is EquipmentSlot.Helmet or EquipmentSlot.Armor,
             _ => false
         });
@@ -184,5 +200,5 @@ public static class EquipmentRules
     }
 
     private static bool ValidLevel(EquipmentInstance item, EquipmentDefinition definition) =>
-        definition.Slot is not (EquipmentSlot.Mount or EquipmentSlot.Treasure) || item.Level == 1 && item.Experience == 0;
+        definition.Slot is not (EquipmentSlot.Mount or EquipmentSlot.Treasure or EquipmentSlot.Tally or EquipmentSlot.Book) || item.Level == 1 && item.Experience == 0;
 }

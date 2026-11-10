@@ -38,7 +38,7 @@ public sealed class GiftSessionTests
     }
 
     [Fact]
-    public void OfficerEquipmentShowsSixSlotsInventoryAndAppliesSelection()
+    public void OfficerEquipmentShowsNineSlotsInventoryAndAppliesSelection()
     {
         var content = Content();
         var session = GameSession.Start(content, 42);
@@ -49,7 +49,7 @@ public sealed class GiftSessionTests
             new Dictionary<string, string> { ["treasure"] = "名马" });
         var data = San9.Application.Presentation.OfficerEquipment.Read(session, texts, 11);
         Assert.True(data.CanManage);
-        Assert.Equal(6, data.Slots.Length);
+        Assert.Equal(9, data.Slots.Length);
         Assert.Equal("名马", Assert.Single(data.Slots.Single(s => s.Slot == EquipmentSlot.Mount).Items).Name);
         var spear = Assert.Single(data.Slots.Single(s => s.Slot == EquipmentSlot.MainHand).Items);
         Assert.True(spear.InInventory);
@@ -79,6 +79,43 @@ public sealed class GiftSessionTests
         Assert.True(migrated.Execute(new("player"), command).Submission.Accepted);
         var restored = SaveService.Decode(SaveService.Encode(migrated), content);
         Assert.False(Assert.Single(restored.Snapshot.Equipment).Equipped);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExistingBookEquipmentKeepsIdentityAndEquippedStateAcrossSave(bool equipped)
+    {
+        var basis = Content();
+        var book = basis.Information.Treasures[0] with { Category = 2 };
+        var legacy = new EquipmentDefinition("legacy-treasure:9", EquipmentSlot.Treasure,
+            EquipmentRarity.Precious, book.AbilityBonuses, default) { LegacyTreasureId = 9 };
+        var content = basis with { Information = basis.Information with { Treasures = [book], Equipment = [legacy] } };
+        var session = GameSession.Start(content, 42);
+        var saved = session.Capture();
+        var oldShape = saved with { World = saved.World with
+        {
+            Equipment = [Assert.Single(saved.World.Equipment) with { Equipped = equipped }]
+        } };
+        var restored = GameSession.Restore(content, oldShape);
+        var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion,
+            new Dictionary<string, string> { ["treasure"] = "兵书" });
+        var item = Assert.Single(San9.Application.Presentation.OfficerEquipment.Read(restored, texts, 11)
+            .Slots.Single(slot => slot.Slot == EquipmentSlot.Book).Items);
+        Assert.Equal(9, item.Id);
+        Assert.Equal(equipped, item.Equipped);
+        var loaded = SaveService.Decode(SaveService.Encode(restored), content);
+        Assert.Equal(equipped, Assert.Single(loaded.Snapshot.Equipment).Equipped);
+    }
+
+    [Fact]
+    public void PreviousBasicEquipmentCatalogGainsHiddenWeaponRecipe()
+    {
+        var basis = Content();
+        var oldCatalog = EquipmentPreset.Basic().Where(item => item.Id != "basic-dart").ToImmutableArray();
+        var content = basis with { Information = basis.Information with { Equipment = oldCatalog } };
+        var session = GameSession.Start(content, 42);
+        Assert.Contains(session.EquipmentRecipes, item => item.Id == "basic-dart" && item.Slot == EquipmentSlot.HiddenWeapon);
     }
 
     [Fact]

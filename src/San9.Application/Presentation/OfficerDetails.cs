@@ -56,7 +56,10 @@ public sealed record OfficerDetailData(string Name, string Biography, string Por
     public bool FormationRulesEnabled { get; init; }
     public OfficerFormation[] Formations { get; init; } = [];
 }
-public sealed record OfficerFormation(string Name, int? Proficiency);
+public sealed record OfficerFormation(string Name, int? Proficiency)
+{
+    public int PracticeDays { get; init; }
+}
 public sealed record OfficerTacticGroup(string Name, int Proficiency, OfficerTactic[] Tactics);
 public sealed record OfficerTactic(string Name, bool Available);
 
@@ -107,7 +110,8 @@ public static class OfficerDetails
                     rule.TravelMode == TravelMode.Land && !military.IsFixedFormation(rule.Id) &&
                     rule.Id != military.UnformedFormationId && !military.SiegeEquipment.Values.Any(e => e.FormationId == rule.Id))
                     .OrderBy(formation => formation.Id).Select(formation => new OfficerFormation(formation.Name,
-                        person.FormationProficiencies?.TryGetValue(formation.Id, out int value) == true ? value : null)).ToArray()
+                        person.FormationProficiencies?.TryGetValue(formation.Id, out int value) == true ? value : null)
+                        { PracticeDays = person.FormationPractice?.GetValueOrDefault(formation.Id) ?? 0 }).ToArray()
                 : []
         };
     }

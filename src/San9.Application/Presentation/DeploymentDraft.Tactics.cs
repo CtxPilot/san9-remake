@@ -14,6 +14,17 @@ public sealed partial class DeploymentDraft
         !View.World.Simulation.NewGame.MixedTroopsEnabled || tactic.Effect != TacticEffect.Martial ||
         Detachments.TryGetValue(officerId, out var detachment) && Rules.SupportsDetachmentTactic(detachment, tactic);
 
+    public IReadOnlyList<TacticRule> SelectableTactics(int officerId) => AvailableTactics(officerId)
+        .Where(tactic => DetachmentSupportsTactic(officerId, tactic)).ToArray();
+
+    private void ClearIncompatibleDetachmentTactics()
+    {
+        if (!View.World.Simulation.NewGame.MixedTroopsEnabled) return;
+        foreach (int id in Members)
+            if (Tactics.GetValueOrDefault(id) is int tactic && !DetachmentSupportsTactic(id, Rules.Tactics[tactic]))
+                Tactics = Tactics.SetItem(id, null);
+    }
+
     public bool IsTacticCompatible(int officerId) => Tactics.TryGetValue(officerId, out var id) && id is int tactic &&
         FormationSupportsTactic(Rules.Tactics[tactic]) && DetachmentSupportsTactic(officerId, Rules.Tactics[tactic]);
 

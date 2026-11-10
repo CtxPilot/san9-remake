@@ -1,99 +1,86 @@
 using Godot;
 using San9.Application;
+using San9.Application.Presentation;
 using San9.Content.Text;
 using San9.Core.Simulation;
 
 namespace San9.Client.Godot;
 
-public partial class ResearchView : ModalView
+/// <summary>Research selection and confirmation use the same catalog and dialog as other commands.</summary>
+public partial class ResearchView : ModalView, IModalInputRouter
 {
     public GameSession Session { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
+    public TextureScope Textures { get; init; } = null!;
+    public TextureService Service { get; init; } = null!;
     public Action Closed { get; init; } = null!;
     public int? InitialSettlementId { get; init; }
-    private VBoxContainer _projects = null!;
-    private OptionButton _settlements = null!;
-    private Label _status = null!;
+    private Control? _page;
+    private int? _place;
+    private static readonly CatalogPage[] Pages = [new("研究", [
+        new("name", "项目", 20, CatalogAlignment.Left), new("cost", "资金", 10, CatalogAlignment.Right),
+        new("days", "日数", 8, CatalogAlignment.Right), new("state", "状态／条件", 30, CatalogAlignment.Left)])];
 
     public override void _Ready()
     {
-        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        MouseFilter = MouseFilterEnum.Stop;
-        Theme = CompanionPanelStyle.Create(GetThemeFont("font"));
-        var backdrop = new ColorRect { Color = new(0, 0, 0, .42f), MouseFilter = MouseFilterEnum.Ignore };
-        AddChild(backdrop); backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var panel = new PanelContainer { AnchorRight = 1, AnchorBottom = 1, OffsetLeft = 64, OffsetRight = -64, OffsetTop = 20, OffsetBottom = -20 };
-        AddChild(panel);
-        var margin = new MarginContainer();
-        foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride($"margin_{side}", 16);
-        panel.AddChild(margin);
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 8); margin.AddChild(column);
-        var title = new Label { Text = "军事研究" }; title.AddThemeFontSizeOverride("font_size", 24); column.AddChild(title);
-        _settlements = new OptionButton(); column.AddChild(_settlements);
+        Size = new(1024, 768); MouseFilter = MouseFilterEnum.Stop;
         int? forceId = Session.View.PlayerForceId;
         var world = Session.Snapshot;
         var seat = world.Simulation.Controls.FirstOrDefault(c => c.ForceId == forceId && c.Kind == ControllerKind.Player);
-        if (seat is not null)
-        {
-            var context = new CommandContext("player");
-            var validPlaces = world.Settlements.Where(place => !place.IsDormant && !place.IsDestroyed && place.CanHostPersons &&
-                CorpsControl.CanControlSettlement(world, seat, context, place.Id)).Select(place => place.Id).ToHashSet();
-            foreach (var place in Session.View.Settlements.Where(s => validPlaces.Contains(s.Id)).OrderBy(s => s.Id))
-                _settlements.AddItem(Texts.Resolve(place.NameKey), place.Id);
-        }
-        if (InitialSettlementId is int selected)
-            for (int i = 0; i < _settlements.ItemCount; i++)
-                if (_settlements.GetItemId(i) == selected) { _settlements.Select(i); break; }
-        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
-        column.AddChild(scroll);
-        _projects = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; scroll.AddChild(_projects);
-        _status = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart }; column.AddChild(_status);
-        var close = new Button { Text = "关闭", CustomMinimumSize = new(96, 34) }; close.Pressed += Closed; column.AddChild(close);
-        Refresh();
+        var valid = seat is null ? [] : world.Settlements.Where(p => !p.IsDormant && !p.IsDestroyed && p.CanHostPersons &&
+            CorpsControl.CanControlSettlement(world, seat, new CommandContext("player"), p.Id)).OrderBy(p => p.Id).Select(p => p.Id).ToArray();
+        _place = InitialSettlementId is int place && valid.Contains(place) ? place : valid.Select(p => (int?)p).FirstOrDefault();
+        ShowCatalog();
     }
 
-    private void Refresh()
+    private void Replace(Control page)
     {
-        foreach (Node child in _projects.GetChildren()) { _projects.RemoveChild(child); child.QueueFree(); }
-        int? forceId = Session.View.PlayerForceId;
-        var force = Session.Snapshot.Forces.FirstOrDefault(f => f.Id == forceId);
-        if (force is null) { _status.Text = "当前没有可操作的势力。"; return; }
-        _status.Text = force.ActiveResearch is { } active
-            ? $"正在研究 {Session.ResearchProjectName(active.ProjectId)}，剩余 {active.DaysRemaining} 日。"
-            : "选择据点和研究项目。费用从该据点所属军团支付。";
-        foreach (var project in Session.ResearchProjects)
-        {
-            bool completed = force.CompletedResearch.Contains(project.Id);
-            var missing = project.Prerequisites.Where(id => !force.CompletedResearch.Contains(id)).ToArray();
-            string prerequisites = missing.Length == 0 ? "" : $"　需要 {string.Join("、", missing.Select(Session.ResearchProjectName))}";
-            string state = completed ? "　已完成" : prerequisites;
-            var row = new HBoxContainer(); _projects.AddChild(row);
-            var label = new Label { Text = $"{Session.ResearchProjectName(project.Id)}　资金 {project.Cost}　{project.Days} 日{state}", SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            row.AddChild(label);
-            var start = new Button { Text = "研究", Disabled = completed || missing.Length > 0 || force.ActiveResearch is not null || _settlements.ItemCount == 0 };
-            row.AddChild(start); start.Pressed += () => Start(force.Id, project.Id);
-        }
+        if (_page is not null) { RemoveChild(_page); _page.QueueFree(); }
+        _page = page; AddChild(page);
     }
 
-    private void Start(int forceId, string projectId)
+    private void ShowCatalog()
     {
-        int settlementId = _settlements.GetSelectedId();
-        var command = new StartResearchCommand(Guid.NewGuid(), forceId, Session.Snapshot.Simulation.NextSequence, settlementId, projectId);
-        var result = Session.Execute(new("player"), command);
-        Refresh();
-        if (!result.Submission.Accepted)
-            _status.Text = result.Submission.Rejection == CommandRejection.InsufficientFunds ? "研究失败，资金不足。" :
-                $"研究失败，请检查当前回合、据点控制权和研究条件（{result.Submission.Rejection}）。";
+        var projects = Session.ResearchProjects.ToArray();
+        var force = Session.Snapshot.Forces.FirstOrDefault(f => f.Id == Session.View.PlayerForceId);
+        string State(int index)
+        {
+            var project = projects[index];
+            if (force is null || _place is null) return "无可操作据点";
+            if (force.CompletedResearch.Contains(project.Id)) return "已完成";
+            if (force.ActiveResearch is { } active)
+                return active.ProjectId == project.Id ? $"进行中，剩余{active.DaysRemaining}日" : "其他研究进行中";
+            var missing = project.Prerequisites.Where(id => !force.CompletedResearch.Contains(id)).Select(Session.ResearchProjectName).ToArray();
+            return missing.Length == 0 ? "可研究" : "需要 " + string.Join("、", missing);
+        }
+        var placeName = _place is int id ? Session.View.Settlements.Single(p => p.Id == id).ResolveName(Texts) : "无";
+        var rows = projects.Select((p, i) => new CatalogRow(i, [Session.ResearchProjectName(p.Id), p.Cost, p.Days, State(i)])).ToArray();
+        Replace(new CatalogView { Title = "军事研究", HintText = $"执行设施　{placeName}。选择研究项目查看条件。",
+            CloseTitle = "中止", Textures = Textures, Service = Service, Pages = Pages, ReadRows = _ => rows, Closed = Closed,
+            Activated = index =>
+            {
+                var project = projects[index]; string state = State(index);
+                if (state != "可研究") { Notice(state); return; }
+                Confirm($"研究 {Session.ResearchProjectName(project.Id)}？\n资金 {project.Cost}　{project.Days} 日。", () => Start(project.Id));
+            } });
     }
 
-    public override void _Input(InputEvent input)
+    private void Start(string projectId)
     {
-        if (!IsVisibleInTree()) return;
-        if (input is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape } ||
-            input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
-        {
-            GetViewport().SetInputAsHandled(); Closed();
-        }
+        if (_place is not int place || Session.View.PlayerForceId is not int force) { Notice("当前没有可操作的据点。"); return; }
+        var result = Session.Execute(new("player"), new StartResearchCommand(Guid.NewGuid(), force,
+            Session.Snapshot.Simulation.NextSequence, place, projectId));
+        if (result.Submission.Accepted) { ShowCatalog(); return; }
+        Notice(result.Submission.Rejection == CommandRejection.InsufficientFunds ? "研究失败，资金不足。" : "研究失败，请检查当前回合、据点控制权和研究条件。");
     }
-    public override void _GuiInput(InputEvent input) => AcceptEvent();
+    private void Confirm(string message, Action yes)
+    {
+        var dialog = new GameDialog { Textures = Textures, Size = Size }; Replace(dialog);
+        dialog.Confirmed += yes; dialog.Dismissed += ShowCatalog; dialog.Closed += ShowCatalog; dialog.SetMessage(message);
+    }
+    private void Notice(string message)
+    {
+        var dialog = new GameDialog { Textures = Textures, Size = Size }; Replace(dialog);
+        dialog.Closed += ShowCatalog; dialog.SetNotice(message);
+    }
 }

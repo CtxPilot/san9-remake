@@ -38,4 +38,19 @@ public sealed class FormationKnowledgeTests
         Assert.Same(person, FormationKnowledge.InitializeLegacy(person, new ForceState(1, 50), rules));
         Assert.False(FormationKnowledge.Knows(person, 28));
     }
+
+    [Fact]
+    public void PracticeLearnsOnTwentiethDayWithoutChangingOtherKnowledge()
+    {
+        var officer = new OfficerState(1, 1, 1, new(10, 10, 10, 20), false)
+        { FormationProficiencies = ImmutableSortedDictionary<int, int>.Empty.Add(6, 100) };
+        for (int day = 0; day < 19; day++) officer = FormationKnowledge.Practice(officer, 28);
+        Assert.False(FormationKnowledge.Knows(officer, 28));
+        Assert.Equal(19, officer.FormationPractice![28]);
+        officer = FormationKnowledge.Practice(officer, 28);
+        Assert.Equal(0, officer.FormationProficiencies![28]);
+        Assert.Equal(100, officer.FormationProficiencies[6]);
+        Assert.Null(officer.FormationPractice);
+        Assert.Same(officer, FormationKnowledge.Practice(officer, 28));
+    }
 }

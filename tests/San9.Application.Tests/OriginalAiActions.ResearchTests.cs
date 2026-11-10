@@ -100,6 +100,52 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void PlayerPurchasesEquipmentIntoInventoryAndCannotBuyUnavailableItems()
+    {
+        var content = Fixture();
+        var session = GameSession.Start(content, 42);
+        long before = session.Snapshot.Corps.Single(c => c.OwnerId == 1 && c.IsRoot).Treasury.Money;
+        var id = Guid.NewGuid();
+        var buy = new PurchaseEquipmentCommand(id, 1, session.Snapshot.Simulation.NextSequence, 1, "basic-spear");
+        var result = session.Execute(new("player"), buy);
+        Assert.True(result.Submission.Accepted);
+        var acquired = Assert.Single(result.Events.OfType<EquipmentPurchasedEvent>());
+        Assert.Equal(400, acquired.Price);
+        Assert.Equal(before - acquired.Price, session.Snapshot.Corps.Single(c => c.OwnerId == 1 && c.IsRoot).Treasury.Money);
+        var item = Assert.Single(session.Snapshot.Equipment, e => e.Id == acquired.InstanceId);
+        Assert.Equal(1, item.InventoryForceId);
+        Assert.False(item.Equipped);
+        Assert.False(session.Execute(new("player"), buy).Submission.Accepted);
+        Assert.False(session.Execute(new("player"), new PurchaseEquipmentCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 1, "not-for-sale")).Submission.Accepted);
+        var loaded = SaveService.Decode(SaveService.Encode(session), content);
+        Assert.Equal(item, loaded.Snapshot.Equipment.Single(e => e.Id == item.Id));
+    }
+
+    [Fact]
+    public void PurchaseRespectsResearchAndFundsWithoutChangingInventory()
+    {
+        var basis = Fixture();
+        var item = new EquipmentDefinition("advanced", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default)
+        { Name = "精制长枪", PurchaseCost = 100, PurchaseResearchProjectId = EquipmentPreset.ResearchId };
+        var content = basis with { Information = basis.Information with { Equipment = EquipmentPreset.Basic().Add(item) } };
+        var original = GameSession.Start(content, 42);
+        PurchaseEquipmentCommand Command(GameSession session) => new(Guid.NewGuid(), 1, session.Snapshot.Simulation.NextSequence, 1, "advanced");
+        Assert.False(original.Execute(new("player"), Command(original)).Submission.Accepted);
+        Assert.DoesNotContain(original.Snapshot.Equipment, equipment => equipment.DefinitionId == "advanced");
+        var save = original.Capture();
+        save = save with { World = save.World with
+        {
+            Forces = save.World.Forces.Select(force => force.Id == 1 ? force with { CompletedResearch = [EquipmentPreset.ResearchId] } : force).ToArray(),
+            Corps = save.World.Corps.Select(corps => corps.OwnerId == 1 && corps.IsRoot ? corps with
+                { Treasury = corps.Treasury with { Money = 0 } } : corps).ToArray()
+        } };
+        var poor = GameSession.Restore(content, save);
+        Assert.Equal(CommandRejection.InsufficientFunds, poor.Execute(new("player"), Command(poor)).Submission.Rejection);
+        Assert.DoesNotContain(poor.Snapshot.Equipment, equipment => equipment.DefinitionId == "advanced");
+    }
+
+    [Fact]
     public void AiResearchesEquipsAndProducesPersonalEquipmentWithoutMixedTroops()
     {
         var content = Fixture();

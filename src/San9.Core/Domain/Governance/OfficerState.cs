@@ -29,6 +29,9 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     [JsonRequired] public int TacticCooldown { get; init; }
     /// <summary>Known formation IDs and individual proficiency; null denotes legacy data awaiting migration.</summary>
     public ImmutableSortedDictionary<int, int>? FormationProficiencies { get; init; }
+    /// <summary>Days of practical instruction toward formations not yet mastered.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableSortedDictionary<int, int>? FormationPractice { get; init; }
     public ImmutableArray<int> TacticProficiencies { get; init; } = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     public int? StatusStartYear { get; init; }
     public int? ParentId { get; init; }
@@ -87,6 +90,8 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
         if (Affinity is < 0 or >= 150 || TacticLinkBonus is < 0 or > 100 || MasteredCategories.IsDefault ||
             MasteredCategories.Any(c => c is < 0 or > 8) || MasteredCategories.Distinct().Count() != MasteredCategories.Length) return false;
         if (FormationProficiencies is not null && FormationProficiencies.Any(p => p.Key < 0 || p.Value is < 0 or > 1000)) return false;
+        if (FormationPractice is not null && FormationPractice.Any(p => p.Key < 0 || p.Value is < 1 or >= FormationKnowledge.PracticeDaysToLearn ||
+            FormationProficiencies?.ContainsKey(p.Key) == true)) return false;
         if (EquippedTacticId < 0 || TacticCooldown < 0 || LearnedTactics is null || TacticProficiencies.IsDefault || TacticProficiencies.Length != 9 ||
             TacticProficiencies.Any(v => v < 0) || LearnedTactics.Any(v => v < 0) ||
             ParentId < 0 || BloodlineId < 0 || AppearanceYear < 0 || LifespanTier < 0 || SuccessionPriority < 0 || Personality is < 0 or > 3) return false;

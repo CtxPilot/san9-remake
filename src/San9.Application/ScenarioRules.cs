@@ -30,6 +30,26 @@ internal sealed class ScenarioRules
         // recipes as an empty legacy catalog, while preserving explicitly authored catalogs.
         if (equipmentDefinitions.All(item => item.LegacyTreasureId is not null))
             equipmentDefinitions = equipmentDefinitions.AddRange(EquipmentPreset.Basic());
+        else if (equipmentDefinitions.Any(item => item.Id == "basic-spear" && item.ResearchProjectId == EquipmentPreset.ResearchId) &&
+                 equipmentDefinitions.All(item => item.Id != "basic-dart"))
+            equipmentDefinitions = equipmentDefinitions.Add(EquipmentPreset.Basic().Single(item => item.Id == "basic-dart"));
+        if (equipmentDefinitions.Any(item => item.Id == "basic-spear" && item.ResearchProjectId == EquipmentPreset.ResearchId))
+            equipmentDefinitions = equipmentDefinitions.AddRange(EquipmentPreset.Basic().Where(p => p.Grade > 1 &&
+                equipmentDefinitions.All(existing => existing.Id != p.Id)));
+        // Only retrofit the unmodified built-in recipes; authored items keep their own purchase policy.
+        var presets = EquipmentPreset.Basic().ToDictionary(item => item.Id, StringComparer.Ordinal);
+        equipmentDefinitions = equipmentDefinitions.Select(item =>
+        {
+            if (item.PurchaseCost is not null || !presets.TryGetValue(item.Id, out var preset) ||
+                item.LegacyTreasureId is not null || item.ResearchProjectId != preset.ResearchProjectId ||
+                item.Slot != preset.Slot || item.Rarity != preset.Rarity || item.BaseBonuses != preset.BaseBonuses ||
+                item.BonusPerLevel != preset.BonusPerLevel || item.ProductionCost != preset.ProductionCost ||
+                item.ProductionDays != preset.ProductionDays || item.TacticId is not null || item.EscapeMount ||
+                !item.CompatibleWeapons.IsEmpty || !(item.Name == preset.Name || item.Name == "制式" + preset.Name ||
+                    item.Id == "basic-bow" && item.Name == "制式弓" || item.Id == "basic-shield" && item.Name == "制式盾" ||
+                    item.Id == "basic-helmet" && item.Name == "制式头盔" || item.Id == "basic-armor" && item.Name == "制式铠甲")) return item;
+            return item with { Name = preset.Name, PurchaseCost = preset.PurchaseCost };
+        }).ToImmutableArray();
         Equipment = new EquipmentRulebook(LegacyEquipmentMigration.Convert(definition.Information.Treasures,
             definition.Information.TreasureStates, equipmentDefinitions).Definitions);
         Treasures = new TreasureRulebook(definition.Information.Treasures.Select(t => t.ToRule()), Equipment);
@@ -38,11 +58,13 @@ internal sealed class ScenarioRules
             definition.Information.Ranks.ToDictionary(r => r.Id, r => r.Precedence));
         if (definition.Military is { } militaryDefinition)
         {
+            militaryDefinition = MixedTroopPreset.UpgradeLegacyTroopLevels(militaryDefinition);
             if (Equipment.Items.Values.Any(e => e.ResearchProjectId == EquipmentPreset.ResearchId) &&
                 !militaryDefinition.ResearchProjects.Any(p => p.Id == EquipmentPreset.ResearchId))
                 militaryDefinition = militaryDefinition with { ResearchProjects = militaryDefinition.ResearchProjects.Add(EquipmentPreset.Research()) };
             Military = new MilitaryRulebook(militaryDefinition);
-            if (Equipment.Items.Values.Any(e => e.ResearchProjectId is string id && !Military.ResearchProjects.ContainsKey(id)))
+            if (Equipment.Items.Values.Any(e => e.ResearchProjectId is string id && !Military.ResearchProjects.ContainsKey(id) ||
+                e.PurchaseResearchProjectId is string purchaseId && !Military.ResearchProjects.ContainsKey(purchaseId)))
                 throw new InvalidDataException("Unknown equipment research project.");
         }
         MilitaryCities = new(definition.MilitaryCityConnections);

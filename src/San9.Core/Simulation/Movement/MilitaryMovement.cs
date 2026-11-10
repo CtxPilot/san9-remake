@@ -82,7 +82,8 @@ internal static class MilitaryMovement
         }
         if (world.Forces.Any(f => f.FormationGrants.Any(g => rules is null || !rules.Formations.ContainsKey(g.FormationId))))
             throw new ArgumentException("Unknown force formation grant.");
-        if (world.Officers.Any(p => p.FormationProficiencies?.Keys.Any(id => rules is null || !rules.Formations.ContainsKey(id)) == true))
+        if (world.Officers.Any(p => p.FormationProficiencies?.Keys.Any(id => rules is null || !rules.Formations.ContainsKey(id)) == true ||
+            p.FormationPractice?.Keys.Any(id => rules is null || !rules.Formations.ContainsKey(id)) == true))
             throw new ArgumentException("Unknown officer formation reference.");
         if (world.Officers.Any(p => p.EquippedTacticId is int id && (rules is null || !rules.Tactics.ContainsKey(id))))
             throw new ArgumentException("Unknown equipped tactic.");

@@ -45,7 +45,6 @@ internal static class OriginalAiEquipment
         }
         var snapshot = engine.Snapshot;
         var force = snapshot.Forces.Single(f => f.Id == seat.ForceId);
-        if (force.EquipmentProduction is not null) return;
         root = snapshot.Corps.First(c => c.Id == root.Id);
         var place = snapshot.Settlements.Where(p => p.OwnerId == force.Id && !p.IsDormant && !p.IsDestroyed && p.CanHostPersons &&
                 (p.CorpsId is null || p.CorpsId == root.Id) && CorpsControl.CanControlSettlement(snapshot, seat, context, p.Id))
@@ -54,6 +53,24 @@ internal static class OriginalAiEquipment
         int Need(EquipmentSlot slot) => officers.Count(id => !snapshot.Equipment.Any(item => item.OfficerId == id && item.Equipped &&
             rules.Items[item.DefinitionId].Slot == slot)) - snapshot.Equipment.Count(item => item.InventoryForceId == force.Id &&
             rules.Items[item.DefinitionId].Slot == slot);
+        var purchase = rules.Items.Values.Where(item => item.Slot is EquipmentSlot.MainHand or EquipmentSlot.Helmet or EquipmentSlot.Armor &&
+                item.PurchaseCost is int price && price <= root.Treasury.Money / 2 && Need(item.Slot) > 0 &&
+                item.ResearchProjectId is string manufacturing && force.CompletedResearch.Contains(manufacturing) &&
+                (item.PurchaseResearchProjectId is null || force.CompletedResearch.Contains(item.PurchaseResearchProjectId)))
+            .OrderByDescending(item => Need(item.Slot)).ThenBy(item => item.PurchaseCost).ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();
+        if (purchase is not null)
+        {
+            long sequence = engine.Snapshot.Simulation.NextSequence;
+            var buy = new PurchaseEquipmentCommand(SimulationIdentity.Command(sequence, seat.ForceId), seat.ForceId, sequence, place.Id, purchase.Id);
+            if (engine.Validate(context, buy).Accepted)
+            {
+                var result = engine.Execute(context, buy);
+                if (result.Submission.Accepted) events.AddRange(result.Events);
+            }
+        }
+        if (force.EquipmentProduction is not null) return;
+        snapshot = engine.Snapshot;
+        root = snapshot.Corps.First(c => c.Id == root.Id);
         var recipe = rules.Items.Values.Where(item => item.ResearchProjectId is string research && force.CompletedResearch.Contains(research) &&
                 item.ProductionCost <= root.Treasury.Money / 2 && Need(item.Slot) > 0)
             .OrderByDescending(item => Need(item.Slot)).ThenBy(item => item.ProductionCost).ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();

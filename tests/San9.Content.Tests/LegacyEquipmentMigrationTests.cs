@@ -23,7 +23,7 @@ public sealed class LegacyEquipmentMigrationTests
         Assert.True(result.Instances.Single(i => i.Id == 5).Equipped);
         Assert.Equal(EquipmentSlot.Mount, result.Definitions.Single(i => i.LegacyTreasureId == 5).Slot);
         Assert.True(result.Definitions.Single(i => i.LegacyTreasureId == 5).EscapeMount);
-        Assert.Equal(EquipmentSlot.Treasure, result.Definitions.Single(i => i.LegacyTreasureId == 6).Slot);
+        Assert.Equal(EquipmentSlot.Book, result.Definitions.Single(i => i.LegacyTreasureId == 6).Slot);
         Assert.Empty(result.UnclassifiedTreasureIds);
     }
 
@@ -34,6 +34,18 @@ public sealed class LegacyEquipmentMigrationTests
         Assert.Equal(2, Assert.Single(result.UnclassifiedTreasureIds));
         Assert.Equal(EquipmentSlot.Treasure, Assert.Single(result.Definitions).Slot);
         Assert.Throws<ArgumentException>(() => LegacyEquipmentMigration.Convert([], [new(1, 10, TreasureDiscovery.Discovered, null)]));
+    }
+
+    [Fact]
+    public void OldGeneratedBookDefinitionsMoveToBookSlotWithoutChangingIdentity()
+    {
+        var treasure = Item(8, 2, 3);
+        var oldDefinition = new EquipmentDefinition("legacy-treasure:8", EquipmentSlot.Treasure,
+            EquipmentRarity.Precious, treasure.AbilityBonuses, default) { LegacyTreasureId = 8 };
+        var result = LegacyEquipmentMigration.Convert([treasure], [new(8, 10, TreasureDiscovery.Discovered, null)], [oldDefinition]);
+        Assert.Equal(EquipmentSlot.Book, Assert.Single(result.Definitions).Slot);
+        Assert.Equal("legacy-treasure:8", Assert.Single(result.Instances).DefinitionId);
+        Assert.True(result.Instances[0].Equipped);
     }
 
     [Fact]

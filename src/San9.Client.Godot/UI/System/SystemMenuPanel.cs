@@ -71,14 +71,28 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         if (_busy) return;
         Browser.Close();
         ReplacePage(null);
+        _textures ??= Service.CreateScope();
+        _textures.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-");
         Show();
-        ReplacePage(new ResearchView { Session = Session, Texts = Texts, Closed = Close, InitialSettlementId = settlementId });
+        ReplacePage(new ResearchView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close, InitialSettlementId = settlementId });
     }
     public void OpenEquipmentProductionAt(int settlementId)
     {
         if (_busy) return;
-        Browser.Close(); ReplacePage(null); Show();
-        ReplacePage(new EquipmentProductionView { Session = Session, Texts = Texts, Closed = Close, SettlementId = settlementId });
+        Browser.Close(); ReplacePage(null);
+        _textures ??= Service.CreateScope();
+        _textures.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-");
+        Show();
+        ReplacePage(new EquipmentProductionView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close, SettlementId = settlementId });
+    }
+    public void OpenEquipmentPurchaseAt(int settlementId)
+    {
+        if (_busy) return;
+        Browser.Close(); ReplacePage(null);
+        _textures ??= Service.CreateScope();
+        _textures.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-");
+        Show();
+        ReplacePage(new EquipmentProductionView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close, SettlementId = settlementId, Purchase = true });
     }
     private void OpenEnvironment()
     {

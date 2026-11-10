@@ -27,6 +27,8 @@ public partial class OfficerFormationVerification : Node
                 ?? throw new InvalidOperationException("Set SAN9_OFFICER_FORMATION_CONTENT to a scenario package.");
             var package = await ClientContentFiles.LoadAsync(root);
             var session = GameSession.Start(package.Scenario, 42, settings: new() { MixedTroopsEnabled = true });
+            if (!session.ResearchProjects.Any(project => project.Id == "crossbow-3"))
+                throw new InvalidOperationException("Legacy troop preset did not upgrade to three levels.");
             var visible = session.View.Officers.Select(o => o.Id).ToHashSet();
             var officer = session.Snapshot.Officers.First(o => visible.Contains(o.Id) && o.FormationProficiencies is { Count: > 0 });
             var expected = OfficerDetails.Read(session.View, package.Text, officer.Id);
@@ -41,7 +43,7 @@ public partial class OfficerFormationVerification : Node
                 State = state, Textures = textures, Texts = package.Text, Service = service,
                 Read = id => OfficerDetails.Read(session.View, package.Text, id),
                 ReadName = id => package.Text.Resolve(session.View.Officers.Single(o => o.Id == id).NameKey),
-                OpenTreasures = _ => { }, CurrentChanged = _ => { }, Closed = () => { }
+                CurrentChanged = _ => { }, Closed = () => { }
             };
             AddChild(page);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
@@ -51,8 +53,8 @@ public partial class OfficerFormationVerification : Node
             var labels = Descendants<Label>(page).Select(l => l.Text).ToArray();
             foreach (var formation in expected.Formations)
             {
-                string wanted = $"{formation.Name}　{(formation.Proficiency is int value ? value.ToString() : "—")}";
-                if (!labels.Contains(wanted)) throw new InvalidOperationException("Missing formation detail: " + formation.Name);
+                if (!labels.Contains(formation.Name) || !labels.Contains(formation.Proficiency?.ToString() ?? "—"))
+                    throw new InvalidOperationException("Missing formation detail: " + formation.Name);
             }
             GD.Print($"OFFICER_FORMATION_OK formations={expected.Formations.Length}");
             page.Free(); service.Free(); GetTree().Quit();

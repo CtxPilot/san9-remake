@@ -7,13 +7,41 @@ public sealed class EquipmentRulesTests
     private static EquipmentDefinition Definition(EquipmentSlot slot) => new("item", slot, EquipmentRarity.Ordinary, default, default);
     private static EquipmentInstance Instance => new(1, "item", 10, null, true);
 
+    [Fact]
+    public void GradesAndMinimumAbilitiesAreIndependentOfExperience()
+    {
+        var mount = Definition(EquipmentSlot.Mount) with { Grade = 2, MinimumAbilities = new(60, 0, 0, 0) };
+        Assert.True(mount.IsValid);
+        Assert.False((mount with { Grade = 0 }).IsValid);
+        Assert.False((mount with { MinimumAbilities = new(-1, 0, 0, 0) }).IsValid);
+        Assert.False(EquipmentRules.MeetsRequirements(mount, new(59, 100, 100, 100)));
+        Assert.True(EquipmentRules.MeetsRequirements(mount, new(60, 0, 0, 0)));
+        Assert.Equal(0, EquipmentRules.RecordUse(Instance, mount, EquipmentUse.Attack).Experience);
+    }
+
+    [Fact]
+    public void PurchasePolicyRejectsTreasuresAndInvalidPrices()
+    {
+        var ordinary = Definition(EquipmentSlot.MainHand) with { PurchaseCost = 100 };
+        Assert.True(ordinary.IsValid);
+        Assert.False((ordinary with { PurchaseCost = -1 }).IsValid);
+        Assert.False((ordinary with { LegacyTreasureId = 4 }).IsValid);
+        Assert.False((ordinary with { Rarity = EquipmentRarity.Precious }).IsValid);
+        Assert.True((ordinary with { Slot = EquipmentSlot.Book }).IsValid);
+        Assert.False((ordinary with { Slot = EquipmentSlot.Treasure }).IsValid);
+        Assert.False((ordinary with { PurchaseCost = null, PurchaseResearchProjectId = "research" }).IsValid);
+    }
+
     [Theory]
     [InlineData(EquipmentSlot.MainHand, EquipmentUse.Attack, 1)]
     [InlineData(EquipmentSlot.OffHand, EquipmentUse.Attack, 1)]
+    [InlineData(EquipmentSlot.HiddenWeapon, EquipmentUse.Attack, 1)]
     [InlineData(EquipmentSlot.Helmet, EquipmentUse.Defense, 1)]
     [InlineData(EquipmentSlot.Armor, EquipmentUse.Defense, 1)]
     [InlineData(EquipmentSlot.Mount, EquipmentUse.Attack, 0)]
     [InlineData(EquipmentSlot.Treasure, EquipmentUse.Defense, 0)]
+    [InlineData(EquipmentSlot.Tally, EquipmentUse.Defense, 0)]
+    [InlineData(EquipmentSlot.Book, EquipmentUse.Attack, 0)]
     [InlineData(EquipmentSlot.Helmet, EquipmentUse.Attack, 0)]
     public void UseOnlyTrainsApplicableEquippedItems(EquipmentSlot slot, EquipmentUse use, int experience)
     {
@@ -123,6 +151,8 @@ public sealed class EquipmentRulesTests
     [Theory]
     [InlineData(EquipmentSlot.Mount)]
     [InlineData(EquipmentSlot.Treasure)]
+    [InlineData(EquipmentSlot.Tally)]
+    [InlineData(EquipmentSlot.Book)]
     public void FixedLevelItemsRejectExperienceAndHigherLevels(EquipmentSlot slot)
     {
         var definition = Definition(slot);

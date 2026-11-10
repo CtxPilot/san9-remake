@@ -9,13 +9,13 @@ public static class OfficerCatalog
     private static CatalogColumn N(string id, string title, int width = 3) => C(id, title, width, CatalogAlignment.Right);
     private static CatalogPage P(string title, params CatalogColumn[] columns) => new(title, [C("name", "武将", 8, CatalogAlignment.Left), .. columns]);
     public static IReadOnlyList<string> TacticCategories { get; } = Array.AsReadOnly(new[]
-        { "步兵", "骑兵", "弓骑", "弩兵", "水军", "攻城", "智略", "谋略", "策略" });
+        { "步兵", "骑兵", "弓骑", "弓弩", "水军", "攻城", "智略", "谋略", "策略" });
     public static IReadOnlyList<CatalogPage> CorePages { get; } = Array.AsReadOnly(new[]
     {
         P("能力", N("leadership", "统率"), N("war", "武力"), N("intelligence", "智力"), N("politics", "政治"), N("learned", "学得", 2), C("health", "健康", 4), N("treasures", "宝物"), C("status", "身分", 4)),
         P("所属", C("force", "势力", 8), C("corps", "军团", 8), C("home", "所属", 10), C("location", "所在", 10), C("status", "身分", 4), C("commander", "大将", 2), N("loyalty", "忠诚")),
         P("命令", C("order", "命令", 4), C("target-person", "对象", 8), C("target-place", "目标", 10), N("arrival", "到达预定", 2), C("formation", "布阵", 4), C("equipped-tactic", "兵法", 4)),
-        P("个人", C("affinity", "相性", 4), C("office", "爵位", 8), N("capacity", "指挥", 5), N("salary", "俸禄"), N("service", "仕官"), C("personality", "性格", 4), C("parent", "父母", 8), N("age", "年龄", 2), N("gender", "性别", 1))
+        P("个人", C("affinity", "相性", 4), C("office", "官职", 8), N("capacity", "指挥", 5), N("salary", "俸禄"), N("service", "仕官"), C("personality", "性格", 4), C("parent", "父母", 8), N("age", "年龄", 2), N("gender", "性别", 1))
     });
 
     public static IReadOnlyList<CatalogPage> Pages(StrategySnapshot view, TextCatalog texts) =>

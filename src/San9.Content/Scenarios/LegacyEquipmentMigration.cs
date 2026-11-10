@@ -21,11 +21,15 @@ public static class LegacyEquipmentMigration
         var byId = source.ToDictionary(d => d.Id);
         if (holdings.Any(s => s.Discovery != TreasureDiscovery.Disabled && !byId.ContainsKey(s.Id)))
             throw new ArgumentException("Unknown legacy treasure definition.");
-        var explicitItems = (authored ?? []).ToArray();
+        var explicitItems = (authored ?? []).Select(item => item.LegacyTreasureId is int id &&
+            item.Id == $"legacy-treasure:{id}" && item.Slot == EquipmentSlot.Treasure &&
+            byId.TryGetValue(id, out var treasure) && treasure.Category is >= 2 and <= 9
+                ? item with { Slot = EquipmentSlot.Book } : item).ToArray();
         var replacedLegacyIds = explicitItems.Where(item => item.LegacyTreasureId is not null).Select(item => item.LegacyTreasureId!.Value).ToHashSet();
         if (replacedLegacyIds.Any(id => !byId.ContainsKey(id))) throw new ArgumentException("Unknown authored treasure reference.");
         var mapped = source.Where(d => !replacedLegacyIds.Contains(d.Id)).OrderBy(d => d.Id).Select(d => new EquipmentDefinition($"legacy-treasure:{d.Id}",
-            d.EscapeMount || d.Category == 0 ? EquipmentSlot.Mount : d.Category == 1 ? EquipmentSlot.MainHand : EquipmentSlot.Treasure,
+            d.EscapeMount || d.Category == 0 ? EquipmentSlot.Mount : d.Category == 1 ? EquipmentSlot.MainHand :
+                d.Category is >= 2 and <= 9 ? EquipmentSlot.Book : EquipmentSlot.Treasure,
             d.TacticId is not null || d.EscapeMount ? EquipmentRarity.Rare : EquipmentRarity.Precious,
             d.AbilityBonuses, default)
         { LegacyTreasureId = d.Id, TacticId = d.TacticId, EscapeMount = d.EscapeMount }).Concat(explicitItems).ToImmutableArray();

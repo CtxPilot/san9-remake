@@ -264,7 +264,7 @@ public sealed class WorldMessageContext
     private string TacticCategory(int id)
     {
         string[] names =
-            ["步兵", "骑兵", "弓骑", "弩兵", "水军", "攻城", "智略", "谋略", "策略"];
+            ["步兵", "骑兵", "弓骑", "弓弩", "水军", "攻城", "智略", "谋略", "策略"];
         int? category = _definition.Military?.Tactics.Single(t => t.Id == id).Category;
         return category is int index && (uint)index < names.Length ? names[index] :
             throw new InvalidDataException($"Tactic {id} has no named category.");

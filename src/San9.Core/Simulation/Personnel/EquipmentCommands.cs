@@ -42,7 +42,8 @@ internal static class EquipmentCommands
         {
             if (!world.AllEquipment.TryGetValue(itemId, out var item) ||
                 (item.OfficerId != person.Id && (item.InventoryForceId != command.IssuerId || item.LegacyTreasureId is not null)) ||
-                rules.Items[item.DefinitionId].Slot != command.Slot)
+                rules.Items[item.DefinitionId].Slot != command.Slot ||
+                !EquipmentRules.MeetsRequirements(rules.Items[item.DefinitionId], person.BaseAbilities))
                 return CommandRejection.InvalidTask;
             var proposed = item.OfficerId == person.Id ? world.AllEquipment.Values : world.AllEquipment.Values.Select(value =>
                 value.Id == itemId ? EquipmentRules.MoveToOfficer(value, person.Id) : value);

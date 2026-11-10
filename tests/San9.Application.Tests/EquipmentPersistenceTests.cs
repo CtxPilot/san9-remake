@@ -48,8 +48,12 @@ public sealed class EquipmentPersistenceTests
         GameCommand production = new StartEquipmentProductionCommand(Guid.NewGuid(), 1, 4, 2, "spear");
         GameCommand transfer = new TransferEquipmentCommand(Guid.NewGuid(), 1, 5, 7, 2);
         DomainEvent completed = new EquipmentProductionCompletedEvent(new(190, 1, 1), 1, 2, "spear", 7);
+        GameCommand purchase = new PurchaseEquipmentCommand(Guid.NewGuid(), 1, 6, 2, "spear");
+        DomainEvent purchased = new EquipmentPurchasedEvent(new(190, 1, 1), 1, 2, "spear", 8, 400);
         Assert.Equal(production, StrictJson.Deserialize<GameCommand>(JsonSerializer.SerializeToUtf8Bytes(production, StrictJson.Options)));
         Assert.Equal(transfer, StrictJson.Deserialize<GameCommand>(JsonSerializer.SerializeToUtf8Bytes(transfer, StrictJson.Options)));
         Assert.Equal(completed, StrictJson.Deserialize<DomainEvent>(JsonSerializer.SerializeToUtf8Bytes(completed, StrictJson.Options)));
+        Assert.Equal(purchase, StrictJson.Deserialize<GameCommand>(JsonSerializer.SerializeToUtf8Bytes(purchase, StrictJson.Options)));
+        Assert.Equal(purchased, StrictJson.Deserialize<DomainEvent>(JsonSerializer.SerializeToUtf8Bytes(purchased, StrictJson.Options)));
     }
 }

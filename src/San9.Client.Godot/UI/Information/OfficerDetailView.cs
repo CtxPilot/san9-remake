@@ -12,7 +12,6 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
     public OfficerDetailState State { get; init; } = null!;
     public Func<int, OfficerDetailData> Read { get; init; } = null!;
     public Func<int, string> ReadName { get; init; } = null!;
-    public Action<int> OpenTreasures { get; init; } = null!;
     public GameSession? Session { get; init; }
     public TextureService Service { get; init; } = null!;
     public TextureScope Textures { get; init; } = null!;
@@ -53,12 +52,12 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
         _scroll.Up.MouseEntered += ClearNameFocus; _scroll.Down.MouseEntered += ClearNameFocus;
         _scroll.Range.ValueChanged += value => { if (!_refreshing) { State.Scroll((int)value); RefreshNames(); } };
         _message = new GameMessageBar { Textures = Textures }; AddChild(_message);
-        _treasure = Action("宝物", "treasure", new(888,493), new(120,40), ShowTreasures, hint: "officer-detail-treasures");
+        _treasure = Action("装备", "treasure", new(888,493), new(120,40), ShowEquipment);
+        _treasure.Name = "EquipmentOpen";
         _status = Action("状态", "tab", new(888,540), new(120,40), () => SelectPage(OfficerDetailPage.Status), hint: "officer-detail-status");
         _tactics = Action("兵法", "tab", new(888,584), new(120,40), () => SelectPage(OfficerDetailPage.Tactics), hint: "officer-detail-tactics");
         _formations = Action("阵形", "tab", new(888,628), new(120,40), () => SelectPage(OfficerDetailPage.Formations));
         _formations.Name = "FormationTab";
-        if (Session is not null) Action("装备", "tab", new(738, 48), new(120, 40), ShowEquipment).Name = "EquipmentOpen";
         Action("关闭", "close", new(875,687), new(108,44), Closed, hint: "detail-close");
         Icon("close-icon",new(964,56), Closed);
         Icon("help",new(934,33), ShowHelp);
@@ -165,26 +164,37 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
                 Label("本局未启用兵种与阵形规则。", new(180, 404, 600, 24));
             else
             {
-                Label("掌握的阵形与熟练度（未掌握显示为 —）", new(180, 404, 600, 24));
-                var scroll = new ScrollContainer { Position = new(176, 440), Size = new(660, 256),
-                    HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, MouseFilter = MouseFilterEnum.Stop };
-                _body.AddChild(scroll);
-                var grid = new GridContainer { Columns = 3, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-                grid.AddThemeConstantOverride("h_separation", 12); grid.AddThemeConstantOverride("v_separation", 6);
-                scroll.AddChild(grid);
-                foreach (var formation in _data.Formations)
+                Label("阵形及熟练", new(176, 412, 140, 24));
+                Control formationParent = _body;
+                int originX = 176, originY = 444;
+                if (_data.Formations.Length > 21)
                 {
-                    var label = new Label { Text = $"{formation.Name}　{(formation.Proficiency is int value ? value.ToString() : "—")}",
-                        CustomMinimumSize = new(196, 28), VerticalAlignment = VerticalAlignment.Center };
-                    grid.AddChild(label);
-                    _text.Apply(label, GameTextStyles.CatalogRow with
-                    { Foreground = new Color(formation.Proficiency is null ? "a4a4a4" : "f0f0f0") });
+                    var scroll = new ScrollContainer { Position = new(176, 444), Size = new(660, 224),
+                        HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, MouseFilter = MouseFilterEnum.Stop };
+                    _body.AddChild(scroll);
+                    formationParent = new Control { CustomMinimumSize = new(640, ((_data.Formations.Length + 2) / 3) * 32) };
+                    scroll.AddChild(formationParent); originX = originY = 0;
+                }
+                for (int i = 0; i < _data.Formations.Length; i++)
+                {
+                    var formation = _data.Formations[i];
+                    int x = originX + (_data.Formations.Length > 21 ? i % 3 : i / 7) * 220;
+                    int y = originY + (_data.Formations.Length > 21 ? i / 3 : i % 7) * 32;
+                    var formationLabel = Label(formation.Name, new(x, y, 96, 24), 16, HorizontalAlignment.Center,
+                        parent: formationParent, color: new Color(formation.Proficiency is null ? "a4a4a4" : "f0f0f0"));
+                    if (formation.Proficiency is null)
+                    {
+                        formationLabel.MouseFilter = MouseFilterEnum.Pass;
+                        formationLabel.TooltipText = $"见习 {formation.PracticeDays}/{San9.Core.Domain.FormationKnowledge.PracticeDaysToLearn} 日";
+                    }
+                    Label(formation.Proficiency?.ToString() ?? "—", new(x + 104, y, 64, 24), 16, HorizontalAlignment.Center,
+                        parent: formationParent, color: new Color(formation.Proficiency is null ? "a4a4a4" : "f0f0f0"));
                 }
             }
         }
         _status.Selected=State.Page==OfficerDetailPage.Status; _tactics.Selected=State.Page==OfficerDetailPage.Tactics;
         _formations.Selected=State.Page==OfficerDetailPage.Formations;
-        _treasure.Disabled=_data.Treasures.Length==0;
+        _treasure.Disabled=Session is null;
         RefreshHint();
         QueueRedraw();
     }
@@ -205,18 +215,15 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
     {
         var panel=Overlay();
         Label("武将情报",new(20,12,480,36),24,parent:panel);
-        Label("单击右侧姓名或按回车切换武将。\n上下键移动名单焦点，滚轮翻阅名单。\n状态、兵法、阵形页在切换武将后保持。\n宝物显示当前武将持有的可见宝物。\nEsc 或右键返回。",new(24,68,472,230),18,parent:panel);
+        Label("单击右侧姓名或按回车切换武将。\n上下键移动名单焦点，滚轮翻阅名单。\n状态、兵法、阵形页在切换武将后保持。\n装备显示持有的装备和宝物。\nEsc 或右键返回。",new(24,68,472,230),18,parent:panel);
         Action("关闭","close",new(206,330),new(108,44),CloseOverlay,panel);
-    }
-    private void ShowTreasures()
-    {
-        if (_data.Treasures.Length > 0) OpenTreasures(State.CurrentId);
     }
     private void ShowEquipment()
     {
         if (Session is null) return;
-        var panel = new OfficerEquipmentView { Session = Session, Texts = Texts, OfficerId = State.CurrentId };
-        panel.Closed = () => { RemoveChild(panel); panel.QueueFree(); RefreshData(); };
+        var panel = new OfficerEquipmentView { Session = Session, Texts = Texts, Textures = Textures, Service = Service, OfficerId = State.CurrentId };
+        _message.Hide();
+        panel.Closed = () => { RemoveChild(panel); panel.QueueFree(); _message.Show(); RefreshData(); };
         AddChild(panel);
     }
     public override void _Input(InputEvent input)

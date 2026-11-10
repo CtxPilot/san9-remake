@@ -6,7 +6,7 @@ namespace San9.Application.Presentation;
 
 public sealed record OfficerEquipmentItem(long Id, string Name, EquipmentSlot Slot, EquipmentRarity Rarity,
     int Level, int Experience, bool Equipped, bool InInventory, bool IsTreasure, string Effect,
-    bool CanEquip, string? UnavailableReason);
+    bool CanEquip, string? UnavailableReason, int Grade, string Requirements);
 public sealed record OfficerEquipmentSlot(EquipmentSlot Slot, string Name, OfficerEquipmentItem[] Items);
 public sealed record OfficerEquipmentData(bool CanManage, OfficerEquipmentSlot[] Slots);
 
@@ -16,8 +16,19 @@ public static class OfficerEquipment
     {
         EquipmentSlot.MainHand => "主武器", EquipmentSlot.OffHand => "副武器", EquipmentSlot.Helmet => "头盔",
         EquipmentSlot.Armor => "铠甲", EquipmentSlot.Mount => "坐骑", EquipmentSlot.Treasure => "宝物",
+        EquipmentSlot.Tally => "兵符", EquipmentSlot.HiddenWeapon => "暗器", EquipmentSlot.Book => "书籍",
         _ => throw new ArgumentOutOfRangeException(nameof(slot))
     };
+
+    public static string Requirements(OfficerAbilities minimum)
+    {
+        List<string> parts = [];
+        if (minimum.Leadership > 0) parts.Add($"统率{minimum.Leadership}");
+        if (minimum.War > 0) parts.Add($"武力{minimum.War}");
+        if (minimum.Intelligence > 0) parts.Add($"智力{minimum.Intelligence}");
+        if (minimum.Politics > 0) parts.Add($"政治{minimum.Politics}");
+        return parts.Count == 0 ? "无" : string.Join("、", parts);
+    }
 
     public static OfficerEquipmentData Read(GameSession session, TextCatalog texts, int officerId)
     {
@@ -46,6 +57,8 @@ public static class OfficerEquipment
         OfficerEquipmentItem Item(EquipmentInstance instance)
         {
             var definition = rules.Items[instance.DefinitionId];
+            string requirements = Requirements(definition.MinimumAbilities);
+            string? unmet = EquipmentRules.MeetsRequirements(definition, person.BaseAbilities) ? null : $"基础属性不足，需要{requirements}。";
             bool inventory = instance.InventoryForceId is not null;
             string? incompatibility = null;
             if (definition.Slot is EquipmentSlot.MainHand or EquipmentSlot.OffHand)
@@ -61,11 +74,11 @@ public static class OfficerEquipment
                     if (!compatible) incompatibility = $"与已装备的{SlotName(otherSlot)}「{Name(otherDefinition)}」不兼容，请先更换或卸下。";
                 }
             }
-            bool allowed = own && incompatibility is null && session.Validate(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), player!.Value,
+            bool allowed = own && incompatibility is null && unmet is null && session.Validate(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), player!.Value,
                 world.Simulation.NextSequence, officerId, definition.Slot, instance.Id)).Accepted;
             return new(instance.Id, Name(definition), definition.Slot, definition.Rarity, instance.Level, instance.Experience,
                 instance.Equipped, inventory, instance.LegacyTreasureId is not null, Effect(definition, instance.Level), allowed,
-                incompatibility ?? (!allowed ? "当前无法操作此装备。" : null));
+                unmet ?? incompatibility ?? (!allowed ? "当前无法操作此装备。" : null), definition.Grade, requirements);
         }
         var visible = world.Equipment.Where(e => e.OfficerId == officerId || own && e.InventoryForceId == player)
             .Select(Item).OrderByDescending(e => e.Equipped).ThenBy(e => e.Name, StringComparer.Ordinal).ThenBy(e => e.Id).ToArray();

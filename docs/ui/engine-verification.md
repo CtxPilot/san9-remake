@@ -2,6 +2,10 @@
 
 以下入口按受影响功能选择，需先构建客户端；有内容参数的检查复用现有转换包。它们验证控件、输入和生命周期，不代表画面、试听或完整玩法验收。历史画面脚本见[画面验证](client-verification.md)，通用验证取舍见[测试说明](../../tests/README.md)。
 
+2026-11-10 使用隔离用户目录与本机升级内容包，在 1024×768 客户区打开研究、制造、出征阵形、分队兵种及武将阵形／装备页面，核对名单、状态、提示和逐层返回。研究不可用提示位于屏幕中央；装备操作名单发现底部提示与武将情报提示重叠，已隐藏被覆盖页面的提示，空物品名单增加说明。修复后重启游戏，复核装备名单和操作名单的底部提示不再重叠；客户端测试与装备控件诊断通过。研究开始确认、己方装备变更和常用编队样式仍待实际画面验证。
+
+同日使用隔离存档和已有旧内容包检查普通装备购买：军事菜单可打开购买名单，实际购买长枪后资金从 18976 减至 18576；修复并重启后核对“购买”页签、旧预设的长枪等新名称和居中确认框。上述检查不替代完整装备、个人爵位与阵形教学验收，实际购买仅发生在隔离会话中。
+
 资料编辑器保存刷新可用无资源引擎检查验证，覆盖保存不重建当前表单／不丢失控件输入，以及隐藏页切回时刷新；不代表画面验收：
 
 ```powershell
@@ -12,7 +16,7 @@ godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/Sha
 
 武将阵形页检查设置 `SAN9_OFFICER_FORMATION_CONTENT` 为已准备的剧本内容目录，运行 `godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/OfficerFormationVerification.tscn`。检查在启用兵种与研究的真实会话中打开武将详情的阵形页，核对阵形名称及熟练度，成功输出 `OFFICER_FORMATION_OK`；这不代表实际画面验收。
 
-武将装备页检查设置 `SAN9_EQUIPMENT_CONTENT` 为已准备的剧本内容目录，运行 `godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/OfficerEquipmentVerification.tscn`。检查打开武将装备窗口、六个槽位和从隔离会话库存装备长枪的命令；成功输出 `OFFICER_EQUIPMENT_OK`，不代表实际画面验收。
+武将装备页检查设置 `SAN9_EQUIPMENT_CONTENT` 为已准备的剧本内容目录，运行 `godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/OfficerEquipmentVerification.tscn`。检查打开武将装备窗口、九个槽位和从隔离会话库存装备长枪的命令；成功输出 `OFFICER_EQUIPMENT_OK`，不代表实际画面验收。
 
 联携关系表检查设置`SAN9_TACTIC_LINK_CONTENT`为现有内容根目录，运行`godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/TacticLinkEditorVerification.tscn`，可验证联携关系表的初次显示、按人物筛选、选中修改、删除及搜索选人后添加。仅改变内存草稿，不发布玩家资料；成功输出`TACTIC_LINK_EDITOR_OK`，不代表画面验收。
 

@@ -582,6 +582,10 @@ public sealed partial class SimulationEngine
                     var productionRejection = EquipmentProduction.Start(mutation, production, _rules.Equipment, events);
                     if (productionRejection != CommandRejection.None) return Reject(productionRejection);
                     break;
+                case PurchaseEquipmentCommand purchase:
+                    var purchaseRejection = EquipmentProduction.Purchase(mutation, purchase, _rules.Equipment, events);
+                    if (purchaseRejection != CommandRejection.None) return Reject(purchaseRejection);
+                    break;
                 case BurnCommand burn:
                     var burnRejection = BurnStrategies.Start(mutation, context, burn, _rules, events);
                     if (burnRejection != CommandRejection.None) return Reject(burnRejection);

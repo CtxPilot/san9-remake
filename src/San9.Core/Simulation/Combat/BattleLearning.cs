@@ -51,10 +51,20 @@ internal static class BattleLearning
                     military.Map.IsWater(unit.Position) || unit.Condition is not (UnitCondition.Normal or UnitCondition.HighSpirits) ||
                     unit.EffectiveOrderClass != UnitOrderClass.Military || !MilitaryEngagements.Engaged(world, unit, military)) continue;
                 foreach (var officer in world.ServingUnitMembers(unit.Id).OrderBy(p => p.Id).ToArray())
-                    if (unit.Detachments.TryGetValue(officer.Id, out var detachment) && detachment.Soldiers > 0 &&
-                        officer.FormationProficiencies?.TryGetValue(formationId, out int current) == true &&
-                        current < FormationKnowledge.MaximumProficiency)
-                        world.Replace(officer with { FormationProficiencies = officer.FormationProficiencies.SetItem(formationId, current + 1) });
+                {
+                    if (!unit.Detachments.TryGetValue(officer.Id, out var detachment) || detachment.Soldiers == 0) continue;
+                    if (officer.FormationProficiencies?.TryGetValue(formationId, out int current) == true)
+                    {
+                        if (current < FormationKnowledge.MaximumProficiency)
+                            world.Replace(officer with { FormationProficiencies = officer.FormationProficiencies.SetItem(formationId, current + 1) });
+                    }
+                    else if (officer.Id != unit.CommanderId && unit.CommanderId is int commander &&
+                        world.Officers.TryGetValue(commander, out var leader) && FormationKnowledge.Knows(leader, formationId))
+                    {
+                        var next = FormationKnowledge.Practice(officer, formationId);
+                        if (!ReferenceEquals(next, officer)) world.Replace(next);
+                    }
+                }
             }
         if (world.Companion.DisableDailyCombatProficiencyGain) return;
         foreach (var unit in world.Units.Values.OrderBy(u => u.Id))

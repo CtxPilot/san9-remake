@@ -57,6 +57,8 @@ public sealed partial class GameSession
     public string ResearchProjectName(string id) => ResearchDisplay.Name(MilitaryRules, id);
     public IReadOnlyList<EquipmentDefinition> EquipmentRecipes => _definition.Rules.Equipment.Items.Values
         .Where(item => item.ResearchProjectId is not null).OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
+    public IReadOnlyList<EquipmentDefinition> PurchasableEquipment => _definition.Rules.Equipment.Items.Values
+        .Where(item => item.PurchaseCost is not null).OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
     public IReadOnlyList<DomainEvent> InitialEvents => _initialEvents;
     public IReadOnlyList<SessionRecord> Records => _readOnlyRecords;
     public IReadOnlyList<ChronicleEntry> Chronicle => _readOnlyChronicle;

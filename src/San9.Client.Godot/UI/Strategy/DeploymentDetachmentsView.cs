@@ -6,127 +6,120 @@ using San9.Core.Domain;
 
 namespace San9.Client.Godot;
 
-/// <summary>Edits member equipment and soldier counts within the deployment draft.</summary>
-public partial class DeploymentDetachmentsView : Control
+/// <summary>Stages mixed detachment choices until the player confirms the entire preparation.</summary>
+public partial class DeploymentDetachmentsView : ModalView, IModalInputRouter
 {
     public DeploymentDraft Draft { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
+    public TextureScope Textures { get; init; } = null!;
+    public TextureService Service { get; init; } = null!;
     public Action Closed { get; init; } = null!;
-    private readonly Dictionary<int, (OptionButton Types, SpinBox Soldiers, List<(int Id, int Level)> Choices)> _rows = [];
-    private Label _message = null!;
-    private OptionButton? _navalTraining;
-    private OptionButton _siege = null!;
-    private readonly List<int?> _siegeChoices = [null];
+    private ImmutableDictionary<int, DetachmentState> _detachments = ImmutableDictionary<int, DetachmentState>.Empty;
+    private int? _naval, _siege;
+    private Control? _body, _child;
+    private string _message = "选择武将的兵种和兵力。";
+    private readonly GameTextPresenter _text = new();
 
     public override void _Ready()
     {
-        Position = Vector2.Zero;
-        Size = new(1024, 768);
-        MouseFilter = MouseFilterEnum.Stop;
-        Theme = CompanionPanelStyle.Create(GetThemeFont("font"));
-        var shade = new ColorRect { Color = new Color(0, 0, 0, .75f), Size = Size, MouseFilter = MouseFilterEnum.Stop };
-        AddChild(shade);
-        var panel = new PanelContainer { Position = new(220, 140), Size = new(584, 480) };
-        AddChild(panel);
-        var margin = new MarginContainer();
-        foreach (string side in new[] { "left", "right", "top", "bottom" })
-            margin.AddThemeConstantOverride($"margin_{side}", 12);
-        panel.AddChild(margin);
-        var layout = new VBoxContainer();
-        margin.AddChild(layout);
-        layout.AddChild(new Label { Text = "分队兵种", HorizontalAlignment = HorizontalAlignment.Center });
-        layout.AddChild(new Label { Text = $"分队兵力合计须为 {Draft.Soldiers}" });
-        if (Draft.NavalFormationId is not null)
-        {
-            _navalTraining = new OptionButton();
-            foreach (var training in Draft.Rules.NavalTraining.Values.OrderBy(t => t.Id)
-                .Where(t => t.ResearchProjectId is null || Draft.Force.CompletedResearch.Contains(t.ResearchProjectId)))
-                _navalTraining.AddItem($"{training.Name}（费用 {training.DeploymentCost}）", training.Id);
-            for (int i = 0; i < _navalTraining.ItemCount; i++)
-                if (_navalTraining.GetItemId(i) == Draft.NavalTrainingId) _navalTraining.Select(i);
-            layout.AddChild(_navalTraining);
-        }
-        _siege = new OptionButton();
-        _siege.AddItem("无攻城器械");
-        foreach (var equipment in Draft.Rules.SiegeEquipment.Values.OrderBy(item => item.Id)
-            .Where(item => Draft.Force.CompletedResearch.Contains(item.ResearchProjectId)))
-        {
-            _siegeChoices.Add(equipment.Id);
-            _siege.AddItem($"{equipment.Name}（费用 {equipment.DeploymentCost}）");
-        }
-        _siege.Select(_siegeChoices.IndexOf(Draft.SiegeEquipmentId));
-        layout.AddChild(_siege);
-        foreach (int officerId in Draft.Members)
-        {
-            var row = new HBoxContainer();
-            layout.AddChild(row);
-            string name = Texts.Resolve(Draft.View.Officers.Single(person => person.Id == officerId).NameKey);
-            row.AddChild(new Label { Text = name, CustomMinimumSize = new(110, 36) });
-            var types = new OptionButton { CustomMinimumSize = new(220, 36) };
-            row.AddChild(types);
-            var choices = new List<(int Id, int Level)>();
-            foreach (var type in Draft.Rules.TroopTypes.Values.OrderBy(type => type.Id))
-                for (int level = 1; level <= type.MaximumLevel; level++)
-                    if (type.LevelResearchProjects.All(project => project.Key > level || Draft.Force.CompletedResearch.Contains(project.Value)))
-                    {
-                        choices.Add((type.Id, level));
-                        types.AddItem($"{type.Name}·{level}级");
-                    }
-            var current = Draft.Detachments[officerId];
-            types.Select(choices.FindIndex(choice => choice.Id == current.TroopTypeId && choice.Level == current.Level));
-            var count = new SpinBox { MinValue = 1, MaxValue = Draft.Soldiers, Step = 1, Value = current.Soldiers,
-                CustomMinimumSize = new(150, 36), AllowGreater = false, AllowLesser = false };
-            row.AddChild(count);
-            _rows.Add(officerId, (types, count, choices));
-        }
-        _message = new Label { Text = "", CustomMinimumSize = new(0, 36) };
-        layout.AddChild(_message);
-        var buttons = new HBoxContainer();
-        layout.AddChild(buttons);
-        var accept = new Button { Text = "确定" };
-        accept.Pressed += Accept;
-        buttons.AddChild(accept);
-        var cancel = new Button { Text = "取消" };
-        cancel.Pressed += () => Closed();
-        buttons.AddChild(cancel);
+        Size = new(1024, 768); MouseFilter = MouseFilterEnum.Stop;
+        _detachments = Draft.Detachments; _naval = Draft.NavalTrainingId; _siege = Draft.SiegeEquipmentId;
+        Rebuild();
     }
 
+    private void Rebuild()
+    {
+        if (_body is not null) { RemoveChild(_body); _body.QueueFree(); }
+        _body = new Control { MouseFilter = MouseFilterEnum.Ignore }; AddChild(_body);
+        _body.AddChild(new ColorRect { Color = new(0, 0, 0, .65f), Size = Size, MouseFilter = MouseFilterEnum.Ignore });
+        _body.AddChild(new CommandWindow { Texts = Texts, Textures = Textures, Position = new(220, 140), Size = new(584, 480),
+            Title = "分队兵种", AcceptTitle = "决定", CancelTitle = "中止", Accepted = Accept, Closed = Closed,
+            Help = () => Notice("选择各武将的兵种和兵力。\n分队兵力合计须等于部队总兵力。") });
+        void Label(string value, Rect2 rect, HorizontalAlignment align = HorizontalAlignment.Left)
+        {
+            var label = new Label { Text = value, Position = rect.Position, Size = rect.Size, HorizontalAlignment = align,
+                VerticalAlignment = VerticalAlignment.Center, MouseFilter = MouseFilterEnum.Ignore, ClipText = true };
+            _body.AddChild(label); _text.Apply(label, GameTextStyles.CatalogRow);
+        }
+        void Button(string title, Rect2 rect, Action action) => _body.AddChild(CommandWindow.CreateActionButton(Textures, title, "edit", rect, action));
+        Label($"兵力合计 {_detachments.Values.Sum(d => (long)d.Soldiers)} / {Draft.Soldiers}　装备费用 {Draft.Rules.DetachmentEquipmentCost(_detachments.Values)}", new(248, 158, 520, 28));
+        Label("武将", new(256, 200, 100, 26)); Label("兵种", new(400, 200, 170, 26)); Label("兵力", new(620, 200, 112, 26));
+        int index = 0;
+        foreach (int officer in Draft.Members)
+        {
+            int y = 232 + index++ * 48;
+            var detachment = _detachments[officer];
+            Label(Texts.Resolve(Draft.View.Officers.Single(p => p.Id == officer).NameKey), new(256, y, 112, 32));
+            string type = Draft.Rules.TroopTypes[detachment.TroopTypeId].Name;
+            Button($"{type}　{detachment.Level}级", new(390, y, 176, 40), () => SelectType(officer));
+            Button(detachment.Soldiers.ToString(), new(606, y, 136, 40), () => SelectSoldiers(officer));
+        }
+        if (Draft.NavalFormationId is not null)
+            Button(_naval is int naval ? Draft.Rules.NavalTraining[naval].Name : "水军训练", new(256, 478, 192, 40), SelectNaval);
+        Button(_siege is int siege ? Draft.Rules.SiegeEquipment[siege].Name : "无攻城器械", new(484, 478, 216, 40), SelectSiege);
+        Label(_message, new(256, 550, 496, 42));
+    }
+
+    private static readonly CatalogPage[] ChoicePages = [new("选择", [
+        new("name", "名称", 22, CatalogAlignment.Left), new("cost", "费用", 10, CatalogAlignment.Right),
+        new("condition", "条件", 28, CatalogAlignment.Left)])];
+
+    private void SelectType(int officer)
+    {
+        var choices = Draft.Rules.TroopTypes.Values.OrderBy(t => t.Id).SelectMany(t => Enumerable.Range(1, t.MaximumLevel)
+            .Where(level => t.LevelResearchProjects.All(p => p.Key > level || Draft.Force.CompletedResearch.Contains(p.Value)))
+            .Select(level => (Type: t, Level: level))).ToArray();
+        OpenCatalog("选择兵种", choices.Select((c, i) => new CatalogRow(i, [$"{c.Type.Name}　{c.Level}级",
+            c.Type.EquipmentCostPerThousand.GetValueOrDefault(c.Level), "每千人费用"])).ToArray(), id =>
+        { var c = choices[id]; _detachments = _detachments.SetItem(officer, _detachments[officer] with { TroopTypeId = c.Type.Id, Level = c.Level }); CloseChild(); });
+    }
+
+    private void SelectSoldiers(int officer)
+    {
+        OpenChild(new NumberInputDialog { State = new(1, Draft.Soldiers, _detachments[officer].Soldiers), Textures = Textures,
+            Confirmed = value => { _detachments = _detachments.SetItem(officer, _detachments[officer] with { Soldiers = value }); CloseChild(); }, Closed = CloseChild });
+    }
+
+    private void SelectNaval()
+    {
+        var choices = Draft.Rules.NavalTraining.Values.OrderBy(t => t.Id)
+            .Where(t => t.ResearchProjectId is null || Draft.Force.CompletedResearch.Contains(t.ResearchProjectId)).ToArray();
+        OpenCatalog("水军训练", choices.Select((c, i) => new CatalogRow(i, [c.Name, c.DeploymentCost, "已解锁"])).ToArray(),
+            id => { _naval = choices[id].Id; CloseChild(); });
+    }
+
+    private void SelectSiege()
+    {
+        var choices = Draft.Rules.SiegeEquipment.Values.OrderBy(e => e.Id)
+            .Where(e => Draft.Force.CompletedResearch.Contains(e.ResearchProjectId)).ToArray();
+        var rows = new[] { new CatalogRow(0, ["无", "", ""]) }.Concat(choices.Select((c, i) =>
+            new CatalogRow(i + 1, [c.Name, c.DeploymentCost, Draft.CanUseSiegeEquipment(c.Id) ? "可用" : "缺少兵法"]))).ToArray();
+        OpenCatalog("攻城器械", rows, id =>
+        { int? chosen = id == 0 ? null : choices[id - 1].Id; if (!Draft.CanUseSiegeEquipment(chosen)) { CloseChild(); Notice("需要具备相应兵法的武将。"); return; } _siege = chosen; CloseChild(); });
+    }
+
+    private void OpenCatalog(string title, CatalogRow[] rows, Action<int> activate) => OpenChild(new CatalogView
+    { Title = title, CloseTitle = "中止", Pages = ChoicePages, ReadRows = _ => rows, Textures = Textures, Service = Service, Activated = activate, Closed = CloseChild });
+    private void OpenChild(Control child) { _child = child; AddChild(child); }
+    private void CloseChild() { if (_child is null) return; RemoveChild(_child); _child.QueueFree(); _child = null; Rebuild(); }
+    private void Notice(string message)
+    {
+        var dialog = new GameDialog { Textures = Textures, Size = Size }; dialog.Closed += CloseChild; OpenChild(dialog); dialog.SetNotice(message);
+    }
     private void Accept()
     {
-        if (_siege.Selected < 0 || !Draft.CanUseSiegeEquipment(_siegeChoices[_siege.Selected]))
-        {
-            _message.Text = "攻城器械需要已解锁且有相应兵法的武将。";
-            return;
-        }
-        if (_navalTraining is not null && (_navalTraining.Selected < 0 ||
-            !Draft.Rules.NavalTraining.TryGetValue(_navalTraining.GetSelectedId(), out var training) ||
+        if (!Draft.CanUseSiegeEquipment(_siege) || _naval is int naval && (!Draft.Rules.NavalTraining.TryGetValue(naval, out var training) ||
             training.ResearchProjectId is string project && !Draft.Force.CompletedResearch.Contains(project)))
-        {
-            _message.Text = "请选择已解锁的水军训练。";
-            return;
-        }
-        var result = ImmutableDictionary.CreateBuilder<int, DetachmentState>();
-        foreach (var (officer, row) in _rows)
-        {
-            if (row.Types.Selected < 0) { _message.Text = "请选择兵种。"; return; }
-            var choice = row.Choices[row.Types.Selected];
-            result.Add(officer, new(choice.Id, choice.Level, (uint)row.Soldiers.Value));
-        }
-        if (!Draft.SetDetachments(result.ToImmutable()))
-        {
-            _message.Text = $"请检查兵种和兵力，合计须为 {Draft.Soldiers}。";
-            return;
-        }
-        if (_navalTraining is not null && !Draft.SetNavalTraining(_navalTraining.GetSelectedId()))
-        {
-            _message.Text = "请选择已解锁的水军训练。";
-            return;
-        }
-        if (_siege.Selected < 0 || !Draft.SetSiegeEquipment(_siegeChoices[_siege.Selected]))
-        {
-            _message.Text = "攻城器械需要已解锁且有相应兵法的武将。";
-            return;
-        }
-        Closed();
+        { _message = "请检查水军训练与攻城器械条件。"; Rebuild(); return; }
+        if (!Draft.SetDetachments(_detachments)) { _message = $"分队兵力合计须为 {Draft.Soldiers}。"; Rebuild(); return; }
+        if (_naval is int selected) Draft.SetNavalTraining(selected);
+        Draft.SetSiegeEquipment(_siege); Closed();
+    }
+    public override void _Input(InputEvent input)
+    {
+        if (!IsVisibleInTree() || _child is not null) return;
+        if (input is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape } ||
+            input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
+        { GetViewport().SetInputAsHandled(); Closed(); }
     }
 }

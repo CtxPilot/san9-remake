@@ -24,6 +24,23 @@ public sealed class EquipmentCommandTests
     }
 
     [Fact]
+    public void RequirementsUseBaseAbilitiesAndRejectedEquipDoesNotMoveInventory()
+    {
+        var source = Engine().CaptureStableState() with { EquipmentInitialized = true, Equipment = [
+            new EquipmentInstance(1, "sword", 1, null, true), new EquipmentInstance(2, "axe", null, 1, false)] };
+        var catalog = new EquipmentRulebook([
+            new EquipmentDefinition("sword", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, new(50, 0, 0, 0), default),
+            new EquipmentDefinition("axe", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default) { Grade = 2, MinimumAbilities = new(60, 0, 0, 0) }]);
+        var engine = new SimulationEngine(WorldState.Restore(source), new SimulationRules { Equipment = catalog });
+        var before = engine.Snapshot;
+        var command = new ConfigureEquipmentCommand(Guid.NewGuid(), 1, before.Simulation.NextSequence, 1, EquipmentSlot.MainHand, 2);
+        Assert.False(engine.Execute(new("player"), command).Submission.Accepted);
+        Assert.Same(before, engine.Snapshot);
+        Assert.Equal(1, engine.Snapshot.Equipment.Single(e => e.Id == 2).InventoryForceId);
+        Assert.True(engine.Snapshot.Equipment.Single(e => e.Id == 1).Equipped);
+    }
+
+    [Fact]
     public void CommandReplacesAndClearsSlotAndSurvivesRestore()
     {
         var engine = Engine();

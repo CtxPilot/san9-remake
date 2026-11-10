@@ -1,79 +1,78 @@
 using Godot;
 using San9.Application;
+using San9.Application.Presentation;
 using San9.Content.Text;
 using San9.Core.Simulation;
 
 namespace San9.Client.Godot;
 
-public partial class EquipmentProductionView : ModalView
+public partial class EquipmentProductionView : ModalView, IModalInputRouter
 {
     public GameSession Session { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
+    public TextureScope Textures { get; init; } = null!;
+    public TextureService Service { get; init; } = null!;
     public Action Closed { get; init; } = null!;
     public int SettlementId { get; init; }
-    private VBoxContainer _recipes = null!;
-    private Label _status = null!;
-
-    public override void _Ready()
+    public bool Purchase { get; init; }
+    private Control? _page;
+    private static readonly CatalogPage[] ProductionPages = [new("制造", [
+        new("name", "装备", 18, CatalogAlignment.Left), new("cost", "资金", 8, CatalogAlignment.Right),
+        new("days", "日数", 8, CatalogAlignment.Right), new("state", "状态／条件", 28, CatalogAlignment.Left)])];
+    private static readonly CatalogPage[] PurchasePages = [new("购买", [
+        new("name", "装备", 18, CatalogAlignment.Left), new("cost", "资金", 8, CatalogAlignment.Right),
+        new("days", "取得", 8, CatalogAlignment.Right), new("state", "状态／条件", 28, CatalogAlignment.Left)])];
+    public override void _Ready() { Size = new(1024, 768); MouseFilter = MouseFilterEnum.Stop; ShowCatalog(); }
+    private void Replace(Control page)
     {
-        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        MouseFilter = MouseFilterEnum.Stop;
-        Theme = CompanionPanelStyle.Create(GetThemeFont("font"));
-        var backdrop = new ColorRect { Color = new(0, 0, 0, .42f), MouseFilter = MouseFilterEnum.Ignore };
-        AddChild(backdrop); backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        var panel = new PanelContainer { AnchorRight = 1, AnchorBottom = 1, OffsetLeft = 64, OffsetRight = -64, OffsetTop = 20, OffsetBottom = -20 };
-        AddChild(panel);
-        var margin = new MarginContainer();
-        foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride($"margin_{side}", 16);
-        panel.AddChild(margin);
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 8); margin.AddChild(column);
-        var place = Session.View.Settlements.Single(s => s.Id == SettlementId);
-        var title = new Label { Text = $"装备制造　{place.ResolveName(Texts)}" }; title.AddThemeFontSizeOverride("font_size", 24); column.AddChild(title);
-        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
-        column.AddChild(scroll);
-        _recipes = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; scroll.AddChild(_recipes);
-        _status = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart }; column.AddChild(_status);
-        var close = new Button { Text = "关闭", CustomMinimumSize = new(96, 34) }; close.Pressed += Closed; column.AddChild(close);
-        Refresh();
+        if (_page is not null) { RemoveChild(_page); _page.QueueFree(); }
+        _page = page; AddChild(page);
     }
-
-    private void Refresh()
+    private void ShowCatalog()
     {
-        foreach (Node child in _recipes.GetChildren()) { _recipes.RemoveChild(child); child.QueueFree(); }
+        var recipes = (Purchase ? Session.PurchasableEquipment : Session.EquipmentRecipes).ToArray();
         var force = Session.Snapshot.Forces.FirstOrDefault(f => f.Id == Session.View.PlayerForceId);
-        if (force is null) { _status.Text = "当前没有可操作的势力。"; return; }
-        _status.Text = force.EquipmentProduction is { } active
-            ? $"正在制造 {Session.EquipmentRecipes.FirstOrDefault(r => r.Id == active.DefinitionId)?.Name ?? active.DefinitionId}，剩余 {active.DaysRemaining} 日。"
-            : "选择装备；完成后进入势力库存。资金由据点所属军团支付。";
-        foreach (var recipe in Session.EquipmentRecipes)
+        string State(int index)
         {
-            bool unlocked = force.CompletedResearch.Contains(recipe.ResearchProjectId!);
-            var row = new HBoxContainer(); _recipes.AddChild(row);
-            var bonus = recipe.BaseBonuses;
-            string effect = $"统率+{bonus.Leadership} 武力+{bonus.War} 智力+{bonus.Intelligence} 政治+{bonus.Politics}";
-            var label = new Label { Text = $"{recipe.Name}　资金 {recipe.ProductionCost}　{recipe.ProductionDays} 日　{effect}" +
-                (unlocked ? "" : $"　需要 {Session.ResearchProjectName(recipe.ResearchProjectId!)}"), SizeFlagsHorizontal = SizeFlags.ExpandFill };
-            row.AddChild(label);
-            var start = new Button { Text = "制造", Disabled = !unlocked || force.EquipmentProduction is not null };
-            row.AddChild(start); start.Pressed += () => Start(force.Id, recipe.Id);
+            var recipe = recipes[index];
+            if (force is null) return "无可操作势力";
+            if (Purchase) return recipe.PurchaseResearchProjectId is not string required || force.CompletedResearch.Contains(required)
+                ? "可购买" : "需要 " + Session.ResearchProjectName(required);
+            if (force.EquipmentProduction is { } active)
+                return active.DefinitionId == recipe.Id ? $"制造中，剩余{active.DaysRemaining}日" : "其他装备制造中";
+            return force.CompletedResearch.Contains(recipe.ResearchProjectId!) ? "可制造" : "需要 " + Session.ResearchProjectName(recipe.ResearchProjectId!);
         }
+        var rows = recipes.Select((p, i) => new CatalogRow(i, [p.Name, Purchase ? p.PurchaseCost!.Value : p.ProductionCost, Purchase ? (CatalogCell)"即时" : p.ProductionDays, State(i)])).ToArray();
+        var place = Session.View.Settlements.Single(s => s.Id == SettlementId).ResolveName(Texts);
+        Replace(new CatalogView { Title = Purchase ? "购买装备" : "装备制造", HintText = $"执行设施　{place}。选择装备查看效果。", CloseTitle = "中止",
+            Textures = Textures, Service = Service, Pages = Purchase ? PurchasePages : ProductionPages, ReadRows = _ => rows, Closed = Closed,
+            Activated = index =>
+            {
+                var recipe = recipes[index]; string state = State(index); var bonus = recipe.BaseBonuses;
+                string effect = $"品阶 {recipe.Grade}　要求 {OfficerEquipment.Requirements(recipe.MinimumAbilities)}\n统率+{bonus.Leadership} 武力+{bonus.War} 智力+{bonus.Intelligence} 政治+{bonus.Politics}";
+                if (state != (Purchase ? "可购买" : "可制造")) { Notice($"{recipe.Name}　{state}\n{effect}"); return; }
+                Confirm(Purchase ? $"购买 {recipe.Name}？\n资金 {recipe.PurchaseCost}，完成后进入库存。\n{effect}" :
+                    $"制造 {recipe.Name}？\n资金 {recipe.ProductionCost}　{recipe.ProductionDays} 日。\n{effect}", () => Start(recipe.Id));
+            } });
     }
-
-    private void Start(int forceId, string id)
+    private void Start(string id)
     {
-        var command = new StartEquipmentProductionCommand(Guid.NewGuid(), forceId, Session.Snapshot.Simulation.NextSequence, SettlementId, id);
+        if (Session.View.PlayerForceId is not int force) { Notice("当前没有可操作的势力。"); return; }
+        GameCommand command = Purchase ? new PurchaseEquipmentCommand(Guid.NewGuid(), force, Session.Snapshot.Simulation.NextSequence, SettlementId, id) :
+            new StartEquipmentProductionCommand(Guid.NewGuid(), force, Session.Snapshot.Simulation.NextSequence, SettlementId, id);
         var result = Session.Execute(new("player"), command);
-        Refresh();
-        if (!result.Submission.Accepted)
-            _status.Text = result.Submission.Rejection == CommandRejection.InsufficientFunds ? "制造失败，资金不足。" : "制造失败，请检查当前回合、据点和研究条件。";
+        if (result.Submission.Accepted) { ShowCatalog(); return; }
+        string action = Purchase ? "购买" : "制造";
+        Notice(result.Submission.Rejection == CommandRejection.InsufficientFunds ? $"{action}失败，资金不足。" : $"{action}失败，请检查当前回合、据点和研究条件。");
     }
-
-    public override void _Input(InputEvent input)
+    private void Confirm(string message, Action yes)
     {
-        if (!IsVisibleInTree()) return;
-        if (input is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape } ||
-            input is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right })
-        { GetViewport().SetInputAsHandled(); Closed(); }
+        var dialog = new GameDialog { Textures = Textures, Size = Size, PreferredWidth = 496 }; Replace(dialog);
+        dialog.Confirmed += yes; dialog.Dismissed += ShowCatalog; dialog.Closed += ShowCatalog; dialog.SetMessage(message);
     }
-    public override void _GuiInput(InputEvent input) => AcceptEvent();
+    private void Notice(string message)
+    {
+        var dialog = new GameDialog { Textures = Textures, Size = Size }; Replace(dialog);
+        dialog.Closed += ShowCatalog; dialog.SetNotice(message);
+    }
 }
