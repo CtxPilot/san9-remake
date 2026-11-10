@@ -28,7 +28,7 @@ public partial class ResearchView : ModalView
         foreach (string side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride($"margin_{side}", 16);
         panel.AddChild(margin);
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 8); margin.AddChild(column);
-        var title = new Label { Text = "兵种研究" }; title.AddThemeFontSizeOverride("font_size", 24); column.AddChild(title);
+        var title = new Label { Text = "军事研究" }; title.AddThemeFontSizeOverride("font_size", 24); column.AddChild(title);
         _settlements = new OptionButton(); column.AddChild(_settlements);
         int? forceId = Session.View.PlayerForceId;
         var world = Session.Snapshot;

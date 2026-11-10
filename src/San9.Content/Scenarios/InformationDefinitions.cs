@@ -65,10 +65,19 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
     [JsonRequired] public FormationCatalogDefinition[] Formations { get; init; } = [];
     [JsonRequired] public CountryTitleDefinition[] CountryTitles { get; init; } = [];
     [JsonRequired] public ForceRelation[] Relations { get; init; } = [];
+    public ImmutableArray<EquipmentDefinition> Equipment { get; init; } = [];
     public static InformationDefinitions Empty => new([], [], [], [], []);
-    public InformationDefinitions Copy() => new(Ranks.ToArray(), Offices.ToArray(), Treasures.ToArray(), Corps.ToArray(), TreasureStates.ToArray()) { ShowOfficerAges = ShowOfficerAges, MapContextExcludedFacilityIds = MapContextExcludedFacilityIds, Relations = Relations.ToArray(), CountryTitles = CountryTitles.ToArray(), Tactics = Tactics.ToArray(), Formations = Formations.ToArray() };
+    public InformationDefinitions Copy() => new(Ranks.ToArray(), Offices.ToArray(), Treasures.ToArray(), Corps.ToArray(), TreasureStates.ToArray()) { ShowOfficerAges = ShowOfficerAges, MapContextExcludedFacilityIds = MapContextExcludedFacilityIds, Relations = Relations.ToArray(), CountryTitles = CountryTitles.ToArray(), Tactics = Tactics.ToArray(), Formations = Formations.ToArray(), Equipment = Equipment };
     public void Validate(ScenarioInitialState scenario)
     {
+        try
+        {
+            if (Equipment.IsDefault) throw new ArgumentException("Missing equipment catalog.");
+            _ = new EquipmentRulebook(Equipment);
+            if (Equipment.Any(e => e.LegacyTreasureId is int id && !Treasures.Any(t => t.Id == id)))
+                throw new ArgumentException("Unknown legacy treasure reference.");
+        }
+        catch (ArgumentException error) { throw new InvalidDataException("Invalid equipment catalog.", error); }
         if (MapContextExcludedFacilityIds.IsDefault ||
             MapContextExcludedFacilityIds.Distinct().Count() != MapContextExcludedFacilityIds.Length ||
             MapContextExcludedFacilityIds.Any(id => scenario.Military?.Facilities.Any(f => f.Id == id) != true))

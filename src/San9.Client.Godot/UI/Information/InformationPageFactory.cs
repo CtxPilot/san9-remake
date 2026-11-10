@@ -134,7 +134,7 @@ internal sealed class InformationPageFactory
             var officerDetail = new OfficerDetailView
             {
                 Service = Service,
-                State = State.OfficerDetail, Textures = Textures, Texts = Texts,
+                State = State.OfficerDetail, Textures = Textures, Texts = Texts, Session = Session,
                 Read = id => OfficerDetails.Read(Session.View, Texts, id),
                 ReadName = id => Texts.Resolve(Session.View.Officers.Single(o => o.Id == id).NameKey),
                 OpenTreasures = id => { Navigate(new("宝物", InformationCategory.Treasures, HolderId: id)); Rebuild(); },

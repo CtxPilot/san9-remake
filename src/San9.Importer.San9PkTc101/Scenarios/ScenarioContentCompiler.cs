@@ -143,6 +143,7 @@ public static class ScenarioContentCompiler
             Relations = summaries.SelectMany(a => summaries.Where(b => b.Id > a.Id).Select(b =>
                 new San9.Core.Domain.ForceRelation(a.Id, b.Id, forces[a.Id].DiplomaticRelations[b.Id]))).ToArray()
         };
+        information = information with { Equipment = LegacyEquipmentMigration.Convert(information.Treasures, information.TreasureStates, EquipmentPreset.Basic()).Definitions };
         var suffixKeys = fixedBuildings.Select(f => (f.Id, Key: text.FacilitySuffix($"facility-suffix.{f.Id}", f.Id)))
                 .Where(p => p.Key is not null).ToDictionary(p => p.Id, p => p.Key!);
         var provinceNames = settlements.Where(s => s.Kind == San9.Core.Domain.SettlementKind.City).Select(s => (int)cities[s.Id].AreaCode).Distinct().ToDictionary(id => id, text.Province);

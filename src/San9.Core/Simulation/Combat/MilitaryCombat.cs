@@ -192,6 +192,7 @@ internal static class MilitaryCombat
     internal static bool BeginExchange(WorldMutation world, BattleSource source, BattleSource target,
         SimulationRules rules, List<DomainEvent> events, GameClock xunStarted, Func<CombatDayContinuation> captureDay)
     {
+        world.BeginEquipmentExchange(source, target);
         var military = rules.Military!;
         int? previousOwner = target.IsSettlement ? world.Settlements[target.Id].OwnerId : null;
         var affected = new[] { source.IsSettlement ? world.Settlements[source.Id].OwnerId : source.Owner(world),
@@ -317,6 +318,7 @@ internal static class MilitaryCombat
     internal static void ResumeDuel(WorldMutation world, SimulationRules rules, List<DomainEvent> events, int successorId)
     {
         var pending = world.Simulation.PendingDuel!;
+        world.BeginEquipmentExchange(new(pending.AttackingUnitId, false), new(pending.DefendingUnitId, false));
         var progress = DuelAftermath.Advance(world, pending.Aftermath, rules, events, successorId);
         if (progress is not null)
         {
@@ -424,6 +426,11 @@ internal static class MilitaryCombat
         damage = FinalDamage(world, new(attacker, attackerIsSettlement), settlement.OwnerId, damage, settlement.Soldiers);
         var loss = CombatMath.Loss(settlement.Soldiers, damage, profile.WoundedPercent, settlement.Wounded,
             MilitaryRulebook.WoundedCapacity, world.Companion.ReduceBattleWounded ? 12 : 10);
+        if (walls > 0 || loss.RemainingSoldiers < settlement.Soldiers)
+        {
+            world.RecordEquipmentUse(new BattleSource(attacker, attackerIsSettlement), EquipmentUse.Attack);
+            world.RecordEquipmentUse(new BattleSource(settlement.Id, true), EquipmentUse.Defense);
+        }
         int morale = 0;
         var damaged = settlement with
         {
@@ -461,6 +468,11 @@ internal static class MilitaryCombat
         bool ranged = false, uint? rangedDamage = null)
     {
         damage = Math.Min(damage, unit.Soldiers);
+        if (damage > 0 || morale > 0)
+        {
+            world.RecordEquipmentUse(source, EquipmentUse.Attack);
+            world.RecordEquipmentUse(new BattleSource(unit.Id, false), EquipmentUse.Defense);
+        }
         var loss = CombatMath.Loss(unit.Soldiers, damage, profile.WoundedPercent, unit.Wounded,
             MilitaryRulebook.WoundedCapacity, world.Companion.ReduceBattleWounded ? 13 : 10);
         uint meleeLoss = rangedDamage is uint rangedPart ? damage - Math.Min(damage, rangedPart) : ranged ? 0 : damage;

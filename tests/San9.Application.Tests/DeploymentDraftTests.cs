@@ -11,14 +11,15 @@ public sealed class DeploymentDraftTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void MilitaryMenuOffersResearchOnlyWhenMixedRulesAreEnabled(bool mixed)
+    public void MilitaryMenuOffersEquipmentResearchWithOrWithoutMixedRules(bool mixed)
     {
         var view = View(world => world with
         {
             Simulation = world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = mixed } }
         });
         var military = MapCommandMenu.Settlement(view, 1).Single(group => group.Id == "military");
-        Assert.Equal(mixed, military.Children.Any(entry => entry.Id == "research" && entry.Enabled));
+        Assert.Contains(military.Children, entry => entry.Id == "research" && entry.Enabled);
+        Assert.Contains(military.Children, entry => entry.Id == "equipment-production" && entry.Enabled);
     }
 
     [Theory]

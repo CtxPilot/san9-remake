@@ -120,6 +120,7 @@ internal sealed class StrategySnapshotSource
 
 public sealed class StrategySnapshot
 {
+    internal IReadOnlyList<EquipmentInstance>? EquippedItems => World.EquipmentInitialized ? World.Equipment : null;
     public CompanionSettings Companion { get; }
     private readonly StrategySnapshotSource _source;
     internal ScenarioRules Rules => _source.Rules;
@@ -127,7 +128,7 @@ public sealed class StrategySnapshot
     internal DecisionPerson DecisionPerson(int id)
     {
         var person = World.Officers.Single(p => p.Id == id);
-        return new(id, _source.Officer(id).NameKey, _source.Abilities.Evaluate(person, World.Treasures));
+        return new(id, _source.Officer(id).NameKey, _source.Abilities.Evaluate(person, World.Treasures, World.EquipmentInitialized ? World.Equipment : null));
     }
     /// <summary>Dialogue speakers include NPCs that are intentionally absent from the officer browser.</summary>
     public (string NameKey, int? OwnerId) MessageSpeaker(int id) =>
@@ -206,7 +207,7 @@ public sealed class StrategySnapshot
             emperor is not null && world.Simulation.Tasks.Any(t => t.OfficerId == emperor.Id && t.Journey is not null));
         var occupied = world.Simulation.Tasks.Select(t => t.OfficerId).ToHashSet();
         var journeys = world.Simulation.Tasks.Where(t => t.Journey is not null).ToDictionary(t => t.OfficerId);
-        var abilities = source.Abilities.EvaluateMany(world.Officers, world.Treasures);
+        var abilities = source.Abilities.EvaluateMany(world.Officers, world.Treasures, world.EquipmentInitialized ? world.Equipment : null);
         Officers = Array.AsReadOnly(world.Officers.Where(o => !o.IsDormant && o.IsVisible).Select(o =>
         {
             var location = o.SettlementId is int id ? settlements[id] : null;

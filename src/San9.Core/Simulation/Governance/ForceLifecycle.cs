@@ -9,8 +9,10 @@ internal static class ForceLifecycle
     internal static bool HasCity(WorldMutation world, int forceId) => world.Settlements.Values.Any(s =>
         s.OwnerId == forceId && s.Kind == SettlementKind.City && !s.IsDestroyed && !s.IsDormant);
 
-    internal static void Retire(WorldMutation world, int forceId, List<DomainEvent> events)
+    internal static void Retire(WorldMutation world, int forceId, List<DomainEvent> events, int? successor = null)
     {
+        MilitaryResearch.CancelForce(world, forceId, events);
+        EquipmentOwnership.ForceRetired(world, forceId, successor, events);
         // Loyalty belongs to a live force identity, not to its former ruler or historical record.
         // Settle transfers first: surrender and consolidation still need the old loyalty values.
         foreach (var person in world.AllOfficers.Values.Where(p => p.ForceLoyalties.ContainsKey(forceId)).OrderBy(p => p.Id).ToArray())

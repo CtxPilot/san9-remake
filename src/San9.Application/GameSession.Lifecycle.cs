@@ -64,6 +64,7 @@ public sealed partial class GameSession
         Func<WorldState, SimulationEngine>? factory)
     {
         snapshot = FormationKnowledgeMigration.Initialize(snapshot, owned.MilitaryRules);
+        snapshot = EquipmentMigration.Initialize(snapshot, owned.Content);
         _ = WorldState.Restore(snapshot.World, owned.Content.DefaultLoyalty);
         SessionValidation.Validate(owned, snapshot);
         ulong seed;
@@ -88,6 +89,7 @@ public sealed partial class GameSession
     internal static GameSession Restore(ScenarioSessionDefinition owned, SessionSnapshot snapshot, Func<WorldState, SimulationEngine>? factory)
     {
         snapshot = FormationKnowledgeMigration.Initialize(snapshot, owned.MilitaryRules);
+        snapshot = EquipmentMigration.Initialize(snapshot, owned.Content);
         var world = WorldState.Restore(snapshot.World, owned.Content.DefaultLoyalty);
         SessionValidation.Validate(owned, snapshot);
         return RestoreValidated(owned, snapshot, world, factory);

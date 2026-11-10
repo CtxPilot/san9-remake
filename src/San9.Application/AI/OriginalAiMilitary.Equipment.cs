@@ -9,7 +9,7 @@ internal sealed partial class OriginalAiMilitary
 {
     private TacticRule[] Tactics(OfficerState person)
     {
-        var available = TacticAvailability.ForOfficer(person, Force, World.Treasures, Treasures);
+        var available = TacticAvailability.ForOfficer(person, Force, World.Treasures, Treasures, World.EquipmentInitialized ? World.Equipment : null);
         return rules.Tactics.Values.Where(t => t.Selectable && t.Category is 0 or 1 or 2 or 3 or 6 or 7 or 8 &&
             available.ContainsKey(t.Id)).OrderBy(t => t.Id).ToArray();
     }
@@ -184,7 +184,7 @@ internal sealed partial class OriginalAiMilitary
             rules.DetachmentEquipmentCost(detachments.Values) +
             (navalTraining is int training ? rules.NavalTraining[training].DeploymentCost : 0);
         int? siege = World.Simulation.NewGame.MixedTroopsEnabled && order.Kind == MilitaryOrderKind.AttackSettlement && building is not null
-            ? MixedDeploymentSelection.SiegeEquipment(rules, Force, people, World.Treasures, Treasures, (long)Corps.Treasury.Money - cost)
+            ? MixedDeploymentSelection.SiegeEquipment(rules, Force, people, World.Treasures, Treasures, (long)Corps.Treasury.Money - cost, World.EquipmentInitialized ? World.Equipment : null)
             : null;
         var command = (DeployUnitCommand)Command((id, owner, sequence) => new DeployUnitCommand(id, owner, sequence, source.Id,
             people.Select(p => p.Id).ToImmutableArray(), soldiers, pair.Land, order)

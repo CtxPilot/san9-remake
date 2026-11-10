@@ -20,10 +20,11 @@ public class SimulationRules
     public TerminalDefinition? Terminal { get; init; }
     public EconomyRulebook Economy { get; init; } = EconomyRulebook.Empty;
     public TreasureRulebook Treasures { get; init; } = TreasureRulebook.Empty;
+    public EquipmentRulebook Equipment { get; init; } = EquipmentRulebook.Empty;
     public PersonnelRulebook Personnel { get; init; } = PersonnelRulebook.Empty;
     public GovernanceRulebook Governance { get; init; } = new([]);
     public MilitaryRulebook? Military { get; init; }
-    internal OfficerAbilityRules Abilities => new(Treasures, Governance, OfficerGrowth);
+    internal OfficerAbilityRules Abilities => new(Treasures, Governance, OfficerGrowth, Equipment);
     internal virtual TaskRule? FindTask(string kind) => kind is PersonnelMissions.RecruitKind or PersonnelMissions.MoveKind or PersonnelMissions.SearchKind
         ? new PersonnelMissionRule(this, kind) : kind == PersonnelReturns.Kind ? new PersonnelReturnRule(Personnel, Military)
         : kind == UnitStrategies.Kind ? new UnitStrategyRule(this) : kind == BurnStrategies.Kind ? new BurnRule(this)

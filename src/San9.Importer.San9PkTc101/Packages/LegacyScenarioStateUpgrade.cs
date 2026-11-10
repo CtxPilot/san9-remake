@@ -103,7 +103,8 @@ public static class LegacyScenarioStateUpgrade
             };
         });
         result = result with { Military = military, Information = result.Information with
-            { Formations = catalogItems.Concat(extra).ToArray() } };
+            { Formations = catalogItems.Concat(extra).ToArray(),
+              Equipment = LegacyEquipmentMigration.Convert(result.Information.Treasures, result.Information.TreasureStates, EquipmentPreset.Basic()).Definitions } };
         result.Validate();
         return result;
     }

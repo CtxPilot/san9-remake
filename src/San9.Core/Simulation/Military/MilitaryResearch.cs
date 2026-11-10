@@ -11,8 +11,18 @@ public sealed record ResearchCancelledEvent(GameClock Clock, int ForceId, string
 
 internal static class MilitaryResearch
 {
+    internal static void CancelForce(WorldMutation world, int forceId, List<DomainEvent> events)
+    {
+        if (world.Forces.TryGetValue(forceId, out var force) && force.ActiveResearch is { } research)
+        {
+            world.Replace(force with { ActiveResearch = null });
+            events.Add(new ResearchCancelledEvent(world.Clock, forceId, research.ProjectId));
+        }
+        EquipmentProduction.CancelForce(world, forceId, events);
+    }
     internal static void CancelAt(WorldMutation world, int settlementId, List<DomainEvent> events)
     {
+        EquipmentProduction.CancelAt(world, settlementId, events);
         foreach (var force in world.Forces.Values.Where(f => f.ActiveResearch?.SettlementId == settlementId).OrderBy(f => f.Id).ToArray())
         {
             string project = force.ActiveResearch!.ProjectId;
@@ -23,7 +33,7 @@ internal static class MilitaryResearch
 
     internal static CommandRejection Start(WorldMutation world, StartResearchCommand command, SimulationRules rules, List<DomainEvent> events)
     {
-        if (!world.Simulation.NewGame.MixedTroopsEnabled || rules.Military is not { } military ||
+        if ((!world.Simulation.NewGame.MixedTroopsEnabled && !rules.Equipment.Items.Values.Any(item => item.ResearchProjectId == command.ProjectId)) || rules.Military is not { } military ||
             string.IsNullOrWhiteSpace(command.ProjectId) || military.IsLegacyFormationResearch(command.ProjectId) || !military.ResearchProjects.TryGetValue(command.ProjectId, out var project) ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsEliminated || force.IsDormant ||
             !world.Settlements.TryGetValue(command.SettlementId, out var place) || place.OwnerId != force.Id ||

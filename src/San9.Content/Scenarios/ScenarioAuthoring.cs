@@ -210,6 +210,7 @@ public sealed record InformationCatalog
     [JsonRequired] public required RankDefinition[] Ranks { get; init; }
     [JsonRequired] public required OfficeDefinition[] Offices { get; init; }
     [JsonRequired] public required TreasureDefinition[] Treasures { get; init; }
+    public ImmutableArray<EquipmentDefinition> Equipment { get; init; } = [];
     [JsonRequired] public required ImmutableArray<int> MapContextExcludedFacilityIds { get; init; }
     [JsonRequired] public required TacticCatalogDefinition[] Tactics { get; init; }
     [JsonRequired] public required FormationCatalogDefinition[] Formations { get; init; }
@@ -220,6 +221,7 @@ public sealed record InformationCatalog
         Ranks = value.Ranks,
         Offices = value.Offices,
         Treasures = value.Treasures,
+        Equipment = value.Equipment,
         MapContextExcludedFacilityIds = value.MapContextExcludedFacilityIds,
         Tactics = value.Tactics,
         Formations = value.Formations,
@@ -229,6 +231,7 @@ public sealed record InformationCatalog
     public InformationDefinitions Compile(ScenarioInformationState state) => new(Ranks.ToArray(), Offices.ToArray(), Treasures.ToArray(), state.Corps, state.TreasureStates)
     {
         MapContextExcludedFacilityIds = MapContextExcludedFacilityIds,
+        Equipment = Equipment,
         Tactics = Tactics,
         Formations = Formations,
         CountryTitles = CountryTitles,

@@ -25,7 +25,7 @@ public sealed partial class DeploymentDraft
         if (id is int selected && (!Rules.SiegeEquipment.TryGetValue(selected, out var equipment) ||
             !Force.CompletedResearch.Contains(equipment.ResearchProjectId) ||
             Rules.Formations[equipment.FormationId].RequiredTacticId is int tactic &&
-            !TacticAvailability.HasForMembers(tactic, View.World.Officers.Where(o => Members.Contains(o.Id)), Force, View.World.Treasures, _treasures))) return false;
+            !TacticAvailability.HasForMembers(tactic, View.World.Officers.Where(o => Members.Contains(o.Id)), Force, View.World.Treasures, _treasures, View.EquippedItems))) return false;
         return true;
     }
     public bool SetSiegeEquipment(int? id)
@@ -154,7 +154,7 @@ public sealed partial class DeploymentDraft
                     ? FormationKnowledge.Knows(commander, f.Id)
                     : Rules.CanSelectFormation(Force, f.Id) && (f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)))) &&
             (View.World.Simulation.NewGame.MixedTroopsEnabled && !naval && commander.FormationProficiencies is not null ||
-                f.RequiredTacticId is not int tactic || TacticAvailability.HasForMembers(tactic, people, Force, View.World.Treasures, _treasures)))
+                f.RequiredTacticId is not int tactic || TacticAvailability.HasForMembers(tactic, people, Force, View.World.Treasures, _treasures, View.EquippedItems)))
             .OrderBy(f => f.Id).ToArray();
     }
     public bool SetFormation(int id, bool naval)
@@ -200,7 +200,7 @@ public sealed partial class DeploymentDraft
     public IReadOnlyList<TacticRule> AvailableTactics(int officerId)
     {
         var person = View.World.Officers.Single(o => o.Id == officerId);
-        var available = TacticAvailability.ForOfficer(person, Force, View.World.Treasures, _treasures);
+        var available = TacticAvailability.ForOfficer(person, Force, View.World.Treasures, _treasures, View.EquippedItems);
         return Rules.Tactics.Values.Where(t => t.Selectable && available.ContainsKey(t.Id)).OrderBy(t => t.Id).ToArray();
     }
     public bool SetTactic(int officerId, int? tacticId)

@@ -66,7 +66,7 @@ public static class OfficerCatalog
                     _ => new(office is null ? "" : office.Name, office?.GovernorPriority ?? -1)
                 };
                 var treasures = treasuresByHolder[o.Id].ToArray();
-                var tactics = page == 0 || page >= 4 ? TacticAvailability.ForOfficer(person, owner, treasures, treasureRules) : null;
+                var tactics = page == 0 || page >= 4 ? TacticAvailability.ForOfficer(person, owner, treasures, treasureRules, view.EquippedItems) : null;
                 CatalogCell Commander()
                 {
                     if (person.Status == OfficerStatus.Free ||

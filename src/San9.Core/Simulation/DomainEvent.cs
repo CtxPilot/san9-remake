@@ -3,6 +3,12 @@ namespace San9.Core.Simulation;
 public sealed record OfficerCapturedEvent(GameClock Clock, int OfficerId, int CaptorId, int? SettlementId, int? UnitId) : DomainEvent;
 
 [System.Text.Json.Serialization.JsonDerivedType(typeof(UnitDefeatedEvent), "unit-defeated")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(EquipmentConfiguredEvent), "equipment-configured")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(EquipmentTransferredEvent), "equipment-transferred")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(EquipmentOwnershipResolvedEvent), "equipment-ownership-resolved")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(EquipmentProductionStartedEvent), "equipment-production-started")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(EquipmentProductionCompletedEvent), "equipment-production-completed")]
+[System.Text.Json.Serialization.JsonDerivedType(typeof(EquipmentProductionCancelledEvent), "equipment-production-cancelled")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(BattleWoundedCapturedEvent), "battle-wounded-captured")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(BattleVictoryMoraleChangedEvent), "battle-victory-morale-changed")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(OfficerInjuryWorsenedEvent), "officer-injury-worsened")]

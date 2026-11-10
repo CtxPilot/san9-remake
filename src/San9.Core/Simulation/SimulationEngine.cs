@@ -23,7 +23,7 @@ public sealed partial class SimulationEngine
         _preparationRevision = -1;
     }
 
-    private WorldMutation BeginMutation() => _world.BeginMutation(_rules.Abilities, _rules.Economy, Companion);
+    private WorldMutation BeginMutation() => _world.BeginMutation(_rules.Abilities, _rules.Economy, Companion, _rules.Equipment);
 
     /// <summary>Branches the current runtime for an isolated operation, sharing immutable records and compiled rules.</summary>
     public SimulationEngine Fork() => new(_world.Fork(), _rules, new(_rules), Companion);
@@ -81,12 +81,24 @@ public sealed partial class SimulationEngine
             { Economy = economy, Personnel = personnel, Treasures = treasures, Governance = governance ?? new([]),
                 Military = military, Terminal = terminal, Politics = politics ?? PoliticalRulebook.Empty }) { }
 
-    private static WorldState ValidateContent(WorldState world, TreasureRulebook treasures, GovernanceRulebook? governance)
+    private static WorldState ValidateContent(WorldState world, TreasureRulebook treasures, GovernanceRulebook? governance, EquipmentRulebook equipment)
     {
         var snapshot = world.CreateSnapshot();
         if (snapshot.Treasures.Any(t => t.Discovery != TreasureDiscovery.Disabled && !treasures.Items.ContainsKey(t.Id)) ||
             treasures.Items.Values.Any(t => t.FavoredOwnerIds.Any(id => !snapshot.Officers.Any(o => o.Id == id))) ||
-            snapshot.Officers.Any(p => p.OfficeId is int id && (governance is null || !governance.Offices.ContainsKey(id))))
+            snapshot.Officers.Any(p => p.OfficeId is int id && (governance is null || !governance.Offices.ContainsKey(id))) ||
+            !EquipmentRules.ValidInventory(snapshot.Equipment, equipment.Items) ||
+            snapshot.Forces.Any(force => force.EquipmentProduction is { } progress &&
+                (!snapshot.EquipmentInitialized || force.IsDormant || force.IsEliminated ||
+                 !equipment.Items.TryGetValue(progress.DefinitionId, out var item) || item.ResearchProjectId is null ||
+                 !force.CompletedResearch.Contains(item.ResearchProjectId) || progress.DaysRemaining > item.ProductionDays ||
+                 !snapshot.Settlements.Any(place => place.Id == progress.SettlementId && place.OwnerId == force.Id &&
+                     !place.IsDormant && !place.IsDestroyed && place.CanHostPersons))) ||
+            snapshot.EquipmentInitialized && (
+                snapshot.Treasures.Where(t => t.Discovery != TreasureDiscovery.Disabled).Any(t =>
+                    !snapshot.Equipment.Any(e => e.LegacyTreasureId == t.Id && e.OfficerId == (t.Discovered ? t.HolderId : null))) ||
+                snapshot.Equipment.Where(e => e.LegacyTreasureId is not null).Any(e =>
+                    !snapshot.Treasures.Any(t => t.Id == e.LegacyTreasureId && e.OfficerId == (t.Discovered ? t.HolderId : null)))))
             throw new ArgumentException("Unknown ability source definition.");
         return world;
     }
@@ -97,7 +109,7 @@ public sealed partial class SimulationEngine
         ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(rules.OfficerGrowth);
         rules.OfficerGrowth.Validate();
-        ValidateContent(world, rules.Treasures, rules.Governance);
+        ValidateContent(world, rules.Treasures, rules.Governance, rules.Equipment);
         rules.Terminal?.Validate(world.CreateSnapshot().Settlements.Where(s => s.Kind == SettlementKind.City).Select(s => s.Id).ToHashSet());
         _world = world;
         _rules = rules;
@@ -108,7 +120,7 @@ public sealed partial class SimulationEngine
         if (rules.Personnel.TacticCourses.Any(c => !world.CreateSnapshot().Settlements.Any(s => s.Id == c.Key && s.Kind == SettlementKind.City) ||
             rules.Military is null || !rules.Military.Tactics.TryGetValue(c.Value, out var tactic) || tactic.Category is not (>= 0 and <= 8)))
             throw new ArgumentException("Invalid tactic study course.");
-        var initial = world.BeginMutation(rules.Abilities, rules.Economy);
+        var initial = world.BeginMutation(rules.Abilities, rules.Economy, equipment: rules.Equipment);
         if (initial.AllSettlements.Values.Any(s => s.EnabledTacticIds.Any(id => rules.Military is null || !rules.Military.Tactics.ContainsKey(id))))
             throw new ArgumentException("Unknown settlement tactic reference.");
         initial.RebuildForceTrust();
@@ -126,7 +138,7 @@ public sealed partial class SimulationEngine
         if (world.Simulation.PendingDailyTask is { } pending)
         {
             var task = world.Simulation.Tasks.Single(t => t.Id == pending.RemainingTaskIds[0]);
-            var mutation = world.BeginMutation(rules.Abilities, rules.Economy);
+            var mutation = world.BeginMutation(rules.Abilities, rules.Economy, equipment: rules.Equipment);
             if (pending.RemainingTaskIds.Any(id => rules.FindTask(world.Simulation.Tasks.Single(t => t.Id == id).Kind)!.Phase != pending.Phase) ||
                 rules.FindTask(task.Kind)!.DecisionRecipient(mutation, task) != pending.RespondingForceId)
                 throw new ArgumentException("Invalid task continuation phase or respondent.");
@@ -558,6 +570,18 @@ public sealed partial class SimulationEngine
                     var researchRejection = MilitaryResearch.Start(mutation, research, _rules, events);
                     if (researchRejection != CommandRejection.None) return Reject(researchRejection);
                     break;
+                case ConfigureEquipmentCommand equipment:
+                    var equipmentRejection = EquipmentCommands.Configure(mutation, equipment, _rules.Equipment, events);
+                    if (equipmentRejection != CommandRejection.None) return Reject(equipmentRejection);
+                    break;
+                case TransferEquipmentCommand transfer:
+                    var transferRejection = EquipmentCommands.Transfer(mutation, transfer, _rules.Equipment, events);
+                    if (transferRejection != CommandRejection.None) return Reject(transferRejection);
+                    break;
+                case StartEquipmentProductionCommand production:
+                    var productionRejection = EquipmentProduction.Start(mutation, production, _rules.Equipment, events);
+                    if (productionRejection != CommandRejection.None) return Reject(productionRejection);
+                    break;
                 case BurnCommand burn:
                     var burnRejection = BurnStrategies.Start(mutation, context, burn, _rules, events);
                     if (burnRejection != CommandRejection.None) return Reject(burnRejection);
@@ -731,6 +755,7 @@ public sealed partial class SimulationEngine
         // The projection depends only on base abilities, injuries, offices and treasure holdings.
         // Orders, action flags and loyalty changes do not invalidate it. Keep only the latest view.
         bool same = _abilitySnapshot is { } previous && previous.Officers.Count == snapshot.Officers.Count &&
+            previous.EquipmentInitialized == snapshot.EquipmentInitialized && previous.Equipment.SequenceEqual(snapshot.Equipment) &&
             previous.Treasures.SequenceEqual(snapshot.Treasures);
         if (same && !ReferenceEquals(_abilitySnapshot!.Officers, snapshot.Officers))
             for (int i = 0; i < snapshot.Officers.Count; i++)
@@ -742,7 +767,8 @@ public sealed partial class SimulationEngine
                 same = false;
                 break;
             }
-        if (!same) _abilityProjection = _rules.Abilities.EvaluateMany(snapshot.Officers, snapshot.Treasures);
+        if (!same) _abilityProjection = _rules.Abilities.EvaluateMany(snapshot.Officers, snapshot.Treasures,
+            snapshot.EquipmentInitialized ? snapshot.Equipment : null);
         _abilitySnapshot = snapshot;
         return _abilityProjection!;
     }

@@ -230,7 +230,7 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
                     : rules.CanSelectFormation(Force, f.Id) && (f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)))) &&
             f.DeploymentCost <= money && f.OfficerCapacity >= people.Length &&
             (World.Simulation.NewGame.MixedTroopsEnabled && !naval && commander?.FormationProficiencies is not null ||
-                f.RequiredTacticId is not int required || TacticAvailability.HasForMembers(required, people, Force, World.Treasures, Treasures)))
+                f.RequiredTacticId is not int required || TacticAvailability.HasForMembers(required, people, Force, World.Treasures, Treasures, World.EquipmentInitialized ? World.Equipment : null)))
         .OrderBy(f => f.Id).ToArray();
     }
     private UnitPolicies Policies(bool fallback = false) => fallback ? new(false, false, false, true) :

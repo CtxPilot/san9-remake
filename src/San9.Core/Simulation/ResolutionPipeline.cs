@@ -94,6 +94,7 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
         var rationAccounts = EconomicCycle.Apply(ResolutionStage.BeforeDailyCommands, world, rules.Economy, events);
         MilitaryTactics.TickCooldowns(world);
         MilitaryResearch.AdvanceDay(world, rules.Military, events);
+        EquipmentProduction.AdvanceDay(world, rules.Equipment, events);
         MilitaryDailyCycle.Apply(world, rationAccounts, rules, events);
         BattleLearning.Daily(world, rules.Military, events);
         MilitaryMovement.BeginDailyCycle(world);

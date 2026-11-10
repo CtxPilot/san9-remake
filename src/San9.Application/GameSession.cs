@@ -51,8 +51,12 @@ public sealed partial class GameSession
     public string InitialDate { get; }
     internal MilitaryRulebook? MilitaryRules => _definition.MilitaryRules;
     public IReadOnlyList<ResearchProjectDefinition> ResearchProjects =>
-        MilitaryRules?.ResearchProjects.Values.Where(p => !MilitaryRules.IsLegacyFormationResearch(p.Id)).OrderBy(p => p.Id, StringComparer.Ordinal).ToArray() ?? [];
+        MilitaryRules?.ResearchProjects.Values.Where(p => !MilitaryRules.IsLegacyFormationResearch(p.Id) &&
+            (Snapshot.Simulation.NewGame.MixedTroopsEnabled || _definition.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId == p.Id)))
+            .OrderBy(p => p.Id, StringComparer.Ordinal).ToArray() ?? [];
     public string ResearchProjectName(string id) => ResearchDisplay.Name(MilitaryRules, id);
+    public IReadOnlyList<EquipmentDefinition> EquipmentRecipes => _definition.Rules.Equipment.Items.Values
+        .Where(item => item.ResearchProjectId is not null).OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
     public IReadOnlyList<DomainEvent> InitialEvents => _initialEvents;
     public IReadOnlyList<SessionRecord> Records => _readOnlyRecords;
     public IReadOnlyList<ChronicleEntry> Chronicle => _readOnlyChronicle;

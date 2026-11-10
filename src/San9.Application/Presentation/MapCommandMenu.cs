@@ -58,8 +58,10 @@ public static class MapCommandMenu
                 : Facilities.Children.Where(c => c.Id is "repair" or "train").ToArray() };
         }
         var availability = new MapCommandAvailability(view);
-        var groups = Common.Select(group => group.Id == "military" && view.World.Simulation.NewGame.MixedTroopsEnabled
-            ? group with { Children = [.. group.Children, new("research", MapCommandTone.Green, [])] } : group);
+        bool researchAvailable = view.MilitaryRules is not null && (view.World.Simulation.NewGame.MixedTroopsEnabled ||
+            view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null));
+        var groups = Common.Select(group => group.Id == "military" && researchAvailable
+            ? group with { Children = [.. group.Children, new("research", MapCommandTone.Green, []), new("equipment-production", MapCommandTone.Green, [])] } : group);
         return new[] { facilities }.Concat(groups).Select(group => group with {
             Children = group.Children.Select(entry => entry with {
                 UnavailableReasonKey = availability.SettlementReasonKey(id, entry.Id)

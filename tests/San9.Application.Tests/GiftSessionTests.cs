@@ -10,6 +10,50 @@ namespace San9.Application.Tests;
 public sealed class GiftSessionTests
 {
     [Fact]
+    public void OfficerEquipmentShowsSixSlotsInventoryAndAppliesSelection()
+    {
+        var content = Content();
+        var session = GameSession.Start(content, 42);
+        var saved = session.Capture();
+        session = GameSession.Restore(content, saved with { World = saved.World with
+        { Equipment = [.. saved.World.Equipment, new EquipmentInstance(500, "basic-spear", null, 1, false)] } });
+        var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion,
+            new Dictionary<string, string> { ["treasure"] = "名马" });
+        var data = San9.Application.Presentation.OfficerEquipment.Read(session, texts, 11);
+        Assert.True(data.CanManage);
+        Assert.Equal(6, data.Slots.Length);
+        Assert.Equal("名马", Assert.Single(data.Slots.Single(s => s.Slot == EquipmentSlot.Mount).Items).Name);
+        var spear = Assert.Single(data.Slots.Single(s => s.Slot == EquipmentSlot.MainHand).Items);
+        Assert.True(spear.InInventory);
+        Assert.True(spear.CanEquip);
+        Assert.True(session.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 11, EquipmentSlot.MainHand, spear.Id)).Submission.Accepted);
+        Assert.Equal(52, session.View.Officers.Single(o => o.Id == 11).Abilities.War);
+        Assert.True(Assert.Single(San9.Application.Presentation.OfficerEquipment.Read(session, texts, 11)
+            .Slots.Single(s => s.Slot == EquipmentSlot.MainHand).Items).Equipped);
+        Assert.False(San9.Application.Presentation.OfficerEquipment.Read(session, texts, 21).CanManage);
+    }
+
+    [Fact]
+    public void LegacySaveMigratesTreasureOnlyOnceAndPreservesUnequippedState()
+    {
+        var content = Content();
+        var session = GameSession.Start(content, 42);
+        var initial = Assert.Single(session.Snapshot.Equipment);
+        Assert.Equal(9, initial.LegacyTreasureId);
+        Assert.True(initial.Equipped);
+        var old = session.Capture();
+        old = old with { World = old.World with { Equipment = [], EquipmentInitialized = false } };
+        var migrated = GameSession.Restore(content, old);
+        Assert.True(migrated.Snapshot.EquipmentInitialized);
+        Assert.True(Assert.Single(migrated.Snapshot.Equipment).Equipped);
+        var command = new ConfigureEquipmentCommand(Guid.NewGuid(), 1, migrated.Snapshot.Simulation.NextSequence, 11, EquipmentSlot.Mount, null);
+        Assert.True(migrated.Execute(new("player"), command).Submission.Accepted);
+        var restored = SaveService.Decode(SaveService.Encode(migrated), content);
+        Assert.False(Assert.Single(restored.Snapshot.Equipment).Equipped);
+    }
+
+    [Fact]
     public void AuthoredDiplomacyPreferencesAreValidatedMappedAndCanChangeWhenLoading()
     {
         var content = Content();
@@ -65,7 +109,13 @@ public sealed class GiftSessionTests
         uint before = kind == GiftKind.Food ? session.Snapshot.Corps.Where(c => c.IsRoot).OrderBy(c => c.OwnerId).ElementAt(0).Treasury.Food : session.Snapshot.Corps.Where(c => c.IsRoot).OrderBy(c => c.OwnerId).ElementAt(0).Treasury.Money;
         Assert.True(session.Execute(new("player"), new GiftCommand(Guid.NewGuid(), 1, 0, 12, 2, offer)).Submission.Accepted);
         Assert.Single(session.Snapshot.Simulation.Tasks);
-        if (kind == GiftKind.Treasure) Assert.Equal(12, session.Snapshot.Treasures[0].HolderId);
+        if (kind == GiftKind.Treasure)
+        {
+            Assert.Equal(12, session.Snapshot.Treasures[0].HolderId);
+            var equipment = Assert.Single(session.Snapshot.Equipment);
+            Assert.Equal(12, equipment.OfficerId);
+            Assert.False(equipment.Equipped);
+        }
         else Assert.Equal(before - amount, kind == GiftKind.Food ? session.Snapshot.Corps.Where(c => c.IsRoot).OrderBy(c => c.OwnerId).ElementAt(0).Treasury.Food : session.Snapshot.Corps.Where(c => c.IsRoot).OrderBy(c => c.OwnerId).ElementAt(0).Treasury.Money);
         // Fix the success roll: this case verifies payment and restoration, not acceptance probability.
         var outbound = session.Capture();
@@ -85,7 +135,11 @@ public sealed class GiftSessionTests
         Assert.Equal(0u, gift.Refunded);
         Assert.Equal(60, Assert.Single(session.Snapshot.Relations).Value);
         Assert.All(session.Snapshot.Simulation.Tasks, t => Assert.NotNull(t.Journey!.ReturnLeg));
-        if (kind == GiftKind.Treasure) Assert.Equal(21, session.Snapshot.Treasures[0].HolderId);
+        if (kind == GiftKind.Treasure)
+        {
+            Assert.Equal(21, session.Snapshot.Treasures[0].HolderId);
+            Assert.Equal(21, Assert.Single(session.Snapshot.Equipment).OfficerId);
+        }
         var returning = SaveService.Decode(SaveService.Encode(session), content);
         var next = session.AdvanceXun();
         EventAssert.Equal(next.Events, returning.AdvanceXun().Events);

@@ -1,5 +1,6 @@
 using Godot;
 using San9.Application.Presentation;
+using San9.Application;
 using San9.Content.Text;
 
 namespace San9.Client.Godot;
@@ -12,6 +13,7 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
     public Func<int, OfficerDetailData> Read { get; init; } = null!;
     public Func<int, string> ReadName { get; init; } = null!;
     public Action<int> OpenTreasures { get; init; } = null!;
+    public GameSession? Session { get; init; }
     public TextureService Service { get; init; } = null!;
     public TextureScope Textures { get; init; } = null!;
     public TextCatalog Texts { get; init; } = null!;
@@ -56,6 +58,7 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
         _tactics = Action("兵法", "tab", new(888,584), new(120,40), () => SelectPage(OfficerDetailPage.Tactics), hint: "officer-detail-tactics");
         _formations = Action("阵形", "tab", new(888,628), new(120,40), () => SelectPage(OfficerDetailPage.Formations));
         _formations.Name = "FormationTab";
+        if (Session is not null) Action("装备", "tab", new(738, 48), new(120, 40), ShowEquipment).Name = "EquipmentOpen";
         Action("关闭", "close", new(875,687), new(108,44), Closed, hint: "detail-close");
         Icon("close-icon",new(964,56), Closed);
         Icon("help",new(934,33), ShowHelp);
@@ -208,6 +211,13 @@ public partial class OfficerDetailView : FixedPage, IInformationPage, IModalInpu
     private void ShowTreasures()
     {
         if (_data.Treasures.Length > 0) OpenTreasures(State.CurrentId);
+    }
+    private void ShowEquipment()
+    {
+        if (Session is null) return;
+        var panel = new OfficerEquipmentView { Session = Session, Texts = Texts, OfficerId = State.CurrentId };
+        panel.Closed = () => { RemoveChild(panel); panel.QueueFree(); RefreshData(); };
+        AddChild(panel);
     }
     public override void _Input(InputEvent input)
     {

@@ -5,10 +5,11 @@ namespace San9.Application.AI;
 
 internal static class OriginalAiResearch
 {
-    internal static void TryStart(SimulationEngine engine, MilitaryRulebook? military, ControlSeat seat, List<DomainEvent> events)
+    internal static void TryStart(SimulationEngine engine, MilitaryRulebook? military, ControlSeat seat, List<DomainEvent> events,
+        EquipmentRulebook? equipment = null)
     {
         var world = engine.Snapshot;
-        if (seat.Kind != ControllerKind.Automatic || !world.Simulation.NewGame.MixedTroopsEnabled || military is null ||
+        if (seat.Kind != ControllerKind.Automatic || military is null ||
             world.Forces.FirstOrDefault(f => f.Id == seat.ForceId) is not { ActiveResearch: null } force) return;
         var root = world.Corps.FirstOrDefault(c => c.OwnerId == force.Id && c.IsRoot);
         if (root is null) return;
@@ -30,6 +31,8 @@ internal static class OriginalAiResearch
         int Demand(ResearchProjectDefinition candidate)
         {
             int score = 0;
+            if (equipment is not null && equipment.Items.Values.Any(item => item.ResearchProjectId is string research && DependsOn(research, candidate.Id)))
+                score += personnel.Length * 2;
             foreach (var type in military.TroopTypes.Values)
             foreach (var level in type.LevelResearchProjects.Where(pair => DependsOn(pair.Value, candidate.Id)))
             {
@@ -50,6 +53,7 @@ internal static class OriginalAiResearch
             return score;
         }
         var project = military.ResearchProjects.Values.Where(p => !military.IsLegacyFormationResearch(p.Id) && !force.CompletedResearch.Contains(p.Id) &&
+                (world.Simulation.NewGame.MixedTroopsEnabled || equipment?.Items.Values.Any(item => item.ResearchProjectId is string research && DependsOn(research, p.Id)) == true) &&
                 p.Prerequisites.All(force.CompletedResearch.Contains) && p.Cost <= root.Treasury.Money / 2)
             .OrderByDescending(Demand).ThenBy(p => p.Cost).ThenBy(p => p.Id, StringComparer.Ordinal).FirstOrDefault();
         if (project is null) return;

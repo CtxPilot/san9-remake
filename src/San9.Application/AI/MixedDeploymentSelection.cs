@@ -38,12 +38,12 @@ internal static class MixedDeploymentSelection
     }
 
     internal static int? SiegeEquipment(MilitaryRulebook rules, ForceState force, OfficerState[] people,
-        IEnumerable<TreasureState> treasures, TreasureRulebook treasureRules, long budget)
+        IEnumerable<TreasureState> treasures, TreasureRulebook treasureRules, long budget, IEnumerable<EquipmentInstance>? equipment = null)
     {
         return rules.SiegeEquipment.Values.Where(item => item.DeploymentCost <= budget &&
                 force.CompletedResearch.Contains(item.ResearchProjectId) &&
                 (rules.Formations[item.FormationId].RequiredTacticId is not int required ||
-                    TacticAvailability.HasForMembers(required, people, force, treasures, treasureRules)))
+                    TacticAvailability.HasForMembers(required, people, force, treasures, treasureRules, equipment)))
             .OrderByDescending(item => rules.Formations[item.FormationId].Combat!.AgainstWalls)
             .ThenByDescending(item => rules.Formations[item.FormationId].Attack!.Range)
             .ThenBy(item => item.DeploymentCost).ThenBy(item => item.Id).Select(item => (int?)item.Id).FirstOrDefault();

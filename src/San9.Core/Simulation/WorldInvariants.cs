@@ -45,6 +45,9 @@ internal static class WorldInvariants
                 force.ActiveResearch is { } research && (string.IsNullOrWhiteSpace(research.ProjectId) || research.SettlementId < 0 ||
                     research.DaysRemaining <= 0 || force.CompletedResearch.Contains(research.ProjectId)))
                 throw new ArgumentException("Invalid force research.");
+            if (force.EquipmentProduction is { } production && (string.IsNullOrWhiteSpace(production.DefinitionId) ||
+                production.SettlementId < 0 || production.DaysRemaining <= 0))
+                throw new ArgumentException("Invalid equipment production.");
             if (force.Id < 0 || force.Trust is < 0 or > 1000 || force.BaseTrust is < 0 or > 1000 || force.ProvidedTactics.IsDefault || force.ProvidedTactics.Any(t => t < 0) || force.ProvidedTactics.Distinct().Count() != force.ProvidedTactics.Length) throw new ArgumentException("Invalid force.");
         }
         foreach (var settlement in state.AllSettlements.Values)
@@ -116,6 +119,8 @@ internal static class WorldInvariants
                 !leader.IsServing && !(c.IsRoot && leader.Status == San9.Core.Domain.OfficerStatus.Captive &&
                     state.AllForces[c.OwnerId].LeaderId == leader.Id) : !c.IsRoot || state.AllForces[c.OwnerId].LeaderId is not null)) ||
             state.AllTreasures.Values.Any(t => !t.IsValid || t.HolderId is int holder && !state.AllOfficers.ContainsKey(holder)) ||
+            state.AllEquipment.Values.Any(e => !e.IsValid || e.OfficerId is int officer && !state.AllOfficers.ContainsKey(officer) ||
+                e.InventoryForceId is int owner && (!state.AllForces.TryGetValue(owner, out var equipmentOwner) || equipmentOwner.IsEliminated)) ||
             state.AllRelations.Values.Any(r => r.FirstId >= r.SecondId || r.Value is < 0 or > 100 || !state.AllForces.ContainsKey(r.FirstId) || !state.AllForces.ContainsKey(r.SecondId)))
             throw new ArgumentException("Invalid information state relationships.");
     }

@@ -8,6 +8,58 @@ namespace San9.Core.Tests;
 public sealed class MilitaryCombatTests
 {
     [Fact]
+    public void EquipmentGainsExperienceOncePerExchangeAcrossDamageAndRestore()
+    {
+        var equipment = new EquipmentRulebook([
+            new("sword", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default),
+            new("helmet", EquipmentSlot.Helmet, EquipmentRarity.Ordinary, default, default)]);
+        var source = Engine(World(defenders: 10000)).CaptureStableState();
+        var world = WorldState.Restore(source with { EquipmentInitialized = true, Equipment = [
+            new EquipmentInstance(1, "sword", 11, null, true, 1, 99),
+            new EquipmentInstance(2, "helmet", 22, null, true)] });
+        var mutation = world.BeginMutation(equipment: equipment);
+        mutation.BeginEquipmentExchange(new(0, false), new(2, true));
+        MilitaryCombat.DamageSettlement(mutation, mutation.Settlements[2], 10, Profile, 0, []);
+        MilitaryCombat.DamageSettlement(mutation, mutation.Settlements[2], 10, Profile, 0, []);
+        Assert.Equal(2, mutation.AllEquipment[1].Level);
+        Assert.Equal(0, mutation.AllEquipment[1].Experience);
+        Assert.Equal(1, mutation.AllEquipment[2].Experience);
+        world.Commit(mutation);
+        var resumed = WorldState.Restore(world.CreateSnapshot()).BeginMutation(equipment: equipment);
+        resumed.BeginEquipmentExchange(new(0, false), new(2, true));
+        MilitaryCombat.DamageSettlement(resumed, resumed.Settlements[2], 10, Profile, 0, []);
+        Assert.Equal(0, resumed.AllEquipment[1].Experience);
+        Assert.Equal(1, resumed.AllEquipment[2].Experience);
+        resumed.BeginEquipmentExchange(new(0, false), new(1, true));
+        resumed.RecordEquipmentUse([11], EquipmentUse.Attack);
+        Assert.Equal(1, resumed.AllEquipment[1].Experience);
+    }
+
+    [Fact]
+    public void RealCombatAndRestoredCombatAdvanceEquipmentEqually()
+    {
+        var equipment = new EquipmentRulebook([
+            new("sword", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default),
+            new("helmet", EquipmentSlot.Helmet, EquipmentRarity.Ordinary, default, default)]);
+        var initial = Engine(World(defenders: 10000, controlled: true)).CaptureStableState() with
+        {
+            EquipmentInitialized = true,
+            Equipment = [new EquipmentInstance(1, "sword", 11, null, true), new EquipmentInstance(2, "helmet", 22, null, true)]
+        };
+        var rules = new SimulationRules { Military = Rules(), Equipment = equipment };
+        var first = new SimulationEngine(WorldState.Restore(initial), rules);
+        var second = new SimulationEngine(WorldState.Restore(initial), rules);
+        first.EndControl(new("player"));
+        second.EndControl(new("player"));
+        var events = first.AdvanceXun().Events;
+        second.AdvanceXun();
+        Assert.Contains(events, e => e is BattleDamageEvent { SoldierLoss: > 0 });
+        Assert.True(first.Snapshot.Equipment.Single(e => e.Id == 1).Experience > 0);
+        Assert.True(first.Snapshot.Equipment.Single(e => e.Id == 2).Experience > 0);
+        StateAssert.Equal(first.Snapshot, second.Snapshot);
+    }
+
+    [Fact]
     public void SiegeEquipmentIsSharedByTargetEligibilityAndArrivalForecast()
     {
         var original = Rules();

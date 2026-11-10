@@ -161,7 +161,7 @@ public sealed class InformationBrowserTests
         detail.PointAt(2);
         browser.Navigate(new("宝物", InformationCategory.Treasures, HolderId: 1));
         var table = query.Read(browser);
-        Assert.Equal(["宝物", "种类", "能力", "上升", "兵法", "效果", "所有"], table.Columns);
+        Assert.Equal(["宝物", "种类", "能力", "上升", "兵法", "效果", "所有", "装备"], table.Columns);
         Assert.Equal("武力", Assert.Single(table.Rows).Cells[2].Text);
         Assert.Equal("奋迅", table.Rows[0].Cells[4].Text);
         browser.Back();

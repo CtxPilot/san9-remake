@@ -12,6 +12,8 @@ godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/Sha
 
 武将阵形页检查设置 `SAN9_OFFICER_FORMATION_CONTENT` 为已准备的剧本内容目录，运行 `godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/OfficerFormationVerification.tscn`。检查在启用兵种与研究的真实会话中打开武将详情的阵形页，核对阵形名称及熟练度，成功输出 `OFFICER_FORMATION_OK`；这不代表实际画面验收。
 
+武将装备页检查设置 `SAN9_EQUIPMENT_CONTENT` 为已准备的剧本内容目录，运行 `godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/OfficerEquipmentVerification.tscn`。检查打开武将装备窗口、六个槽位和从隔离会话库存装备长枪的命令；成功输出 `OFFICER_EQUIPMENT_OK`，不代表实际画面验收。
+
 联携关系表检查设置`SAN9_TACTIC_LINK_CONTENT`为现有内容根目录，运行`godot --headless --path src/San9.Client.Godot res://Diagnostics/Verification/TacticLinkEditorVerification.tscn`，可验证联携关系表的初次显示、按人物筛选、选中修改、删除及搜索选人后添加。仅改变内存草稿，不发布玩家资料；成功输出`TACTIC_LINK_EDITOR_OK`，不代表画面验收。
 
 涉及工作流窗口或地图回调生命周期时，可在客户端编译后运行无资源依赖的引擎检查（将 `godot` 替换为本机 Godot .NET 可执行文件）：

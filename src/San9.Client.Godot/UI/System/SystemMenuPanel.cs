@@ -74,6 +74,12 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         Show();
         ReplacePage(new ResearchView { Session = Session, Texts = Texts, Closed = Close, InitialSettlementId = settlementId });
     }
+    public void OpenEquipmentProductionAt(int settlementId)
+    {
+        if (_busy) return;
+        Browser.Close(); ReplacePage(null); Show();
+        ReplacePage(new EquipmentProductionView { Session = Session, Texts = Texts, Closed = Close, SettlementId = settlementId });
+    }
     private void OpenEnvironment()
     {
         _textures!.RequestPrefixes("environment-", "save-load-", "dialog-");

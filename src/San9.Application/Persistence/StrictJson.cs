@@ -39,9 +39,14 @@ public static class StrictJson
     private static bool IsLegacyOptional(Type type, JsonPropertyInfo property)
     {
         string? name = (property.AttributeProvider as MemberInfo)?.Name;
-        return type == typeof(OfficerState) && name == nameof(OfficerState.FormationProficiencies) ||
+        return type == typeof(EquipmentInstance) && name is nameof(EquipmentInstance.LegacyTreasureId) or nameof(EquipmentInstance.IsLost) ||
+            type == typeof(San9.Content.Scenarios.InformationDefinitions) && name == nameof(San9.Content.Scenarios.InformationDefinitions.Equipment) ||
+            type == typeof(San9.Content.Scenarios.InformationCatalog) && name == nameof(San9.Content.Scenarios.InformationCatalog.Equipment) ||
+            type == typeof(WorldSnapshot) && name is nameof(WorldSnapshot.Equipment) or nameof(WorldSnapshot.EquipmentInitialized) ||
+            type == typeof(OfficerState) && name == nameof(OfficerState.FormationProficiencies) ||
             type == typeof(NewGameSettings) && name == nameof(NewGameSettings.MixedTroopsEnabled) ||
-            type == typeof(ForceState) && name is nameof(ForceState.CompletedResearch) or nameof(ForceState.ActiveResearch) ||
+            type == typeof(ForceState) && name is nameof(ForceState.CompletedResearch) or nameof(ForceState.ActiveResearch) or nameof(ForceState.EquipmentProduction) ||
+            type == typeof(EquipmentDefinition) && name is nameof(EquipmentDefinition.Name) or nameof(EquipmentDefinition.ResearchProjectId) or nameof(EquipmentDefinition.ProductionCost) or nameof(EquipmentDefinition.ProductionDays) ||
             type == typeof(UnitState) && name is nameof(UnitState.Detachments) or nameof(UnitState.NavalTrainingId) or nameof(UnitState.SiegeEquipmentId) ||
             type == typeof(DeploymentPreset) && name is nameof(DeploymentPreset.NavalTrainingId) or nameof(DeploymentPreset.SiegeEquipmentId) ||
             type == typeof(DeploymentPresetMember) && name == nameof(DeploymentPresetMember.Detachment);

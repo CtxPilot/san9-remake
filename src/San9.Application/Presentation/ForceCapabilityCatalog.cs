@@ -44,7 +44,7 @@ public static class ForceCapabilityCatalog
         var members = view.World.Officers.Where(o => o.OwnerId == forceId && o.IsServing && !o.IsDormant && o.IsVisible).ToArray();
         var treasures = view.Rules.Treasures;
         string Person(int id) => texts.Resolve(view.Officers.Single(o => o.Id == id).NameKey);
-        bool HasTactic(int id) => TacticAvailability.HasForMembers(id, members, force, view.World.Treasures, treasures);
+        bool HasTactic(int id) => TacticAvailability.HasForMembers(id, members, force, view.World.Treasures, treasures, view.EquippedItems);
         string Tactic(int? id) => id is int key ? view.Information.Tactics.Single(t => t.Id == key).Name : "—";
         InformationRow Row(int id, params CatalogCell[] cells) => new(new(category, id), cells);
         IEnumerable<InformationRow> rows;
