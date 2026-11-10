@@ -242,6 +242,10 @@ internal sealed partial class WorldMutation : IWorldQuery
         EnsureOpen();
         var previous = AllEquipment.GetValueOrDefault(item.Id);
         if (previous == item) return;
+        bool sealChanged = _economy.ImperialSealId is int seal &&
+            (previous?.LegacyTreasureId == seal || item.LegacyTreasureId == seal) &&
+            (previous?.Equipped != item.Equipped || previous?.OfficerId != item.OfficerId);
+        int? previousSealOwner = sealChanged ? ForceTrust.SealOwner(this, _economy) : null;
         _equipmentBonuses = null;
         foreach (var effects in _treasureEffects.Values)
         {
@@ -250,6 +254,7 @@ internal sealed partial class WorldMutation : IWorldQuery
         }
         LeadershipChanged(firstOfficer: previous?.OfficerId, secondOfficer: item.OfficerId);
         AllEquipment = AllEquipment.SetItem(item.Id, item);
+        if (sealChanged) RefreshForceTrust(previousSealOwner, ForceTrust.SealOwner(this, _economy));
     }
     internal ImmutableDictionary<(int FirstId, int SecondId), ForceRelation> AllRelations { get; private set; }
 

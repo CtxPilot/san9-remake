@@ -23,6 +23,32 @@ public sealed class TreasureCommandTests
     };
 
     [Fact]
+    public void ImperialSealTrustRequiresEquippingAndTracksTransferAndRestore()
+    {
+        var definition = Fixture();
+        var session = GameSession.Start(definition, 190);
+        int Trust() => session.Snapshot.Forces.Single(force => force.Id == 1).Trust;
+        Assert.Equal(1000, Trust());
+        Assert.True(session.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 1, EquipmentSlot.MainHand, null)).Submission.Accepted);
+        Assert.Equal(950, Trust());
+        Assert.True(session.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 1, EquipmentSlot.MainHand, 10)).Submission.Accepted);
+        Assert.Equal(1000, Trust());
+        Assert.True(session.Execute(new("player"), new GrantTreasureCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 10, 2)).Submission.Accepted);
+        Assert.Equal(950, Trust());
+        Assert.True(session.Execute(new("player"), new ConfiscateTreasureCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 10)).Submission.Accepted);
+        Assert.Equal(950, Trust());
+        var restored = SaveService.Decode(SaveService.Encode(session), definition);
+        Assert.Equal(950, restored.Snapshot.Forces.Single(force => force.Id == 1).Trust);
+        Assert.True(restored.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
+            restored.Snapshot.Simulation.NextSequence, 1, EquipmentSlot.MainHand, 10)).Submission.Accepted);
+        Assert.Equal(1000, restored.Snapshot.Forces.Single(force => force.Id == 1).Trust);
+    }
+
+    [Fact]
     public void TransferCommandsKeepQueriesSaveRestoreConsistent()
     {
         var definition = Fixture();
