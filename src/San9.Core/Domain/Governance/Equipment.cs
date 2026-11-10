@@ -80,6 +80,7 @@ public static class EquipmentRules
                 !definitions.TryGetValue(id, out var other) ||
                 other.Slot != (definition.Slot == EquipmentSlot.MainHand ? EquipmentSlot.OffHand : EquipmentSlot.MainHand))) ||
             all.Any(item => !item.IsValid || !definitions.ContainsKey(item.DefinitionId)) ||
+            all.Any(item => !ValidLevel(item, definitions[item.DefinitionId])) ||
             all.Any(item => item.LegacyTreasureId != definitions[item.DefinitionId].LegacyTreasureId) ||
             all.Select(item => item.Id).Distinct().Count() != all.Length ||
             all.Where(item => item.LegacyTreasureId is not null).GroupBy(item => item.LegacyTreasureId).Any(group => group.Count() > 1))
@@ -169,7 +170,7 @@ public static class EquipmentRules
 
     public static EquipmentInstance RecordUse(EquipmentInstance item, EquipmentDefinition definition, EquipmentUse use)
     {
-        if (!item.IsValid || !definition.IsValid || item.DefinitionId != definition.Id || !Enum.IsDefined(use))
+        if (!item.IsValid || !definition.IsValid || item.DefinitionId != definition.Id || !ValidLevel(item, definition) || !Enum.IsDefined(use))
             throw new ArgumentException("Invalid equipment use.");
         bool earns = item.Equipped && item.Level < 5 && (use switch
         {
@@ -181,4 +182,7 @@ public static class EquipmentRules
         int experience = item.Experience + 1;
         return experience == 100 ? item with { Level = item.Level + 1, Experience = 0 } : item with { Experience = experience };
     }
+
+    private static bool ValidLevel(EquipmentInstance item, EquipmentDefinition definition) =>
+        definition.Slot is not (EquipmentSlot.Mount or EquipmentSlot.Treasure) || item.Level == 1 && item.Experience == 0;
 }

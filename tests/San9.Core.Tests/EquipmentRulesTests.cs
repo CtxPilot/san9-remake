@@ -119,4 +119,17 @@ public sealed class EquipmentRulesTests
         Assert.False((Instance with { Level = 5, Experience = 1 }).IsValid);
         Assert.Throws<ArgumentException>(() => EquipmentRules.RecordUse(Instance with { DefinitionId = "unknown" }, Definition(EquipmentSlot.MainHand), EquipmentUse.Attack));
     }
+
+    [Theory]
+    [InlineData(EquipmentSlot.Mount)]
+    [InlineData(EquipmentSlot.Treasure)]
+    public void FixedLevelItemsRejectExperienceAndHigherLevels(EquipmentSlot slot)
+    {
+        var definition = Definition(slot);
+        var definitions = new Dictionary<string, EquipmentDefinition> { [definition.Id] = definition };
+        Assert.True(EquipmentRules.ValidInventory([Instance], definitions));
+        Assert.False(EquipmentRules.ValidInventory([Instance with { Level = 2 }], definitions));
+        Assert.False(EquipmentRules.ValidInventory([Instance with { Experience = 1 }], definitions));
+        Assert.Throws<ArgumentException>(() => EquipmentRules.RecordUse(Instance with { Level = 2 }, definition, EquipmentUse.Attack));
+    }
 }
