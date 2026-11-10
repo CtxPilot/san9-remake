@@ -63,6 +63,18 @@ internal static class LegacyContentUpgrade
             catalog["officerDefaults"] = "shared/officer-defaults.json";
             await File.WriteAllTextAsync(Path.Combine(stage, "catalog.json"), catalog.ToJsonString(PackageFiles.JsonOptions), Encoding.UTF8);
             await LegacyScenarioDataUpgrade.PublishWorldsAsync(prepared, stage);
+            var unclassified = prepared.Worlds.Select(world => new
+            {
+                scenarioId = world.Scenario.ScenarioId,
+                treasures = world.Scenario.Information.Treasures.Where(item => item.Category > 12)
+                    .OrderBy(item => item.Id).Select(item => new { id = item.Id, category = item.Category }).ToArray()
+            }).Where(world => world.treasures.Length > 0).ToArray();
+            await WriteAsync(Path.Combine(stage, "legacy-equipment-upgrade-report.json"), new
+            {
+                description = "无法识别类别的旧宝物已按可用特征分类；无明确特征时归入宝物槽。请按剧本和物品 ID 检查。",
+                unclassified
+            });
+            Console.WriteLine($"Equipment upgrade report: {unclassified.Sum(world => world.treasures.Length)} unclassified scenario items.");
             await ContentVerification.VerifyAsync(stage, Console.WriteLine);
             foreach (var world in prepared.Worlds)
             {

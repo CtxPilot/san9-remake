@@ -35,4 +35,19 @@ public sealed class LegacyEquipmentMigrationTests
         Assert.Equal(EquipmentSlot.Treasure, Assert.Single(result.Definitions).Slot);
         Assert.Throws<ArgumentException>(() => LegacyEquipmentMigration.Convert([], [new(1, 10, TreasureDiscovery.Discovered, null)]));
     }
+
+    [Fact]
+    public void RejectsConflictingAuthoredLegacyLoadout()
+    {
+        TreasureDefinition[] treasures = [Item(1, 1, 3), Item(2, 11, 2)];
+        TreasureState[] states = [new(1, 10, TreasureDiscovery.Discovered, null), new(2, 10, TreasureDiscovery.Discovered, null)];
+        EquipmentDefinition[] authored =
+        [
+            new("main", EquipmentSlot.MainHand, EquipmentRarity.Precious, default, default)
+                { LegacyTreasureId = 1, CompatibleWeapons = ["other"] },
+            new("off", EquipmentSlot.OffHand, EquipmentRarity.Precious, default, default) { LegacyTreasureId = 2 },
+            new("other", EquipmentSlot.OffHand, EquipmentRarity.Ordinary, default, default)
+        ];
+        Assert.Throws<ArgumentException>(() => LegacyEquipmentMigration.Convert(treasures, states, authored));
+    }
 }

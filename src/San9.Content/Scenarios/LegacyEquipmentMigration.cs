@@ -29,7 +29,7 @@ public static class LegacyEquipmentMigration
             d.TacticId is not null || d.EscapeMount ? EquipmentRarity.Rare : EquipmentRarity.Precious,
             d.AbilityBonuses, default)
         { LegacyTreasureId = d.Id, TacticId = d.TacticId, EscapeMount = d.EscapeMount }).Concat(explicitItems).ToImmutableArray();
-        _ = new EquipmentRulebook(mapped);
+        var rulebook = new EquipmentRulebook(mapped);
         var byLegacyId = mapped.Where(d => d.LegacyTreasureId is not null).ToDictionary(d => d.LegacyTreasureId!.Value);
         var eligible = holdings.Where(s => s.Discovered && s.HolderId is not null).OrderBy(s => s.Id).ToArray();
         // Preserve every holding; choose the strongest original effect for each slot, with ID as a stable tie-breaker.
@@ -38,6 +38,8 @@ public static class LegacyEquipmentMigration
         var instances = holdings.Where(s => s.Discovery != TreasureDiscovery.Disabled && byLegacyId.ContainsKey(s.Id)).OrderBy(s => s.Id)
             .Select(s => new EquipmentInstance(s.Id, byLegacyId[s.Id].Id, s.Discovered ? s.HolderId : null, null, selected.Contains(s.Id))
             { LegacyTreasureId = s.Id }).ToImmutableArray();
+        if (!EquipmentRules.ValidInventory(instances, rulebook.Items))
+            throw new ArgumentException("Legacy equipment migration produced an incompatible or conflicting loadout.");
         return new(mapped, instances, source.Where(d => d.Category > 12).Select(d => d.Id).Order().ToImmutableArray());
     }
 

@@ -31,6 +31,21 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void UnknownLegacyTreasureCategoryRemainsPlayableAsTreasureSlot()
+    {
+        var basis = Fixture();
+        var treasure = new TreasureDefinition(99, "legacy-item", 19, 2, 0, null);
+        var state = new TreasureState(99, 1, TreasureDiscovery.Discovered, null);
+        var content = basis with { Information = basis.Information with { Treasures = [treasure], TreasureStates = [state] } };
+        var session = GameSession.Start(content, 42);
+        var item = Assert.Single(session.Snapshot.Equipment, item => item.LegacyTreasureId == 99);
+        Assert.Equal(EquipmentSlot.Treasure, new ScenarioSessionDefinition(content).Rules.Equipment.Items[item.DefinitionId].Slot);
+        var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion,
+            new Dictionary<string, string> { ["legacy-item"] = "旧宝物", ["person.1"] = "君主" });
+        Assert.Equal("宝物", Assert.Single(TreasureCatalog.Read(session.View, texts).Rows).Cells[1].Text);
+    }
+
+    [Fact]
     public void PlayerResearchesMakesEquipsAndRestoresEquipment()
     {
         var basis = Fixture();
