@@ -28,6 +28,22 @@ public sealed class PrisonerExecutionTests
         };
     }
 
+    [Fact]
+    public void CaptiveKeepsLegacyTreasureUnequippedOnNewGameAndOldSaveMigration()
+    {
+        var definition = Fixture();
+        var session = GameSession.Start(definition, 190);
+        var initial = Assert.Single(session.Snapshot.Equipment, item => item.LegacyTreasureId == 100);
+        Assert.Equal(7, initial.OfficerId);
+        Assert.False(initial.Equipped);
+        var capture = session.Capture();
+        var oldSave = capture with { World = capture.World with { Equipment = [], EquipmentInitialized = false } };
+        var restored = GameSession.Restore(definition, oldSave);
+        var migrated = Assert.Single(restored.Snapshot.Equipment, item => item.LegacyTreasureId == 100);
+        Assert.Equal(7, migrated.OfficerId);
+        Assert.False(migrated.Equipped);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

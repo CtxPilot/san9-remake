@@ -105,8 +105,8 @@ internal sealed class ScenarioSessionDefinition
             Content.Settlements.Single(s => s.Id == r.TargetSettlementId).OwnerId!.Value, r.RemainingXun)), Content.AnnualAppearancesEnabled, Content.NaturalDeathsEnabled, Content.FreeOfficerMigrationEnabled, battleDeathsEnabled, Content.OfficeRequestsEnabled, Content.ConsumedEventKeys, Content.ForceConsolidationEnabled, Content.ForceEmergenceEnabled, Content.CityIndependenceEnabled, Content.ImperialCourtEnded, Content.ThreeVisitsStarted, Content.FoodExchangeRate, Content.SettlementDefectionsEnabled, Content.UnitDefectionsEnabled,
         settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces,
         Definitions.Forces.Select(f => f.Id).ToHashSet(), Definitions.Officers.Select(p => p.Id).ToHashSet(), Content.DefaultLoyalty,
-        equipment: LegacyEquipmentMigration.Convert(Content.Information.Treasures, Content.Information.TreasureStates,
-            Content.Information.Equipment).Instances);
+        equipment: EquipmentMigration.UnequipNonServing(LegacyEquipmentMigration.Convert(Content.Information.Treasures,
+            Content.Information.TreasureStates, Content.Information.Equipment).Instances, people));
     }
 
     private IEnumerable<UnitState> InitialUnits(NewGameSettings? settings)
