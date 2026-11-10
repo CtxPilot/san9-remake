@@ -10,6 +10,34 @@ namespace San9.Application.Tests;
 public sealed class GiftSessionTests
 {
     [Fact]
+    public void EquipmentScreenExplainsIncompatibleWeaponsAndDoesNotMoveInventory()
+    {
+        var basis = Content();
+        var main = new EquipmentDefinition("spear", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default)
+            { Name = "枪", CompatibleWeapons = ["shield"] };
+        var shield = new EquipmentDefinition("shield", EquipmentSlot.OffHand, EquipmentRarity.Ordinary, default, default) { Name = "盾" };
+        var bow = new EquipmentDefinition("bow", EquipmentSlot.OffHand, EquipmentRarity.Ordinary, default, default) { Name = "弓" };
+        var content = basis with { Information = basis.Information with { Equipment = [main, shield, bow] } };
+        var initial = GameSession.Start(content, 42).Capture();
+        var session = GameSession.Restore(content, initial with { World = initial.World with
+        {
+            Equipment = [.. initial.World.Equipment, new EquipmentInstance(500, "spear", 11, null, true),
+                new EquipmentInstance(501, "bow", null, 1, false)]
+        } });
+        var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion,
+            new Dictionary<string, string> { ["treasure"] = "名马" });
+        var offered = Assert.Single(San9.Application.Presentation.OfficerEquipment.Read(session, texts, 11)
+            .Slots.Single(slot => slot.Slot == EquipmentSlot.OffHand).Items);
+        Assert.False(offered.CanEquip);
+        Assert.Contains("不兼容", offered.UnavailableReason);
+        Assert.False(session.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 11, EquipmentSlot.OffHand, offered.Id)).Submission.Accepted);
+        var unchanged = session.Snapshot.Equipment.Single(item => item.Id == offered.Id);
+        Assert.Equal(1, unchanged.InventoryForceId);
+        Assert.Null(unchanged.OfficerId);
+    }
+
+    [Fact]
     public void OfficerEquipmentShowsSixSlotsInventoryAndAppliesSelection()
     {
         var content = Content();
