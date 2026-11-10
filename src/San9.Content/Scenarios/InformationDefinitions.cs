@@ -76,6 +76,8 @@ public sealed record InformationDefinitions(RankDefinition[] Ranks, OfficeDefini
             _ = new EquipmentRulebook(Equipment);
             if (Equipment.Any(e => e.LegacyTreasureId is int id && !Treasures.Any(t => t.Id == id)))
                 throw new ArgumentException("Unknown legacy treasure reference.");
+            if (Tactics is null || Equipment.Any(e => e.TacticId is int id && !Tactics.Any(t => t is not null && t.Id == id)))
+                throw new ArgumentException("Unknown equipment tactic reference.");
         }
         catch (ArgumentException error) { throw new InvalidDataException("Invalid equipment catalog.", error); }
         if (MapContextExcludedFacilityIds.IsDefault ||

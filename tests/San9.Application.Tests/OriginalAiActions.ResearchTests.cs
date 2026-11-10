@@ -46,6 +46,16 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void EquipmentWithUnknownTacticReferenceIsRejected()
+    {
+        var basis = Fixture();
+        var item = new EquipmentDefinition("invalid-tactic", EquipmentSlot.MainHand, EquipmentRarity.Ordinary,
+            default, default) { TacticId = 999999 };
+        var content = basis with { Information = basis.Information with { Equipment = [item] } };
+        Assert.Throws<InvalidDataException>(() => content.Validate());
+    }
+
+    [Fact]
     public void PlayerResearchesMakesEquipsAndRestoresEquipment()
     {
         var basis = Fixture();
