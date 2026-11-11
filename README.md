@@ -66,6 +66,8 @@ dotnet run --project src/San9.Tools -- upgrade-legacy-content --source "E:/San9R
 
 ### 运行客户端
 
+Windows 本机使用 `local/generated` 内的 .NET 10、Godot 和已升级内容包时，可双击 `start-game.cmd` 启动。也可在 PowerShell 中使用 `tools/start-game.ps1`，通过 `-ContentRoot` 和 `-GodotPath` 指定其他内容目录或 Godot 可执行文件；`-CheckOnly` 仅检查启动路径和列出运行时。
+
 用 Godot Mono 打开 `src/San9.Client.Godot/project.godot`，构建 C# 并运行主场景。无参进入开局菜单；直接进入指定剧本和玩家势力：
 
 ```powershell
