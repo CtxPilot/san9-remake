@@ -13,6 +13,7 @@ public partial class StrategyHud : Control
     public MapWorld World { get; init; } = null!;
     public StrategySelection Selection { get; init; } = null!;
     public San9.Application.GameSession Session { get; init; } = null!;
+    public ScenarioInitialState? AppearanceScenario { get; init; }
     public MapMessageLog RecordsLog { get; init; } = null!;
     public San9.Application.Presentation.StrategySnapshot Scenario => World.View;
     public TextCatalog Texts { get; init; } = null!;
@@ -214,6 +215,7 @@ public partial class StrategyHud : Control
             Texts = Texts,
             Store = SaveStore,
             Session = Session,
+            AppearanceScenario = AppearanceScenario, AppearanceContentRoot = ContentRoot,
             CreateSummary = SaveSummary,
             ExitMessages = CommandPresentation.ExitMenu,
             ActivateSession = ActivateSession,
@@ -437,11 +439,12 @@ public partial class StrategyHud : Control
             });
             return;
         }
-        if (command is not ("sortie" or "patrol" or "build" or "transport" or "demolish" or "delegate" or "research" or "equipment-production" or "equipment-purchase") && !MissionDraft.Supports(command) && !FacilityCommandDraft.Supports(command) && !AppointmentDraft.Supports(command) && !PersonnelDraft.Supports(command)) return;
+        if (command is not ("sortie" or "patrol" or "build" or "transport" or "demolish" or "delegate" or "research" or "equipment-production" or "equipment-purchase" or "personal-peerage") && !MissionDraft.Supports(command) && !FacilityCommandDraft.Supports(command) && !AppointmentDraft.Supports(command) && !PersonnelDraft.Supports(command)) return;
         _commandReturn = (target, _commandMenu.Navigation.Anchor, _commandMenu.Navigation.GroupId);
         _commandMenu.Close();
         Overview.Close();
         if (command == "research") SystemMenu.OpenResearchAt(target.Id);
+        else if (command == "personal-peerage") SystemMenu.OpenPersonalPeerage();
         else if (command == "equipment-production") SystemMenu.OpenEquipmentProductionAt(target.Id);
         else if (command == "equipment-purchase") SystemMenu.OpenEquipmentPurchaseAt(target.Id);
         else if (command == "patrol") _patrolFlow.Open(target.Id);

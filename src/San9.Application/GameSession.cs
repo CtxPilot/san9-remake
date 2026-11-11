@@ -59,6 +59,17 @@ public sealed partial class GameSession
         .Where(item => item.ResearchProjectId is not null).OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
     public IReadOnlyList<EquipmentDefinition> PurchasableEquipment => _definition.Rules.Equipment.Items.Values
         .Where(item => item.PurchaseCost is not null).OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
+    public IReadOnlyDictionary<string, EquipmentDefinition> EquipmentDefinitions => _definition.Rules.Equipment.Items;
+
+    public WorldSnapshot PreviewEditor(WorldEditOperation operation)
+    {
+        var candidate = _simulation.Fork();
+        if (operation.Kind == WorldEditorKind.Equipment && operation.Edits.IsEmpty && operation.EquipmentEdits is { } equipment)
+            candidate.EditEquipment(equipment);
+        else if (operation.EquipmentEdits is null) candidate.EditWorld(operation.Kind, operation.Edits);
+        else throw new ArgumentException("Invalid editor preview.");
+        return candidate.Snapshot;
+    }
     public IReadOnlyList<DomainEvent> InitialEvents => _initialEvents;
     public IReadOnlyList<SessionRecord> Records => _readOnlyRecords;
     public IReadOnlyList<ChronicleEntry> Chronicle => _readOnlyChronicle;

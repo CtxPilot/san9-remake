@@ -98,6 +98,15 @@ public static class LegacyScenarioDataUpgrade
                 MessageTags = rawText["messageTags"]?.Deserialize<string[]>(PackageFiles.JsonOptions) ?? []
             };
             var scenario = LegacyScenarioStateUpgrade.Convert(state, rawText, showAge);
+            var parts = package.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            scenario = LegacyHistoricalPeerageEvidence.Apply(scenario, text,
+                parts.Length >= 2 && parts[0] == "scenarios" && parts[1] == "historical");
+            scenario = scenario with { AppearanceEvidence = scenario.Officers.Where(p => p.State.IsServing && p.State.OwnerId is not null)
+                .Select(p => (Person: p.State, Force: scenario.Forces.SingleOrDefault(f => f.Id == p.State.OwnerId)))
+                .Where(p => p.Force?.LeaderId is not null)
+                .Select(p => new ScenarioAppearanceEvidence(p.Person.Id, p.Force!.LeaderId!.Value,
+                    p.Person.UnitId is int unit ? scenario.Units.SingleOrDefault(u => u.Id == unit)?.ServicePlaceId : p.Person.SettlementId,
+                    scenario.ScenarioId, scenario.Year)).ToArray() };
             if (scenario.ScenarioId != id || worlds.Any(w => w.Scenario.ScenarioId == id))
                 throw new InvalidDataException($"Duplicate or mismatched scenario: {id}.");
             worlds.Add(new(package, scenario, text));

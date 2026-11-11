@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 
 namespace San9.Content.Scenarios;
 
+public sealed record ScenarioAppearanceEvidence(int OfficerId, int LeaderId, int? SettlementId, string SourceScenarioId, int Year);
+
 public sealed record ForceInitialState(int Id, string NameKey, int ColorCode, int Trust)
 {
     [JsonRequired] public long? AutomaticSchedulingKey { get; init; }
@@ -17,6 +19,7 @@ public sealed record ForceInitialState(int Id, string NameKey, int ColorCode, in
     [JsonRequired] public int? AdviserId { get; init; }
     [JsonRequired] public int? RankId { get; init; }
     [JsonRequired] public int? CountryTitleId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? PersonalPeerageRegimeId { get; init; }
 }
 public sealed record SettlementInitialState(int Id, string NameKey, int? OwnerId, int X, int Y,
     uint Soldiers, int Durability, int MaxDurability, int Morale, string[] Icons)
@@ -44,6 +47,7 @@ public sealed record SettlementInitialState(int Id, string NameKey, int? OwnerId
 public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements, Dictionary<int, string> RegionNameKeys, Dictionary<int, int> RegionCityIds)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ScenarioAppearanceEvidence[]? AppearanceEvidence { get; init; }
     public const int CurrentSchemaVersion = 158;
     [JsonRequired] public San9.Core.Domain.OfficerGrowthRules OfficerGrowth { get; init; } = San9.Core.Domain.OfficerGrowthRules.Default;
     [JsonRequired] public int[] FictionalOfficerPlaceIds { get; init; } = [];
@@ -90,6 +94,7 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
     [JsonRequired] public System.Collections.Immutable.ImmutableArray<San9.Core.Domain.DomesticPair> DomesticPairs { get; init; } = [];
     [JsonRequired] public int? ImperialSealId { get; init; }
     [JsonRequired] public San9.Core.Domain.ImperialCourtDefinition ImperialCourt { get; init; } = San9.Core.Domain.ImperialCourtDefinition.Empty;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public San9.Core.Domain.PersonalPeerageRegimeDefinition[]? PersonalPeerageRegimes { get; init; }
     [JsonRequired] public bool ImperialCourtEnded { get; init; }
     [JsonRequired] public OfficerInitialState[] Officers { get; init; } = [];
     [JsonRequired] public San9.Core.Domain.UnitState[] Units { get; init; } = [];
@@ -98,6 +103,11 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
 
     public void Validate(ScenarioValidationContext? context)
     {
+        if (AppearanceEvidence is { } evidence && evidence.Any(e => e is null || e.OfficerId < 0 || e.LeaderId < 0 ||
+            e.SettlementId is < 0 || e.Year <= 0 || string.IsNullOrWhiteSpace(e.SourceScenarioId) ||
+            !Officers.Any(o => o.State.Id == e.OfficerId) || !Officers.Any(o => o.State.Id == e.LeaderId) ||
+            e.SettlementId is int place && !Settlements.Any(s => s.Id == place)))
+            throw new InvalidDataException("Invalid scenario appearance evidence.");
         if (DefaultLoyalty is < 0 or > 255) throw new InvalidDataException("Invalid default loyalty.");
         if (OfficerGrowth is null || OfficerGrowth.MaximumBaseAbility < San9.Core.Domain.OfficerGrowthRules.MinimumEditableAbility || OfficerGrowth.TacticProficiencyCap <= 0)
             throw new InvalidDataException("Invalid officer growth rules.");
@@ -119,6 +129,25 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
             FictionalOfficerPlaceIds.Any(id => !Settlements.Any(s => s.Id == id && !s.IsDormant) && !UnbuiltPlaces.Any(p => p.Id == id)))
             throw new InvalidDataException("Invalid fictional officer starting places.");
         Information.Validate(this);
+        if (Officers.Any(o => o.InitialPersonalPeerage is { IsValid: false }))
+            throw new InvalidDataException("Invalid initial personal peerage evidence.");
+        var peerageRegimes = PersonalPeerageRegimes ?? [];
+        if (peerageRegimes.Any(r => r is null || string.IsNullOrWhiteSpace(r.Id) || r.Name is not null && string.IsNullOrWhiteSpace(r.Name) || r.Periods.IsDefaultOrEmpty) ||
+            peerageRegimes.Select(r => r.Id).Distinct(StringComparer.Ordinal).Count() != peerageRegimes.Length ||
+            Forces.Any(f => f.PersonalPeerageRegimeId is string id && !peerageRegimes.Any(r => r.Id == id)) ||
+            Information.CountryTitles.Any(t => t.Rule.PersonalPeerageRegimeId is string id && !peerageRegimes.Any(r => r.Id == id)))
+            throw new InvalidDataException("Invalid personal peerage regime references.");
+        try
+        {
+            foreach (var regime in peerageRegimes)
+            {
+                _ = new San9.Core.Domain.PersonalPeerageRegime(regime.Periods);
+                if (regime.Periods.SelectMany(p => p.AuthorizedRanks.Values).SelectMany(ids => ids)
+                    .Any(id => !Information.Ranks.Any(rank => rank.Id == id)))
+                    throw new InvalidDataException("Unknown personal peerage political rank.");
+            }
+        }
+        catch (ArgumentException error) { throw new InvalidDataException("Invalid personal peerage regime.", error); }
         try { Alliance?.Validate(Forces.Where(f => !f.IsDormant && !f.IsBarbarian).Select(f => f.Id).ToHashSet()); }
         catch (ArgumentException error) { throw new InvalidDataException("Invalid initial alliance.", error); }
         if (Forces.Any(f => f.FormationGrants.IsDefault ||

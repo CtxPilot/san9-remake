@@ -11,6 +11,49 @@ namespace San9.Application.Tests;
 public sealed class EquipmentPersistenceTests
 {
     [Fact]
+    public void MigratedNamedItemIsDeferredForNonServingHolder()
+    {
+        var person = new OfficerState(2, null, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Free };
+        var named = new EquipmentInstance(5, "legacy-treasure:5", 2, null, true) { LegacyTreasureId = 5 };
+        var deferred = Assert.Single(EquipmentMigration.UnequipNonServing([named], [person]));
+        Assert.False(deferred.Equipped);
+        Assert.True(deferred.EquipOnService);
+        Assert.Equal(5, deferred.LegacyTreasureId);
+    }
+    [Fact]
+    public void InitialIssueMigratesOldSaveOnceAndDoesNotReissueAfterUnequip()
+    {
+        var scenario = G01ScenarioTests.Fixture();
+        scenario = scenario with { Information = scenario.Information with { Equipment = EquipmentPreset.Basic() } };
+        var session = GameSession.Start(scenario, 42);
+        var original = session.Capture();
+        var owned = original.World.Equipment.Where(e => e.OfficerId == 1 && e.DefinitionId.StartsWith("issue-", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(3, owned.Length);
+        var old = original with { InitialEquipmentIssued = null, World = original.World with
+            { Equipment = original.World.Equipment.Where(e => !e.DefinitionId.StartsWith("issue-", StringComparison.Ordinal)).ToArray() } };
+        var migrated = GameSession.Restore(scenario, old).Capture();
+        Assert.True(migrated.InitialEquipmentIssued);
+        Assert.Equal(3, migrated.World.Equipment.Count(e => e.OfficerId == 1 && e.DefinitionId.StartsWith("issue-", StringComparison.Ordinal)));
+        var unequipped = migrated with { World = migrated.World with { Equipment = migrated.World.Equipment
+            .Select(e => e.OfficerId == 1 && e.DefinitionId == "issue-short-sword" ? e with { Equipped = false } : e).ToArray() } };
+        var saved = GameSession.Restore(scenario, unequipped);
+        var restored = SaveService.Decode(SaveService.Encode(saved), scenario).Capture();
+        Assert.False(restored.World.Equipment.Single(e => e.OfficerId == 1 && e.DefinitionId == "issue-short-sword").Equipped);
+        Assert.Equal(unequipped.World.Equipment.Count, restored.World.Equipment.Count);
+    }
+    [Fact]
+    public void LegacyEquipmentDefinitionsDefaultGradeAndRequirements()
+    {
+        var definition = new EquipmentDefinition("spear", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default);
+        var json = JsonNode.Parse(JsonSerializer.Serialize(definition, StrictJson.Options))!.AsObject();
+        json.Remove("grade");
+        json.Remove("minimumAbilities");
+        var restored = StrictJson.Deserialize<EquipmentDefinition>(Encoding.UTF8.GetBytes(json.ToJsonString()));
+        Assert.Equal(1, restored.Grade);
+        Assert.Equal(default, restored.MinimumAbilities);
+    }
+
+    [Fact]
     public void WorldSnapshotAcceptsLegacyMissingEquipmentAndRoundTripsInstances()
     {
         var world = WorldState.Create(new(190, 1, 1), 1, [new ForceState(1, 0)], [], [],

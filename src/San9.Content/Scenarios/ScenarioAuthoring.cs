@@ -36,6 +36,7 @@ public sealed record ScenarioDefinitions
     [JsonRequired] public required ThreeVisitsDefinition? ThreeVisits { get; init; }
     [JsonRequired] public required QiaoMarriageDefinition? QiaoMarriage { get; init; }
     [JsonRequired] public required PoliticalEventsDefinition? PoliticalEvents { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageRegimeDefinition[]? PersonalPeerageRegimes { get; init; }
     [JsonRequired] public required ImmutableDictionary<int, int> ProvinceCountryTitleIds { get; init; }
     [JsonRequired] public required ImmutableArray<SearchEventDefinition> SearchEvents { get; init; }
     [JsonRequired] public required TerminalDefinition? Terminal { get; init; }
@@ -70,6 +71,7 @@ public sealed record ScenarioDefinitions
         ThreeVisits = scenario.ThreeVisits,
         QiaoMarriage = scenario.QiaoMarriage,
         PoliticalEvents = scenario.PoliticalEvents,
+        PersonalPeerageRegimes = scenario.PersonalPeerageRegimes,
         ProvinceCountryTitleIds = scenario.ProvinceCountryTitleIds,
         SearchEvents = scenario.SearchEvents,
         Terminal = scenario.Terminal,
@@ -118,6 +120,7 @@ public sealed record ScenarioDefinitionsOverrides
     public ContentOverride<QiaoMarriageDefinition?>? QiaoMarriage { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<PoliticalEventsDefinition?>? PoliticalEvents { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ContentOverride<PersonalPeerageRegimeDefinition[]?>? PersonalPeerageRegimes { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ContentOverride<ImmutableDictionary<int, int>>? ProvinceCountryTitleIds { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -159,6 +162,7 @@ public sealed record ScenarioDefinitionsOverrides
         ThreeVisits = ThreeVisits is { } changeThreeVisits ? changeThreeVisits.Value : defaults.ThreeVisits,
         QiaoMarriage = QiaoMarriage is { } changeQiaoMarriage ? changeQiaoMarriage.Value : defaults.QiaoMarriage,
         PoliticalEvents = PoliticalEvents is { } changePoliticalEvents ? changePoliticalEvents.Value : defaults.PoliticalEvents,
+        PersonalPeerageRegimes = PersonalPeerageRegimes is { } changePersonalPeerageRegimes ? changePersonalPeerageRegimes.Value : defaults.PersonalPeerageRegimes,
         ProvinceCountryTitleIds = ProvinceCountryTitleIds is { } changeProvinceCountryTitleIds ? changeProvinceCountryTitleIds.Value : defaults.ProvinceCountryTitleIds,
         SearchEvents = SearchEvents is { } changeSearchEvents ? changeSearchEvents.Value : defaults.SearchEvents,
         Terminal = Terminal is { } changeTerminal ? changeTerminal.Value : defaults.Terminal,
@@ -190,6 +194,7 @@ public sealed record ScenarioDefinitionsOverrides
         ThreeVisits = ContentComparison.Equal(defaults.ThreeVisits, value.ThreeVisits) ? null : new(value.ThreeVisits),
         QiaoMarriage = ContentComparison.Equal(defaults.QiaoMarriage, value.QiaoMarriage) ? null : new(value.QiaoMarriage),
         PoliticalEvents = ContentComparison.Equal(defaults.PoliticalEvents, value.PoliticalEvents) ? null : new(value.PoliticalEvents),
+        PersonalPeerageRegimes = ContentComparison.Equal(defaults.PersonalPeerageRegimes, value.PersonalPeerageRegimes) ? null : new(value.PersonalPeerageRegimes),
         ProvinceCountryTitleIds = ContentComparison.Equal(defaults.ProvinceCountryTitleIds, value.ProvinceCountryTitleIds) ? null : new(value.ProvinceCountryTitleIds),
         SearchEvents = ContentComparison.Equal(defaults.SearchEvents, value.SearchEvents) ? null : new(value.SearchEvents),
         Terminal = ContentComparison.Equal(defaults.Terminal, value.Terminal) ? null : new(value.Terminal),
@@ -400,6 +405,7 @@ public sealed record ScenarioGeography
 public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int Year, int Month, int Day, int? PlayerForceId,
     ForceInitialState[] Forces, SettlementInitialState[] Settlements)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ScenarioAppearanceEvidence[]? AppearanceEvidence { get; init; }
     public const int CurrentSchemaVersion = 5;
     [JsonRequired] public required GameClock? ThreeVisitsStarted { get; init; }
     [JsonRequired] public required bool UnitDefectionsEnabled { get; init; }
@@ -429,6 +435,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
         var additional = value.Officers.Where(p => !known.Contains(p.State.Id)).Select(p => OfficerDefaults.From(p, texts)).ToArray();
         return new(CurrentSchemaVersion, value.ScenarioId, value.Year, value.Month, value.Day, value.PlayerForceId, value.Forces, value.Settlements)
         {
+            AppearanceEvidence = value.AppearanceEvidence,
             ThreeVisitsStarted = value.ThreeVisitsStarted,
             UnitDefectionsEnabled = value.UnitDefectionsEnabled,
             SettlementDefectionsEnabled = value.SettlementDefectionsEnabled,
@@ -465,6 +472,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
         return new(ScenarioInitialState.CurrentSchemaVersion, ScenarioId, Year, Month, Day, PlayerForceId, Forces, Settlements,
             new(geography.RegionNameKeys), new(geography.RegionCityIds))
         {
+            AppearanceEvidence = AppearanceEvidence,
             ThreeVisitsStarted = ThreeVisitsStarted,
             UnitDefectionsEnabled = UnitDefectionsEnabled,
             SettlementDefectionsEnabled = SettlementDefectionsEnabled,
@@ -497,6 +505,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
             ThreeVisits = definitions.ThreeVisits,
             QiaoMarriage = definitions.QiaoMarriage,
             PoliticalEvents = definitions.PoliticalEvents,
+            PersonalPeerageRegimes = definitions.PersonalPeerageRegimes,
             ProvinceCountryTitleIds = definitions.ProvinceCountryTitleIds,
             SearchEvents = definitions.SearchEvents,
             Terminal = definitions.Terminal,

@@ -326,8 +326,11 @@ public sealed class StrategySnapshot
     public EconomicIncomeRates CityIncomeRates(int? ownerId) => EconomicIncomeRates.ForForce(World.Simulation,
         World.Forces.SingleOrDefault(f => f.Id == ownerId), Companion);
     public EconomicOutlook? PlayerEconomicOutlook => PlayerCorps is {} corps
-        ? EconomicOutlook.Read(World, Information.Offices.ToDictionary(o => o.Id, o => o.Salary), corps.OwnerId, Companion, corps.Id)
+        ? EconomicOutlook.Read(World, Information.Offices.ToDictionary(o => o.Id, o => o.Salary), corps.OwnerId, Companion, corps.Id, PersonalPeeragePolicy(corps.OwnerId))
         : null;
+    public PersonalPeeragePolicy PersonalPeeragePolicy(int forceId) => Rules.Economy.PeeragePolicy(World.Forces.Single(f => f.Id == forceId), Year);
+    public string? PersonalPeerageRegimeName(int forceId) => World.Forces.Single(f => f.Id == forceId).PersonalPeerageRegimeId is string id
+        ? Rules.PersonalPeerageRegimeNames.GetValueOrDefault(id) : null;
     public IReadOnlyList<CityTacticCourse> TacticCourses { get; }
     public IReadOnlyDictionary<int, string> ProvinceNameKeys { get; }
     public IReadOnlyList<CityConnection> CityConnections { get; }

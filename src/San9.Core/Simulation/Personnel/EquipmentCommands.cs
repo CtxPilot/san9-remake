@@ -19,13 +19,16 @@ internal static class EquipmentCommands
         List<DomainEvent> events)
     {
         if (!world.EquipmentInitialized || !world.AllEquipment.TryGetValue(command.EquipmentId, out var item) ||
-            item.LegacyTreasureId is not null || !rules.Items.ContainsKey(item.DefinitionId)) return CommandRejection.InvalidTask;
+            !rules.Items.ContainsKey(item.DefinitionId)) return CommandRejection.InvalidTask;
+        if (item.LegacyTreasureId is not null && item.InventoryForceId != command.IssuerId) return CommandRejection.InvalidTask;
         if (item.InventoryForceId != command.IssuerId && (item.OfficerId is not int previous ||
             !world.Officers.TryGetValue(previous, out var owner) || !owner.IsServing || owner.OwnerId != command.IssuerId || world.IsTraveling(previous)))
             return CommandRejection.PersonUnavailable;
         if (command.OfficerId is int target && (!world.Officers.TryGetValue(target, out var person) || !person.IsServing ||
             person.OwnerId != command.IssuerId || world.IsTraveling(target))) return CommandRejection.PersonUnavailable;
         var updated = command.OfficerId is int recipient ? EquipmentRules.MoveToOfficer(item, recipient) : EquipmentRules.MoveToInventory(item, command.IssuerId);
+        if (item.LegacyTreasureId is int treasure && command.OfficerId is int holder)
+            world.Replace(world.AllTreasures[treasure] with { HolderId = holder, Discovery = TreasureDiscovery.Discovered });
         world.SetEquipment(updated);
         events.Add(new EquipmentTransferredEvent(world.Clock, command.IssuerId, item.Id, item.OfficerId, command.OfficerId));
         return CommandRejection.None;
@@ -41,7 +44,7 @@ internal static class EquipmentCommands
         if (command.EquipmentId is long itemId)
         {
             if (!world.AllEquipment.TryGetValue(itemId, out var item) ||
-                (item.OfficerId != person.Id && (item.InventoryForceId != command.IssuerId || item.LegacyTreasureId is not null)) ||
+                (item.OfficerId != person.Id && item.InventoryForceId != command.IssuerId) ||
                 rules.Items[item.DefinitionId].Slot != command.Slot ||
                 !EquipmentRules.MeetsRequirements(rules.Items[item.DefinitionId], person.BaseAbilities))
                 return CommandRejection.InvalidTask;
@@ -49,6 +52,8 @@ internal static class EquipmentCommands
                 value.Id == itemId ? EquipmentRules.MoveToOfficer(value, person.Id) : value);
             var updated = EquipmentRules.Equip(proposed, rules.Items, person.Id, itemId);
             if (updated is null) return CommandRejection.InvalidTask;
+            if (item.LegacyTreasureId is int treasure && item.OfficerId != person.Id)
+                world.Replace(world.AllTreasures[treasure] with { HolderId = person.Id, Discovery = TreasureDiscovery.Discovered });
             foreach (var changed in updated.Value)
                 if (changed != world.AllEquipment[changed.Id]) world.SetEquipment(changed);
         }

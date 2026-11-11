@@ -73,7 +73,7 @@ internal sealed class ScenarioSessionDefinition
         {
             DefaultLoyalty = Content.DefaultLoyalty,
             Forces = Forces().ToArray(), Settlements = Settlements().ToArray(),
-            Officers = Content.Officers.Select(o => o.CreateState(Content.Year)).ToArray(), Units = Content.Units,
+            Officers = PersonalPeerageMigration.Initialize(Content.Officers.Select(o => o.CreateState(Content.Year)), Content.Officers, clock), Units = Content.Units,
             Corps = Content.Information.Corps, Relations = Content.Information.Relations, Treasures = Content.Information.TreasureStates
         };
         return new StrategySnapshotSource(Content, Rules, Definitions).Project(world);
@@ -91,6 +91,7 @@ internal sealed class ScenarioSessionDefinition
         var forces = Forces().ToArray();
         var initialUnits = InitialUnits(settings).ToArray();
         var people = Content.Officers.Select(o => o.CreateState(Content.Year)).ToArray();
+        people = PersonalPeerageMigration.Initialize(people, Content.Officers, new(Content.Year, Content.Month, Content.Day));
         if (settings?.MixedTroopsEnabled == true && MilitaryRules is { } formationRules)
             people = FormationKnowledgeMigration.Initialize(people, forces, initialUnits, formationRules);
         return WorldState.Create(new(Content.Year, Content.Month, Content.Day), seed,
@@ -106,7 +107,7 @@ internal sealed class ScenarioSessionDefinition
         settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces,
         Definitions.Forces.Select(f => f.Id).ToHashSet(), Definitions.Officers.Select(p => p.Id).ToHashSet(), Content.DefaultLoyalty,
         equipment: EquipmentMigration.UnequipNonServing(LegacyEquipmentMigration.Convert(Content.Information.Treasures,
-            Content.Information.TreasureStates, Content.Information.Equipment).Instances, people));
+            Content.Information.TreasureStates, Content.Information.Equipment).Instances, people), initialEquipmentRules: Rules.Equipment);
     }
 
     private IEnumerable<UnitState> InitialUnits(NewGameSettings? settings)
@@ -162,7 +163,7 @@ internal sealed class ScenarioSessionDefinition
         ColorCode = f.ColorCode,
         FormationGrants = f.FormationGrants.OrderBy(g => g.FormationId).ToImmutableArray(),
         ProvidedTactics = f.ProvidedTactics.Order().ToImmutableArray(), IsBarbarian = !_playerForces.Contains(f.Id) && f.IsBarbarian, IsDormant = f.IsDormant,
-        EventHistory = f.EventHistory.OrderBy(k => k.Value, StringComparer.Ordinal).ToImmutableArray(), HasDeposedEmperor = f.HasDeposedEmperor, LeaderId = f.LeaderId, AdviserId = f.AdviserId, RankId = f.RankId, CountryTitleId = f.CountryTitleId, BaseTrust = f.BaseTrust
+        EventHistory = f.EventHistory.OrderBy(k => k.Value, StringComparer.Ordinal).ToImmutableArray(), HasDeposedEmperor = f.HasDeposedEmperor, LeaderId = f.LeaderId, AdviserId = f.AdviserId, RankId = f.RankId, CountryTitleId = f.CountryTitleId, BaseTrust = f.BaseTrust, PersonalPeerageRegimeId = f.PersonalPeerageRegimeId
     });
 
     private IEnumerable<SettlementState> Settlements() => Content.Settlements.Select(s => new SettlementState(s.Id,

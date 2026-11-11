@@ -65,10 +65,16 @@ public sealed record OfficerTactic(string Name, bool Available);
 
 public static class OfficerDetails
 {
+    public static string PeerageName(PersonalPeerage? peerage) => peerage is null ? "无" : peerage.Title ?? peerage.Grade switch
+    {
+        PersonalPeerageGrade.ImperialMarquis => "关内侯", PersonalPeerageGrade.VillageMarquis => "亭侯",
+        PersonalPeerageGrade.DistrictMarquis => "乡侯", PersonalPeerageGrade.CountyMarquis => "县侯",
+        PersonalPeerageGrade.Duke => "公", PersonalPeerageGrade.King => "王", _ => throw new InvalidDataException("Unknown personal peerage.")
+    };
     private static readonly string[][] FieldIds =
     [
         ["force", "corps", "home", "location", "service", "status"],
-        ["office", "capacity", "salary", "loyalty"],
+        ["office", "capacity", "salary", "loyalty", "personal-peerage"],
         ["gender", "personality", "affinity", "parent", "age", "health"],
         ["order", "target-person", "target-place", "arrival", "formation", "equipped-tactic"]
     ];
@@ -77,6 +83,7 @@ public static class OfficerDetails
         var officer = view.Officers.Single(o => o.Id == id);
         var person = view.World.Officers.Single(o => o.Id == id);
         var values = new Dictionary<string, InformationField>();
+        values["personal-peerage"] = new("爵位", PeerageName(person.PersonalPeerage));
         var tactics = new List<OfficerTacticGroup>();
         var pages = OfficerCatalog.Pages(view, texts);
         for (int page = 0; page < pages.Count; page++)

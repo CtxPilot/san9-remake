@@ -30,6 +30,7 @@ public sealed record ForceState(int Id, int Trust)
     public int? LeaderId { get; init; }
     [JsonRequired] public int? AdviserId { get; init; }
     public int? RankId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? PersonalPeerageRegimeId { get; init; }
     [JsonRequired] public int? CountryTitleId { get; init; }
 }
 

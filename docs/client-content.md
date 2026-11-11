@@ -176,6 +176,8 @@ dotnet run --project src/San9.Tools -- import-textures --game-dir "private/game-
 
 客户端通过Godot的`template`特性区分开发与导出运行：开发读取`local/generated/content`；Windows／Linux导出版读取可执行文件旁的`content/`；macOS导出版读取系统“文稿”目录下的`San9Remake/content/`，通常为`~/Documents/San9Remake/content/`，不依赖`.app`的位置。无参数先进入开局菜单；`--content-root`指定其他目录，`--scenario ID`按目录定位明确剧本，`--content-package PATH`直接指定包，两种剧本选择互斥。发布包不附带转换内容，但内置转换器。启动加载失败时显示实际路径，并提供“选择目录”“开始转换”“打开目录”和“重新加载内容”；转换校验成功后可直接进入游戏，无需重启。也可手动复制完整内容目录，保留`catalog.json`、`shared/`和`scenarios/`的相对位置，再重新加载。存档位置见[用户数据目录](user-settings.md#用户数据目录)。离线地图使用`render-map --content-package <剧本包目录>`。正常游戏加载只读取转换结果；源资源与生成物不提交。
 
+剧本文档可选 `appearanceEvidence`，记录人物 ID、原势力君主 ID、可空据点 ID、来源剧本 ID 和年份，作为手动登场的剧本依据。旧包升级从各剧本已有初始状态生成；没有该字段的内容仍可在运行时从初始状态推导。依据只用于建议，不视为史实证明；引用错误在内容校验时拒绝。
+
 ### 发行版内置转换入口
 
 内容准备页的“开始转换”直接调用导出时引用的 Importer，在后台任务中执行，与游戏共用一份 .NET 运行时，不启动额外转换器进程，也不附带 `importer/` 目录。源格式解释仍封装在 Importer，正常游戏加载仍只消费转换包。当前仅支持繁体中文 PK 1.0.1.0 的已登记构建，原版目录须直接包含 `San9PK.exe` 和 S9，内容目录与原版目录不得相同或互相包含；始终写入界面显示的内容目录，保留源文件不变。

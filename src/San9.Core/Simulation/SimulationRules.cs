@@ -40,6 +40,11 @@ public class SimulationRules
     internal void ValidateEvents(WorldMutation initial)
     {
         var rules = this;
+        var peerageRegimes = Economy.PersonalPeerageRegimes;
+        if (peerageRegimes is null || peerageRegimes.Any(p => string.IsNullOrWhiteSpace(p.Key) || p.Value is null) ||
+            initial.AllForces.Values.Any(f => f.PersonalPeerageRegimeId is string id && !peerageRegimes.ContainsKey(id)) ||
+            Politics.Titles.Values.Any(t => t.PersonalPeerageRegimeId is string id && !peerageRegimes.ContainsKey(id)))
+            throw new ArgumentException("Unknown personal peerage regime.");
         rules.QiaoMarriage?.Validate(initial.AllOfficers.Keys.ToHashSet(), rules.Personnel.CityProvinces);
         rules.SunMarriage?.Validate(initial.AllOfficers.Keys.ToHashSet(),
             rules.Military?.Tactics.Values.Where(t => t.Category is >= 0 and <= 8).Select(t => t.Id).ToHashSet() ?? []);

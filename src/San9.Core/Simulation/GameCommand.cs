@@ -65,6 +65,7 @@ public sealed record RespondDailyTaskCommand(Guid CommandId, int IssuerId, long 
 [JsonDerivedType(typeof(ChooseDuelSuccessorCommand), "choose-duel-successor")]
 [JsonDerivedType(typeof(ChooseExecutionSuccessorCommand), "choose-execution-successor")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(AssignOfficesCommand), "assign-offices")]
+[JsonDerivedType(typeof(SetPersonalPeerageCommand), "set-personal-peerage")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(SetCorpsControlCommand), "set-corps-control")]
 [System.Text.Json.Serialization.JsonDerivedType(typeof(SetCorpsDelegationCommand), "set-corps-delegation")]
 public abstract record GameCommand(
@@ -117,6 +118,13 @@ public enum CommandRejection
     SettlementConfused,
     FormationUnavailable,
     PrisonerExecutionProhibited,
+    PeerageRegimeUnavailable,
+    PeerageUnauthorized,
+    PeerageQuotaFull,
+    PeerageRoyalLineageRequired,
+    PeerageEmperorRequired,
+    PeerageCourtControlRequired,
+    PeerageUnchanged,
 }
 
 public readonly record struct CommandSubmissionResult(

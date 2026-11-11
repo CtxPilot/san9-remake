@@ -28,6 +28,9 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
     public Action? Closed { get; init; }
     public Action? Confirmed { get; init; }
     public Action? ShowMap { get; init; }
+    public Action? Search { get; init; }
+    public string SearchTitle { get; init; } = "搜索";
+    public bool SearchEnabled { get; init; } = true;
     public bool TabStripFollowsPage { get; init; }
     public int? InitialCurrentId { get; init; }
     public CatalogTableState TableState { get; init; } = new();
@@ -88,6 +91,12 @@ public partial class CatalogView : FixedPage, IInformationPage, IModalInputRoute
             var tab = new CatalogSkinButton { Textures = Textures, Kind = CatalogButtonKind.Tab, Title = Pages[i].Title,
                 Position = _body.Position + new Vector2(86 + i % 7 * 62, 75 + i / 7 * 32), Size = new(58, 26) };
             tab.Pressed += () => ChangePage(page); AddChild(tab); _tabs.Add(tab);
+        }
+        if (Search is not null)
+        {
+            var search = new CatalogBulkButton { Title = SearchTitle, Textures = Textures, Disabled = !SearchEnabled,
+                Position = _body.Position + new Vector2(160, 75), Size = new(112, 32) };
+            search.Pressed += Search; AddChild(search);
         }
         var close = new InformationActionButton
         {

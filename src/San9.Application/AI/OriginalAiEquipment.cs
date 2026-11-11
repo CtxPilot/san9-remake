@@ -53,9 +53,10 @@ internal static class OriginalAiEquipment
         int Need(EquipmentSlot slot) => officers.Count(id => !snapshot.Equipment.Any(item => item.OfficerId == id && item.Equipped &&
             rules.Items[item.DefinitionId].Slot == slot)) - snapshot.Equipment.Count(item => item.InventoryForceId == force.Id &&
             rules.Items[item.DefinitionId].Slot == slot);
+        bool initialIssueEnabled = rules.Items.Values.Any(item => item.InitialIssue == true);
         var purchase = rules.Items.Values.Where(item => item.Slot is EquipmentSlot.MainHand or EquipmentSlot.Helmet or EquipmentSlot.Armor &&
                 item.PurchaseCost is int price && price <= root.Treasury.Money / 2 && Need(item.Slot) > 0 &&
-                item.ResearchProjectId is string manufacturing && force.CompletedResearch.Contains(manufacturing) &&
+                (initialIssueEnabled || item.ResearchProjectId is string manufacturing && force.CompletedResearch.Contains(manufacturing)) &&
                 (item.PurchaseResearchProjectId is null || force.CompletedResearch.Contains(item.PurchaseResearchProjectId)))
             .OrderByDescending(item => Need(item.Slot)).ThenBy(item => item.PurchaseCost).ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();
         if (purchase is not null)

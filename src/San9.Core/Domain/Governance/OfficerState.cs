@@ -5,6 +5,14 @@ namespace San9.Core.Domain;
 
 public enum OfficerStatus { Ruler, Governor, Strategist, Serving, Captive, Free, Undiscovered, NotAppeared, Dead, Special }
 
+/// <summary>An explicit player-configured future appearance, independent of historical scheduling.</summary>
+public sealed record ManualOfficerAppearance(int Year, int SettlementId, int? ForceId, int Age)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool KeepPendingIfForceUnavailable { get; init; }
+    [JsonIgnore] public bool IsValid => Year > 0 && SettlementId >= 0 && ForceId is not < 0 && Age is >= 1 and <= 100 && Age < Year;
+}
+
 public readonly record struct OfficerAbilities(int War, int Intelligence, int Politics, int Leadership)
 {
     [System.Text.Json.Serialization.JsonIgnore]
@@ -46,10 +54,15 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     [JsonRequired] public int LifespanTier { get; init; }
     [JsonRequired] public int SuccessionPriority { get; init; }
     [JsonRequired] public int AppearanceYear { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ManualOfficerAppearance? ManualAppearance { get; init; }
     // A family identity, not a reference to a required living officer.
     [JsonRequired] public int? BloodlineId { get; init; }
     [JsonRequired] public string Surname { get; init; } = "";
     public int? OfficeId { get; init; }
+    /// <summary>Personal title retained independently of the officer's current appointment.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PersonalPeerage? PersonalPeerage { get; init; }
     [JsonRequired] public bool IsCommander { get; init; }
     private LoyaltyMap _loyalties = LoyaltyMap.Empty;
     // The wire contract contains only overrides. Keep incoming entries until the content baseline is bound.
@@ -95,6 +108,7 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
         if (EquippedTacticId < 0 || TacticCooldown < 0 || LearnedTactics is null || TacticProficiencies.IsDefault || TacticProficiencies.Length != 9 ||
             TacticProficiencies.Any(v => v < 0) || LearnedTactics.Any(v => v < 0) ||
             ParentId < 0 || BloodlineId < 0 || AppearanceYear < 0 || LifespanTier < 0 || SuccessionPriority < 0 || Personality is < 0 or > 3) return false;
+        if (PersonalPeerage is { IsValid: false } || ManualAppearance is { } manual && (!manual.IsValid || Status != OfficerStatus.NotAppeared)) return false;
         if (Surname is null || Id < 0 || IsServing && SettlementId is null && UnitId is null || UnitId < 0 ||
             UnitId is not null && (SettlementId is not null || RegionId is not null || !IsServing && Status != OfficerStatus.Captive || IsCommander) ||
             SettlementId < 0 || OwnerId < 0 || RegionId < 0 || RegionId is not null && SettlementId is not null || !Enum.IsDefined(Status) || Injury is < 0 or > 14 ||

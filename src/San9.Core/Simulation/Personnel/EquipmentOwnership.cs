@@ -17,7 +17,7 @@ internal static class EquipmentOwnership
         foreach (var item in world.AllEquipment.Values.Where(e => e.OfficerId == previous.Id && e.LegacyTreasureId is null).OrderBy(e => e.Id).ToArray())
         {
             world.SetEquipment(recipient is int forceId ? EquipmentRules.MoveToInventory(item, forceId) :
-                item with { OfficerId = null, InventoryForceId = null, Equipped = false, IsLost = true });
+                item with { OfficerId = null, InventoryForceId = null, Equipped = false, IsLost = true, EquipOnService = null });
             events.Add(new EquipmentOwnershipResolvedEvent(world.Clock, item.Id, previous.OwnerId, previous.Id, recipient));
         }
     }
@@ -29,7 +29,7 @@ internal static class EquipmentOwnership
         foreach (var item in world.AllEquipment.Values.Where(e => e.InventoryForceId == forceId).OrderBy(e => e.Id).ToArray())
         {
             world.SetEquipment(successor is int id ? EquipmentRules.MoveToInventory(item, id) :
-                item with { OfficerId = null, InventoryForceId = null, Equipped = false, IsLost = true });
+                item with { OfficerId = null, InventoryForceId = null, Equipped = false, IsLost = item.LegacyTreasureId is null, EquipOnService = null });
             events.Add(new EquipmentOwnershipResolvedEvent(world.Clock, item.Id, forceId, null, successor));
         }
     }

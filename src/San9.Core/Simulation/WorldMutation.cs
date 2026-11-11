@@ -443,6 +443,22 @@ internal sealed partial class WorldMutation : IWorldQuery
         if (previous.IsServing && !value.IsServing)
             foreach (var equipment in AllEquipment.Values.Where(item => item.OfficerId == value.Id && item.Equipped).ToArray())
                 SetEquipment(equipment with { Equipped = false });
+        if (!previous.IsServing && value.IsServing && EquipmentInitialized)
+        {
+            foreach (var issued in AllEquipment.Values.Where(item => item.OfficerId == value.Id && item.EquipOnService == true)
+                         .OrderBy(item => item.Id).ToArray())
+            {
+                var pendingItem = issued with { EquipOnService = null };
+                SetEquipment(pendingItem);
+                var definition = _equipmentRules.Items[pendingItem.DefinitionId];
+                if (!EquipmentRules.MeetsRequirements(definition, value.BaseAbilities) ||
+                    AllEquipment.Values.Any(e => e.OfficerId == value.Id && e.Equipped && _equipmentRules.Items[e.DefinitionId].Slot == definition.Slot)) continue;
+                var equipped = EquipmentRules.Equip(AllEquipment.Values, _equipmentRules.Items, value.Id, pendingItem.Id);
+                if (equipped is null) continue;
+                foreach (var changed in equipped.Value)
+                    if (changed != AllEquipment[changed.Id]) SetEquipment(changed);
+            }
+        }
         if (previous.IsDormant != value.IsDormant) InvalidateParticipationQueries();
         if (courtChanged)
         {
@@ -572,8 +588,8 @@ internal sealed partial class WorldMutation : IWorldQuery
             SetEquipment(new EquipmentInstance(id, definition.Id, holder, null, false) { LegacyTreasureId = treasure.Id });
             return;
         }
-        if (instance.OfficerId != holder || instance.InventoryForceId is not null)
-            SetEquipment(instance with { OfficerId = holder, InventoryForceId = null, Equipped = false });
+        if (instance.OfficerId != holder || instance.InventoryForceId is not null && (holder is not null || !treasure.Discovered))
+            SetEquipment(instance with { OfficerId = holder, InventoryForceId = null, Equipped = false, EquipOnService = null });
     }
     internal void Replace(ForceRelation value)
     {

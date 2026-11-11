@@ -16,6 +16,9 @@ public sealed record EquipmentDefinition(string Id, EquipmentSlot Slot, Equipmen
     public string Name { get; init; } = "";
     /// <summary>Fixed item grade, independent of rarity and experience level.</summary>
     public int Grade { get; init; } = 1;
+    /// <summary>Issue one ordinary item in this slot when an old game or new scenario is initialized.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? InitialIssue { get; init; }
     /// <summary>Minimum innate officer abilities; equipped bonuses never count.</summary>
     public OfficerAbilities MinimumAbilities { get; init; }
     public string? ResearchProjectId { get; init; }
@@ -31,11 +34,13 @@ public sealed record EquipmentDefinition(string Id, EquipmentSlot Slot, Equipmen
     [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => !string.IsNullOrWhiteSpace(Id) && Enum.IsDefined(Slot) && Enum.IsDefined(Rarity) &&
         LegacyTreasureId is not < 0 && TacticId is not < 0 && (!EscapeMount || Slot == EquipmentSlot.Mount) &&
         Name is not null && Grade is >= 1 and <= 5 && MinimumAbilities.IsNonnegative && ProductionCost >= 0 && ProductionDays >= 0 && PurchaseCost is not < 0 &&
+        (InitialIssue != true || Rarity == EquipmentRarity.Ordinary && LegacyTreasureId is null && Grade == 1 &&
+            Slot is EquipmentSlot.MainHand or EquipmentSlot.Helmet or EquipmentSlot.Armor && BaseBonuses == default && MinimumAbilities == default) &&
         (PurchaseCost is not null || PurchaseResearchProjectId is null) &&
         (PurchaseResearchProjectId is null || !string.IsNullOrWhiteSpace(PurchaseResearchProjectId)) &&
         (PurchaseCost is null || LegacyTreasureId is null && Rarity == EquipmentRarity.Ordinary && Slot != EquipmentSlot.Treasure) &&
         (ResearchProjectId is null ? ProductionCost == 0 && ProductionDays == 0 :
-            !string.IsNullOrWhiteSpace(ResearchProjectId) && ProductionDays > 0 && LegacyTreasureId is null && Slot is not (EquipmentSlot.Treasure or EquipmentSlot.Tally or EquipmentSlot.Book)) &&
+            !string.IsNullOrWhiteSpace(ResearchProjectId) && ProductionDays > 0 && LegacyTreasureId is null && Rarity == EquipmentRarity.Ordinary && Slot is not (EquipmentSlot.Treasure or EquipmentSlot.Tally or EquipmentSlot.Book)) &&
         BaseBonuses.IsNonnegative && BonusPerLevel.IsNonnegative && !CompatibleWeapons.IsDefault &&
         CompatibleWeapons.All(id => !string.IsNullOrWhiteSpace(id)) &&
         CompatibleWeapons.Distinct(StringComparer.Ordinal).Count() == CompatibleWeapons.Length &&
@@ -50,6 +55,9 @@ public sealed record EquipmentInstance(long Id, string DefinitionId, int? Office
 {
     public int? LegacyTreasureId { get; init; }
     public bool IsLost { get; init; }
+    /// <summary>Initial or migrated item held while not serving; consumed on the first return to service.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? EquipOnService { get; init; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? LastExperienceExchange { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => Id >= 0 && !string.IsNullOrWhiteSpace(DefinitionId) &&
@@ -58,7 +66,7 @@ public sealed record EquipmentInstance(long Id, string DefinitionId, int? Office
         !(OfficerId is not null && InventoryForceId is not null) &&
         (OfficerId is not null || InventoryForceId is not null || LegacyTreasureId is not null || IsLost) &&
         (!IsLost || OfficerId is null && InventoryForceId is null && LegacyTreasureId is null && !Equipped) &&
-        (!Equipped || OfficerId is not null) && Level is >= 1 and <= 5 && Experience is >= 0 and < 100 &&
+        (!Equipped || OfficerId is not null) && (EquipOnService != true || OfficerId is not null && !Equipped) && Level is >= 1 and <= 5 && Experience is >= 0 and < 100 &&
         (Level != 5 || Experience == 0);
 }
 
@@ -76,7 +84,8 @@ public sealed class EquipmentRulebook
             throw new ArgumentException("Invalid equipment definitions.");
         Items = items.ToImmutableDictionary(item => item.Id, StringComparer.Ordinal);
         if (!EquipmentRules.ValidInventory([], Items) ||
-            Items.Values.Where(item => item.LegacyTreasureId is not null).GroupBy(item => item.LegacyTreasureId).Any(g => g.Count() > 1))
+            Items.Values.Where(item => item.LegacyTreasureId is not null).GroupBy(item => item.LegacyTreasureId).Any(g => g.Count() > 1) ||
+            Items.Values.Where(item => item.InitialIssue == true).GroupBy(item => item.Slot).Any(g => g.Count() > 1))
             throw new ArgumentException("Invalid equipment definition references.");
     }
 }
@@ -141,13 +150,13 @@ public static class EquipmentRules
     public static EquipmentInstance MoveToOfficer(EquipmentInstance item, int officerId)
     {
         if (!item.IsValid || officerId < 0) throw new ArgumentException("Invalid equipment transfer.");
-        return item with { OfficerId = officerId, InventoryForceId = null, Equipped = false, IsLost = false };
+        return item with { OfficerId = officerId, InventoryForceId = null, Equipped = false, IsLost = false, EquipOnService = null };
     }
 
     public static EquipmentInstance MoveToInventory(EquipmentInstance item, int forceId)
     {
         if (!item.IsValid || forceId < 0) throw new ArgumentException("Invalid equipment transfer.");
-        return item with { OfficerId = null, InventoryForceId = forceId, Equipped = false, IsLost = false };
+        return item with { OfficerId = null, InventoryForceId = forceId, Equipped = false, IsLost = false, EquipOnService = null };
     }
 
     public static OfficerAbilities Bonuses(IEnumerable<EquipmentInstance> items,

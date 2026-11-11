@@ -18,23 +18,28 @@ internal sealed class ScenarioRules
     internal MilitaryCityNetwork MilitaryCities { get; }
     internal PoliticalRulebook Politics { get; }
     internal OfficerAbilityRules Abilities { get; }
+    internal ImmutableDictionary<string, string> PersonalPeerageRegimeNames { get; }
 
     internal ScenarioRules(ScenarioInitialState definition)
     {
+        var peerageRegimes = (definition.PersonalPeerageRegimes ?? []).ToImmutableDictionary(r => r.Id, r => new PersonalPeerageRegime(r.Periods), StringComparer.Ordinal);
+        PersonalPeerageRegimeNames = (definition.PersonalPeerageRegimes ?? []).ToImmutableDictionary(r => r.Id, r => r.Name ?? r.Id, StringComparer.Ordinal);
         Economy = new EconomyRulebook(definition.Information.Offices.Select(o => new OfficeSalary(o.Id, o.Salary)).ToImmutableArray(),
             definition.DomesticPairs, definition.ImperialSealId)
-        { FoodMarket = definition.FoodMarket, ImperialCourt = definition.ImperialCourt, RegionCityIds = definition.RegionCityIds.ToImmutableDictionary() };
+        { FoodMarket = definition.FoodMarket, ImperialCourt = definition.ImperialCourt, RegionCityIds = definition.RegionCityIds.ToImmutableDictionary(), PersonalPeerageRegimes = peerageRegimes };
         Personnel = new PersonnelRulebook(definition.Settlements.Select(s => new PersonPlace(s.Id, s.Position)).Concat(definition.UnbuiltPlaces), definition.RegionCityIds, definition.CityConnections, definition.CityProvinceIds, definition.TacticCourses, definition.SearchEvents);
         var equipmentDefinitions = definition.Information.Equipment;
+        bool builtInEquipment = equipmentDefinitions.Any(item => item.Id == "basic-spear" && item.ResearchProjectId == EquipmentPreset.ResearchId);
+        bool authoredInitialIssue = equipmentDefinitions.Any(item => item.InitialIssue is not null);
         // Older upgraded packages can contain only converted treasures. Supply the same
         // recipes as an empty legacy catalog, while preserving explicitly authored catalogs.
         if (equipmentDefinitions.All(item => item.LegacyTreasureId is not null))
-            equipmentDefinitions = equipmentDefinitions.AddRange(EquipmentPreset.Basic());
+            equipmentDefinitions = equipmentDefinitions.AddRange(EquipmentPreset.Basic().Where(item => item.InitialIssue != true));
         else if (equipmentDefinitions.Any(item => item.Id == "basic-spear" && item.ResearchProjectId == EquipmentPreset.ResearchId) &&
                  equipmentDefinitions.All(item => item.Id != "basic-dart"))
             equipmentDefinitions = equipmentDefinitions.Add(EquipmentPreset.Basic().Single(item => item.Id == "basic-dart"));
-        if (equipmentDefinitions.Any(item => item.Id == "basic-spear" && item.ResearchProjectId == EquipmentPreset.ResearchId))
-            equipmentDefinitions = equipmentDefinitions.AddRange(EquipmentPreset.Basic().Where(p => p.Grade > 1 &&
+        if (builtInEquipment)
+            equipmentDefinitions = equipmentDefinitions.AddRange(EquipmentPreset.Basic().Where(p => (p.Grade > 1 || p.Id == "yellow-horse" || p.InitialIssue == true && !authoredInitialIssue) &&
                 equipmentDefinitions.All(existing => existing.Id != p.Id)));
         // Only retrofit the unmodified built-in recipes; authored items keep their own purchase policy.
         var presets = EquipmentPreset.Basic().ToDictionary(item => item.Id, StringComparer.Ordinal);

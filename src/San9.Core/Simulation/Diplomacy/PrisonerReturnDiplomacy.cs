@@ -78,9 +78,10 @@ internal static class PrisonerReturnDiplomacy
 
     internal static long SalaryReserve(WorldMutation world, int force, SimulationRules rules)
     {
-        long salaries = world.Officers.Values.Where(p => p.IsServing && p.Status != OfficerStatus.Ruler && p.OwnerId == force &&
+        long salaries = world.Officers.Values.Where(p => p.IsServing && p.OwnerId == force &&
             ResourceAccounts.Resolve(world, force, PersonnelLocations.Corps(world, p)).Id == ResourceAccounts.Root(world, force).Id)
-            .Sum(p => (long)(p.OfficeId is int office ? rules.Economy.Salaries.Single(s => s.OfficeId == office).Amount : 1));
+            .Sum(p => (long)(p.Status == OfficerStatus.Ruler ? 0 : p.OfficeId is int office ? rules.Economy.Salaries.Single(s => s.OfficeId == office).Amount : 1)
+                + rules.Economy.PeeragePolicy(world.Forces[force], world.Clock.Year).Salary(p.PersonalPeerage));
         return checked(salaries * DiplomacyMath.PrisonerSalaryReserveXuns(world.Clock.Month, world.Clock.Day));
     }
 

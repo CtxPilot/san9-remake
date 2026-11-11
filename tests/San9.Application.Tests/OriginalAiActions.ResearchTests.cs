@@ -146,6 +146,24 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void AiCanBuyBasicEquipmentBeforeManufacturingResearch()
+    {
+        var source = Fixture();
+        var content = source with { Information = source.Information with { Equipment = EquipmentPreset.Basic() } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42).CreateSnapshot();
+        initial = initial with { Equipment = initial.Equipment.Where(item => item.OfficerId != 2).ToArray(),
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 } };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+        OriginalAiEquipment.Manage(engine, definition.Rules.Equipment, seat, events);
+        Assert.Empty(engine.Snapshot.Forces.Single(force => force.Id == 2).CompletedResearch);
+        var purchased = Assert.Single(events.OfType<EquipmentPurchasedEvent>());
+        Assert.Null(definition.Rules.Equipment.Items[purchased.DefinitionId].PurchaseResearchProjectId);
+    }
+
+    [Fact]
     public void AiResearchesEquipsAndProducesPersonalEquipmentWithoutMixedTroops()
     {
         var content = Fixture();

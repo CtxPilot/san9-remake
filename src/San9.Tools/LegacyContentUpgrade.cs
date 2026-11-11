@@ -72,7 +72,12 @@ internal static class LegacyContentUpgrade
             await WriteAsync(Path.Combine(stage, "legacy-equipment-upgrade-report.json"), new
             {
                 description = "无法识别类别的旧宝物已按可用特征分类；无明确特征时归入宝物槽。请按剧本和物品 ID 检查。",
-                unclassified
+                unclassified,
+                peerage = new { description = "旧包未提供政权爵制；以下剧本采用通用重制规则，不代表历史制度。未推测宗室或历史封爵。",
+                    scenarios = prepared.Worlds.Where(world => world.Scenario.PersonalPeerageRegimes?.Any(r => r.Id == PersonalPeeragePreset.GenericId) == true)
+                        .Select(world => world.Scenario.ScenarioId).ToArray(),
+                    historicalEvidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers.Where(o => o.InitialPersonalPeerage is not null)
+                        .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id, evidence = o.InitialPersonalPeerage })).ToArray() }
             });
             Console.WriteLine($"Equipment upgrade report: {unclassified.Sum(world => world.treasures.Length)} unclassified scenario items.");
             await ContentVerification.VerifyAsync(stage, Console.WriteLine);

@@ -2,6 +2,7 @@ using Godot;
 using San9.Application;
 using San9.Application.Presentation;
 using San9.Content.Text;
+using San9.Core.Domain;
 using San9.Core.Simulation;
 
 namespace San9.Client.Godot;
@@ -31,6 +32,11 @@ public partial class EquipmentProductionView : ModalView, IModalInputRouter
     private void ShowCatalog()
     {
         var recipes = (Purchase ? Session.PurchasableEquipment : Session.EquipmentRecipes).ToArray();
+        var duplicateNames = recipes.GroupBy(item => item.Name, StringComparer.Ordinal)
+            .Where(group => group.Select(item => item.Slot).Distinct().Skip(1).Any())
+            .Select(group => group.Key).ToHashSet(StringComparer.Ordinal);
+        string DisplayName(EquipmentDefinition item) => duplicateNames.Contains(item.Name)
+            ? $"{item.Name}（{OfficerEquipment.SlotName(item.Slot)}）" : item.Name;
         var force = Session.Snapshot.Forces.FirstOrDefault(f => f.Id == Session.View.PlayerForceId);
         string State(int index)
         {
@@ -42,7 +48,7 @@ public partial class EquipmentProductionView : ModalView, IModalInputRouter
                 return active.DefinitionId == recipe.Id ? $"制造中，剩余{active.DaysRemaining}日" : "其他装备制造中";
             return force.CompletedResearch.Contains(recipe.ResearchProjectId!) ? "可制造" : "需要 " + Session.ResearchProjectName(recipe.ResearchProjectId!);
         }
-        var rows = recipes.Select((p, i) => new CatalogRow(i, [p.Name, Purchase ? p.PurchaseCost!.Value : p.ProductionCost, Purchase ? (CatalogCell)"即时" : p.ProductionDays, State(i)])).ToArray();
+        var rows = recipes.Select((p, i) => new CatalogRow(i, [DisplayName(p), Purchase ? p.PurchaseCost!.Value : p.ProductionCost, Purchase ? (CatalogCell)"即时" : p.ProductionDays, State(i)])).ToArray();
         var place = Session.View.Settlements.Single(s => s.Id == SettlementId).ResolveName(Texts);
         Replace(new CatalogView { Title = Purchase ? "购买装备" : "装备制造", HintText = $"执行设施　{place}。选择装备查看效果。", CloseTitle = "中止",
             Textures = Textures, Service = Service, Pages = Purchase ? PurchasePages : ProductionPages, ReadRows = _ => rows, Closed = Closed,
@@ -50,9 +56,9 @@ public partial class EquipmentProductionView : ModalView, IModalInputRouter
             {
                 var recipe = recipes[index]; string state = State(index); var bonus = recipe.BaseBonuses;
                 string effect = $"品阶 {recipe.Grade}　要求 {OfficerEquipment.Requirements(recipe.MinimumAbilities)}\n统率+{bonus.Leadership} 武力+{bonus.War} 智力+{bonus.Intelligence} 政治+{bonus.Politics}";
-                if (state != (Purchase ? "可购买" : "可制造")) { Notice($"{recipe.Name}　{state}\n{effect}"); return; }
-                Confirm(Purchase ? $"购买 {recipe.Name}？\n资金 {recipe.PurchaseCost}，完成后进入库存。\n{effect}" :
-                    $"制造 {recipe.Name}？\n资金 {recipe.ProductionCost}　{recipe.ProductionDays} 日。\n{effect}", () => Start(recipe.Id));
+                if (state != (Purchase ? "可购买" : "可制造")) { Notice($"{DisplayName(recipe)}　{state}\n{effect}"); return; }
+                Confirm(Purchase ? $"购买 {DisplayName(recipe)}？\n资金 {recipe.PurchaseCost}，完成后进入库存。\n{effect}" :
+                    $"制造 {DisplayName(recipe)}？\n资金 {recipe.ProductionCost}　{recipe.ProductionDays} 日。\n{effect}", () => Start(recipe.Id));
             } });
     }
     private void Start(string id)

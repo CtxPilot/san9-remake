@@ -17,6 +17,8 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
     public TextCatalog Texts { get; init; } = null!;
     public SlotSaveStore Store { get; init; } = null!;
     public GameSession Session { get; init; } = null!;
+    public San9.Content.Scenarios.ScenarioInitialState? AppearanceScenario { get; init; }
+    public string AppearanceContentRoot { get; init; } = "";
     public MapWorld World { get; init; } = null!;
     public San9.Content.Interface.InterfaceSkin Skin { get; init; } = null!;
     public IReadOnlyDictionary<string, string> ExitMessages { get; init; } = null!;
@@ -56,7 +58,25 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
             OpenEnvironment = OpenEnvironment, OpenPkSettings = OpenPkSettings, OpenExit = OpenExit, Closed = Close,
             OpenCompanionSettings = OpenCompanionSettings, CanConfigureCompanion = () => Session.CanEditWorld,
             ReturnToOpening = RequestReturnToOpening,
-            OpenEditor = OpenEditor, CanEdit = kind => Session.CanEditWorld && WorldEditing.Candidates(Session.Snapshot, kind).Count > 0 });
+            OpenOfficerAppearance = OpenOfficerAppearance,
+            OpenSpecialEditor = OpenSpecialEditor,
+            PendingAppearances = Session.Snapshot.Officers.Count(p => p.ManualAppearance is { KeepPendingIfForceUnavailable: true } plan && plan.Year <= Session.Snapshot.Clock.Year),
+            OpenEditor = OpenEditor, CanEdit = kind => Session.CanEditWorld && (kind == WorldEditorKind.Equipment
+                ? Session.Snapshot.Equipment.Count > 0 : WorldEditing.Candidates(Session.Snapshot, kind).Count > 0) });
+    }
+    private void OpenSpecialEditor(WorldEditorKind kind)
+    {
+        _textures!.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-", "deployment-number-");
+        ReplacePage(new ForceEquipmentEditorView { Session = Session, Texts = Texts, Textures = _textures, Service = Service,
+            Closed = Close, Equipment = kind == WorldEditorKind.Equipment,
+            AvailableColors = Enumerable.Range(0, 51).Where(color => World.Scene is { } scene && scene.Clips.ContainsKey($"flag-cloth-{color}") &&
+                Enumerable.Range(0, 8).All(direction => scene.Clips.ContainsKey($"unit-flag-{direction}-cloth-{color}"))).ToHashSet() });
+    }
+    private void OpenOfficerAppearance()
+    {
+        _textures!.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-", "deployment-number-", "save-load-");
+        ReplacePage(new OfficerAppearanceView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close,
+            Scenario = AppearanceScenario, ContentRoot = AppearanceContentRoot });
     }
     private void OpenEditor(WorldEditorKind kind)
     {
@@ -93,6 +113,15 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         _textures.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-");
         Show();
         ReplacePage(new EquipmentProductionView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close, SettlementId = settlementId, Purchase = true });
+    }
+    public void OpenPersonalPeerage()
+    {
+        if (_busy) return;
+        Browser.Close(); ReplacePage(null);
+        _textures ??= Service.CreateScope();
+        _textures.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-", "save-load-");
+        Show();
+        ReplacePage(new PersonalPeerageView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close });
     }
     private void OpenEnvironment()
     {

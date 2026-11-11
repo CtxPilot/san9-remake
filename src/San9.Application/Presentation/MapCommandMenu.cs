@@ -61,7 +61,10 @@ public static class MapCommandMenu
         bool researchAvailable = view.MilitaryRules is not null && (view.World.Simulation.NewGame.MixedTroopsEnabled ||
             view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null));
         bool purchaseAvailable = view.Rules.Equipment.Items.Values.Any(item => item.PurchaseCost is not null);
-        var groups = Common.Select(group => group.Id == "military"
+        bool peerageAvailable = view.World.Forces.FirstOrDefault(f => f.Id == view.PlayerForceId)?.PersonalPeerageRegimeId is not null;
+        var groups = Common.Select(group => group.Id == "appointments" && peerageAvailable
+            ? group with { Children = [.. group.Children, new MapCommandEntry("personal-peerage", MapCommandTone.Brown, [])] }
+            : group.Id == "military"
             ? group with { Children = [.. group.Children,
                 .. researchAvailable ? new[] { new MapCommandEntry("research", MapCommandTone.Green, []), new MapCommandEntry("equipment-production", MapCommandTone.Green, []) } : [],
                 .. purchaseAvailable ? new[] { new MapCommandEntry("equipment-purchase", MapCommandTone.Green, []) } : []] } : group);

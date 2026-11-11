@@ -51,6 +51,11 @@ public sealed class PrisonerReturnTests
         Assert.Equal(20L * xuns, PrisonerReturnDiplomacy.SalaryReserve(state, 1, rules));
         state.Replace(state.Officers[12] with { OfficeId = null });
         Assert.Equal((long)xuns, PrisonerReturnDiplomacy.SalaryReserve(state, 1, rules));
+        state.Replace(state.Officers[11] with { PersonalPeerage = new(PersonalPeerageGrade.ImperialMarquis, null) });
+        state.Replace(state.Officers[12] with { PersonalPeerage = new(PersonalPeerageGrade.CountyMarquis, null) });
+        state.Replace(state.Officers[13] with { PersonalPeerage = new(PersonalPeerageGrade.King, null) });
+        state.Replace(state.Officers[14] with { PersonalPeerage = new(PersonalPeerageGrade.King, null) });
+        Assert.Equal(8L * xuns, PrisonerReturnDiplomacy.SalaryReserve(state, 1, rules));
     }
 
     private static SimulationRules Rules() => new() { Personnel = new([new(1, new(0, 0)), new(2, new(90, 0))],

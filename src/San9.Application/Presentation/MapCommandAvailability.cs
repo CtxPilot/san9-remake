@@ -30,6 +30,7 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
         // Management must remain reachable so a player can restore directly controlled corps.
         if (command == "delegate") return null;
         if (!Controlled(home.CorpsId)) return "unavailable";
+        if (command == "personal-peerage") return Force.PersonalPeerageRegimeId is null ? "unavailable" : null;
         if (IsDomestic(command) && home.Kind != SettlementKind.City && command is not ("repair" or "train"))
             return "unavailable";
         if (command is "strategist" or "rank" or "reward" or "bestow" or "confiscate" or "execute" or "exile")

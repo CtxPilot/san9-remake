@@ -128,6 +128,7 @@ public sealed partial class SimulationEngine
             SetUnitPoliciesCommand policies => MilitaryPolicies.Eligibility(world, policies),
             AppointAdviserCommand appoint => PersonnelAppointments.Eligibility(world, appoint),
             AssignOfficesCommand offices => PersonnelOffices.Eligibility(world, offices, _rules.Governance),
+            SetPersonalPeerageCommand peerage => PersonalPeerageCommands.Eligibility(world, peerage, _rules),
             RewardOfficerCommand reward => PersonnelRewards.Eligibility(world, reward),
             GrantTreasureCommand grant => PersonnelTreasures.GrantEligibility(world, grant, _rules.Treasures),
             ConfiscateTreasureCommand confiscate => PersonnelTreasures.ConfiscateEligibility(world, confiscate, _rules.Treasures),

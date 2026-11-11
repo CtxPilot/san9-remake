@@ -668,6 +668,10 @@ public sealed partial class SimulationEngine
                     var officesRejection = PersonnelOffices.Apply(mutation, offices, _rules.Governance, events);
                     if (officesRejection != CommandRejection.None) return Reject(officesRejection);
                     break;
+                case SetPersonalPeerageCommand personalPeerage:
+                    var personalPeerageRejection = PersonalPeerageCommands.Apply(mutation, personalPeerage, _rules, events);
+                    if (personalPeerageRejection != CommandRejection.None) return Reject(personalPeerageRejection);
+                    break;
                 case RewardOfficerCommand reward:
                     var rewardRejection = PersonnelRewards.Apply(mutation, reward, events);
                     if (rewardRejection != CommandRejection.None) return Reject(rewardRejection);

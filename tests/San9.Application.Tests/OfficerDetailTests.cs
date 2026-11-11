@@ -1,11 +1,32 @@
 using System.Collections.Immutable;
 using San9.Application.Presentation;
 using San9.Content.Text;
+using San9.Core.Domain;
 
 namespace San9.Application.Tests;
 
 public sealed class OfficerDetailTests
 {
+    [Fact]
+    public void PersonalPeerageAppearsSeparatelyFromOffice()
+    {
+        var definition = G01ScenarioTests.Fixture();
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion,
+            definition.Officers.Select(o => o.NameKey).Concat(definition.Settlements.Select(s => s.NameKey))
+                .Distinct().ToDictionary(key => key, key => key));
+        var view = DeploymentDraftTests.View(world => world with
+        {
+            Officers = world.Officers.Select(person => person.Id == 1
+                ? person with { PersonalPeerage = new(PersonalPeerageGrade.VillageMarquis, "汉寿亭侯") }
+                : person).ToArray()
+        });
+        var fields = OfficerDetails.Read(view, texts, 1).Fields.SelectMany(column => column).ToArray();
+        Assert.Contains(fields, field => field.Label == "官职");
+        Assert.Contains(fields, field => field.Label == "爵位" && field.Value == "汉寿亭侯");
+        var table = OfficerCatalog.Read(view, texts, 3, null, null, 1);
+        Assert.Equal("汉寿亭侯", Assert.Single(table.Rows).Cells[Array.IndexOf(table.Columns, "爵位")].Text);
+    }
+
     [Fact]
     public void FormationPageShowsPersonalKnowledgeAndDistinguishesZeroFromUnknown()
     {

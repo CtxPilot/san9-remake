@@ -59,7 +59,7 @@ public sealed class WorldState
     public static WorldState Create(GameClock clock, ulong seed) => Create(clock, seed, [], [], []);
 
     public static WorldState Create(GameClock clock, ulong seed, IEnumerable<ForceState> forces,
-        IEnumerable<SettlementState> settlements, IEnumerable<OfficerState> officers, IEnumerable<UnitState>? units = null, IEnumerable<CorpsState>? corps = null, IEnumerable<TreasureState>? treasures = null, IEnumerable<ForceRelation>? relations = null, IEnumerable<ControlSeat>? controls = null, int computerDamageBonusPercent = 0, AllianceState? alliance = null, IEnumerable<AttackRequestState>? attackRequests = null, bool annualAppearancesEnabled = true, bool naturalDeathsEnabled = true, bool freeOfficerMigrationEnabled = true, bool battleDeathsEnabled = false, bool officeRequestsEnabled = true, IEnumerable<PersistentEventKey>? consumedEventKeys = null, bool forceConsolidationEnabled = true, bool forceEmergenceEnabled = true, bool cityIndependenceEnabled = true, bool imperialCourtEnded = false, GameClock? threeVisitsStarted = null, int foodExchangeRate = 1, bool settlementDefectionsEnabled = true, bool unitDefectionsEnabled = true, NewGameSettings? newGame = null, IReadOnlyList<int>? officerStartingPlaces = null, IReadOnlySet<int>? initialPlayerForces = null, IReadOnlySet<int>? foundedForceIds = null, IReadOnlySet<int>? createdOfficerIds = null, int defaultLoyalty = 50, IEnumerable<EquipmentInstance>? equipment = null)
+        IEnumerable<SettlementState> settlements, IEnumerable<OfficerState> officers, IEnumerable<UnitState>? units = null, IEnumerable<CorpsState>? corps = null, IEnumerable<TreasureState>? treasures = null, IEnumerable<ForceRelation>? relations = null, IEnumerable<ControlSeat>? controls = null, int computerDamageBonusPercent = 0, AllianceState? alliance = null, IEnumerable<AttackRequestState>? attackRequests = null, bool annualAppearancesEnabled = true, bool naturalDeathsEnabled = true, bool freeOfficerMigrationEnabled = true, bool battleDeathsEnabled = false, bool officeRequestsEnabled = true, IEnumerable<PersistentEventKey>? consumedEventKeys = null, bool forceConsolidationEnabled = true, bool forceEmergenceEnabled = true, bool cityIndependenceEnabled = true, bool imperialCourtEnded = false, GameClock? threeVisitsStarted = null, int foodExchangeRate = 1, bool settlementDefectionsEnabled = true, bool unitDefectionsEnabled = true, NewGameSettings? newGame = null, IReadOnlyList<int>? officerStartingPlaces = null, IReadOnlySet<int>? initialPlayerForces = null, IReadOnlySet<int>? foundedForceIds = null, IReadOnlySet<int>? createdOfficerIds = null, int defaultLoyalty = 50, IEnumerable<EquipmentInstance>? equipment = null, EquipmentRulebook? initialEquipmentRules = null)
     {
         var world = new WorldState(clock, seed) { DefaultLoyalty = defaultLoyalty };
         world._forces = IndexUnique(forces, value => value.Id);
@@ -94,6 +94,8 @@ public sealed class WorldState
                     createdOfficerIds ?? ImmutableHashSet<int>.Empty);
             world.Commit(initialization);
         }
+        if (initialEquipmentRules is not null && world._equipmentInitialized)
+            world._equipment = IndexUnique(InitialEquipment.Issue(world._equipment.Values, world._officers.Values, initialEquipmentRules), item => item.Id);
         WorldInvariants.Validate(world.BeginMutation());
         return world;
     }

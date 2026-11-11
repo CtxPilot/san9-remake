@@ -264,6 +264,8 @@ public sealed record ScenarioOfficerState(int Id)
     [JsonRequired] public required OfficerStatus Status { get; init; }
     [JsonRequired] public required int? RegionId { get; init; }
     [JsonRequired] public required int? OfficeId { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerage? PersonalPeerage { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence? InitialPersonalPeerage { get; init; }
     [JsonRequired] public required bool IsCommander { get; init; }
     [JsonRequired] public required ImmutableDictionary<int, int> ForceLoyalties { get; init; }
     [JsonRequired] public required bool RewardedThisXun { get; init; }
@@ -283,6 +285,8 @@ public sealed record ScenarioOfficerState(int Id)
         Status = value.State.Status,
         RegionId = value.State.RegionId,
         OfficeId = value.State.OfficeId,
+        PersonalPeerage = value.State.PersonalPeerage,
+        InitialPersonalPeerage = value.InitialPersonalPeerage,
         IsCommander = value.State.IsCommander,
         ForceLoyalties = value.State.WithLoyaltyDefault(defaultLoyalty).ForceLoyalties,
         RewardedThisXun = value.State.RewardedThisXun,
@@ -305,6 +309,7 @@ public sealed record ScenarioOfficerState(int Id)
             Status = Status,
             RegionId = RegionId,
             OfficeId = OfficeId,
+            PersonalPeerage = PersonalPeerage,
             IsCommander = IsCommander,
             ForceLoyalties = ForceLoyalties,
             RewardedThisXun = RewardedThisXun,
@@ -332,6 +337,7 @@ public sealed record ScenarioOfficerState(int Id)
             HasRecruitmentPoliticsBonus = profile.HasRecruitmentPoliticsBonus,
         })
         {
+            InitialPersonalPeerage = InitialPersonalPeerage,
             AgeAtScenarioStart = profile.AgeAtScenarioStart,
             FlagGlyph = profile.FlagGlyph,
             CourtesyNameKey = profile.CourtesyName is null ? null : profile.CourtesyNameKey ?? $"officer-courtesy.{Id}",
