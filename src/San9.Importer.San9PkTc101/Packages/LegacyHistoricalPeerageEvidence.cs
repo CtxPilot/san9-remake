@@ -48,6 +48,18 @@ public static class LegacyHistoricalPeerageEvidence
                         PersonalPeerageEvidenceKind.Historical, source + "建安二十一年进魏王，取次年至去世年前。")
                 ] };
             }
+            if (officer.State.Id == 422 && name == "张辽" && courtesyName == "文远")
+            {
+                const string source = "《三国志·张辽传》：https://ctext.org/text.pl?if=gb&node=602710&remap=gb；";
+                return officer with { InitialPersonalPeerageHistory = [
+                    new(new(PersonalPeerageGrade.ImperialMarquis, "关内侯"), new(199, 1, 1), new(200, 12, 30),
+                        PersonalPeerageEvidenceKind.Historical, source + "下邳归曹后赐关内侯；仅取其后有把握的完整年度。"),
+                    new(new(PersonalPeerageGrade.VillageMarquis, "都亭侯"), new(211, 1, 1), new(219, 12, 30),
+                        PersonalPeerageEvidenceKind.Historical, source + "记载征讨荆州后封都亭侯，曹丕即位后又进爵；保守取上述完整年度。"),
+                    new(new(PersonalPeerageGrade.CountyMarquis, "晋阳侯"), new(221, 1, 1), new(221, 12, 30),
+                        PersonalPeerageEvidenceKind.Historical, source + "曹丕称帝后封晋阳侯，晋阳为县（https://ctext.org/wiki.pl?chapter=291343&if=gb）；仅取进封次年至去世年前的完整年度。")
+                ] };
+            }
             PersonalPeerageEvidence? evidence = (officer.State.Id, name, courtesyName) switch
             {
                 (95, "关羽", "云长") => new(new(PersonalPeerageGrade.VillageMarquis, "汉寿亭侯"),
