@@ -56,6 +56,42 @@ public sealed class FormationTeachingTests
         Assert.False(FormationKnowledge.Knows(world.Officers[2], 7));
         Assert.Single(events.OfType<FormationTeachingCancelledEvent>());
     }
+
+    [Theory]
+    [InlineData("student-leaves")]
+    [InlineData("settlement-changes-owner")]
+    [InlineData("settlement-destroyed")]
+    [InlineData("teacher-dies")]
+    public void InvalidatedLessonCancelsWithoutCompleting(string cause)
+    {
+        var world = World(); var events = new List<DomainEvent>();
+        var command = new StartFormationTeachingCommand(Guid.NewGuid(), 1, 0, 1, 1, 2, 7);
+        Assert.Equal(CommandRejection.None, FormationTeaching.Start(world, command, Rules(), events));
+        for (int i = 0; i < 29; i++) FormationTeaching.AdvanceDay(world, events);
+        switch (cause)
+        {
+            case "student-leaves": world.Replace(world.Officers[2] with { SettlementId = null }); break;
+            case "settlement-changes-owner": world.Replace(world.Settlements[1] with { OwnerId = null }); break;
+            case "settlement-destroyed": world.Replace(world.Settlements[1] with { IsDestroyed = true }); break;
+            case "teacher-dies": world.Replace(world.Officers[1] with { Status = OfficerStatus.Dead, OwnerId = null }); break;
+        }
+        FormationTeaching.AdvanceDay(world, events);
+        Assert.Null(world.Officers[2].FormationTeaching);
+        Assert.False(FormationKnowledge.Knows(world.Officers[2], 7));
+        Assert.Single(events.OfType<FormationTeachingCancelledEvent>());
+        Assert.Empty(events.OfType<FormationTeachingCompletedEvent>());
+    }
+
+    [Fact]
+    public void StudentCannotStartAnotherLessonWithADifferentTeacher()
+    {
+        var world = World();
+        world.Replace(world.Officers[3] with { FormationProficiencies = ImmutableSortedDictionary<int, int>.Empty.Add(7, 300) });
+        var command = new StartFormationTeachingCommand(Guid.NewGuid(), 1, 0, 1, 1, 2, 7);
+        Assert.Equal(CommandRejection.None, FormationTeaching.Start(world, command, Rules(), []));
+        Assert.Equal(CommandRejection.InvalidTask, FormationTeaching.Start(world, command with { TeacherId = 3 }, Rules(), []));
+        Assert.Equal(1, world.Officers[2].FormationTeaching!.TeacherId);
+    }
     [Fact]
     public void LessonSurvivesWorldSnapshotAndContinuesFromRemainingDays()
     {
