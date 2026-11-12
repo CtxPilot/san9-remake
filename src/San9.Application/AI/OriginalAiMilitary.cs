@@ -221,15 +221,15 @@ internal sealed partial class OriginalAiMilitary(SimulationEngine engine, Scenar
         var commander = Governance.SelectCommander(people, Abilities);
         return rules.Formations.Values
         .Where(f => f.TravelMode == (naval ? TravelMode.Water : TravelMode.Land) && f.Id != rules.UnformedFormationId &&
-            (!naval && World.Simulation.NewGame.MixedTroopsEnabled ? !rules.IsFixedFormation(f.Id) : rules.CanSelectFormation(Force, f.Id)) &&
-            (!f.MixedTroopsOnly || World.Simulation.NewGame.MixedTroopsEnabled) &&
+            (!naval && World.Simulation.NewGame.FormationKnowledgeEnabled ? !rules.IsFixedFormation(f.Id) : rules.CanSelectFormation(Force, f.Id)) &&
+            (!f.MixedTroopsOnly || World.Simulation.NewGame.FormationKnowledgeEnabled) &&
             (!World.Simulation.NewGame.MixedTroopsEnabled || !rules.SiegeEquipment.Values.Any(item => item.FormationId == f.Id)) &&
-            (!World.Simulation.NewGame.MixedTroopsEnabled ||
+            (!World.Simulation.NewGame.FormationKnowledgeEnabled ||
                 (!naval && commander?.FormationProficiencies is not null
                     ? FormationKnowledge.Knows(commander, f.Id)
                     : rules.CanSelectFormation(Force, f.Id) && (f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)))) &&
             f.DeploymentCost <= money && f.OfficerCapacity >= people.Length &&
-            (World.Simulation.NewGame.MixedTroopsEnabled && !naval && commander?.FormationProficiencies is not null ||
+            (World.Simulation.NewGame.FormationKnowledgeEnabled && !naval && commander?.FormationProficiencies is not null ||
                 f.RequiredTacticId is not int required || TacticAvailability.HasForMembers(required, people, Force, World.Treasures, Treasures, World.EquipmentInitialized ? World.Equipment : null)))
         .OrderBy(f => f.Id).ToArray();
     }
