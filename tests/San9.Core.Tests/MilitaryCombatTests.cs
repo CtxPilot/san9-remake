@@ -25,7 +25,8 @@ public sealed class MilitaryCombatTests
         Assert.Equal(0, mutation.AllEquipment[1].Experience);
         Assert.Equal(1, mutation.AllEquipment[2].Experience);
         world.Commit(mutation);
-        var resumed = WorldState.Restore(world.CreateSnapshot()).BeginMutation(equipment: equipment);
+        var resumedWorld = WorldState.Restore(world.CreateSnapshot());
+        var resumed = resumedWorld.BeginMutation(equipment: equipment);
         resumed.BeginEquipmentExchange(new(0, false), new(2, true));
         MilitaryCombat.DamageSettlement(resumed, resumed.Settlements[2], 10, Profile, 0, []);
         Assert.Equal(0, resumed.AllEquipment[1].Experience);
@@ -33,6 +34,20 @@ public sealed class MilitaryCombatTests
         resumed.BeginEquipmentExchange(new(0, false), new(1, true));
         resumed.RecordEquipmentUse([11], EquipmentUse.Attack);
         Assert.Equal(1, resumed.AllEquipment[1].Experience);
+        resumed.BeginEquipmentExchange(new(0, false), new(2, true));
+        resumed.RecordEquipmentUse([11], EquipmentUse.Attack);
+        Assert.Equal(1, resumed.AllEquipment[1].Experience);
+        resumedWorld.Commit(resumed);
+        var savedWorld = WorldState.Restore(resumedWorld.CreateSnapshot());
+        var loaded = savedWorld.BeginMutation(equipment: equipment);
+        loaded.BeginEquipmentExchange(new(0, false), new(1, true));
+        loaded.RecordEquipmentUse([11], EquipmentUse.Attack);
+        Assert.Equal(1, loaded.AllEquipment[1].Experience);
+        loaded.SetClock(loaded.Clock.NextDay());
+        loaded.BeginEquipmentExchange(new(0, false), new(2, true));
+        loaded.RecordEquipmentUse([11], EquipmentUse.Attack);
+        Assert.Equal(2, loaded.AllEquipment[1].Experience);
+        Assert.Single(loaded.AllEquipment[1].ExperienceExchanges!);
     }
 
     [Fact]

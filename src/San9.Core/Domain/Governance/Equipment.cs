@@ -60,8 +60,11 @@ public sealed record EquipmentInstance(long Id, string DefinitionId, int? Office
     public bool? EquipOnService { get; init; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? LastExperienceExchange { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableSortedSet<string>? ExperienceExchanges { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => Id >= 0 && !string.IsNullOrWhiteSpace(DefinitionId) &&
         LegacyTreasureId is not < 0 && (LastExperienceExchange is null || !string.IsNullOrWhiteSpace(LastExperienceExchange)) &&
+        (ExperienceExchanges is null || ExperienceExchanges.Count > 0 && ExperienceExchanges.All(value => !string.IsNullOrWhiteSpace(value))) &&
         OfficerId is not < 0 && InventoryForceId is not < 0 &&
         !(OfficerId is not null && InventoryForceId is not null) &&
         (OfficerId is not null || InventoryForceId is not null || LegacyTreasureId is not null || IsLost) &&

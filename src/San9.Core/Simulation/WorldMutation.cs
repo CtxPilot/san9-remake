@@ -229,11 +229,20 @@ internal sealed partial class WorldMutation : IWorldQuery
     {
         if (!_owner.EquipmentInitialized || _equipmentExchange is null || Simulation.NewGame.EquipmentDevelopmentEnabled == false) return;
         var ids = officers.ToHashSet();
+        string dayPrefix = $"{Clock.DayNumber}:";
         foreach (var item in AllEquipment.Values.Where(item => item.Equipped && item.OfficerId is int id && ids.Contains(id) &&
-                     item.LastExperienceExchange != _equipmentExchange).OrderBy(item => item.Id).ToArray())
+                     item.LastExperienceExchange != _equipmentExchange && item.ExperienceExchanges?.Contains(_equipmentExchange) != true)
+                     .OrderBy(item => item.Id).ToArray())
         {
             var updated = EquipmentRules.RecordUse(item, _equipmentRules.Items[item.DefinitionId], use);
-            if (updated != item) SetEquipment(updated with { LastExperienceExchange = _equipmentExchange });
+            if (updated != item)
+            {
+                var exchanges = (item.ExperienceExchanges ?? ImmutableSortedSet<string>.Empty)
+                    .Where(value => value.StartsWith(dayPrefix, StringComparison.Ordinal)).ToImmutableSortedSet(StringComparer.Ordinal);
+                if (item.LastExperienceExchange?.StartsWith(dayPrefix, StringComparison.Ordinal) == true)
+                    exchanges = exchanges.Add(item.LastExperienceExchange);
+                SetEquipment(updated with { LastExperienceExchange = _equipmentExchange, ExperienceExchanges = exchanges.Add(_equipmentExchange) });
+            }
         }
     }
     internal void SetEquipment(EquipmentInstance item)

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Collections.Immutable;
 using San9.Application.Persistence;
 using San9.Core.Domain;
 using San9.Core.Simulation;
@@ -10,6 +11,23 @@ namespace San9.Application.Tests;
 
 public sealed class EquipmentPersistenceTests
 {
+    [Fact]
+    public void ExchangeHistoryRoundTripsAndLegacyItemWithoutHistoryLoads()
+    {
+        var item = new EquipmentInstance(8, "sword", null, 1, false, 2, 33)
+        {
+            LastExperienceExchange = "42:u1:u3",
+            ExperienceExchanges = ImmutableSortedSet.Create(StringComparer.Ordinal, "42:u1:u2", "42:u1:u3")
+        };
+        var json = JsonNode.Parse(JsonSerializer.Serialize(item, StrictJson.Options))!.AsObject();
+        var restored = StrictJson.Deserialize<EquipmentInstance>(Encoding.UTF8.GetBytes(json.ToJsonString()));
+        Assert.True(item.ExperienceExchanges.SetEquals(restored.ExperienceExchanges!));
+        json.Remove("experienceExchanges");
+        var legacy = StrictJson.Deserialize<EquipmentInstance>(Encoding.UTF8.GetBytes(json.ToJsonString()));
+        Assert.Null(legacy.ExperienceExchanges);
+        Assert.Equal(item.LastExperienceExchange, legacy.LastExperienceExchange);
+    }
+
     [Fact]
     public void MigratedNamedItemIsDeferredForNonServingHolder()
     {
