@@ -25,4 +25,19 @@ public sealed class LegacyHistoricalPeerageEvidenceTests
         texts.Entries["courtesy"] = "他字";
         Assert.Null(LegacyHistoricalPeerageEvidence.Apply(scenario, texts, true).Officers[0].InitialPersonalPeerage);
     }
+
+    [Fact]
+    public void ZhaoYunReceivesOnlyTheFullySupportedYearsAndCorrectGrade()
+    {
+        var person = new OfficerInitialState("name", new OfficerState(376, 1, 1, new(50, 50, 50, 50), false)) { CourtesyNameKey = "courtesy" };
+        var scenario = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "fixture", 225, 1, 1, null, [], [], [], []) { Officers = [person] };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, new() { ["name"] = "赵云", ["courtesy"] = "子龙" });
+        var evidence = LegacyHistoricalPeerageEvidence.Apply(scenario, texts, true).Officers[0].InitialPersonalPeerage!;
+        Assert.Equal(new PersonalPeerage(PersonalPeerageGrade.VillageMarquis, "永昌亭侯"), evidence.Peerage);
+        Assert.False(evidence.Applies(new(223, 12, 30)));
+        Assert.True(evidence.Applies(new(224, 1, 1)));
+        Assert.True(evidence.Applies(new(228, 12, 30)));
+        Assert.False(evidence.Applies(new(229, 1, 1)));
+        Assert.Null(LegacyHistoricalPeerageEvidence.Apply(scenario, texts, false).Officers[0].InitialPersonalPeerage);
+    }
 }

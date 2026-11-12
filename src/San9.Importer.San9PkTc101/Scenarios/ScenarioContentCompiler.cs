@@ -3,6 +3,7 @@ using San9.Content.Scenarios;
 using San9.Content.Text;
 using San9.Core.Domain;
 using San9.Importer.San9PkTc101.Text;
+using San9.Importer.San9PkTc101.Packages;
 
 namespace San9.Importer.San9PkTc101.Scenarios;
 
@@ -226,6 +227,8 @@ public static class ScenarioContentCompiler
             new(snapshot.Military!), settlements.Where(s => s.Kind == San9.Core.Domain.SettlementKind.City).Select(s => s.Id), token: token).Connections };
         snapshot = EventContentCompiler.InitializePenglai(snapshot);
         snapshot = InitialLeadershipCompiler.Compile(snapshot);
+        snapshot = LegacyHistoricalPeerageEvidence.Apply(snapshot, catalog, header.ScenarioId <= 9);
+        snapshot = HistoricalPeerageContent.Apply(snapshot, header.ScenarioId <= 9);
         snapshot = CuratedFormationEvidence.Apply(snapshot, catalog);
         snapshot.Validate(); catalog.Validate(); return (snapshot, catalog);
     }

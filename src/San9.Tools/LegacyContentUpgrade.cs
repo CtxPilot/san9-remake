@@ -73,9 +73,11 @@ internal static class LegacyContentUpgrade
             {
                 description = "无法识别类别的旧宝物已按可用特征分类；无明确特征时归入宝物槽。请按剧本和物品 ID 检查。",
                 unclassified,
-                peerage = new { description = "旧包未提供政权爵制；以下剧本采用通用重制规则，不代表历史制度。未推测宗室或历史封爵。",
-                    scenarios = prepared.Worlds.Where(world => world.Scenario.PersonalPeerageRegimes?.Any(r => r.Id == PersonalPeeragePreset.GenericId) == true)
+                peerage = new { description = "旧包未提供政权爵制；可明确识别的历史政权使用对应重制规则，其余势力使用通用规则。具体名额、费用与授爵权限为游戏设定，不代表完整历史制度。",
+                    scenarios = prepared.Worlds.Where(world => world.Scenario.Forces.Any(f => f.PersonalPeerageRegimeId == PersonalPeeragePreset.GenericId))
                         .Select(world => world.Scenario.ScenarioId).ToArray(),
+                    regimes = prepared.Worlds.SelectMany(world => world.Scenario.Forces.Where(f => f.PersonalPeerageRegimeId is not null)
+                        .Select(f => new { scenarioId = world.Scenario.ScenarioId, forceId = f.Id, regimeId = f.PersonalPeerageRegimeId })).ToArray(),
                     historicalEvidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers.Where(o => o.InitialPersonalPeerage is not null)
                         .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id, evidence = o.InitialPersonalPeerage })).ToArray() },
                 formations = new { description = "列出的个人初始阵形附依据类型和解释；其余人物使用通用重制默认值，不代表史实。",

@@ -102,6 +102,8 @@ public static class LegacyScenarioDataUpgrade
             var parts = package.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
             scenario = LegacyHistoricalPeerageEvidence.Apply(scenario, text,
                 parts.Length >= 2 && parts[0] == "scenarios" && parts[1] == "historical");
+            scenario = HistoricalPeerageContent.Apply(scenario,
+                parts.Length >= 2 && parts[0] == "scenarios" && parts[1] == "historical");
             scenario = CuratedFormationEvidence.Apply(scenario, text);
             scenario = scenario with { AppearanceEvidence = scenario.Officers.Where(p => p.State.IsServing && p.State.OwnerId is not null)
                 .Select(p => (Person: p.State, Force: scenario.Forces.SingleOrDefault(f => f.Id == p.State.OwnerId)))
