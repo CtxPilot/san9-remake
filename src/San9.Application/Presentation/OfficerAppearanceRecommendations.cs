@@ -45,10 +45,12 @@ public static class OfficerAppearanceRecommendations
             var matches = usable.Where(m => Math.Abs((long)m.Evidence.Year - current.Year) == distance).ToArray();
             var forceIds = matches.Select(m => m.Current[0].Id).Distinct().ToArray();
             if (forceIds.Length != 1) { result.Add(new(id, null, null, null, null, "同年代剧本归属冲突")); continue; }
-            int force = forceIds[0];
-            var candidates = world.Settlements.Where(s => Eligible(s) && s.OwnerId == force).ToArray();
-            if (candidates.Length == 0) { result.Add(new(id, null, null, null, null, "对应势力没有可用城市")); continue; }
             var historical = matches.Select(m => m.Evidence.SettlementId).Where(p => p is not null).ToHashSet();
+            if (historical.Count > 1) { result.Add(new(id, null, null, null, null, "同年代剧本地点冲突")); continue; }
+            int force = forceIds[0];
+            var candidates = world.Settlements.Where(s => Eligible(s) && s.OwnerId == force &&
+                (historical.Contains(s.Id) || s.Kind == SettlementKind.City)).ToArray();
+            if (candidates.Length == 0) { result.Add(new(id, null, null, null, null, "对应势力没有可用城市")); continue; }
             var place = candidates.OrderBy(s => historical.Contains(s.Id) ? 0 : 1).ThenBy(s => load[s.Id]).ThenBy(s => s.Id).First();
             load[place.Id]++;
             var source = matches.Select(m => m.Evidence).OrderBy(e => e.SourceId, StringComparer.Ordinal).First();

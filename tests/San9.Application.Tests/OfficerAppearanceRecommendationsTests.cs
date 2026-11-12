@@ -6,6 +6,29 @@ namespace San9.Application.Tests;
 public sealed class OfficerAppearanceRecommendationsTests
 {
     [Fact]
+    public void ConflictingLocationsAtEqualDistanceRequireManualChoice()
+    {
+        var current = G01ScenarioTests.Fixture();
+        var source = current with { AppearanceEvidence = [new(2, 1, 1, "first", 189), new(2, 1, 2, "second", 191)] };
+        var result = Assert.Single(OfficerAppearanceRecommendations.Create(current, GameSession.Start(current, 42).Snapshot, [source], [2]));
+        Assert.Contains("地点冲突", result.Problem);
+        Assert.Null(result.SettlementId);
+    }
+
+    [Fact]
+    public void FallbackPrefersCitiesButAcceptsAnEvidencedFacility()
+    {
+        var current = G01ScenarioTests.Fixture();
+        var world = GameSession.Start(current, 42).Snapshot;
+        world = world with { Settlements = world.Settlements.Select(s => s.Id == 1
+            ? s with { Kind = SettlementKind.Facility } : s with { OwnerId = 1, Kind = SettlementKind.City }).ToArray() };
+        var source = current with { AppearanceEvidence = [new(2, 1, null, "source", 190)] };
+        Assert.Equal(2, Assert.Single(OfficerAppearanceRecommendations.Create(current, world, [source], [2])).SettlementId);
+        source = source with { AppearanceEvidence = [new(2, 1, 1, "source", 190)] };
+        Assert.Equal(1, Assert.Single(OfficerAppearanceRecommendations.Create(current, world, [source], [2])).SettlementId);
+    }
+
+    [Fact]
     public void UsesNearestScenarioAndExplicitLeaderIdentity()
     {
         var current = G01ScenarioTests.Fixture();

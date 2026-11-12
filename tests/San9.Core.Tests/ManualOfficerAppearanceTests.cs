@@ -61,6 +61,27 @@ public sealed class ManualOfficerAppearanceTests
     }
 
     [Fact]
+    public void InvalidatedHistoricalLocationFallsBackToCityRatherThanFacility()
+    {
+        var engine = Engine();
+        engine.ConfigureOfficerAppearance(2, new(191, 1, 1, 30) { KeepPendingIfForceUnavailable = true });
+        var saved = engine.CaptureStableState();
+        var place = saved.Settlements.Single();
+        var world = WorldState.Restore(saved with { Clock = new(191, 1, 1), Officers = saved.Officers.Select(p => p.Id == 1 ? p with { SettlementId = 3 } : p).ToArray(), Settlements = [
+            place with { OwnerId = null }, place with { Id = 2, Kind = SettlementKind.Facility },
+            place with { Id = 3, Kind = SettlementKind.City }] }).BeginMutation();
+        OfficerAppearance.AdvanceYear(world, new PersonnelRulebook([]), []);
+        Assert.Equal(3, world.Officers[2].SettlementId);
+        Assert.Equal(1, world.Officers[2].OwnerId);
+
+        var noCity = WorldState.Restore(saved with { Clock = new(191, 1, 1), Officers = saved.Officers.Select(p => p.Id == 1 ? p with { SettlementId = 2 } : p).ToArray(), Settlements = [
+            place with { OwnerId = null }, place with { Id = 2, Kind = SettlementKind.Facility }] }).BeginMutation();
+        OfficerAppearance.AdvanceYear(noCity, new PersonnelRulebook([]), []);
+        Assert.NotNull(noCity.Officers[2].ManualAppearance);
+        Assert.Equal(OfficerStatus.NotAppeared, noCity.Officers[2].Status);
+    }
+
+    [Fact]
     public void InvalidRequestsDoNotChangeWorld()
     {
         var engine = Engine();

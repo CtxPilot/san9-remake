@@ -75,7 +75,8 @@ internal static class OfficerAppearance
         var selected = world.Settlements.GetValueOrDefault(plan.SettlementId);
         SettlementState? location = selected is not null && Available(selected) ? selected : null;
         if (forceActive && (location is null || location.OwnerId != plan.ForceId))
-            location = world.Settlements.Values.Where(p => Available(p) && p.OwnerId == plan.ForceId)
+            location = world.Settlements.Values.Where(p => Available(p) && p.OwnerId == plan.ForceId &&
+                    (!plan.KeepPendingIfForceUnavailable || p.Kind == SettlementKind.City))
                 .OrderBy(p => plan.KeepPendingIfForceUnavailable
                     ? world.Officers.Values.Count(o => o.IsServing && o.SettlementId == p.Id) : 0)
                 .ThenBy(p => p.Id).FirstOrDefault();
