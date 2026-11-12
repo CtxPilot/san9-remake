@@ -49,7 +49,7 @@ internal static class BattleLearning
         if (world.Simulation.NewGame.FormationTrainingEnabled)
             foreach (var unit in world.Units.Values.OrderBy(u => u.Id).ToArray())
             {
-                if (unit.FormationId is not int formationId || world.Simulation.NewGame.MixedTroopsEnabled && unit.Detachments.IsEmpty ||
+                if (unit.Soldiers == 0 || unit.Morale == 0 || unit.FormationId is not int formationId || world.Simulation.NewGame.MixedTroopsEnabled && unit.Detachments.IsEmpty ||
                     military.Map.IsWater(unit.Position) || unit.Condition is not (UnitCondition.Normal or UnitCondition.HighSpirits) ||
                     unit.EffectiveOrderClass != UnitOrderClass.Military || !MilitaryEngagements.Engaged(world, unit, military)) continue;
                 foreach (var officer in world.ServingUnitMembers(unit.Id).OrderBy(p => p.Id).ToArray())
