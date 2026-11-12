@@ -7,6 +7,22 @@ namespace San9.Core.Tests;
 
 public sealed class MilitaryCombatTests
 {
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void RestoredEquipmentDevelopmentSwitchControlsCombatGrowth(bool enabled, int expected)
+    {
+        var equipment = new EquipmentRulebook([new("sword", EquipmentSlot.MainHand, EquipmentRarity.Ordinary, default, default)]);
+        var source = Engine(World(defenders: 10000)).CaptureStableState();
+        var snapshot = source with { EquipmentInitialized = true,
+            Equipment = [new EquipmentInstance(1, "sword", 11, null, true)],
+            Simulation = source.Simulation with { NewGame = source.Simulation.NewGame with { EquipmentDevelopmentEnabled = enabled } } };
+        var mutation = WorldState.Restore(snapshot).BeginMutation(equipment: equipment);
+        mutation.BeginEquipmentExchange(new(0, false), new(2, true));
+        mutation.RecordEquipmentUse([11], EquipmentUse.Attack);
+        Assert.Equal(expected, mutation.AllEquipment[1].Experience);
+    }
+
     [Fact]
     public void EquipmentGainsExperienceOncePerExchangeAcrossDamageAndRestore()
     {
