@@ -129,7 +129,10 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
             FictionalOfficerPlaceIds.Any(id => !Settlements.Any(s => s.Id == id && !s.IsDormant) && !UnbuiltPlaces.Any(p => p.Id == id)))
             throw new InvalidDataException("Invalid fictional officer starting places.");
         Information.Validate(this);
-        if (Officers.Any(o => o.InitialPersonalPeerage is { IsValid: false }))
+        if (Officers.Any(o => o.PersonalPeerageEvidenceRecords.Any(e => e is null || !e.IsValid) ||
+            o.PersonalPeerageEvidenceRecords.OrderBy(e => e.From.DayNumber).Zip(
+                o.PersonalPeerageEvidenceRecords.OrderBy(e => e.From.DayNumber).Skip(1))
+                .Any(pair => pair.First.Until is null || pair.First.Until.Value.DayNumber >= pair.Second.From.DayNumber)))
             throw new InvalidDataException("Invalid initial personal peerage evidence.");
         if (Officers.Any(o => o.InitialFormationEvidence is { } evidence &&
             (evidence.Any(e => e is null || !e.IsValid || Military is null ||

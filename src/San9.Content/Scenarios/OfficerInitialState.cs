@@ -26,7 +26,10 @@ public sealed record OfficerInitialState(
     [property: JsonRequired] OfficerState State)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence? InitialPersonalPeerage { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence[]? InitialPersonalPeerageHistory { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public FormationEvidence[]? InitialFormationEvidence { get; init; }
+    [JsonIgnore] public IEnumerable<PersonalPeerageEvidence> PersonalPeerageEvidenceRecords =>
+        (InitialPersonalPeerage is { } initial ? new[] { initial } : []).Concat(InitialPersonalPeerageHistory ?? []);
     // A year difference, not the inclusive age displayed by the UI. A value excludes a fixed State.BirthYear.
     [JsonRequired] public int? AgeAtScenarioStart { get; init; }
 

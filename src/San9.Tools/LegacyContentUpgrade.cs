@@ -78,8 +78,9 @@ internal static class LegacyContentUpgrade
                         .Select(world => world.Scenario.ScenarioId).ToArray(),
                     regimes = prepared.Worlds.SelectMany(world => world.Scenario.Forces.Where(f => f.PersonalPeerageRegimeId is not null)
                         .Select(f => new { scenarioId = world.Scenario.ScenarioId, forceId = f.Id, regimeId = f.PersonalPeerageRegimeId })).ToArray(),
-                    historicalEvidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers.Where(o => o.InitialPersonalPeerage is not null)
-                        .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id, evidence = o.InitialPersonalPeerage })).ToArray() },
+                    historicalEvidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers
+                        .SelectMany(o => o.PersonalPeerageEvidenceRecords.Select(record =>
+                            new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id, evidence = record }))).ToArray() },
                 formations = new { description = "列出的个人初始阵形附依据类型和解释；其余人物使用通用重制默认值，不代表史实。",
                     evidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers.Where(o => o.InitialFormationEvidence is not null)
                         .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id,

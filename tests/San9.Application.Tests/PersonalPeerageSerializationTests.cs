@@ -11,6 +11,34 @@ namespace San9.Application.Tests;
 public sealed class PersonalPeerageSerializationTests
 {
     [Fact]
+    public void HistoricalTimelineSelectsTheRecordForTheLoadDateAndRejectsOverlaps()
+    {
+        var person = new OfficerState(2, 1, 1, new(50, 50, 50, 50), false);
+        var early = new PersonalPeerageEvidence(new(PersonalPeerageGrade.VillageMarquis, "都亭侯"),
+            new(224, 1, 1), new(229, 12, 30), PersonalPeerageEvidenceKind.Historical, "早期来源");
+        var late = new PersonalPeerageEvidence(new(PersonalPeerageGrade.CountyMarquis, "南郑侯"),
+            new(231, 1, 1), new(233, 12, 30), PersonalPeerageEvidenceKind.Historical, "后期来源");
+        OfficerInitialState[] content = [new("person", person) { InitialPersonalPeerageHistory = [early, late] }];
+        Assert.Equal("都亭侯", PersonalPeerageMigration.Initialize([person], content, new(225, 1, 1))[0].PersonalPeerage!.Title);
+        Assert.Null(PersonalPeerageMigration.Initialize([person], content, new(230, 1, 1))[0].PersonalPeerage);
+        Assert.Equal("南郑侯", PersonalPeerageMigration.Initialize([person], content, new(232, 1, 1))[0].PersonalPeerage!.Title);
+        var basis = G01ScenarioTests.Fixture();
+        var bad = basis with { Officers = basis.Officers.Select(o => o.State.Id == 2 ? o with
+            { InitialPersonalPeerageHistory = [early, late with { From = new(229, 12, 30) }] } : o).ToArray() };
+        Assert.Throws<InvalidDataException>(bad.Validate);
+        var scenario = basis with { Year = 225, Officers = basis.Officers.Select(o => o.State.Id == 2 ? o with
+            { InitialPersonalPeerageHistory = [early, late] } : o).ToArray() };
+        var session = GameSession.Start(scenario, 42);
+        var saved = session.Capture();
+        var legacy = saved with { PersonalPeerageInitialized = null, World = saved.World with
+        {
+            Clock = new(232, 1, 1), Officers = saved.World.Officers.Select(p => p.Id == 2 ? p with { PersonalPeerage = null } : p).ToArray()
+        } };
+        var migrated = GameSession.Restore(scenario, legacy);
+        Assert.Equal("南郑侯", migrated.Snapshot.Officers.Single(p => p.Id == 2).PersonalPeerage!.Title);
+    }
+
+    [Fact]
     public void BattleMeritIsSavedPerForceAndOldSaveWithoutItLoads()
     {
         var basis = G01ScenarioTests.Fixture();

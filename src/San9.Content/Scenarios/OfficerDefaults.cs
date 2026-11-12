@@ -267,6 +267,7 @@ public sealed record ScenarioOfficerState(int Id)
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerage? PersonalPeerage { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ImmutableSortedDictionary<int, int>? BattleMerit { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence? InitialPersonalPeerage { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence[]? InitialPersonalPeerageHistory { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public FormationEvidence[]? InitialFormationEvidence { get; init; }
     [JsonRequired] public required bool IsCommander { get; init; }
     [JsonRequired] public required ImmutableDictionary<int, int> ForceLoyalties { get; init; }
@@ -290,6 +291,7 @@ public sealed record ScenarioOfficerState(int Id)
         PersonalPeerage = value.State.PersonalPeerage,
         BattleMerit = value.State.BattleMerit,
         InitialPersonalPeerage = value.InitialPersonalPeerage,
+        InitialPersonalPeerageHistory = value.InitialPersonalPeerageHistory,
         InitialFormationEvidence = value.InitialFormationEvidence,
         IsCommander = value.State.IsCommander,
         ForceLoyalties = value.State.WithLoyaltyDefault(defaultLoyalty).ForceLoyalties,
@@ -343,6 +345,7 @@ public sealed record ScenarioOfficerState(int Id)
         })
         {
             InitialPersonalPeerage = InitialPersonalPeerage,
+            InitialPersonalPeerageHistory = InitialPersonalPeerageHistory,
             InitialFormationEvidence = InitialFormationEvidence,
             AgeAtScenarioStart = profile.AgeAtScenarioStart,
             FlagGlyph = profile.FlagGlyph,

@@ -8,12 +8,13 @@ internal static class PersonalPeerageMigration
 {
     internal static OfficerState[] Initialize(IEnumerable<OfficerState> officers, IEnumerable<OfficerInitialState> content, GameClock clock)
     {
-        var evidence = content.Where(o => o.InitialPersonalPeerage is not null)
-            .ToDictionary(o => o.State.Id, o => o.InitialPersonalPeerage!);
+        var evidence = content.Where(o => o.PersonalPeerageEvidenceRecords.Any())
+            .ToDictionary(o => o.State.Id, o => o.PersonalPeerageEvidenceRecords.ToArray());
         return officers.Select(person =>
         {
             var title = person.PersonalPeerage;
-            if (title is null && person.Status != OfficerStatus.Dead && evidence.TryGetValue(person.Id, out var record) && record.Applies(clock)) title = record.Peerage;
+            if (title is null && person.Status != OfficerStatus.Dead && evidence.TryGetValue(person.Id, out var records))
+                title = records.SingleOrDefault(record => record.Applies(clock))?.Peerage;
             return title == person.PersonalPeerage ? person : person with { PersonalPeerage = title };
         }).ToArray();
     }
