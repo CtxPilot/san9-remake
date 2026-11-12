@@ -1,10 +1,23 @@
 using San9.Content.Scenarios;
 using San9.Core.Domain;
+using System.Collections.Immutable;
 
 namespace San9.Content.Tests;
 
 public sealed class ScenarioIdentityTests
 {
+    [Fact]
+    public void FormationEvidenceRequiresUniqueValidEntriesForKnownFormations()
+    {
+        var officer = new OfficerInitialState("person", new(1, 9000, 1000, new(50, 50, 50, 50), false)
+        { FormationProficiencies = ImmutableSortedDictionary<int, int>.Empty.Add(7, 100) });
+        var good = new FormationEvidence(7, FormationEvidenceKind.ExperienceInference, "来源", "基于经历的游戏推定");
+        var scenario = Fixture() with { Officers = [officer with { InitialFormationEvidence = [good] }] };
+        scenario.Validate();
+        Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good, good] }] }).Validate());
+        Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good with { FormationId = 8 }] }] }).Validate());
+        Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good with { Source = "" }] }] }).Validate());
+    }
     [Theory]
     [InlineData(1)]
     [InlineData(2)]

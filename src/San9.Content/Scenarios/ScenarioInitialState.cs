@@ -131,6 +131,10 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
         Information.Validate(this);
         if (Officers.Any(o => o.InitialPersonalPeerage is { IsValid: false }))
             throw new InvalidDataException("Invalid initial personal peerage evidence.");
+        if (Officers.Any(o => o.InitialFormationEvidence is { } evidence &&
+            (evidence.Any(e => e is null || !e.IsValid || o.State.FormationProficiencies?.ContainsKey(e.FormationId) != true) ||
+             evidence.Select(e => e.FormationId).Distinct().Count() != evidence.Length)))
+            throw new InvalidDataException("Invalid initial formation evidence or missing formation proficiency.");
         var peerageRegimes = PersonalPeerageRegimes ?? [];
         if (peerageRegimes.Any(r => r is null || string.IsNullOrWhiteSpace(r.Id) || r.Name is not null && string.IsNullOrWhiteSpace(r.Name) || r.Periods.IsDefaultOrEmpty) ||
             peerageRegimes.Select(r => r.Id).Distinct(StringComparer.Ordinal).Count() != peerageRegimes.Length ||

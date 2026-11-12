@@ -39,4 +39,20 @@ public sealed class OfficerFormationProficiencyTests
         Assert.Equal(750, restored.FormationProficiencies[28]);
         Assert.Null(legacy.FormationProficiencies);
     }
+
+    [Fact]
+    public void FormationEvidenceSurvivesScenarioCompositionAndIsNotMistakenForHistoricalFact()
+    {
+        var profile = OfficerDefaults.Create(1);
+        var state = new OfficerState(1, 1, 1, new(50, 50, 50, 50), false)
+        { FormationProficiencies = ImmutableSortedDictionary<int, int>.Empty.Add(7, 300) };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, new() { [profile.NameKey] = profile.Name });
+        var evidence = new FormationEvidence(7, FormationEvidenceKind.ExperienceInference, "测试来源", "根据人物经历作游戏推定");
+        var placement = ScenarioOfficerState.From(new(profile.NameKey, state) { InitialFormationEvidence = [evidence] }, profile, texts, 50);
+        var json = JsonSerializer.Serialize(placement, PackageFiles.JsonOptions);
+        var compiled = JsonSerializer.Deserialize<ScenarioOfficerState>(json, PackageFiles.JsonOptions)!.Compile(profile);
+        Assert.Equal(evidence, Assert.Single(compiled.InitialFormationEvidence!));
+        Assert.Equal(300, compiled.State.FormationProficiencies![7]);
+        Assert.False(new FormationEvidence(7, FormationEvidenceKind.Historical, "", "无来源").IsValid);
+    }
 }

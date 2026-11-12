@@ -5,6 +5,12 @@ using San9.Core.Simulation;
 namespace San9.Content.Scenarios;
 
 public enum PersonalPeerageEvidenceKind { Historical, Romance }
+public enum FormationEvidenceKind { Historical, Romance, ExperienceInference, CommonFoundation }
+public sealed record FormationEvidence(int FormationId, FormationEvidenceKind Kind, string Source, string Explanation)
+{
+    [JsonIgnore] public bool IsValid => FormationId >= 0 && Enum.IsDefined(Kind) &&
+        !string.IsNullOrWhiteSpace(Source) && !string.IsNullOrWhiteSpace(Explanation);
+}
 public sealed record PersonalPeerageEvidence(PersonalPeerage Peerage, GameClock From, GameClock? Until,
     PersonalPeerageEvidenceKind Kind, string Source)
 {
@@ -19,6 +25,7 @@ public sealed record OfficerInitialState(
     [property: JsonRequired] OfficerState State)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence? InitialPersonalPeerage { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public FormationEvidence[]? InitialFormationEvidence { get; init; }
     // A year difference, not the inclusive age displayed by the UI. A value excludes a fixed State.BirthYear.
     [JsonRequired] public int? AgeAtScenarioStart { get; init; }
 

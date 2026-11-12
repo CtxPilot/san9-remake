@@ -266,6 +266,7 @@ public sealed record ScenarioOfficerState(int Id)
     [JsonRequired] public required int? OfficeId { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerage? PersonalPeerage { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence? InitialPersonalPeerage { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public FormationEvidence[]? InitialFormationEvidence { get; init; }
     [JsonRequired] public required bool IsCommander { get; init; }
     [JsonRequired] public required ImmutableDictionary<int, int> ForceLoyalties { get; init; }
     [JsonRequired] public required bool RewardedThisXun { get; init; }
@@ -287,6 +288,7 @@ public sealed record ScenarioOfficerState(int Id)
         OfficeId = value.State.OfficeId,
         PersonalPeerage = value.State.PersonalPeerage,
         InitialPersonalPeerage = value.InitialPersonalPeerage,
+        InitialFormationEvidence = value.InitialFormationEvidence,
         IsCommander = value.State.IsCommander,
         ForceLoyalties = value.State.WithLoyaltyDefault(defaultLoyalty).ForceLoyalties,
         RewardedThisXun = value.State.RewardedThisXun,
@@ -338,6 +340,7 @@ public sealed record ScenarioOfficerState(int Id)
         })
         {
             InitialPersonalPeerage = InitialPersonalPeerage,
+            InitialFormationEvidence = InitialFormationEvidence,
             AgeAtScenarioStart = profile.AgeAtScenarioStart,
             FlagGlyph = profile.FlagGlyph,
             CourtesyNameKey = profile.CourtesyName is null ? null : profile.CourtesyNameKey ?? $"officer-courtesy.{Id}",
