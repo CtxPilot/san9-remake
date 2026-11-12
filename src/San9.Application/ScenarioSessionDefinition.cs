@@ -94,7 +94,14 @@ internal sealed class ScenarioSessionDefinition
         people = settings?.PersonalPeerageEnabled == false ? people.Select(p => p with { PersonalPeerage = null }).ToArray() :
             PersonalPeerageMigration.Initialize(people, Content.Officers, new(Content.Year, Content.Month, Content.Day));
         if (settings?.FormationKnowledgeEnabled == true && MilitaryRules is { } formationRules)
-            people = FormationKnowledgeMigration.Initialize(people, forces, initialUnits, formationRules);
+        {
+            people = FormationKnowledgeMigration.Initialize(people, forces, initialUnits, formationRules, newGame: true);
+            var evidence = Content.Officers.Where(o => o.InitialFormationEvidence is not null)
+                .ToDictionary(o => o.State.Id, o => o.InitialFormationEvidence!);
+            people = people.Select(p => evidence.TryGetValue(p.Id, out var records)
+                ? p with { FormationProficiencies = records.Aggregate(p.FormationProficiencies!,
+                    (skills, record) => skills.SetItem(record.FormationId, record.Proficiency)) } : p).ToArray();
+        }
         return WorldState.Create(new(Content.Year, Content.Month, Content.Day), seed,
         forces,
         BarbarianStartup.CreateSettlements(forces, Settlements(), people),

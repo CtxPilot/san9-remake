@@ -226,6 +226,7 @@ public static class ScenarioContentCompiler
             new(snapshot.Military!), settlements.Where(s => s.Kind == San9.Core.Domain.SettlementKind.City).Select(s => s.Id), token: token).Connections };
         snapshot = EventContentCompiler.InitializePenglai(snapshot);
         snapshot = InitialLeadershipCompiler.Compile(snapshot);
+        snapshot = CuratedFormationEvidence.Apply(snapshot, catalog);
         snapshot.Validate(); catalog.Validate(); return (snapshot, catalog);
     }
 }

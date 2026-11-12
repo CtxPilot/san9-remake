@@ -6,9 +6,10 @@ namespace San9.Content.Scenarios;
 
 public enum PersonalPeerageEvidenceKind { Historical, Romance }
 public enum FormationEvidenceKind { Historical, Romance, ExperienceInference, CommonFoundation }
-public sealed record FormationEvidence(int FormationId, FormationEvidenceKind Kind, string Source, string Explanation)
+public sealed record FormationEvidence([property: JsonRequired] int FormationId, [property: JsonRequired] int Proficiency,
+    [property: JsonRequired] FormationEvidenceKind Kind, [property: JsonRequired] string Source, [property: JsonRequired] string Explanation)
 {
-    [JsonIgnore] public bool IsValid => FormationId >= 0 && Enum.IsDefined(Kind) &&
+    [JsonIgnore] public bool IsValid => FormationId >= 0 && Proficiency is >= 0 and <= 1000 && Enum.IsDefined(Kind) &&
         !string.IsNullOrWhiteSpace(Source) && !string.IsNullOrWhiteSpace(Explanation);
 }
 public sealed record PersonalPeerageEvidence(PersonalPeerage Peerage, GameClock From, GameClock? Until,

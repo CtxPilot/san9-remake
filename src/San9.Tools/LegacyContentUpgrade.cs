@@ -77,7 +77,14 @@ internal static class LegacyContentUpgrade
                     scenarios = prepared.Worlds.Where(world => world.Scenario.PersonalPeerageRegimes?.Any(r => r.Id == PersonalPeeragePreset.GenericId) == true)
                         .Select(world => world.Scenario.ScenarioId).ToArray(),
                     historicalEvidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers.Where(o => o.InitialPersonalPeerage is not null)
-                        .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id, evidence = o.InitialPersonalPeerage })).ToArray() }
+                        .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id, evidence = o.InitialPersonalPeerage })).ToArray() },
+                formations = new { description = "列出的个人初始阵形附依据类型和解释；其余人物使用通用重制默认值，不代表史实。",
+                    evidence = prepared.Worlds.SelectMany(world => world.Scenario.Officers.Where(o => o.InitialFormationEvidence is not null)
+                        .Select(o => new { scenarioId = world.Scenario.ScenarioId, officerId = o.State.Id,
+                            records = o.InitialFormationEvidence!.Select(e => new { e.FormationId, e.Proficiency,
+                                kind = e.Kind switch { FormationEvidenceKind.Historical => "史实", FormationEvidenceKind.Romance => "演义",
+                                    FormationEvidenceKind.ExperienceInference => "人物经历推定", FormationEvidenceKind.CommonFoundation => "通用基础",
+                                    _ => throw new InvalidDataException("Invalid formation evidence kind.") }, e.Source, e.Explanation }).ToArray() })).ToArray() }
             });
             Console.WriteLine($"Equipment upgrade report: {unclassified.Sum(world => world.treasures.Length)} unclassified scenario items.");
             await ContentVerification.VerifyAsync(stage, Console.WriteLine);

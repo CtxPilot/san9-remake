@@ -11,12 +11,15 @@ public sealed class ScenarioIdentityTests
     {
         var officer = new OfficerInitialState("person", new(1, 9000, 1000, new(50, 50, 50, 50), false)
         { FormationProficiencies = ImmutableSortedDictionary<int, int>.Empty.Add(7, 100) });
-        var good = new FormationEvidence(7, FormationEvidenceKind.ExperienceInference, "来源", "基于经历的游戏推定");
-        var scenario = Fixture() with { Officers = [officer with { InitialFormationEvidence = [good] }] };
+        var good = new FormationEvidence(7, 100, FormationEvidenceKind.ExperienceInference, "来源", "基于经历的游戏推定");
+        var scenario = Fixture() with { Officers = [officer with { InitialFormationEvidence = [good] }],
+            Military = new(75, 1, Enumerable.Repeat(0, 75).ToImmutableArray(), [new(0, 1, null)], [new(7, 1, 0, 10000, 5, new(1, 1), TravelMode.Land)],
+                Fixture().Settlements.Select(s => new BattlefieldPlace(s.Id, s.Position, new(1, 1))).ToImmutableArray()) };
         scenario.Validate();
         Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good, good] }] }).Validate());
         Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good with { FormationId = 8 }] }] }).Validate());
         Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good with { Source = "" }] }] }).Validate());
+        Assert.Throws<InvalidDataException>(() => (scenario with { Officers = [officer with { InitialFormationEvidence = [good with { Proficiency = 1001 }] }] }).Validate());
     }
     [Theory]
     [InlineData(1)]

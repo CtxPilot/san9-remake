@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using San9.Content.Packages;
 using San9.Content.Scenarios;
 using San9.Content.Text;
+using San9.Importer.San9PkTc101.Scenarios;
 
 namespace San9.Importer.San9PkTc101.Packages;
 
@@ -101,6 +102,7 @@ public static class LegacyScenarioDataUpgrade
             var parts = package.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
             scenario = LegacyHistoricalPeerageEvidence.Apply(scenario, text,
                 parts.Length >= 2 && parts[0] == "scenarios" && parts[1] == "historical");
+            scenario = CuratedFormationEvidence.Apply(scenario, text);
             scenario = scenario with { AppearanceEvidence = scenario.Officers.Where(p => p.State.IsServing && p.State.OwnerId is not null)
                 .Select(p => (Person: p.State, Force: scenario.Forces.SingleOrDefault(f => f.Id == p.State.OwnerId)))
                 .Where(p => p.Force?.LeaderId is not null)

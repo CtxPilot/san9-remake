@@ -132,7 +132,8 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
         if (Officers.Any(o => o.InitialPersonalPeerage is { IsValid: false }))
             throw new InvalidDataException("Invalid initial personal peerage evidence.");
         if (Officers.Any(o => o.InitialFormationEvidence is { } evidence &&
-            (evidence.Any(e => e is null || !e.IsValid || o.State.FormationProficiencies?.ContainsKey(e.FormationId) != true) ||
+            (evidence.Any(e => e is null || !e.IsValid || Military is null ||
+                !Military.Formations.Any(f => f.Id == e.FormationId && f.TravelMode == San9.Core.Domain.TravelMode.Land)) ||
              evidence.Select(e => e.FormationId).Distinct().Count() != evidence.Length)))
             throw new InvalidDataException("Invalid initial formation evidence or missing formation proficiency.");
         var peerageRegimes = PersonalPeerageRegimes ?? [];
@@ -162,6 +163,9 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
         if (Military is { } military)
         {
             var rules = context is null ? new San9.Core.Domain.MilitaryRulebook(military) : context.ValidateMilitary(military);
+            if (Officers.Any(o => o.InitialFormationEvidence?.Any(e => rules.IsFixedFormation(e.FormationId) ||
+                e.FormationId == rules.UnformedFormationId || rules.SiegeEquipment.Values.Any(s => s.FormationId == e.FormationId)) == true))
+                throw new InvalidDataException("Initial formation evidence must reference a selectable land formation.");
             if (context is not null) San9.Content.Packages.ContentStructure.Validate(military.Places);
             var places = context is null ? rules.Places : rules.ValidatePlaces(military.Places);
             if (Units.Any(u => u.FormationId is int id && !rules.ValidFormationPair(id, u.NavalFormationId)))
