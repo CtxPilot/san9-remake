@@ -22,6 +22,9 @@ public static class CuratedFormationEvidence
                 (642, "吕布", "奉先") when scenario.Year >= 190 => new(31, 600, FormationEvidenceKind.ExperienceInference,
                     "《三国志·吕布传》：https://ctext.org/text.pl?if=gb&node=602263&remap=gb",
                     "记载便于弓马；将骑兵型车悬列为初始掌握是游戏推定，并无其使用此阵的记载。"),
+                (422, "张辽", "文远") when scenario.Year >= 216 => new(30, 600, FormationEvidenceKind.ExperienceInference,
+                    "《三国志·张辽传》：https://ctext.org/text.pl?if=gb&node=602710&remap=gb",
+                    "记载合肥募士出击；依据其战斗经历推定掌握钩行，史书并未记载此阵或据此证明步骑协同。"),
                 _ => null
             };
             return record is null || scenario.Military?.Formations.Any(f => f.Id == record.FormationId && f.TravelMode == TravelMode.Land) != true
