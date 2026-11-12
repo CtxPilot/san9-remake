@@ -96,6 +96,14 @@ public partial class SystemMenuPanel : ModalView, IModalInputRouter
         Show();
         ReplacePage(new ResearchView { Session = Session, Texts = Texts, Textures = _textures, Service = Service, Closed = Close, InitialSettlementId = settlementId });
     }
+    public void OpenFormationTeachingAt(int settlementId)
+    {
+        if (_busy) return;
+        Browser.Close(); ReplacePage(null); _textures ??= Service.CreateScope();
+        _textures.RequestPrefixes("catalog-", "information-", "scroll-", "dialog-"); Show();
+        ReplacePage(new FormationTeachingView { Session = Session, Texts = Texts, Textures = _textures,
+            Service = Service, Closed = Close, SettlementId = settlementId });
+    }
     public void OpenEquipmentProductionAt(int settlementId)
     {
         if (_busy) return;

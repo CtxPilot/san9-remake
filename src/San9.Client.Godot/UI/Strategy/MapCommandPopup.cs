@@ -28,7 +28,7 @@ public partial class MapCommandPopup : ModalView
     private InformationMenuButton? _expandedButton;
     private string? _expandedGroupId;
     public (Vector2 Anchor, string? GroupId) Navigation => (_anchor, _expandedGroupId);
-    public string Hint => _hovered is {} entry ? entry.Id == "personal-peerage" && entry.Enabled ? "授予或撤销个人爵位。" : (entry.Id is "research" or "equipment-production" or "equipment-purchase") && entry.Enabled ? (entry.Id == "research" ? "研究兵种与装备。" : entry.Id == "equipment-purchase" ? "购买普通装备。" : "制造装备。") : Texts.Resolve(entry.UnavailableReasonKey ?? CommandMenuSkin.HintKey(entry.Id)) : "";
+    public string Hint => _hovered is {} entry ? entry.Id == "formation-teaching" && entry.Enabled ? "安排同据点武将学习阵形。" : entry.Id == "personal-peerage" && entry.Enabled ? "授予或撤销个人爵位。" : (entry.Id is "research" or "equipment-production" or "equipment-purchase") && entry.Enabled ? (entry.Id == "research" ? "研究兵种与装备。" : entry.Id == "equipment-purchase" ? "购买普通装备。" : "制造装备。") : Texts.Resolve(entry.UnavailableReasonKey ?? CommandMenuSkin.HintKey(entry.Id)) : "";
 
     public bool HintEnabled => _hovered?.Enabled ?? true;
 
@@ -89,7 +89,7 @@ public partial class MapCommandPopup : ModalView
     private InformationMenuButton AddSecondaryButton(MapCommandEntry entry, Vector2 point)
     {
         var button = new InformationMenuButton {
-            Title = entry.Id == "research" ? "研究" : entry.Id == "equipment-production" ? "制造" : entry.Id == "equipment-purchase" ? "购买" : entry.Id == "personal-peerage" ? "封爵" : entry.Id == "rank" ? "官职" : CommandText.Resolve(Texts, "title." + entry.Id), Disabled = !entry.Enabled, Textures = Textures, Position = point, Size = new(68, 28),
+            Title = entry.Id == "formation-teaching" ? "阵形学习" : entry.Id == "research" ? "研究" : entry.Id == "equipment-production" ? "制造" : entry.Id == "equipment-purchase" ? "购买" : entry.Id == "personal-peerage" ? "封爵" : entry.Id == "rank" ? "官职" : CommandText.Resolve(Texts, "title." + entry.Id), Disabled = !entry.Enabled, Textures = Textures, Position = point, Size = new(68, 28),
             SkinPrefix = $"command-secondary-{entry.Tone.ToString().ToLowerInvariant()}"
         };
         button.Pressed += () =>

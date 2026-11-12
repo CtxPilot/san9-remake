@@ -44,6 +44,7 @@ internal static class OriginalAiEquipment
             }
         }
         var snapshot = engine.Snapshot;
+        if (snapshot.Simulation.NewGame.EquipmentDevelopmentEnabled == false) return;
         var force = snapshot.Forces.Single(f => f.Id == seat.ForceId);
         root = snapshot.Corps.First(c => c.Id == root.Id);
         var place = snapshot.Settlements.Where(p => p.OwnerId == force.Id && !p.IsDormant && !p.IsDestroyed && p.CanHostPersons &&

@@ -17,7 +17,7 @@ internal static class FormationKnowledgeMigration
 
     internal static SessionSnapshot Initialize(SessionSnapshot snapshot, MilitaryRulebook? rules)
     {
-        if (!snapshot.World.Simulation.NewGame.MixedTroopsEnabled || rules is null ||
+        if (!snapshot.World.Simulation.NewGame.FormationKnowledgeEnabled || rules is null ||
             snapshot.World.Officers.All(o => o.FormationProficiencies is not null)) return snapshot;
         return snapshot with { World = snapshot.World with
         {

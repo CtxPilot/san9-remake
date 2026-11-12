@@ -59,14 +59,16 @@ public static class MapCommandMenu
         }
         var availability = new MapCommandAvailability(view);
         bool researchAvailable = view.MilitaryRules is not null && (view.World.Simulation.NewGame.MixedTroopsEnabled ||
-            view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null));
-        bool purchaseAvailable = view.Rules.Equipment.Items.Values.Any(item => item.PurchaseCost is not null);
-        bool peerageAvailable = view.World.Forces.FirstOrDefault(f => f.Id == view.PlayerForceId)?.PersonalPeerageRegimeId is not null;
+            view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false && view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null));
+        bool purchaseAvailable = view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false && view.Rules.Equipment.Items.Values.Any(item => item.PurchaseCost is not null);
+        bool peerageAvailable = view.World.Simulation.NewGame.PersonalPeerageEnabled != false && view.World.Forces.FirstOrDefault(f => f.Id == view.PlayerForceId)?.PersonalPeerageRegimeId is not null;
         var groups = Common.Select(group => group.Id == "appointments" && peerageAvailable
             ? group with { Children = [.. group.Children, new MapCommandEntry("personal-peerage", MapCommandTone.Brown, [])] }
             : group.Id == "military"
             ? group with { Children = [.. group.Children,
-                .. researchAvailable ? new[] { new MapCommandEntry("research", MapCommandTone.Green, []), new MapCommandEntry("equipment-production", MapCommandTone.Green, []) } : [],
+                .. view.MilitaryRules is not null && view.World.Simulation.NewGame.FormationTrainingEnabled ? new[] { new MapCommandEntry("formation-teaching", MapCommandTone.Green, []) } : [],
+                .. researchAvailable ? new[] { new MapCommandEntry("research", MapCommandTone.Green, []) } : [],
+                .. researchAvailable && view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false ? new[] { new MapCommandEntry("equipment-production", MapCommandTone.Green, []) } : [],
                 .. purchaseAvailable ? new[] { new MapCommandEntry("equipment-purchase", MapCommandTone.Green, []) } : []] } : group);
         return new[] { facilities }.Concat(groups).Select(group => group with {
             Children = group.Children.Select(entry => entry with {

@@ -30,7 +30,7 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
         // Management must remain reachable so a player can restore directly controlled corps.
         if (command == "delegate") return null;
         if (!Controlled(home.CorpsId)) return "unavailable";
-        if (command == "personal-peerage") return Force.PersonalPeerageRegimeId is null ? "unavailable" : null;
+        if (command == "personal-peerage") return view.World.Simulation.NewGame.PersonalPeerageEnabled == false || Force.PersonalPeerageRegimeId is null ? "unavailable" : null;
         if (IsDomestic(command) && home.Kind != SettlementKind.City && command is not ("repair" or "train"))
             return "unavailable";
         if (command is "strategist" or "rank" or "reward" or "bestow" or "confiscate" or "execute" or "exile")
@@ -42,9 +42,11 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
         // Deployment and transport remain available under siege; ordinary missions do not.
         if (command is not ("sortie" or "build" or "transport") && view.IsSettlementEngaged(id)) return "engaged";
         if (command == "demolish") return null;
-        if (command == "equipment-purchase") return view.Rules.Equipment.Items.Values.Any(item => item.PurchaseCost is not null) ? null : "unavailable";
+        if (command == "formation-teaching") return view.MilitaryRules is not null && view.World.Simulation.NewGame.FormationTrainingEnabled ? null : "unavailable";
+        if (command == "equipment-purchase") return view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false && view.Rules.Equipment.Items.Values.Any(item => item.PurchaseCost is not null) ? null : "unavailable";
+        if (command == "equipment-production" && view.World.Simulation.NewGame.EquipmentDevelopmentEnabled == false) return "unavailable";
         if (command is "research" or "equipment-production") return view.MilitaryRules is not null && (view.World.Simulation.NewGame.MixedTroopsEnabled ||
-            view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null)) ? null : "unavailable";
+            view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false && view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null)) ? null : "unavailable";
         if (command == "move" && !OtherHomes(home).Any()) return "no-move-destination";
         if (command == "transport" && !OtherHomes(home, directOnly: false).Any()) return "no-other-facility";
         if (command == "build" && !BuildableTypes().Any()) return "no-construction-site";

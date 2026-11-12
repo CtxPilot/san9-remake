@@ -21,6 +21,7 @@ internal static class PersonalPeerageMigration
     internal static SessionSnapshot Initialize(SessionSnapshot snapshot, ScenarioInitialState content)
     {
         if (snapshot.PersonalPeerageInitialized == true) return snapshot;
+        if (snapshot.World.Simulation.NewGame.PersonalPeerageEnabled == false) return snapshot with { PersonalPeerageInitialized = true };
         var original = content.Forces.ToDictionary(f => f.Id);
         return snapshot with { PersonalPeerageInitialized = true, World = snapshot.World with
         {

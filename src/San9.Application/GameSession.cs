@@ -52,7 +52,7 @@ public sealed partial class GameSession
     internal MilitaryRulebook? MilitaryRules => _definition.MilitaryRules;
     public IReadOnlyList<ResearchProjectDefinition> ResearchProjects =>
         MilitaryRules?.ResearchProjects.Values.Where(p => !MilitaryRules.IsLegacyFormationResearch(p.Id) &&
-            (Snapshot.Simulation.NewGame.MixedTroopsEnabled || _definition.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId == p.Id)))
+            ResearchModuleRules.IsAvailable(MilitaryRules, _definition.Rules.Equipment, Snapshot.Simulation.NewGame, p.Id))
             .OrderBy(p => p.Id, StringComparer.Ordinal).ToArray() ?? [];
     public string ResearchProjectName(string id) => ResearchDisplay.Name(MilitaryRules, id);
     public IReadOnlyList<EquipmentDefinition> EquipmentRecipes => _definition.Rules.Equipment.Items.Values

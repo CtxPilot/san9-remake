@@ -73,7 +73,7 @@ internal static class EconomicCycle
             var account = ResourceAccounts.Resolve(world, person.OwnerId!.Value, corpsId);
             int salary = Salary(person);
             var force = world.Forces[person.OwnerId!.Value];
-            int peerageSalary = rules.PeeragePolicy(force, world.Clock.Year).Salary(person.PersonalPeerage);
+            int peerageSalary = world.Simulation.NewGame.PersonalPeerageEnabled == false ? 0 : rules.PeeragePolicy(force, world.Clock.Year).Salary(person.PersonalPeerage);
             bool paid = ResourceAccounts.Balance(world, account, ResourceKind.Money) >= (long)salary + peerageSalary;
             ResourceAccounts.Change(world, account, ResourceKind.Money, -salary, "salary", person.Id, events, true);
             if (peerageSalary > 0)
@@ -88,7 +88,7 @@ internal static class EconomicCycle
             events.Add(new OfficerLoyaltyChangedEvent(world.Clock, person.Id, force.Id, person.Loyalty, loyalty,
                 paid ? "paid-salary" : "unpaid-salary"));
         }
-        foreach (var ruler in world.Officers.Values.Where(p => p.Status == OfficerStatus.Ruler && p.OwnerId is not null && p.PersonalPeerage is not null).OrderBy(p => p.Id))
+        foreach (var ruler in world.Officers.Values.Where(p => world.Simulation.NewGame.PersonalPeerageEnabled != false && p.Status == OfficerStatus.Ruler && p.OwnerId is not null && p.PersonalPeerage is not null).OrderBy(p => p.Id))
         {
             int salary = rules.PeeragePolicy(world.Forces[ruler.OwnerId!.Value], world.Clock.Year).Salary(ruler.PersonalPeerage);
             if (salary == 0) continue;

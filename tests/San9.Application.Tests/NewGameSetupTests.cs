@@ -12,6 +12,20 @@ namespace San9.Application.Tests;
 public sealed class NewGameSetupTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NewGameModuleChoicesSurviveSaveAndControlNaturalDeaths(bool enabled)
+    {
+        var source = Source();
+        var settings = new NewGameSettings { NaturalDeathsEnabled = enabled, EquipmentDevelopmentEnabled = enabled,
+            FormationLearningEnabled = enabled, PersonalPeerageEnabled = enabled };
+        var session = GameSession.Start(source, 123, settings: settings);
+        var restored = SaveService.Decode(SaveService.Encode(session), source);
+        Assert.Equal(enabled, restored.Snapshot.Simulation.NaturalDeathsEnabled);
+        Assert.Equal(settings, restored.Snapshot.Simulation.NewGame);
+    }
+
+    [Theory]
     [InlineData(true, 4)]
     [InlineData(false, null)]
     public void NewForceUsesTheUnrankedIdentityWithoutInferringAnInitialRank(bool marked, int? expected)

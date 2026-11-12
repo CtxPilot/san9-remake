@@ -53,7 +53,7 @@ internal static class OriginalAiResearch
             return score;
         }
         var project = military.ResearchProjects.Values.Where(p => !military.IsLegacyFormationResearch(p.Id) && !force.CompletedResearch.Contains(p.Id) &&
-                (world.Simulation.NewGame.MixedTroopsEnabled || equipment?.Items.Values.Any(item => item.ResearchProjectId is string research && DependsOn(research, p.Id)) == true) &&
+                ResearchModuleRules.IsAvailable(military, equipment ?? EquipmentRulebook.Empty, world.Simulation.NewGame, p.Id) &&
                 p.Prerequisites.All(force.CompletedResearch.Contains) && p.Cost <= root.Treasury.Money / 2)
             .OrderByDescending(Demand).ThenBy(p => p.Cost).ThenBy(p => p.Id, StringComparer.Ordinal).FirstOrDefault();
         if (project is null) return;

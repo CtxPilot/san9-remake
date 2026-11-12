@@ -13,6 +13,11 @@ internal static class WorldInvariants
         _ = new GameClock(state.Clock.Year, state.Clock.Month, state.Clock.Day);
         ValidateParticipation(state);
         ValidateSimulation(state);
+        var lessons = state.AllOfficers.Values.Where(p => p.FormationTeaching is not null).ToArray();
+        if (lessons.Any(p => p.FormationTeaching is { } t && (!state.AllOfficers.ContainsKey(t.TeacherId) ||
+                !state.AllForces.ContainsKey(t.ForceId) || !state.AllSettlements.ContainsKey(t.SettlementId))) ||
+            lessons.SelectMany(p => new[] { p.Id, p.FormationTeaching!.TeacherId }).GroupBy(id => id).Any(g => g.Count() > 1))
+            throw new ArgumentException("Invalid formation teaching references.");
         var titles = state.AllForces.Values.Where(f => f.CountryTitleId is not null).Select(f => f.CountryTitleId!.Value).ToArray();
         if (titles.Any(id => id < 0) || titles.Distinct().Count() != titles.Length) throw new ArgumentException("Invalid country title ownership.");
         foreach (var force in state.AllForces.Values)

@@ -566,6 +566,10 @@ public sealed partial class SimulationEngine
                     break;
                 case WaitCommand:
                     break;
+                case StartFormationTeachingCommand teaching:
+                    var teachingRejection = FormationTeaching.Start(mutation, teaching, _rules.Military, events);
+                    if (teachingRejection != CommandRejection.None) return Reject(teachingRejection);
+                    break;
                 case StartResearchCommand research:
                     var researchRejection = MilitaryResearch.Start(mutation, research, _rules, events);
                     if (researchRejection != CommandRejection.None) return Reject(researchRejection);

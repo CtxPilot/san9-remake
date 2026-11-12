@@ -9,7 +9,7 @@ internal static class OriginalAiPersonalPeerage
     internal static void Manage(SimulationEngine engine, ControlSeat seat, List<DomainEvent> events)
     {
         var world = engine.Snapshot;
-        if (seat.Kind != ControllerKind.Automatic) return;
+        if (seat.Kind != ControllerKind.Automatic || world.Simulation.NewGame.PersonalPeerageEnabled == false) return;
         var force = world.Forces.FirstOrDefault(f => f.Id == seat.ForceId);
         var root = world.Corps.FirstOrDefault(c => c.OwnerId == seat.ForceId && c.IsRoot);
         if (force?.PersonalPeerageRegimeId is null || root is null) return;

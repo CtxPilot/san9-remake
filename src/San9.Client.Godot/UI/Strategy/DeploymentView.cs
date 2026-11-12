@@ -229,7 +229,7 @@ public partial class DeploymentView : FixedPage
     {
         var category = naval ? InformationCategory.Ships : InformationCategory.Formations;
         var candidates = Draft.Formations(naval).Select(f => f.Id).ToHashSet();
-        bool showProficiency = !naval && Draft.View.World.Simulation.NewGame.MixedTroopsEnabled && Draft.CommanderId is not null;
+        bool showProficiency = !naval && Draft.View.World.Simulation.NewGame.FormationKnowledgeEnabled && Draft.CommanderId is not null;
         var commander = Draft.CommanderId is int commanderId ? Draft.View.World.Officers.Single(o => o.Id == commanderId) : null;
         var pages = ForceCapabilityCatalog.Pages(category);
         if (showProficiency)
@@ -237,7 +237,7 @@ public partial class DeploymentView : FixedPage
         var view = new CatalogView
         {
             Title = naval ? "选择船" : "选择阵形",
-            HintText = naval ? "请选择船。" : Draft.View.World.Simulation.NewGame.MixedTroopsEnabled
+            HintText = naval ? "请选择船。" : Draft.View.World.Simulation.NewGame.FormationKnowledgeEnabled
                 ? "请选择主将掌握的阵形；武将熟练度影响各自分队。" : "请选择阵形。",
             CloseTitle = "中止",
             Pages = pages,

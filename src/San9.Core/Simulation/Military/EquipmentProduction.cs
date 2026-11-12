@@ -16,7 +16,7 @@ internal static class EquipmentProduction
     internal static CommandRejection Purchase(WorldMutation world, PurchaseEquipmentCommand command, EquipmentRulebook rules,
         List<DomainEvent> events)
     {
-        if (!world.EquipmentInitialized || string.IsNullOrWhiteSpace(command.DefinitionId) ||
+        if (world.Simulation.NewGame.EquipmentDevelopmentEnabled == false || !world.EquipmentInitialized || string.IsNullOrWhiteSpace(command.DefinitionId) ||
             !rules.Items.TryGetValue(command.DefinitionId, out var item) || item.PurchaseCost is not int cost ||
             item.LegacyTreasureId is not null || item.Rarity != EquipmentRarity.Ordinary ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsDormant || force.IsEliminated ||
@@ -35,7 +35,7 @@ internal static class EquipmentProduction
     internal static CommandRejection Start(WorldMutation world, StartEquipmentProductionCommand command, EquipmentRulebook rules,
         List<DomainEvent> events)
     {
-        if (!world.EquipmentInitialized || string.IsNullOrWhiteSpace(command.DefinitionId) ||
+        if (world.Simulation.NewGame.EquipmentDevelopmentEnabled == false || !world.EquipmentInitialized || string.IsNullOrWhiteSpace(command.DefinitionId) ||
             !rules.Items.TryGetValue(command.DefinitionId, out var item) || item.ResearchProjectId is not string project ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsDormant || force.IsEliminated ||
             force.EquipmentProduction is not null || !force.CompletedResearch.Contains(project) ||

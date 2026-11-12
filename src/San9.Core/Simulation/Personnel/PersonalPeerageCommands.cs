@@ -11,6 +11,7 @@ internal static class PersonalPeerageCommands
 {
     internal static CommandRejection Eligibility(WorldMutation world, SetPersonalPeerageCommand command, SimulationRules rules)
     {
+        if (world.Simulation.NewGame.PersonalPeerageEnabled == false) return CommandRejection.InvalidTask;
         if (!world.Officers.TryGetValue(command.OfficerId, out var person)) return CommandRejection.UnknownPerson;
         if (!person.IsServing || person.OwnerId != command.IssuerId || !world.Forces.TryGetValue(command.IssuerId, out var force) ||
             force.LeaderId == person.Id) return CommandRejection.PersonUnavailable;

@@ -26,7 +26,7 @@ public sealed record EconomicOutlook(ResourceOutlook Money, ResourceOutlook Food
         var payroll = query.Officers.Values.Where(o => o.IsServing && o.OwnerId == forceId)
             .ToLookup(o => Account(PersonnelLocations.Corps(query, o)),
                 o => (long)(o.Status == OfficerStatus.Ruler ? 0 : o.OfficeId is int office && salaries.TryGetValue(office, out int amount) ? amount : 1)
-                    + peerages.Salary(o.PersonalPeerage));
+                    + (world.Simulation.NewGame.PersonalPeerageEnabled == false ? 0 : peerages.Salary(o.PersonalPeerage)));
         int[] accounts = corpsId is int selected ? [selected] : [.. corps.Keys];
         int dayOfYear = (world.Clock.Month - 1) * 30 + world.Clock.Day - 1;
         int moneyDays = 90 - dayOfYear % 90;

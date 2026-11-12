@@ -143,19 +143,19 @@ public sealed partial class DeploymentDraft
     public IReadOnlyList<FormationRule> Formations(bool naval) => Members.IsEmpty ? [] : Formations(naval, Members);
     private IEnumerable<FormationRule> CandidateFormations(bool naval) => Rules.Formations.Values.Where(f =>
         f.TravelMode == (naval ? TravelMode.Water : TravelMode.Land) && f.Id != Rules.UnformedFormationId &&
-        (!naval && View.World.Simulation.NewGame.MixedTroopsEnabled ? !Rules.IsFixedFormation(f.Id) : Rules.CanSelectFormation(Force, f.Id)) &&
-        (!f.MixedTroopsOnly || View.World.Simulation.NewGame.MixedTroopsEnabled) &&
+        (!naval && View.World.Simulation.NewGame.FormationKnowledgeEnabled ? !Rules.IsFixedFormation(f.Id) : Rules.CanSelectFormation(Force, f.Id)) &&
+        (!f.MixedTroopsOnly || View.World.Simulation.NewGame.FormationKnowledgeEnabled) &&
         (!View.World.Simulation.NewGame.MixedTroopsEnabled || !Rules.SiegeEquipment.Values.Any(item => item.FormationId == f.Id)));
     private IReadOnlyList<FormationRule> Formations(bool naval, ImmutableArray<int> members)
     {
         var people = View.World.Officers.Where(o => members.Contains(o.Id)).ToArray();
         var commander = View.World.Officers.Single(o => o.Id == members[0]);
         return CandidateFormations(naval).Where(f => f.OfficerCapacity >= members.Length &&
-            (!View.World.Simulation.NewGame.MixedTroopsEnabled ||
+            (!View.World.Simulation.NewGame.FormationKnowledgeEnabled ||
                 (!naval && commander.FormationProficiencies is not null
                     ? FormationKnowledge.Knows(commander, f.Id)
                     : Rules.CanSelectFormation(Force, f.Id) && (f.ResearchProjectId is null || Force.CompletedResearch.Contains(f.ResearchProjectId)))) &&
-            (View.World.Simulation.NewGame.MixedTroopsEnabled && !naval && commander.FormationProficiencies is not null ||
+            (View.World.Simulation.NewGame.FormationKnowledgeEnabled && !naval && commander.FormationProficiencies is not null ||
                 f.RequiredTacticId is not int tactic || TacticAvailability.HasForMembers(tactic, people, Force, View.World.Treasures, _treasures, View.EquippedItems)))
             .OrderBy(f => f.Id).ToArray();
     }

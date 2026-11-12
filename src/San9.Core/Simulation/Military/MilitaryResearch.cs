@@ -33,8 +33,9 @@ internal static class MilitaryResearch
 
     internal static CommandRejection Start(WorldMutation world, StartResearchCommand command, SimulationRules rules, List<DomainEvent> events)
     {
-        if ((!world.Simulation.NewGame.MixedTroopsEnabled && !rules.Equipment.Items.Values.Any(item => item.ResearchProjectId == command.ProjectId)) || rules.Military is not { } military ||
+        if (rules.Military is not { } military ||
             string.IsNullOrWhiteSpace(command.ProjectId) || military.IsLegacyFormationResearch(command.ProjectId) || !military.ResearchProjects.TryGetValue(command.ProjectId, out var project) ||
+            !ResearchModuleRules.IsAvailable(military, rules.Equipment, world.Simulation.NewGame, command.ProjectId) ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsEliminated || force.IsDormant ||
             !world.Settlements.TryGetValue(command.SettlementId, out var place) || place.OwnerId != force.Id ||
             place.IsDormant || place.IsDestroyed || !place.CanHostPersons || force.ActiveResearch is not null ||

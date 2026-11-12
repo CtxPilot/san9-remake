@@ -81,6 +81,7 @@ public static class CorpsControl
         {
             WaitCommand => true,
             StartResearchCommand research => ControlsPlace(research.SettlementId),
+            StartFormationTeachingCommand teaching => ControlsPlace(teaching.SettlementId),
             StartEquipmentProductionCommand production => ControlsPlace(production.SettlementId),
             PurchaseEquipmentCommand purchase => ControlsPlace(purchase.SettlementId),
             ConfigureEquipmentCommand equipment => world.Officers.FirstOrDefault(p => p.Id == equipment.OfficerId)?.UnitId is int assignedUnit

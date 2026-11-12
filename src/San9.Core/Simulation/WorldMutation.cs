@@ -227,7 +227,7 @@ internal sealed partial class WorldMutation : IWorldQuery
 
     internal void RecordEquipmentUse(IEnumerable<int> officers, EquipmentUse use)
     {
-        if (!_owner.EquipmentInitialized || _equipmentExchange is null) return;
+        if (!_owner.EquipmentInitialized || _equipmentExchange is null || Simulation.NewGame.EquipmentDevelopmentEnabled == false) return;
         var ids = officers.ToHashSet();
         foreach (var item in AllEquipment.Values.Where(item => item.Equipped && item.OfficerId is int id && ids.Contains(id) &&
                      item.LastExperienceExchange != _equipmentExchange).OrderBy(item => item.Id).ToArray())

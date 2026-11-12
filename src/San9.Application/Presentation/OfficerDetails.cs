@@ -111,8 +111,8 @@ public static class OfficerDetails
             tactics.ToArray(), view.World.Treasures.Where(t => t.Discovered && t.HolderId == id).Select(t => t.Id).ToArray())
         {
             IsDeceased = person.Status == OfficerStatus.Dead,
-            FormationRulesEnabled = view.World.Simulation.NewGame.MixedTroopsEnabled,
-            Formations = view.World.Simulation.NewGame.MixedTroopsEnabled && view.MilitaryRules is { } military
+            FormationRulesEnabled = view.World.Simulation.NewGame.FormationKnowledgeEnabled,
+            Formations = view.World.Simulation.NewGame.FormationKnowledgeEnabled && view.MilitaryRules is { } military
                 ? view.Information.Formations.Where(formation => military.Formations.TryGetValue(formation.Id, out var rule) &&
                     rule.TravelMode == TravelMode.Land && !military.IsFixedFormation(rule.Id) &&
                     rule.Id != military.UnformedFormationId && !military.SiegeEquipment.Values.Any(e => e.FormationId == rule.Id))

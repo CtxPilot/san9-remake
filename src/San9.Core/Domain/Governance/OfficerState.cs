@@ -13,6 +13,8 @@ public sealed record ManualOfficerAppearance(int Year, int SettlementId, int? Fo
     [JsonIgnore] public bool IsValid => Year > 0 && SettlementId >= 0 && ForceId is not < 0 && Age is >= 1 and <= 100 && Age < Year;
 }
 
+public sealed record FormationTeachingProgress(int TeacherId, int ForceId, int SettlementId, int FormationId, int DaysRemaining);
+
 public readonly record struct OfficerAbilities(int War, int Intelligence, int Politics, int Leadership)
 {
     [System.Text.Json.Serialization.JsonIgnore]
@@ -40,6 +42,8 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     /// <summary>Days of practical instruction toward formations not yet mastered.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ImmutableSortedDictionary<int, int>? FormationPractice { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public FormationTeachingProgress? FormationTeaching { get; init; }
     public ImmutableArray<int> TacticProficiencies { get; init; } = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     public int? StatusStartYear { get; init; }
     public int? ParentId { get; init; }
@@ -105,6 +109,8 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
         if (FormationProficiencies is not null && FormationProficiencies.Any(p => p.Key < 0 || p.Value is < 0 or > 1000)) return false;
         if (FormationPractice is not null && FormationPractice.Any(p => p.Key < 0 || p.Value is < 1 or >= FormationKnowledge.PracticeDaysToLearn ||
             FormationProficiencies?.ContainsKey(p.Key) == true)) return false;
+        if (FormationTeaching is { } teaching && (teaching.TeacherId < 0 || teaching.TeacherId == Id || teaching.ForceId < 0 ||
+            teaching.SettlementId < 0 || teaching.FormationId < 0 || teaching.DaysRemaining is < 1 or > 30)) return false;
         if (EquippedTacticId < 0 || TacticCooldown < 0 || LearnedTactics is null || TacticProficiencies.IsDefault || TacticProficiencies.Length != 9 ||
             TacticProficiencies.Any(v => v < 0) || LearnedTactics.Any(v => v < 0) ||
             ParentId < 0 || BloodlineId < 0 || AppearanceYear < 0 || LifespanTier < 0 || SuccessionPriority < 0 || Personality is < 0 or > 3) return false;
