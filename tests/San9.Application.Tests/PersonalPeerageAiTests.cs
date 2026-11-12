@@ -7,12 +7,15 @@ namespace San9.Application.Tests;
 
 public sealed class PersonalPeerageAiTests
 {
-    private static (SimulationEngine Engine, ControlSeat Seat) Create(uint money, bool authorized, int salary = 1)
+    private static (SimulationEngine Engine, ControlSeat Seat) Create(uint money, bool authorized, int salary = 1, bool competing = false)
     {
         var seat = new ControlSeat("ai", 1, ControllerKind.Automatic);
         var world = WorldState.Create(new(190, 1, 1), 1,
             [new ForceState(1, 100) { LeaderId = 1, RankId = 3, PersonalPeerageRegimeId = "test" }],
             [new SettlementState(1, 1, 0, 100, 100, 0, 0, 0, 100, 0, 100)],
+            competing ? [new OfficerState(1, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler },
+                new OfficerState(2, 1, 1, new(50, 50, 50, 50), false) { TacticProficiencies = [1000, 0, 0, 0, 0, 0, 0, 0, 0] },
+                new OfficerState(3, 1, 1, new(50, 50, 50, 50), false) { BattleMerit = ImmutableSortedDictionary<int, int>.Empty.Add(1, 1) }] :
             [new OfficerState(1, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler },
              new OfficerState(2, 1, 1, new(50, 50, 50, 50), false)],
             controls: [seat], corps: [new CorpsState(1, 1, 1, new(money, 1000)) { IsRoot = true }]);
@@ -24,6 +27,15 @@ public sealed class PersonalPeerageAiTests
         var rules = new SimulationRules { Economy = new EconomyRulebook([], []) { PersonalPeerageRegimes = ImmutableDictionary<string, PersonalPeerageRegime>.Empty
             .Add("test", new([period])) } };
         return (new SimulationEngine(world, rules), seat);
+    }
+
+    [Fact]
+    public void AiPrioritizesRecordedMeritInTheCurrentForce()
+    {
+        var (engine, seat) = Create(1000, true, competing: true);
+        OriginalAiPersonalPeerage.Manage(engine, seat, []);
+        Assert.NotNull(engine.Snapshot.Officers.Single(p => p.Id == 3).PersonalPeerage);
+        Assert.Null(engine.Snapshot.Officers.Single(p => p.Id == 2).PersonalPeerage);
     }
 
     [Fact]

@@ -11,6 +11,23 @@ namespace San9.Application.Tests;
 public sealed class PersonalPeerageSerializationTests
 {
     [Fact]
+    public void BattleMeritIsSavedPerForceAndOldSaveWithoutItLoads()
+    {
+        var basis = G01ScenarioTests.Fixture();
+        var scenario = basis with { Officers = basis.Officers.Select(o => o.State.Id == 2
+            ? o with { State = o.State with { BattleMerit = ImmutableSortedDictionary<int, int>.Empty.Add(1, 4).Add(2, 7) } } : o).ToArray() };
+        var session = GameSession.Start(scenario, 42);
+        var saved = SaveService.Encode(session);
+        var restored = SaveService.Decode(saved, scenario);
+        Assert.Equal(4, restored.Snapshot.Officers.Single(p => p.Id == 2).BattleMeritFor(1));
+        Assert.Equal(7, restored.Snapshot.Officers.Single(p => p.Id == 2).BattleMeritFor(2));
+        var json = System.Text.Json.Nodes.JsonNode.Parse(saved)!;
+        foreach (var item in json["session"]!["world"]!["officers"]!.AsArray()) item!.AsObject().Remove("battleMerit");
+        var old = SaveService.Decode(System.Text.Encoding.UTF8.GetBytes(json.ToJsonString()), scenario);
+        Assert.Equal(0, old.Snapshot.Officers.Single(p => p.Id == 2).BattleMeritFor(1));
+    }
+
+    [Fact]
     public void HistoricalEvidenceRespectsDatesAndDoesNotCreateTitleForDeadOfficer()
     {
         var person = new OfficerState(2, 1, 1, new(50, 50, 50, 50), false);

@@ -15,18 +15,17 @@ internal static class OriginalAiPersonalPeerage
         if (force?.PersonalPeerageRegimeId is null || root is null) return;
         var policy = engine.GetPersonalPeeragePolicy(seat.ForceId);
         var context = new CommandContext(root.ControlMode == CorpsControlMode.Automatic ? CorpsControl.ControllerId(root.Id) : seat.ControllerId);
-        // No separate merit ledger exists yet: tactic experience and service length are observable proxies.
         var candidates = world.Officers.Where(p => p.OwnerId == seat.ForceId && p.IsServing && !p.IsDormant && p.Id != force.LeaderId)
-            .Select(p => new { Person = p, Experience = p.TacticProficiencies.Sum(x => (long)x),
+            .Select(p => new { Person = p, Merit = p.BattleMeritFor(seat.ForceId), Experience = p.TacticProficiencies.Sum(x => (long)x),
                 Service = p.StatusStartYear is int year ? Math.Max(0L, (long)world.Clock.Year - year) : 0L })
-            .OrderByDescending(c => c.Experience).ThenByDescending(c => c.Service).ThenBy(c => c.Person.Loyalty).ThenBy(c => c.Person.Id);
+            .OrderByDescending(c => c.Merit).ThenByDescending(c => c.Experience).ThenByDescending(c => c.Service).ThenBy(c => c.Person.Loyalty).ThenBy(c => c.Person.Id);
         foreach (var candidate in candidates)
         {
             var person = candidate.Person;
             int current = person.PersonalPeerage is { } title ? (int)title.Grade : -1;
-            if (current >= (int)PersonalPeerageGrade.CountyMarquis || candidate.Experience == 0 && person.Loyalty >= 100) continue;
+            if (current >= (int)PersonalPeerageGrade.CountyMarquis || candidate.Merit == 0 && candidate.Experience == 0 && person.Loyalty >= 100) continue;
             int target = Math.Min((int)PersonalPeerageGrade.CountyMarquis, current + 1);
-            if (target > 0 && candidate.Experience < target * 1000L) continue;
+            if (target > 0 && candidate.Merit < target * 3 && candidate.Experience < target * 1000L) continue;
             var grade = (PersonalPeerageGrade)target;
             int? assigned = person.UnitId is int unit ? world.Units.FirstOrDefault(u => u.Id == unit)?.CorpsId :
                 person.SettlementId is int place ? world.Settlements.FirstOrDefault(s => s.Id == place)?.CorpsId : null;

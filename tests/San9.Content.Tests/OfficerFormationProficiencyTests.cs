@@ -14,7 +14,8 @@ public sealed class OfficerFormationProficiencyTests
     {
         var profile = OfficerDefaults.Create(1);
         var state = new OfficerState(1, 1, 1, new(50, 50, 50, 50), false)
-        { OfficeId = 7, PersonalPeerage = new(PersonalPeerageGrade.VillageMarquis, "汉寿亭侯") };
+        { OfficeId = 7, PersonalPeerage = new(PersonalPeerageGrade.VillageMarquis, "汉寿亭侯"),
+            BattleMerit = ImmutableSortedDictionary<int, int>.Empty.Add(1, 4) };
         var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, new() { [profile.NameKey] = profile.Name });
         var evidence = new PersonalPeerageEvidence(state.PersonalPeerage!, new(189, 1, 1), null, PersonalPeerageEvidenceKind.Historical, "测试来源");
         var placement = ScenarioOfficerState.From(new(profile.NameKey, state) { InitialPersonalPeerage = evidence }, profile, texts, 50);
@@ -23,6 +24,7 @@ public sealed class OfficerFormationProficiencyTests
         var restored = compiled.State;
         Assert.Equal(state.PersonalPeerage, restored.PersonalPeerage);
         Assert.Equal(7, restored.OfficeId);
+        Assert.Equal(4, restored.BattleMeritFor(1));
         Assert.Equal(evidence, compiled.InitialPersonalPeerage);
     }
 

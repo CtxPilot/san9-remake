@@ -265,6 +265,7 @@ public sealed record ScenarioOfficerState(int Id)
     [JsonRequired] public required int? RegionId { get; init; }
     [JsonRequired] public required int? OfficeId { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerage? PersonalPeerage { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ImmutableSortedDictionary<int, int>? BattleMerit { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public PersonalPeerageEvidence? InitialPersonalPeerage { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public FormationEvidence[]? InitialFormationEvidence { get; init; }
     [JsonRequired] public required bool IsCommander { get; init; }
@@ -287,6 +288,7 @@ public sealed record ScenarioOfficerState(int Id)
         RegionId = value.State.RegionId,
         OfficeId = value.State.OfficeId,
         PersonalPeerage = value.State.PersonalPeerage,
+        BattleMerit = value.State.BattleMerit,
         InitialPersonalPeerage = value.InitialPersonalPeerage,
         InitialFormationEvidence = value.InitialFormationEvidence,
         IsCommander = value.State.IsCommander,
@@ -312,6 +314,7 @@ public sealed record ScenarioOfficerState(int Id)
             RegionId = RegionId,
             OfficeId = OfficeId,
             PersonalPeerage = PersonalPeerage,
+            BattleMerit = BattleMerit,
             IsCommander = IsCommander,
             ForceLoyalties = ForceLoyalties,
             RewardedThisXun = RewardedThisXun,

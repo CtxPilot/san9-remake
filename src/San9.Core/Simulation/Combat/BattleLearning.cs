@@ -6,6 +6,7 @@ internal static class BattleLearning
 {
     internal static void DefeatedUnit(WorldMutation world, BattleSource winner, List<DomainEvent> events)
     {
+        OfficerBattleMerit.Credit(world, winner, 1, "unit-defeated", events);
         int? commander = winner.IsSettlement ? LeadershipMaintenance.Commander(world, winner.Id)?.Id : world.Units[winner.Id].CommanderId;
         if (commander is int officer)
             OfficerAbilityGrowth.TryIncrease(world, officer, OfficerAbility.Leadership, "military-defeat-growth", events);
@@ -14,6 +15,7 @@ internal static class BattleLearning
     internal static void CapturedSettlement(WorldMutation world, BattleSource winner, MilitaryRulebook military, List<DomainEvent> events)
     {
         if (winner.IsSettlement) return;
+        OfficerBattleMerit.Credit(world, winner, 3, "settlement-captured", events);
         var unit = world.Units[winner.Id];
         var members = world.ServingUnitMembers(unit.Id).OrderBy(p => p.Id).ToArray();
         if (members.Length == 0) return;

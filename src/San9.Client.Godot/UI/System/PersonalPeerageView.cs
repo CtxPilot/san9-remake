@@ -18,6 +18,8 @@ public partial class PersonalPeerageView : ModalView, IModalInputRouter
     private Control? _page;
     private static readonly CatalogPage[] OfficersPage = [new("武将", [
         new("name", "武将", 16, CatalogAlignment.Left), new("peerage", "爵位", 16, CatalogAlignment.Left),
+        new("loyalty", "忠诚", 8, CatalogAlignment.Right)]), new("战功", [
+        new("name", "武将", 16, CatalogAlignment.Left), new("merit", "本势力战功", 16, CatalogAlignment.Right),
         new("loyalty", "忠诚", 8, CatalogAlignment.Right)])];
     private static readonly CatalogPage[] GradesPage = [new("爵位", [
         new("grade", "爵位", 16, CatalogAlignment.Left), new("limit", "名额", 12, CatalogAlignment.Right),
@@ -52,8 +54,10 @@ public partial class PersonalPeerageView : ModalView, IModalInputRouter
         var names = view.Officers.ToDictionary(p => p.Id, p => Texts.Resolve(p.NameKey));
         var rows = people.Select((p, i) => new CatalogRow(i, [names[p.Id],
             p.PersonalPeerage is { } title ? title.Title ?? GradeName(title.Grade) : "无", OfficerCatalog.DisplayLoyalty(p.Loyalty)])).ToArray();
+        var meritRows = people.Select((p, i) => new CatalogRow(i, [names[p.Id], p.BattleMeritFor(force),
+            OfficerCatalog.DisplayLoyalty(p.Loyalty)])).ToArray();
         Replace(new CatalogView { Title = "封爵", HintText = $"{view.PersonalPeerageRegimeName(force) ?? "爵制未配置"}　选择武将，再选择爵位。", CloseTitle = "中止",
-            Textures = Textures, Service = Service, Pages = OfficersPage, ReadRows = _ => rows, Closed = Closed,
+            Textures = Textures, Service = Service, Pages = OfficersPage, ReadRows = page => page == 0 ? rows : meritRows, Closed = Closed,
             Activated = index => ShowGrades(people[index].Id) });
     }
     private void ShowGrades(int officerId)
