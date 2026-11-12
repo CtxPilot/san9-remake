@@ -716,6 +716,9 @@ public sealed partial class SimulationEngine
                         return Reject(CommandRejection.NotActiveController);
                     development = DomesticDevelopmentHandler.Apply(mutation, develop.Development, _rules.Economy, _rules.Military, events);
                     if (!development.Value.Accepted) return Reject(CommandRejection.DevelopmentFailed, development);
+                    if (development.Value.Increment > 0)
+                        foreach (int officer in develop.Development.OfficerIds.Order())
+                            OfficerServiceMerit.Credit(mutation, officer, command.IssuerId, 1, "development", events);
                     events.Add(new DevelopmentCompletedEvent(mutation.Clock, develop.Development,
                         development.Value.Increment, development.Value.Cost) { Bonus = development.Value.Bonus });
                     break;

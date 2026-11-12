@@ -94,6 +94,7 @@ internal static class WorldInvariants
                     (!state.AllSettlements.ContainsKey(scheduled.SettlementId) || scheduled.ForceId is int scheduledForce && !state.AllForces.ContainsKey(scheduledForce)) ||
                 officer.ForceLoyalties.Keys.Any(id => !state.AllForces.ContainsKey(id)) ||
                 officer.BattleMerit?.Keys.Any(id => !state.AllForces.ContainsKey(id)) == true ||
+                officer.ServiceMerit?.Keys.Any(id => !state.AllForces.ContainsKey(id)) == true ||
                 officer.SettlementId is int location && !state.AllSettlements.ContainsKey(location) ||
                 officer.OwnerId is int owner && !state.AllForces.ContainsKey(owner) ||
                 officer.UnitId is int unitId && (!state.Units.TryGetValue(unitId, out var unit) ||

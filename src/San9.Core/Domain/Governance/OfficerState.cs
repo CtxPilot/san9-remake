@@ -71,6 +71,9 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ImmutableSortedDictionary<int, int>? BattleMerit { get; init; }
     public int BattleMeritFor(int forceId) => BattleMerit?.GetValueOrDefault(forceId) ?? 0;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableSortedDictionary<int, int>? ServiceMerit { get; init; }
+    public int ServiceMeritFor(int forceId) => ServiceMerit?.GetValueOrDefault(forceId) ?? 0;
     [JsonRequired] public bool IsCommander { get; init; }
     private LoyaltyMap _loyalties = LoyaltyMap.Empty;
     // The wire contract contains only overrides. Keep incoming entries until the content baseline is bound.
@@ -114,6 +117,7 @@ public sealed record OfficerState(int Id, int? OwnerId, int? SettlementId, Offic
         if (FormationPractice is not null && FormationPractice.Any(p => p.Key < 0 || p.Value is < 1 or >= FormationKnowledge.PracticeDaysToLearn ||
             FormationProficiencies?.ContainsKey(p.Key) == true)) return false;
         if (BattleMerit is not null && (BattleMerit.IsEmpty || BattleMerit.Any(p => p.Key < 0 || p.Value is < 1 or > 1000000))) return false;
+        if (ServiceMerit is not null && (ServiceMerit.IsEmpty || ServiceMerit.Any(p => p.Key < 0 || p.Value is < 1 or > 1000000))) return false;
         if (FormationTeaching is { } teaching && (teaching.TeacherId < 0 || teaching.TeacherId == Id || teaching.ForceId < 0 ||
             teaching.SettlementId < 0 || teaching.FormationId < 0 || teaching.DaysRemaining is < 1 or > 30)) return false;
         if (EquippedTacticId < 0 || TacticCooldown < 0 || LearnedTactics is null || TacticProficiencies.IsDefault || TacticProficiencies.Length != 9 ||

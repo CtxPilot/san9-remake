@@ -16,7 +16,7 @@ internal static class OriginalAiPersonalPeerage
         var policy = engine.GetPersonalPeeragePolicy(seat.ForceId);
         var context = new CommandContext(root.ControlMode == CorpsControlMode.Automatic ? CorpsControl.ControllerId(root.Id) : seat.ControllerId);
         var candidates = world.Officers.Where(p => p.OwnerId == seat.ForceId && p.IsServing && !p.IsDormant && p.Id != force.LeaderId)
-            .Select(p => new { Person = p, Merit = p.BattleMeritFor(seat.ForceId), Experience = p.TacticProficiencies.Sum(x => (long)x),
+            .Select(p => new { Person = p, Merit = (long)p.BattleMeritFor(seat.ForceId) + p.ServiceMeritFor(seat.ForceId), Experience = p.TacticProficiencies.Sum(x => (long)x),
                 Service = p.StatusStartYear is int year ? Math.Max(0L, (long)world.Clock.Year - year) : 0L })
             .OrderByDescending(c => c.Merit).ThenByDescending(c => c.Experience).ThenByDescending(c => c.Service).ThenBy(c => c.Person.Loyalty).ThenBy(c => c.Person.Id);
         foreach (var candidate in candidates)

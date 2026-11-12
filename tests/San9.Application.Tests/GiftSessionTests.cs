@@ -195,6 +195,7 @@ public sealed class GiftSessionTests
         StateAssert.Equal(session.Capture(), restored.Capture());
         var gift = Assert.Single(result.Events.OfType<GiftResolvedEvent>());
         Assert.True(gift.Accepted);
+        Assert.Equal(1, session.Snapshot.Officers.Single(p => p.Id == 12).ServiceMeritFor(1));
         Assert.Equal(amount, gift.Received);
         Assert.Equal(0u, gift.Spent);
         Assert.Equal(0u, gift.Refunded);
@@ -257,6 +258,7 @@ public sealed class GiftSessionTests
         StateAssert.Equal(session.Capture(), restored.Capture());
         var gift = Assert.Single(result.Events.OfType<GiftResolvedEvent>());
         Assert.Equal(accept, gift.Accepted);
+        Assert.Equal(accept ? 1 : 0, session.Snapshot.Officers.Single(p => p.Id == 22).ServiceMeritFor(2));
         Assert.Equal(accept ? amount : 0, gift.Received);
         Assert.Equal(accept ? 0 : amount, gift.Refunded);
         Assert.Equal(0u, gift.Spent);

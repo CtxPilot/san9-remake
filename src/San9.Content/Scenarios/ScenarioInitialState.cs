@@ -322,6 +322,7 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
             Officers.Select(o => o.State.Id).Distinct().Count() != Officers.Length || Officers.Any(o =>
                 o.State.ForceLoyalties.Keys.Any(id => !forceIds.Contains(id)) ||
                 o.State.BattleMerit?.Keys.Any(id => !forceIds.Contains(id)) == true ||
+                o.State.ServiceMerit?.Keys.Any(id => !forceIds.Contains(id)) == true ||
                 o.State.SettlementId is int location && !settlementIds.Contains(location) ||
                 o.State.OwnerId is int owner && !forceIds.Contains(owner) ||
                 o.State.UnitId is int unit && !Units.Any(u => u.Id == unit &&
