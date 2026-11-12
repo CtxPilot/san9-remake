@@ -14,6 +14,32 @@ namespace San9.Application.Tests;
 public sealed partial class OriginalAiActionsTests
 {
     [Fact]
+    public void MixedTroopAndOtherModuleChoicesSurviveSaveIndependently()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])]
+        } };
+        for (var flags = 0; flags < 16; flags++)
+        {
+            var settings = new NewGameSettings
+            {
+                MixedTroopsEnabled = true,
+                NaturalDeathsEnabled = (flags & 1) != 0,
+                EquipmentDevelopmentEnabled = (flags & 2) != 0,
+                FormationLearningEnabled = (flags & 4) != 0,
+                PersonalPeerageEnabled = (flags & 8) != 0
+            };
+            var session = GameSession.Start(content, 42, settings: settings);
+            var restored = SaveService.Decode(SaveService.Encode(session), content);
+            Assert.Equal(settings, restored.Snapshot.Simulation.NewGame);
+            Assert.Equal(settings.FormationLearningEnabled, restored.Snapshot.Simulation.NewGame.FormationTrainingEnabled);
+        }
+    }
+
+    [Fact]
     public void LegacyTreasureOnlyCatalogAlsoReceivesBasicEquipmentRecipes()
     {
         var basis = Fixture();
