@@ -6,6 +6,49 @@ namespace San9.Core.Tests;
 
 public sealed class DemobilizationTests
 {
+    [Fact]
+    public void MixedCombatLossesAndReturnPreserveBothDetachmentsAcrossRestore()
+    {
+        var world = WorldState.Create(new(190, 1, 1), 42, [new(1, 0), new(2, 0)],
+            [new(1, 1, 100, 100, 100, 50, 0, 0, 100, 0, 100), new(2, 2, 100, 100, 100, 50, 0, 0, 100, 0, 100)],
+            [new OfficerState(11, 1, null, new(70, 70, 70, 70), false) { UnitId = 0 },
+                new OfficerState(12, 1, null, new(70, 70, 70, 70), false) { UnitId = 0 }],
+            units: [new(0, 1, new(2, 2), 1000)
+            {
+                Morale = 90,
+                MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty
+                    .Add(11, new(0, BattleRank.Front)).Add(12, new(0, BattleRank.Rear)),
+                Detachments = ImmutableDictionary<int, DetachmentState>.Empty
+                    .Add(11, new(0, 1, 400) { Weapon = new("spear", 200, 400, 0) })
+                    .Add(12, new(0, 1, 600) { Armor = new("armor", 600, 600, 0) })
+            }], corps: [new CorpsState(1, 1, null, new(1000, 1000)) { IsRoot = true },
+                new CorpsState(2, 2, null, new(1000, 1000)) { IsRoot = true }]);
+        var geography = new PersonnelRulebook([new(1, new(2, 2)), new(2, new(5, 2))]);
+        var military = new MilitaryRulebook(new(8, 3, [.. Enumerable.Repeat(0, 24)],
+            [new(0, 1, null)], [], [new(1, new(2, 2), new(1, 1)), new(2, new(5, 2), new(1, 1))]));
+        var mutation = world.BeginMutation(); List<DomainEvent> events = [];
+        var profile = new CombatProfile(10, 10, 10, 10, 50);
+        MilitaryCombat.ApplyUnitLoss(mutation, mutation.Units[0], 200, 0, profile, new(2, true), events);
+        MilitaryCombat.ApplyUnitLoss(mutation, mutation.Units[0], 100, 0, profile, new(2, true), events, ranged: true);
+        Assert.Equal(87u, mutation.Units[0].Detachments[11].Weapon!.RemainingSets);
+        Assert.Equal(525u, mutation.Units[0].Detachments[12].Armor!.RemainingSets);
+        mutation.SetSimulation(mutation.Simulation with { Boundary = SimulationBoundary.Stable });
+        world.Commit(mutation);
+
+        var restored = WorldState.Restore(world.CreateSnapshot());
+        mutation = restored.BeginMutation();
+        MilitaryMovement.Absorb(mutation, mutation.Units[0], 1, new([]), geography, military, events);
+        Assert.Empty(mutation.Units);
+        Assert.Equal(87u, mutation.Forces[1].ArmamentInventory!["spear"]);
+        Assert.Equal(525u, mutation.Forces[1].ArmamentInventory!["armor"]);
+        Assert.Single(events.OfType<UnitAbsorbedEvent>());
+        mutation.SetSimulation(mutation.Simulation with { Boundary = SimulationBoundary.Stable });
+        restored.Commit(mutation);
+        var saved = WorldState.Restore(restored.CreateSnapshot()).CreateSnapshot();
+        Assert.Equal(87u, saved.Forces.Single(f => f.Id == 1).ArmamentInventory!["spear"]);
+        Assert.Equal(525u, saved.Forces.Single(f => f.Id == 1).ArmamentInventory!["armor"]);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
