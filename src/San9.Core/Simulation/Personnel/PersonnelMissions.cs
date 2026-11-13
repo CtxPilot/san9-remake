@@ -70,6 +70,10 @@ internal static class PersonnelMissions
     internal const string MoveKind = "personnel-move";
     internal const string SearchKind = "personnel-search";
 
+    internal static bool DirectSearch(WorldMutation world, int forceId, SettlementState home) =>
+        world.Simulation.Controls.Any(c => c.ForceId == forceId && c.Kind == ControllerKind.Player) &&
+        (home.CorpsId is not int corpsId || world.Corps[corpsId].ControlMode == CorpsControlMode.Direct);
+
     internal static bool CanAct(WorldMutation world, int force, int id) =>
         world.Officers.TryGetValue(id, out var person) && person.IsServing && person.OwnerId == force &&
         person.SettlementId is int origin && world.Settlements.TryGetValue(origin, out var home) && home.OwnerId == force && home.CanHostPersons && home.Durability > 0 &&
@@ -266,8 +270,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
          journey.TargetOfficerId is >= 0 && journey.SuccessRoll is >= 0 and < 100);
 
     private static bool Direct(WorldMutation world, PersistentTask task) =>
-        world.Simulation.Controls.Any(c => c.ForceId == task.ForceId && c.Kind == ControllerKind.Player) &&
-        (PersonnelLocations.TaskHome(world, task).CorpsId is not int corpsId || world.Corps[corpsId].ControlMode == CorpsControlMode.Direct);
+        PersonnelMissions.DirectSearch(world, task.ForceId, PersonnelLocations.TaskHome(world, task));
 
     internal override int? DecisionRecipient(WorldMutation world, PersistentTask task) =>
         task.SearchEncounter is not null ? task.ForceId : null;

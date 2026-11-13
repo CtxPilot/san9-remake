@@ -78,6 +78,18 @@ public sealed class SearchOutcomeTests
         San9.Tests.StateAssert.Equal(before, engine.CaptureStableState());
     }
 
+    [Theory]
+    [InlineData(false, AdviserOpinion.Favorable)]
+    [InlineData(true, AdviserOpinion.Unfavorable)]
+    public void SearchAdviceOnlyCountsLegacyTreasureWhenTheActorCanDiscoverIt(bool automatic, AdviserOpinion expected)
+    {
+        var engine = Engine(false, true, automatic: automatic, adviser: true);
+        var single = engine.GetPersonnelJourney(1, 2, 30, PersonnelJourneyKind.Search).Advice;
+        var batch = engine.GetPersonnelAdvice(1, PersonnelJourneyKind.Search, [(2, 30)])[(2, 30)].Advice;
+        Assert.Equal(expected, single.Opinion);
+        Assert.Equal(single, batch);
+    }
+
     [Fact]
     public void BatchSearchClaimsOneTreasureOnlyOnce()
     {
