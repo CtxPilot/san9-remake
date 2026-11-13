@@ -56,7 +56,27 @@ internal static class OriginalAiArmament
             .Where(pair => rules.Armaments.TryGetValue(pair.Key, out var item) && item.Slot == slot).Sum(pair => (long)pair.Value) +
             (force.ArmamentProduction is { } progress && rules.Armaments.TryGetValue(progress.DefinitionId, out var pending) && pending.Slot == slot
                 ? (long)progress.Batches * ArmamentInventory.SetsPerBatch : 0);
-        var choice = rules.Armaments.Values.Where(item => item.ResearchProjectId is null || force.CompletedResearch.Contains(item.ResearchProjectId))
+        var detachments = world.Units.Where(item => item.OwnerId == force.Id).SelectMany(item => item.Detachments.Values).ToArray();
+        long Demand(ArmamentDefinition item) => detachments.Where(detachment => item.Supports(detachment.TroopTypeId))
+            .Sum(detachment =>
+            {
+                var issued = item.Slot == ArmamentSlot.Weapon ? detachment.Weapon : detachment.Armor;
+                return issued is null ? (long)detachment.Soldiers : issued.DefinitionId == item.Id
+                    ? (long)detachment.Soldiers - issued.RemainingSets : 0L;
+            });
+        long Available(ArmamentDefinition item)
+        {
+            ulong reserve = force.ArmamentReserve?.GetValueOrDefault(item.Id) ?? 0;
+            long stock = force.ArmamentInventory?.GetValueOrDefault(item.Id) ?? 0;
+            long pending = force.ArmamentProduction is { } production && production.DefinitionId == item.Id
+                ? (long)production.Batches * ArmamentInventory.SetsPerBatch : 0;
+            return (long)Math.Min((ulong)long.MaxValue, Math.Min((ulong)long.MaxValue - (ulong)stock - (ulong)pending, reserve) + (ulong)stock + (ulong)pending);
+        }
+        var eligible = rules.Armaments.Values.Where(item => item.ResearchProjectId is null || force.CompletedResearch.Contains(item.ResearchProjectId)).ToArray();
+        var choice = eligible.Where(item => Demand(item) > Available(item))
+            .OrderByDescending(item => Demand(item) - Available(item)).ThenBy(item => item.PurchaseCostPerThousand)
+            .ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();
+        choice ??= eligible
             .Where(item => Stock(item.Slot) < Math.Min(soldiers, 5000))
             .OrderBy(item => Stock(item.Slot)).ThenBy(item => item.PurchaseCostPerThousand)
             .ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();
@@ -74,7 +94,7 @@ internal static class OriginalAiArmament
         world = engine.Snapshot;
         force = world.Forces.Single(item => item.Id == seat.ForceId);
         root = world.Corps.Single(item => item.Id == root.Id);
-        if (Stock(choice.Slot) >= 1000 || choice.PurchaseCostPerThousand > (long)root.Treasury.Money / 4 + (force.ArmamentMigrationCredit ?? 0)) return;
+        if (Available(choice) >= 1000 || choice.PurchaseCostPerThousand > (long)root.Treasury.Money / 4 + (force.ArmamentMigrationCredit ?? 0)) return;
         long next = world.Simulation.NextSequence;
         var purchase = new PurchaseArmamentCommand(SimulationIdentity.Command(next, force.Id), force.Id, next, place.Id, choice.Id, 1);
         if (!engine.Validate(context, purchase).Accepted) return;

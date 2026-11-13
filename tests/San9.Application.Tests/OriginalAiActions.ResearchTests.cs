@@ -101,6 +101,37 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void AiBuysCompatibleWeaponsWhenOtherWeaponStockCannotEquipTheUnit()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "弓兵", 1, ImmutableDictionary<int, int>.Empty), new(101, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [101], 8, 0, 100, null),
+                new("bow", "弓", ArmamentSlot.Weapon, [100], 8, 0, 100, null)]
+        } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42, settings: new NewGameSettings { MixedTroopsEnabled = true }).CreateSnapshot();
+        initial = initial with
+        {
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 },
+            Forces = initial.Forces.Select(force => force.Id == 2 ? force with
+                { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 5000) } : force).ToArray(),
+            Units = initial.Units.Select(unit => unit.Id == 20 ? unit with { Position = new(37, 7) } : unit).ToArray()
+        };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
+
+        Assert.Equal("bow", Assert.Single(events.OfType<ArmamentPurchasedEvent>()).DefinitionId);
+        Assert.Equal(1000u, engine.Snapshot.Forces.Single(force => force.Id == 2).ArmamentInventory!["bow"]);
+        Assert.Equal(5000u, engine.Snapshot.Forces.Single(force => force.Id == 2).ArmamentInventory!["spear"]);
+    }
+
+    [Fact]
     public void AiManufacturesArmamentsWithTheSameModuleAndResourceRules()
     {
         var basis = Fixture();
