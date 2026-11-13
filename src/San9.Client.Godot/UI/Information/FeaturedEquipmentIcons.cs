@@ -47,6 +47,8 @@ internal static class FeaturedEquipmentIcons
         {
             ("legacy-treasure:0", "赤兔马" or "赤兔馬") => "res://assets/equipment/red-hare.png",
             ("legacy-treasure:9", "方天画戟" or "方天畫戟") => "res://assets/equipment/fangtian-ji.png",
+            ("legacy-treasure:10", "青龙偃月刀" or "青龍偃月刀") => "res://assets/equipment/green-dragon-blade.png",
+            ("legacy-treasure:11", "蛇矛") => "res://assets/equipment/serpent-spear.png",
             _ => null
         };
         return path is not null && ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
