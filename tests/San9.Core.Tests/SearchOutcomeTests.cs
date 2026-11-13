@@ -39,6 +39,7 @@ public sealed class SearchOutcomeTests
         var engine = Engine(false, false, featured: true);
         var result = Search(engine);
         Assert.Equal(SearchResultKind.Equipment, result.Result);
+        Assert.Equal(1, engine.Snapshot.Officers.Single(o => o.Id == 2).ServiceMeritFor(1));
         Assert.Equal(100, result.EquipmentId);
         var found = Assert.Single(engine.Snapshot.Equipment);
         Assert.Equal(1, found.OfficerId);
@@ -97,6 +98,7 @@ public sealed class SearchOutcomeTests
         var engine = Engine(false, true);
         var result = Search(engine);
         Assert.Equal(SearchResultKind.Treasure, result.Result);
+        Assert.Equal(1, engine.Snapshot.Officers.Single(o => o.Id == 2).ServiceMeritFor(1));
         Assert.Equal(10, result.TreasureId);
         Assert.Equal(1, Assert.Single(engine.Snapshot.Treasures).HolderId);
         Assert.Equal(engine.Snapshot.Officers.Single(p => p.Id == 1).BaseAbilities.War + 5, engine.GetAbilities(engine.Snapshot)[1].War);
@@ -111,6 +113,7 @@ public sealed class SearchOutcomeTests
         var result = Search(engine);
         Assert.Equal(SearchResultKind.Money, result.Result);
         Assert.True(result.Money > 0);
+        Assert.Equal(1, engine.Snapshot.Officers.Single(o => o.Id == 2).ServiceMeritFor(1));
         Assert.Equal((long)before + result.Money - 1, engine.Snapshot.Corps.Single(c => c.IsRoot).Treasury.Money); // Normal xun salary remains payable.
         Assert.Null(Assert.Single(engine.Snapshot.Treasures).HolderId);
         Assert.DoesNotContain(engine.Snapshot.Simulation.RandomStreams, s => s.Name is "personnel-search-treasure" or "personnel-politics-growth");

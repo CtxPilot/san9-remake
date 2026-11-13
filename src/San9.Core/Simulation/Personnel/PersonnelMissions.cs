@@ -451,6 +451,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
             bool transferredObject = PersonnelDefection.Recruit(world, task, simulationRules, events);
             if (!transferredObject) PersonnelReturns.Start(world, task, rules, events, true, target.Id);
             PersonnelMissions.GrowPolitics(world, task.OfficerId, events);
+            OfficerServiceMerit.Credit(world, task.OfficerId, task.ForceId, 2, "recruitment-succeeded", events);
         }
         else RecruitmentRules.Failure(world, task.ForceId, target.Id, threshold, events);
         events.Add(new RecruitmentResolvedEvent(world.Clock, task.OfficerId, target.Id, threshold, roll, success) { Occurrence = occurrence });
@@ -492,6 +493,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
                 RecruitmentRules.SetLoyalty(world, target.Id, task.ForceId, 49, "search-recruit-failed", events);
         }
         PersonnelMissions.GrowPolitics(world, task.OfficerId, events);
+        OfficerServiceMerit.Credit(world, task.OfficerId, task.ForceId, recruited ? 2 : 1, "search-person", events);
         events.Add(new SearchResolvedEvent(world.Clock, task.OfficerId, destination, target.Id, recruited) { Result = SearchResultKind.Person });
     }
 
@@ -516,6 +518,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
                     var item = items[selected];
                     world.Replace(item with { Discovery = TreasureDiscovery.Discovered, HolderId = rulerId });
                     PersonnelMissions.GrowPolitics(world, task.OfficerId, events);
+                    OfficerServiceMerit.Credit(world, task.OfficerId, task.ForceId, 1, "search-treasure", events);
                     events.Add(new SearchResolvedEvent(world.Clock, task.OfficerId, destination, null, false)
                         { Result = SearchResultKind.Treasure, TreasureId = item.Id });
                     return;
@@ -523,6 +526,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
                 var found = equipment[selected - items.Length];
                 world.SetEquipment(EquipmentRules.MoveToOfficer(found, rulerId));
                 PersonnelMissions.GrowPolitics(world, task.OfficerId, events);
+                OfficerServiceMerit.Credit(world, task.OfficerId, task.ForceId, 1, "search-equipment", events);
                 events.Add(new SearchResolvedEvent(world.Clock, task.OfficerId, destination, null, false)
                     { Result = SearchResultKind.Equipment, EquipmentId = found.Id });
                 return;
@@ -535,6 +539,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
             var account = ResourceAccounts.Resolve(world, task.ForceId, corpsId);
             uint before = ResourceAccounts.Balance(world, account, ResourceKind.Money);
             uint after = ResourceAccounts.Change(world, account, ResourceKind.Money, funds, "search-funds", destination, events);
+            if (after > before) OfficerServiceMerit.Credit(world, task.OfficerId, task.ForceId, 1, "search-funds", events);
             events.Add(new SearchResolvedEvent(world.Clock, task.OfficerId, destination, null, false)
                 { Result = SearchResultKind.Money, Money = (long)after - before });
             return;
