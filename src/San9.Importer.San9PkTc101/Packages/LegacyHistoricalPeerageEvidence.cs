@@ -62,6 +62,10 @@ public static class LegacyHistoricalPeerageEvidence
             }
             PersonalPeerageEvidence? evidence = (officer.State.Id, name, courtesyName) switch
             {
+                (253, "蒋琬", "公琰") => new(new(PersonalPeerageGrade.VillageMarquis, "安阳亭侯"),
+                    new(239, 1, 1), new(245, 12, 30), PersonalPeerageEvidenceKind.Historical,
+                    "《三国志·蒋琬传》在延熙元年诏命之前记载封安阳亭侯、延熙九年去世：https://www.shidianguji.com/book/SK0709/chapter/1l9igy92ju522；" +
+                    "仅取延熙元年次年至去世前的完整年度，不推定具体受封日期。"),
                 (416, "张飞", "益德") => new(new(PersonalPeerageGrade.VillageMarquis, "新亭侯"),
                     new(215, 1, 1), new(220, 12, 30), PersonalPeerageEvidenceKind.Historical,
                     "《三国志·张飞传》记载定江南后封新亭侯、章武元年进封西乡侯：https://zh.wikisource.org/zh-hans/三國志/卷36；" +
