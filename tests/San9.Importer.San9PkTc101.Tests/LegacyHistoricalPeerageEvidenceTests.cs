@@ -7,6 +7,23 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class LegacyHistoricalPeerageEvidenceTests
 {
+    [Fact]
+    public void ZhangFeiTitleRequiresMatchingIdentityAndExcludesPromotionYear()
+    {
+        var person = new OfficerInitialState("name", new OfficerState(416, 1, 1, new(50, 50, 50, 50), false)) { CourtesyNameKey = "courtesy" };
+        var scenario = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "fixture", 215, 1, 1, null, [], [], [], []) { Officers = [person] };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, new() { ["name"] = "张飞", ["courtesy"] = "益德" });
+        var evidence = LegacyHistoricalPeerageEvidence.Apply(scenario, texts, true).Officers[0].InitialPersonalPeerage!;
+        Assert.Equal(new PersonalPeerage(PersonalPeerageGrade.VillageMarquis, "新亭侯"), evidence.Peerage);
+        Assert.False(evidence.Applies(new(214, 12, 30)));
+        Assert.True(evidence.Applies(new(215, 1, 1)));
+        Assert.True(evidence.Applies(new(220, 12, 30)));
+        Assert.False(evidence.Applies(new(221, 1, 1)));
+        Assert.Null(LegacyHistoricalPeerageEvidence.Apply(scenario, texts, false).Officers[0].InitialPersonalPeerage);
+        texts.Entries["courtesy"] = "他字";
+        Assert.Null(LegacyHistoricalPeerageEvidence.Apply(scenario, texts, true).Officers[0].InitialPersonalPeerage);
+    }
+
     [Theory]
     [InlineData(324, "曹仁", "子孝", "安平亭侯")]
     [InlineData(319, "曹洪", "子廉", "国明亭侯")]

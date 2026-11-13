@@ -62,6 +62,10 @@ public static class LegacyHistoricalPeerageEvidence
             }
             PersonalPeerageEvidence? evidence = (officer.State.Id, name, courtesyName) switch
             {
+                (416, "张飞", "益德") => new(new(PersonalPeerageGrade.VillageMarquis, "新亭侯"),
+                    new(215, 1, 1), new(220, 12, 30), PersonalPeerageEvidenceKind.Historical,
+                    "《三国志·张飞传》记载定江南后封新亭侯、章武元年进封西乡侯：https://zh.wikisource.org/zh-hans/三國志/卷36；" +
+                    "保守取平定益州次年至进封年前的完整年度，不推定具体受封日期。"),
                 (324, "曹仁", "子孝") => new(new(PersonalPeerageGrade.VillageMarquis, "安平亭侯"),
                     new(214, 1, 1), new(219, 12, 30), PersonalPeerageEvidenceKind.Historical,
                     "《三国志·曹仁传》记载转封安平亭侯及曹丕即王位后进封：https://www.shidianguji.com/zh/book/LS0004/chapter/1j7fnutukl9o8_33；" +
