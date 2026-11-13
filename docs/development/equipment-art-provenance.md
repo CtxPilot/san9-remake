@@ -23,6 +23,10 @@
 | `src/San9.Client.Godot/assets/equipment/sanjian-dao.png` | 三尖刀，独立设计的三尖长兵器 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/shuangtie-ji.png` | 双铁戟，独立设计的双持短戟 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/da-fu.png` | 大斧，独立设计的长柄斧 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/tie-bian.png` | 铁鞭，独立设计的铁质短兵 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/jili-guduo.png` | 铁蒺藜骨朵，独立设计的锤头兵器 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/liuxing-chui.png` | 流星锤，独立设计的链锤 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/meijian-dao.png` | 眉尖刀，独立设计的长柄刀 | 已接入；待实机检查 |
 
 玄纹长戟生成提示词：
 
@@ -49,5 +53,7 @@
 七星宝刀、雌雄一对剑和古锭刀图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求带七枚铜饰的环首刀、交叉双剑和古朴环首刀，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
 
 铁脊蛇矛、三尖刀、双铁戟和大斧图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求带中脊的波形矛、三尖长兵器、一对短戟和单刃大斧，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
+
+铁鞭、铁蒺藜骨朵、流星锤和眉尖刀图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求带环形凸纹的铁棒、带短突起的锤头、链与铁重物、细长刀头的长兵器，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
 
 其他旧名物和未配置图标的模组物品目前无对应图标，界面缺图时隐藏图像；旧名物逐件图标仍待制作。
