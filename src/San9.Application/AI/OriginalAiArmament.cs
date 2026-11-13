@@ -13,15 +13,17 @@ internal static class OriginalAiArmament
         var root = world.Corps.FirstOrDefault(item => item.OwnerId == seat.ForceId && item.IsRoot);
         if (force is null || root is null) return;
         var context = new CommandContext(root.ControlMode == CorpsControlMode.Automatic ? CorpsControl.ControllerId(root.Id) : seat.ControllerId);
+        int managedUnits = 0;
         foreach (int unitId in world.Units.Where(unit => unit.OwnerId == force.Id && !unit.Detachments.IsEmpty)
-                     .OrderBy(unit => unit.Id).Select(unit => unit.Id).Take(10))
+                     .OrderBy(unit => unit.Id).Select(unit => unit.Id))
         {
+            bool managed = false;
             long sequence = engine.Snapshot.Simulation.NextSequence;
             var command = new ResupplyUnitArmamentsCommand(SimulationIdentity.Command(sequence, force.Id), force.Id, sequence, unitId);
             if (engine.Validate(context, command).Accepted)
             {
                 var result = engine.Execute(context, command);
-                if (result.Submission.Accepted) events.AddRange(result.Events);
+                if (result.Submission.Accepted) { events.AddRange(result.Events); managed = true; }
             }
             var currentUnit = engine.Snapshot.Units.Single(item => item.Id == unitId);
             foreach (var (officerId, detachment) in currentUnit.Detachments.OrderBy(pair => pair.Key))
@@ -40,8 +42,9 @@ internal static class OriginalAiArmament
                     unitId, officerId, slot, issueChoice.Id);
                 if (!engine.Validate(context, configure).Accepted) continue;
                 var configured = engine.Execute(context, configure);
-                if (configured.Submission.Accepted) events.AddRange(configured.Events);
+                if (configured.Submission.Accepted) { events.AddRange(configured.Events); managed = true; }
             }
+            if (managed && ++managedUnits >= 10) break;
         }
         world = engine.Snapshot;
         force = world.Forces.Single(item => item.Id == seat.ForceId);

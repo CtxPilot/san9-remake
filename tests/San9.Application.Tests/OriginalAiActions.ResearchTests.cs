@@ -14,6 +14,51 @@ namespace San9.Application.Tests;
 public sealed partial class OriginalAiActionsTests
 {
     [Fact]
+    public void AiCanResupplyUnitAfterTenIneligibleUnits()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [100], 8, 0, 100, null)]
+        } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42, settings: new NewGameSettings { MixedTroopsEnabled = true }).CreateSnapshot();
+        var target = initial.Units.Single(unit => unit.Id == 20) with
+        {
+            Position = new(37, 7),
+            Detachments = initial.Units.Single(unit => unit.Id == 20).Detachments.SetItem(9,
+                initial.Units.Single(unit => unit.Id == 20).Detachments[9] with { Weapon = new("spear", 1000, 5000, 0) })
+        };
+        var idle = Enumerable.Range(100, 10).Select(id => target with
+        {
+            Id = id, ActiveEngagement = true, CommanderId = id + 1000,
+            MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty.Add(id + 1000, target.MemberPositions[9]),
+            Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(id + 1000, target.Detachments[9])
+        }).ToArray();
+        target = target with { Id = 200 };
+        initial = initial with
+        {
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0, NextUnitId = 201 },
+            Forces = initial.Forces.Select(force => force.Id == 2 ? force with
+                { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 500) } : force).ToArray(),
+            Units = initial.Units.Where(unit => unit.Id != 20).Concat(idle).Append(target).ToArray(),
+            Officers = initial.Officers.Select(officer => officer.Id == 9 ? officer with { UnitId = 200 } : officer)
+                .Concat(Enumerable.Range(100, 10).Select(id => initial.Officers.Single(officer => officer.Id == 9) with
+                    { Id = id + 1000, UnitId = id })).ToArray()
+        };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
+
+        Assert.Equal(200, Assert.Single(events.OfType<UnitArmamentsResuppliedEvent>()).UnitId);
+        Assert.Equal(1500u, engine.Snapshot.Units.Single(unit => unit.Id == 200).Detachments[9].Weapon!.RemainingSets);
+    }
+
+    [Fact]
     public void AuthoredHiddenEquipmentSurvivesNewGameAndSaveAndRejectsInvalidPlaces()
     {
         var basis = Fixture();
