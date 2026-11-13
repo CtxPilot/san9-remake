@@ -40,19 +40,23 @@ public sealed class ArmamentPersistenceTests
         var force = new ForceState(1, 0)
         {
             ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("iron-spear", 725),
+            ArmamentReserve = ImmutableDictionary<string, ulong>.Empty.Add("iron-spear", (ulong)uint.MaxValue + 123),
             ArmamentMigrationCredit = 240,
             ArmamentEscrowSuccessorId = 2
         };
         var restored = StrictJson.Deserialize<ForceState>(JsonSerializer.SerializeToUtf8Bytes(force, StrictJson.Options));
         Assert.Equal(725u, restored.ArmamentInventory!["iron-spear"]);
+        Assert.Equal((ulong)uint.MaxValue + 123, restored.ArmamentReserve!["iron-spear"]);
         Assert.Equal(240, restored.ArmamentMigrationCredit);
         Assert.Equal(2, restored.ArmamentEscrowSuccessorId);
         var oldForce = JsonNode.Parse(JsonSerializer.Serialize(force, StrictJson.Options))!.AsObject();
         oldForce.Remove("armamentInventory");
+        oldForce.Remove("armamentReserve");
         oldForce.Remove("armamentMigrationCredit");
         oldForce.Remove("armamentEscrowSuccessorId");
         var legacy = StrictJson.Deserialize<ForceState>(System.Text.Encoding.UTF8.GetBytes(oldForce.ToJsonString()));
         Assert.Null(legacy.ArmamentInventory);
+        Assert.Null(legacy.ArmamentReserve);
         Assert.Null(legacy.ArmamentMigrationCredit);
         Assert.Null(legacy.ArmamentEscrowSuccessorId);
 

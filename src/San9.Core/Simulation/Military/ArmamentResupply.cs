@@ -22,6 +22,8 @@ internal static class ArmamentResupply
             return CommandRejection.InvalidTask;
 
         var stock = force.ArmamentInventory ?? ImmutableDictionary<string, uint>.Empty;
+        var reserve = force.ArmamentReserve ?? ImmutableDictionary<string, ulong>.Empty;
+        (stock, reserve) = ArmamentInventory.ReleaseReserve(stock, reserve);
         var detachments = unit.Detachments;
         var lines = ImmutableArray.CreateBuilder<ArmamentResupplyLine>();
         foreach (var (officerId, original) in unit.Detachments.OrderBy(pair => pair.Key))
@@ -39,6 +41,7 @@ internal static class ArmamentResupply
                 if (count == 0) continue;
                 uint left = stock[issue.DefinitionId] - count;
                 stock = left == 0 ? stock.Remove(issue.DefinitionId) : stock.SetItem(issue.DefinitionId, left);
+                (stock, reserve) = ArmamentInventory.ReleaseReserve(stock, reserve);
                 var updated = new ArmamentAllocation(issue.DefinitionId, checked(issue.RemainingSets + count), current.Soldiers, 0);
                 current = slot == ArmamentSlot.Weapon ? current with { Weapon = updated } : current with { Armor = updated };
                 lines.Add(new(officerId, slot, issue.DefinitionId, count));
@@ -46,7 +49,7 @@ internal static class ArmamentResupply
             detachments = detachments.SetItem(officerId, current);
         }
         if (lines.Count == 0) return CommandRejection.InvalidTask;
-        world.Replace(force with { ArmamentInventory = stock.IsEmpty ? null : stock });
+        world.Replace(force with { ArmamentInventory = stock.IsEmpty ? null : stock, ArmamentReserve = reserve.IsEmpty ? null : reserve });
         world.Replace(unit with { Detachments = detachments });
         events.Add(new UnitArmamentsResuppliedEvent(world.Clock, force.Id, unit.Id, lines.ToImmutable()));
         return CommandRejection.None;

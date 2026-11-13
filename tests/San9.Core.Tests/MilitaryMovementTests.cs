@@ -66,6 +66,38 @@ public sealed class MilitaryMovementTests
     }
 
     [Fact]
+    public void ResupplyDrawsFromReserveWithoutWaitingForAnotherDay()
+    {
+        var definition = new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [new(7, 1, 0, 10000, 5, new(1, 1), TravelMode.Land)],
+            [new(1, new(2, 7), new(1, 1)), new(2, new(37, 7), new(1, 1))])
+        {
+            RegionIds = Enumerable.Repeat<int?>(1, 24).ToImmutableArray(),
+            TroopTypes = [new(1, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("research", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [1], 10, 0, 100, null)]
+        };
+        var rules = new MilitaryRulebook(definition);
+        var initial = Engine(World(), rules).Snapshot;
+        var engine = Engine(WorldState.Restore(initial with
+        {
+            Simulation = initial.Simulation with { NewGame = initial.Simulation.NewGame with { MixedTroopsEnabled = true } },
+            Forces = initial.Forces.Select(force => force with { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 100) }).ToArray()
+        }), rules);
+        var deploy = new DeployUnitCommand(Guid.NewGuid(), 1, 0, 1, [11], 1000, 7, new(MilitaryOrderKind.Move, new(32, 7), null))
+        { Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11, new(1, 1, 1000) { Weapon = new("spear", 100, 1000, 0) }) };
+        Assert.True(engine.Execute(Player, deploy).Submission.Accepted);
+        var snapshot = engine.CaptureStableState();
+        engine = Engine(WorldState.Restore(snapshot with { Forces = snapshot.Forces.Select(force => force with
+            { ArmamentInventory = null, ArmamentReserve = ImmutableDictionary<string, ulong>.Empty.Add("spear", 300) }).ToArray() }), rules);
+        var command = new ResupplyUnitArmamentsCommand(Guid.NewGuid(), 1, engine.Snapshot.Simulation.NextSequence, Assert.Single(engine.Snapshot.Units).Id);
+        Assert.Equal(300u, Assert.Single(engine.Preview(Player, command).ArmamentResupply).Sets);
+        Assert.True(engine.Execute(Player, command).Submission.Accepted);
+        Assert.Equal(400u, engine.Snapshot.Units.Single().Detachments[11].Weapon!.RemainingSets);
+        Assert.Null(engine.Snapshot.Forces.Single().ArmamentReserve);
+    }
+
+    [Fact]
     public void ResupplyUsesRealStockOnceAndPreservesDetachmentStrength()
     {
         var definition = new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
