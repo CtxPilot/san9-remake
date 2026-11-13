@@ -49,6 +49,8 @@ internal static class FeaturedEquipmentIcons
             ("legacy-treasure:1", "的卢" or "的盧") => "res://assets/equipment/dilu.png",
             ("legacy-treasure:2", "爪黄飞电" or "爪黃飛電") => "res://assets/equipment/zhaohuang-feidian.png",
             ("legacy-treasure:3", "绝影" or "絕影") => "res://assets/equipment/jueying.png",
+            ("legacy-treasure:4", "大宛马" or "大宛馬") => "res://assets/equipment/dayuan-ma.png",
+            ("legacy-treasure:5", "四轮车" or "四輪車") => "res://assets/equipment/silun-che.png",
             ("legacy-treasure:6", "七星宝刀" or "七星寶刀") => "res://assets/equipment/qixing-dao.png",
             ("legacy-treasure:7", "倚天剑" or "倚天劍") => "res://assets/equipment/yitian-jian.png",
             ("legacy-treasure:8", "青釭剑" or "青釭劍") => "res://assets/equipment/qinggang-jian.png",
@@ -65,6 +67,8 @@ internal static class FeaturedEquipmentIcons
             ("legacy-treasure:19", "铁蒺藜骨朵" or "鐵蒺藜骨朵") => "res://assets/equipment/jili-guduo.png",
             ("legacy-treasure:20", "流星锤" or "流星錘") => "res://assets/equipment/liuxing-chui.png",
             ("legacy-treasure:21", "眉尖刀") => "res://assets/equipment/meijian-dao.png",
+            ("legacy-treasure:22", "铜锤" or "銅錘") => "res://assets/equipment/tong-chui.png",
+            ("legacy-treasure:23", "铁锁" or "鐵鎖") => "res://assets/equipment/tie-suo.png",
             _ => null
         };
         return path is not null && ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
