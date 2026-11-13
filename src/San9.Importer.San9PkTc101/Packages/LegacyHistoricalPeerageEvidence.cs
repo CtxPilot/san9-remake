@@ -62,6 +62,10 @@ public static class LegacyHistoricalPeerageEvidence
             }
             PersonalPeerageEvidence? evidence = (officer.State.Id, name, courtesyName) switch
             {
+                (279, "徐晃", "公明") => new(new(PersonalPeerageGrade.VillageMarquis, "都亭侯"),
+                    new(201, 1, 1), new(219, 12, 30), PersonalPeerageEvidenceKind.Historical,
+                    "《三国志·徐晃传》记载封都亭侯及曹丕即王位后进封：https://ctext.org/text.pl?if=gb&node=602739；" +
+                    "故市之战后至进封前仅取完整年度，不假定具体封爵日期。"),
                 (95, "关羽", "云长") => new(new(PersonalPeerageGrade.VillageMarquis, "汉寿亭侯"),
                     new(201, 1, 1), new(218, 12, 30), PersonalPeerageEvidenceKind.Historical,
                     "《三国志·关羽传》记载受封：https://ctext.org/text.pl?if=gb&node=603537&show=parallel；" +
