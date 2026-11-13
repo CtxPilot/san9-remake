@@ -206,3 +206,5 @@ tests/San9.Importer.San9PkTc101.Tests/MilitaryContentCompilerTests.cs
 同日补充的倚天剑、青釭剑图标分别由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
 
 同日补充的七星宝刀、雌雄一对剑、古锭刀图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
+
+同日补充的铁脊蛇矛、三尖刀、双铁戟和大斧图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。

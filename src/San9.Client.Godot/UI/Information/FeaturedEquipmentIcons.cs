@@ -55,8 +55,12 @@ internal static class FeaturedEquipmentIcons
             ("legacy-treasure:9", "方天画戟" or "方天畫戟") => "res://assets/equipment/fangtian-ji.png",
             ("legacy-treasure:10", "青龙偃月刀" or "青龍偃月刀") => "res://assets/equipment/green-dragon-blade.png",
             ("legacy-treasure:11", "蛇矛") => "res://assets/equipment/serpent-spear.png",
+            ("legacy-treasure:12", "铁脊蛇矛" or "鐵脊蛇矛") => "res://assets/equipment/tieji-shemao.png",
             ("legacy-treasure:13", "雌雄一对剑" or "雌雄一對劍") => "res://assets/equipment/cixiong-jian.png",
             ("legacy-treasure:14", "古锭刀" or "古錠刀") => "res://assets/equipment/guding-dao.png",
+            ("legacy-treasure:15", "三尖刀") => "res://assets/equipment/sanjian-dao.png",
+            ("legacy-treasure:16", "双铁戟" or "雙鐵戟") => "res://assets/equipment/shuangtie-ji.png",
+            ("legacy-treasure:17", "大斧") => "res://assets/equipment/da-fu.png",
             _ => null
         };
         return path is not null && ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;

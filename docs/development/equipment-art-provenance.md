@@ -19,6 +19,10 @@
 | `src/San9.Client.Godot/assets/equipment/qixing-dao.png` | 七星宝刀，独立设计的环首刀 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/cixiong-jian.png` | 雌雄一对剑，独立设计的双剑 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/guding-dao.png` | 古锭刀，独立设计的环首刀 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/tieji-shemao.png` | 铁脊蛇矛，独立设计的长柄矛 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/sanjian-dao.png` | 三尖刀，独立设计的三尖长兵器 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/shuangtie-ji.png` | 双铁戟，独立设计的双持短戟 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/da-fu.png` | 大斧，独立设计的长柄斧 | 已接入；待实机检查 |
 
 玄纹长戟生成提示词：
 
@@ -43,5 +47,7 @@
 倚天剑与青釭剑图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求铁质双刃直剑和青灰色双刃直剑、简洁铜饰、暗色底、无人物文字或游戏标识。图像是独立的游戏化设计，不声称复原历史实物或参考作品造型。
 
 七星宝刀、雌雄一对剑和古锭刀图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求带七枚铜饰的环首刀、交叉双剑和古朴环首刀，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
+
+铁脊蛇矛、三尖刀、双铁戟和大斧图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求带中脊的波形矛、三尖长兵器、一对短戟和单刃大斧，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
 
 其他旧名物和未配置图标的模组物品目前无对应图标，界面缺图时隐藏图像；旧名物逐件图标仍待制作。
