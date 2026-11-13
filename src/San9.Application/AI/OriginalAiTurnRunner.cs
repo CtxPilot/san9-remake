@@ -26,6 +26,7 @@ internal static class OriginalAiTurnRunner
             OriginalAiResearch.TryStart(engine, definition.MilitaryRules, seat, events, definition.Rules.Equipment);
             OriginalAiFormationTeaching.TryStart(engine, definition.MilitaryRules, seat, events);
             OriginalAiEquipment.Manage(engine, definition.Rules.Equipment, seat, events);
+            OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
             OriginalAiPersonalPeerage.Manage(engine, seat, events);
             PlayerDomesticAutomation.Run(engine, definition, seat, state, events, reports);
             cursor = new(seat, engine.Snapshot.Corps.Where(c => c.OwnerId == seat.ForceId)

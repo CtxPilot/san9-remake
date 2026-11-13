@@ -38,11 +38,13 @@ public sealed record ScholarReturnEncounter(string EventId) : SearchEncounter;
 public sealed record TreasureMonumentEncounter(string EventId) : SearchEncounter;
 public sealed record ShanyangGongEncounter(bool ChoosingCountryTitle = false) : SearchEncounter;
 public sealed record SearchRecruitmentPrompt(Guid TaskId, int Step, int ForceId, int SearchingOfficerId, int DiscoveredOfficerId, int PlaceId);
-public enum SearchResultKind { None, Person, Treasure, Money }
+public enum SearchResultKind { None, Person, Treasure, Money, Equipment }
 public sealed record SearchResolvedEvent(GameClock Clock, int OfficerId, int PlaceId, int? DiscoveredOfficerId, bool Recruited) : DomainEvent
 {
     public SearchResultKind Result { get; init; }
     public int? TreasureId { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public long? EquipmentId { get; init; }
     public long Money { get; init; }
 }
 public sealed record RecruitmentResolvedEvent(GameClock Clock, int OfficerId, int TargetOfficerId, int Threshold, int Roll, bool Success) : DomainEvent
@@ -501,15 +503,28 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
         {
             var items = world.Treasures.Values.Where(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
                 t.DiscoveryRegionId == destination && treasures.Items.ContainsKey(t.Id)).OrderBy(t => t.Id).ToArray();
-            long threshold = PersonnelSearchChances.Treasure(politicsScore, items.Length);
-            if (items.Length > 0 && task.Journey.SuccessRoll < threshold)
+            var equipment = world.AllEquipment.Values.Where(item => item.IsLost && item.SearchPlaceId == destination &&
+                simulationRules.Equipment.Items.ContainsKey(item.DefinitionId)).OrderBy(item => item.Id).ToArray();
+            int count = checked(items.Length + equipment.Length);
+            long threshold = PersonnelSearchChances.Treasure(politicsScore, count);
+            if (count > 0 && task.Journey.SuccessRoll < threshold)
             {
-                var item = items[world.NextRandom("personnel-search-treasure") % (ulong)items.Length];
+                int selected = (int)(world.NextRandom("personnel-search-treasure") % (ulong)count);
                 int rulerId = world.Forces[task.ForceId].LeaderId!.Value;
-                world.Replace(item with { Discovery = TreasureDiscovery.Discovered, HolderId = rulerId });
+                if (selected < items.Length)
+                {
+                    var item = items[selected];
+                    world.Replace(item with { Discovery = TreasureDiscovery.Discovered, HolderId = rulerId });
+                    PersonnelMissions.GrowPolitics(world, task.OfficerId, events);
+                    events.Add(new SearchResolvedEvent(world.Clock, task.OfficerId, destination, null, false)
+                        { Result = SearchResultKind.Treasure, TreasureId = item.Id });
+                    return;
+                }
+                var found = equipment[selected - items.Length];
+                world.SetEquipment(EquipmentRules.MoveToOfficer(found, rulerId));
                 PersonnelMissions.GrowPolitics(world, task.OfficerId, events);
                 events.Add(new SearchResolvedEvent(world.Clock, task.OfficerId, destination, null, false)
-                    { Result = SearchResultKind.Treasure, TreasureId = item.Id });
+                    { Result = SearchResultKind.Equipment, EquipmentId = found.Id });
                 return;
             }
         }

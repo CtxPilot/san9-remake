@@ -60,6 +60,8 @@ public sealed partial class GameSession
     public IReadOnlyList<EquipmentDefinition> PurchasableEquipment => _definition.Rules.Equipment.Items.Values
         .Where(item => item.PurchaseCost is not null).OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
     public IReadOnlyDictionary<string, EquipmentDefinition> EquipmentDefinitions => _definition.Rules.Equipment.Items;
+    public IReadOnlyDictionary<string, ArmamentDefinition> ArmamentDefinitions =>
+        MilitaryRules?.Armaments ?? ImmutableDictionary<string, ArmamentDefinition>.Empty;
 
     public WorldSnapshot PreviewEditor(WorldEditOperation operation)
     {

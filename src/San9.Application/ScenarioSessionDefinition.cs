@@ -29,6 +29,7 @@ internal sealed class ScenarioSessionDefinition
         {
             FictionalOfficerPlaceIds = definition.FictionalOfficerPlaceIds.ToArray(),
             Information = definition.Information.Copy(), Forces = definition.Forces.ToArray(),
+            InitialEquipment = definition.InitialEquipment?.ToArray(),
             Officers = definition.Officers.ToArray(), Units = definition.Units.ToArray(),
             Settlements = definition.Settlements.Select(s => s with { Icons = s.Icons.ToArray() }).ToArray(),
             FacilityNameSuffixKeys = new(definition.FacilityNameSuffixKeys), RegionNameKeys = new(definition.RegionNameKeys), RegionCityIds = new(definition.RegionCityIds),
@@ -115,7 +116,7 @@ internal sealed class ScenarioSessionDefinition
         settings ?? new NewGameSettings { Difficulty = Content.OriginalAi.Advanced ? GameDifficulty.Advanced : GameDifficulty.Beginner }, Content.FictionalOfficerPlaceIds, _playerForces,
         Definitions.Forces.Select(f => f.Id).ToHashSet(), Definitions.Officers.Select(p => p.Id).ToHashSet(), Content.DefaultLoyalty,
         equipment: EquipmentMigration.UnequipNonServing(LegacyEquipmentMigration.Convert(Content.Information.Treasures,
-            Content.Information.TreasureStates, Content.Information.Equipment).Instances, people), initialEquipmentRules: Rules.Equipment);
+            Content.Information.TreasureStates, Content.Information.Equipment).Instances.Concat(Content.InitialEquipment ?? []), people));
     }
 
     private IEnumerable<UnitState> InitialUnits(NewGameSettings? settings)

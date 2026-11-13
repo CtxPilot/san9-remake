@@ -55,6 +55,7 @@ public partial class OfficerEquipmentView : ModalView, IModalInputRouter
                 item.Level == 5 ? "满级" : $"{item.Experience}/100", item.Equipped ? "已装备" : item.InInventory ? "库存" : "持有", item.Effect])).ToArray();
         Replace(new CatalogView { Title = slot.Name, HintText = rows.Length == 0 ? "此部位没有可查看的物品。" : "选择物品查看可用操作；宝物通过赏赐或没收转移。", CloseTitle = "返回",
             Textures = Textures, Service = Service, Pages = ItemsPage, ReadRows = _ => rows, Closed = ShowSlots,
+            ItemIcon = index => FeaturedEquipmentIcons.Find(slot.Items[index].DefinitionId, slot.Items[index].Name), PortraitSize = new(80, 80),
             Activated = index => ShowActions(selected, slot.Items[index].Id) });
     }
     private void ShowActions(EquipmentSlot selected, long itemId)
@@ -65,8 +66,10 @@ public partial class OfficerEquipmentView : ModalView, IModalInputRouter
         var rows = new[] {
             new CatalogRow(0, [item.Equipped ? "卸下" : "装备", item.Equipped ? (data.CanManage ? "卸下当前装备" : "当前仅供查看") : item.CanEquip ? item.Effect : item.UnavailableReason ?? "当前无法装备"]),
             new CatalogRow(1, ["入库", item.IsTreasure ? "宝物通过赏赐或没收转移" : item.InInventory ? "已在库存" : data.CanManage ? "收回至势力库存" : "当前仅供查看"]) };
-        Replace(new CatalogView { Title = item.Name, HintText = $"{item.Effect}　基础属性要求：{item.Requirements}", CloseTitle = "返回",
+        string origin = item.Origin switch { EquipmentOrigin.Project => "项目自创", EquipmentOrigin.Historical => "史实", EquipmentOrigin.Romance => "演义", _ => "" };
+        Replace(new CatalogView { Title = item.Name, HintText = $"{item.Effect}　基础属性要求：{item.Requirements}" + (origin.Length == 0 ? "" : $"　来源：{origin}"), CloseTitle = "返回",
             Textures = Textures, Service = Service, Pages = ActionsPage, ReadRows = _ => rows, Closed = () => ShowItems(selected),
+            ItemIcon = _ => FeaturedEquipmentIcons.Find(item.DefinitionId, item.Name), PortraitSize = new(80, 80),
             Activated = action =>
             {
                 bool allowed = action == 0 ? item.Equipped ? data.CanManage : item.CanEquip : data.CanManage && !item.InInventory && !item.IsTreasure;

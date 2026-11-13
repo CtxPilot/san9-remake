@@ -91,6 +91,8 @@ public sealed record MilitaryDefinition(int Width, int Height, ImmutableArray<in
     ImmutableArray<TerrainPassage> Terrains, ImmutableArray<FormationRule> Formations,
     ImmutableArray<BattlefieldPlace> Places)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<ArmamentDefinition>? Armaments { get; init; }
     public ImmutableArray<TroopTypeDefinition> TroopTypes { get; init; } = [];
     public ImmutableArray<NavalTrainingDefinition> NavalTraining { get; init; } = [];
     public ImmutableArray<SiegeEquipmentDefinition> SiegeEquipment { get; init; } = [];
@@ -125,6 +127,7 @@ public sealed record MilitaryDefinition(int Width, int Height, ImmutableArray<in
 
 public sealed partial class MilitaryRulebook
 {
+    public ImmutableDictionary<string, ArmamentDefinition> Armaments { get; }
     public ImmutableDictionary<int, TroopTypeDefinition> TroopTypes { get; }
     public ImmutableDictionary<int, NavalTrainingDefinition> NavalTraining { get; }
     public ImmutableDictionary<int, SiegeEquipmentDefinition> SiegeEquipment { get; }
@@ -234,6 +237,13 @@ public sealed partial class MilitaryRulebook
             type.TacticMinimumLevels.Any(pair => pair.Value <= 0 || pair.Value > type.MaximumLevel ||
                 !Tactics.TryGetValue(pair.Key, out var tactic) || tactic.Effect != TacticEffect.Martial)))
             throw new ArgumentException("Invalid troop type definition.");
+        var armaments = definition.Armaments ?? [];
+        if (armaments.IsDefault || armaments.Any(item => item is null || !item.IsValid ||
+                item.TroopTypeIds.Any(id => !TroopTypes.ContainsKey(id)) ||
+                item.ResearchProjectId is string project && !ResearchProjects.ContainsKey(project)) ||
+            armaments.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count() != armaments.Length)
+            throw new ArgumentException("Invalid armament definition.");
+        Armaments = armaments.ToImmutableDictionary(item => item.Id, StringComparer.Ordinal);
         if (definition.NavalTraining.IsDefault || definition.NavalTraining.Any(training => training is null))
             throw new ArgumentException("Missing naval training definitions.");
         NavalTraining = definition.NavalTraining.ToImmutableDictionary(training => training.Id);
@@ -409,6 +419,7 @@ public sealed partial class MilitaryRulebook
     public ImmutableDictionary<int, FormationRule> Formations { get; }
     public long DetachmentEquipmentCost(IEnumerable<DetachmentState> detachments)
     {
+        if (!Armaments.IsEmpty) return 0;
         System.Numerics.BigInteger total = 0;
         foreach (var detachment in detachments)
         {

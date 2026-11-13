@@ -19,10 +19,12 @@ internal static class MilitaryResearch
             events.Add(new ResearchCancelledEvent(world.Clock, forceId, research.ProjectId));
         }
         EquipmentProduction.CancelForce(world, forceId, events);
+        ArmamentProduction.CancelForce(world, forceId, events);
     }
     internal static void CancelAt(WorldMutation world, int settlementId, List<DomainEvent> events)
     {
         EquipmentProduction.CancelAt(world, settlementId, events);
+        ArmamentProduction.CancelAt(world, settlementId, events);
         foreach (var force in world.Forces.Values.Where(f => f.ActiveResearch?.SettlementId == settlementId).OrderBy(f => f.Id).ToArray())
         {
             string project = force.ActiveResearch!.ProjectId;

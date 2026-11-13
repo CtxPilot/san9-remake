@@ -96,6 +96,8 @@ internal sealed class ResolutionPipeline(SimulationRules rules)
         MilitaryResearch.AdvanceDay(world, rules.Military, events);
         FormationTeaching.AdvanceDay(world, events);
         EquipmentProduction.AdvanceDay(world, rules.Equipment, events);
+        ForceLifecycle.RetryArmamentTransfers(world, events);
+        ArmamentProduction.AdvanceDay(world, rules.Military, events);
         MilitaryDailyCycle.Apply(world, rationAccounts, rules, events);
         BattleLearning.Daily(world, rules.Military, events);
         MilitaryMovement.BeginDailyCycle(world);

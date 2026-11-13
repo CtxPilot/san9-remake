@@ -6,7 +6,10 @@ namespace San9.Core.Domain;
 /// <summary>A member's equipment and soldiers in a mixed unit.</summary>
 public sealed record DetachmentState(int TroopTypeId, int Level, uint Soldiers)
 {
-    [JsonIgnore] public bool IsValid => TroopTypeId >= 0 && Level > 0;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ArmamentAllocation? Weapon { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ArmamentAllocation? Armor { get; init; }
+    [JsonIgnore] public bool IsValid => TroopTypeId >= 0 && Level > 0 &&
+        (Weapon is null || Weapon.IsValid) && (Armor is null || Armor.IsValid);
 }
 
 public static class DetachmentAllocation
@@ -44,12 +47,36 @@ public static class DetachmentAllocation
                 .ToImmutableDictionary();
             uint groupSoldiers = (uint)group.Values.Aggregate(0UL, (sum, detachment) => sum + detachment.Soldiers);
             uint groupLoss = Math.Min(loss, groupSoldiers);
-            foreach (var pair in Resize(group, groupSoldiers - groupLoss)) result = result.SetItem(pair.Key, pair.Value);
+            foreach (var pair in ResizeForCombatLoss(group, groupSoldiers - groupLoss)) result = result.SetItem(pair.Key, pair.Value);
             loss -= groupLoss;
         }
         if (loss == 0) return result;
         uint remaining = (uint)result.Values.Aggregate(0UL, (sum, detachment) => sum + detachment.Soldiers);
-        return Resize(result, remaining - loss);
+        return ResizeForCombatLoss(result, remaining - loss);
+    }
+
+    /// <summary>Applies battle casualties to the issued sets as well as the soldier allocation.</summary>
+    public static ImmutableDictionary<int, DetachmentState> ResizeForCombatLoss(
+        ImmutableDictionary<int, DetachmentState> detachments, uint soldiers)
+    {
+        ulong previous = detachments.Values.Aggregate(0UL, (sum, item) => sum + item.Soldiers);
+        if (soldiers > previous) throw new ArgumentOutOfRangeException(nameof(soldiers));
+        var resized = Resize(detachments, soldiers);
+        foreach (var (id, old) in detachments)
+        {
+            uint loss = old.Soldiers - resized[id].Soldiers;
+            if (loss == 0) continue;
+            ArmamentAllocation? Apply(ArmamentAllocation? issue)
+            {
+                if (issue is null) return null;
+                // Reinforcements use basic kit. Rebase without inventing extra issued sets.
+                if (issue.InitialSoldiers - issue.Casualties != old.Soldiers)
+                    issue = new(issue.DefinitionId, Math.Min(issue.RemainingSets, old.Soldiers), old.Soldiers, 0);
+                return issue.ApplyCasualties(loss);
+            }
+            resized = resized.SetItem(id, resized[id] with { Weapon = Apply(old.Weapon), Armor = Apply(old.Armor) });
+        }
+        return resized;
     }
 
     /// <summary>Resizes an allocation proportionally with stable largest-remainder rounding.</summary>

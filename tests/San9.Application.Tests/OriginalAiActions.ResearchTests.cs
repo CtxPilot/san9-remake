@@ -14,6 +14,117 @@ namespace San9.Application.Tests;
 public sealed partial class OriginalAiActionsTests
 {
     [Fact]
+    public void AuthoredHiddenEquipmentSurvivesNewGameAndSaveAndRejectsInvalidPlaces()
+    {
+        var basis = Fixture();
+        var definition = new EquipmentDefinition("featured-spear", EquipmentSlot.MainHand, EquipmentRarity.Precious,
+            new(2, 0, 0, 0), new(1, 0, 0, 0)) { Name = "玄纹长戟" };
+        var hidden = new EquipmentInstance(10000, definition.Id, null, null, false)
+            { IsLost = true, SearchPlaceId = basis.Settlements[0].Id };
+        var content = basis with { Information = basis.Information with { Equipment = [definition] }, InitialEquipment = [hidden] };
+        var session = GameSession.Start(content, 42);
+        Assert.Equal(hidden, Assert.Single(session.Snapshot.Equipment, item => item.Id == hidden.Id));
+        var restored = SaveService.Decode(SaveService.Encode(session), content);
+        Assert.Equal(hidden, Assert.Single(restored.Snapshot.Equipment, item => item.Id == hidden.Id));
+        Assert.Throws<InvalidDataException>(() => (content with
+            { InitialEquipment = [hidden with { SearchPlaceId = int.MaxValue }] }).Validate());
+        Assert.Throws<InvalidDataException>(() => (content with { InitialEquipment = [hidden, hidden] }).Validate());
+    }
+
+    [Fact]
+    public void AiResuppliesEligibleFieldUnitUsingTheSameInventoryCommand()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [100], 8, 0, 100, null)]
+        } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42, settings: new NewGameSettings { MixedTroopsEnabled = true }).CreateSnapshot();
+        initial = initial with
+        {
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 },
+            Forces = initial.Forces.Select(force => force.Id == 2 ? force with
+                { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 500) } : force).ToArray(),
+            Units = initial.Units.Select(unit => unit.Id == 20 ? unit with
+            {
+                Position = new(37, 7),
+                Detachments = unit.Detachments.SetItem(9, unit.Detachments[9] with { Weapon = new("spear", 1000, 5000, 0) })
+            } : unit).ToArray()
+        };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
+
+        Assert.Equal(500u, Assert.Single(Assert.Single(events.OfType<UnitArmamentsResuppliedEvent>()).Lines).Sets);
+        Assert.Equal(1500u, engine.Snapshot.Units.Single(unit => unit.Id == 20).Detachments[9].Weapon!.RemainingSets);
+    }
+
+    [Fact]
+    public void AiIssuesAvailableArmamentsToAnUnarmedFieldDetachment()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [100], 8, 0, 100, null),
+                new("advanced", "铁戟", ArmamentSlot.Weapon, [100], 20, 0, 100, "basic"),
+                new("armor", "皮甲", ArmamentSlot.Armor, [], 0, 8, 100, null)]
+        } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42, settings: new NewGameSettings { MixedTroopsEnabled = true }).CreateSnapshot();
+        initial = initial with
+        {
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 },
+            Forces = initial.Forces.Select(force => force.Id == 2 ? force with
+                { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 500).Add("advanced", 900).Add("armor", 400) } : force).ToArray(),
+            Units = initial.Units.Select(unit => unit.Id == 20 ? unit with { Position = new(37, 7) } : unit).ToArray()
+        };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
+
+        var detachment = engine.Snapshot.Units.Single(unit => unit.Id == 20).Detachments[9];
+        Assert.Equal("spear", detachment.Weapon!.DefinitionId);
+        Assert.Equal(500u, detachment.Weapon.RemainingSets);
+        Assert.Equal("armor", detachment.Armor!.DefinitionId);
+        Assert.Equal(400u, detachment.Armor.RemainingSets);
+        Assert.Equal(2, events.OfType<UnitArmamentConfiguredEvent>().Count());
+        Assert.Equal(900u, engine.Snapshot.Forces.Single(force => force.Id == 2).ArmamentInventory!["advanced"]);
+    }
+
+    [Fact]
+    public void AiManufacturesArmamentsWithTheSameModuleAndResourceRules()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])],
+            Armaments = [new("armor", "皮甲", ArmamentSlot.Armor, [], 0, 8, 100, null)
+                { ProductionCostPerThousand = 50, ProductionDays = 30 }]
+        } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42, settings: new NewGameSettings { MixedTroopsEnabled = true }).CreateSnapshot();
+        initial = initial with { Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 } };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        var before = engine.Snapshot.Corps.Single(c => c.OwnerId == 2 && c.IsRoot).Treasury.Money;
+        List<DomainEvent> events = [];
+        OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
+        Assert.Equal("armor", engine.Snapshot.Forces.Single(force => force.Id == 2).ArmamentProduction?.DefinitionId);
+        Assert.Equal(before - 50, engine.Snapshot.Corps.Single(c => c.OwnerId == 2 && c.IsRoot).Treasury.Money);
+        Assert.Single(events.OfType<ArmamentProductionStartedEvent>());
+    }
+
+    [Fact]
     public void MixedTroopAndOtherModuleChoicesSurviveSaveIndependently()
     {
         var basis = Fixture();
@@ -92,7 +203,7 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
-    public void PlayerResearchesMakesEquipsAndRestoresEquipment()
+    public void PlayerCannotResearchOrManufactureObsoleteOfficerEquipment()
     {
         var basis = Fixture();
         var content = basis with
@@ -104,29 +215,18 @@ public sealed partial class OriginalAiActionsTests
             }).ToArray()
         };
         var session = GameSession.Start(content, 42);
-        Assert.True(session.Execute(new("player"), new StartResearchCommand(Guid.NewGuid(), 1,
+        Assert.False(session.Execute(new("player"), new StartResearchCommand(Guid.NewGuid(), 1,
             session.Snapshot.Simulation.NextSequence, 1, EquipmentPreset.ResearchId)).Submission.Accepted);
-        for (int i = 0; i < 4 && !session.Snapshot.Forces.Single(f => f.Id == 1).CompletedResearch.Contains(EquipmentPreset.ResearchId); i++)
-            session.AdvanceXun();
-        Assert.Contains(EquipmentPreset.ResearchId, session.Snapshot.Forces.Single(f => f.Id == 1).CompletedResearch);
-        Assert.True(session.Execute(new("player"), new StartEquipmentProductionCommand(Guid.NewGuid(), 1,
-            session.Snapshot.Simulation.NextSequence, 1, "basic-spear")).Submission.Accepted);
+        Assert.DoesNotContain(EquipmentPreset.ResearchId, session.Snapshot.Forces.Single(f => f.Id == 1).CompletedResearch);
+        Assert.Equal(CommandRejection.InvalidTask, session.Execute(new("player"), new StartEquipmentProductionCommand(Guid.NewGuid(), 1,
+            session.Snapshot.Simulation.NextSequence, 1, "basic-spear")).Submission.Rejection);
         var restored = SaveService.Decode(SaveService.Encode(session), content);
-        for (int i = 0; i < 4 && session.Snapshot.Forces.Single(f => f.Id == 1).EquipmentProduction is not null; i++)
-        {
-            EventAssert.Equal(session.AdvanceXun().Events, restored.AdvanceXun().Events);
-            StateAssert.Equal(session.Capture(), restored.Capture());
-        }
-        var item = Assert.Single(session.Snapshot.Equipment, e => e.DefinitionId == "basic-spear" && e.InventoryForceId == 1);
-        Assert.True(session.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
-            session.Snapshot.Simulation.NextSequence, 1, EquipmentSlot.MainHand, item.Id)).Submission.Accepted);
-        restored = SaveService.Decode(SaveService.Encode(session), content);
-        Assert.True(restored.Snapshot.Equipment.Single(e => e.Id == item.Id).Equipped);
+        Assert.DoesNotContain(restored.Snapshot.Equipment, item => item.DefinitionId == "basic-spear");
         StateAssert.Equal(session.Capture(), restored.Capture());
     }
 
     [Fact]
-    public void PlayerPurchasesEquipmentIntoInventoryAndCannotBuyUnavailableItems()
+    public void PlayerCannotPurchaseOrdinaryOfficerEquipment()
     {
         var content = Fixture();
         var session = GameSession.Start(content, 42);
@@ -134,18 +234,13 @@ public sealed partial class OriginalAiActionsTests
         var id = Guid.NewGuid();
         var buy = new PurchaseEquipmentCommand(id, 1, session.Snapshot.Simulation.NextSequence, 1, "basic-spear");
         var result = session.Execute(new("player"), buy);
-        Assert.True(result.Submission.Accepted);
-        var acquired = Assert.Single(result.Events.OfType<EquipmentPurchasedEvent>());
-        Assert.Equal(400, acquired.Price);
-        Assert.Equal(before - acquired.Price, session.Snapshot.Corps.Single(c => c.OwnerId == 1 && c.IsRoot).Treasury.Money);
-        var item = Assert.Single(session.Snapshot.Equipment, e => e.Id == acquired.InstanceId);
-        Assert.Equal(1, item.InventoryForceId);
-        Assert.False(item.Equipped);
-        Assert.False(session.Execute(new("player"), buy).Submission.Accepted);
+        Assert.Equal(CommandRejection.InvalidTask, result.Submission.Rejection);
+        Assert.Equal(before, session.Snapshot.Corps.Single(c => c.OwnerId == 1 && c.IsRoot).Treasury.Money);
+        Assert.DoesNotContain(session.Snapshot.Equipment, item => item.DefinitionId == "basic-spear");
         Assert.False(session.Execute(new("player"), new PurchaseEquipmentCommand(Guid.NewGuid(), 1,
             session.Snapshot.Simulation.NextSequence, 1, "not-for-sale")).Submission.Accepted);
         var loaded = SaveService.Decode(SaveService.Encode(session), content);
-        Assert.Equal(item, loaded.Snapshot.Equipment.Single(e => e.Id == item.Id));
+        Assert.DoesNotContain(loaded.Snapshot.Equipment, item => item.DefinitionId == "basic-spear");
     }
 
     [Fact]
@@ -167,12 +262,34 @@ public sealed partial class OriginalAiActionsTests
                 { Treasury = corps.Treasury with { Money = 0 } } : corps).ToArray()
         } };
         var poor = GameSession.Restore(content, save);
-        Assert.Equal(CommandRejection.InsufficientFunds, poor.Execute(new("player"), Command(poor)).Submission.Rejection);
+        Assert.Equal(CommandRejection.InvalidTask, poor.Execute(new("player"), Command(poor)).Submission.Rejection);
         Assert.DoesNotContain(poor.Snapshot.Equipment, equipment => equipment.DefinitionId == "advanced");
     }
 
     [Fact]
-    public void AiCanBuyBasicEquipmentBeforeManufacturingResearch()
+    public void AiPrefersLegalEquipmentWithACombatEffect()
+    {
+        var basis = Fixture();
+        var plain = new EquipmentDefinition("plain-feature", EquipmentSlot.MainHand, EquipmentRarity.Precious, default, default);
+        var useful = plain with { Id = "combat-feature", CombatEffects = new(AttackPercent: 5) };
+        var content = basis with { Information = basis.Information with { Equipment = [plain, useful] } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42).CreateSnapshot();
+        initial = initial with { Equipment = [.. initial.Equipment, new EquipmentInstance(500, plain.Id, null, 2, false),
+            new EquipmentInstance(501, useful.Id, null, 2, false)],
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 } };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiEquipment.Manage(engine, definition.Rules.Equipment, seat, events);
+
+        Assert.True(engine.Snapshot.Equipment.Single(item => item.Id == 501).Equipped);
+        Assert.Equal(2, engine.Snapshot.Equipment.Single(item => item.Id == 501).OfficerId);
+    }
+
+    [Fact]
+    public void AiDoesNotBuyOrdinaryOfficerEquipment()
     {
         var source = Fixture();
         var content = source with { Information = source.Information with { Equipment = EquipmentPreset.Basic() } };
@@ -185,8 +302,7 @@ public sealed partial class OriginalAiActionsTests
         List<DomainEvent> events = [];
         OriginalAiEquipment.Manage(engine, definition.Rules.Equipment, seat, events);
         Assert.Empty(engine.Snapshot.Forces.Single(force => force.Id == 2).CompletedResearch);
-        var purchased = Assert.Single(events.OfType<EquipmentPurchasedEvent>());
-        Assert.Null(definition.Rules.Equipment.Items[purchased.DefinitionId].PurchaseResearchProjectId);
+        Assert.Empty(events.OfType<EquipmentPurchasedEvent>());
     }
 
     [Fact]
@@ -200,7 +316,7 @@ public sealed partial class OriginalAiActionsTests
         var researching = GameSession.EngineFactory(content)(WorldState.Restore(initial));
         List<DomainEvent> researchEvents = [];
         OriginalAiResearch.TryStart(researching, definition.MilitaryRules, seat, researchEvents, definition.Rules.Equipment);
-        Assert.Equal(EquipmentPreset.ResearchId, Assert.Single(researchEvents.OfType<ResearchStartedEvent>()).ProjectId);
+        Assert.Empty(researchEvents.OfType<ResearchStartedEvent>());
         var ready = initial with
         {
             Forces = initial.Forces.Select(force => force.Id == 2 ? force with { CompletedResearch = [EquipmentPreset.ResearchId] } : force).ToArray(),
@@ -211,9 +327,9 @@ public sealed partial class OriginalAiActionsTests
         List<DomainEvent> firstEvents = [], secondEvents = [];
         OriginalAiEquipment.Manage(first, definition.Rules.Equipment, seat, firstEvents);
         OriginalAiEquipment.Manage(second, definition.Rules.Equipment, seat, secondEvents);
-        Assert.True(first.Snapshot.Equipment.Single(item => item.Id == 500).Equipped);
-        Assert.NotNull(first.Snapshot.Forces.Single(force => force.Id == 2).EquipmentProduction);
-        Assert.Contains(firstEvents, e => e is EquipmentProductionStartedEvent);
+        Assert.False(first.Snapshot.Equipment.Single(item => item.Id == 500).Equipped);
+        Assert.Null(first.Snapshot.Forces.Single(force => force.Id == 2).EquipmentProduction);
+        Assert.DoesNotContain(firstEvents, e => e is EquipmentProductionStartedEvent);
         StateAssert.Equal(first.Snapshot, second.Snapshot);
         EventAssert.Equal(firstEvents, secondEvents);
     }

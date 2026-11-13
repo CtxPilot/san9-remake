@@ -18,7 +18,7 @@ internal static class EquipmentCommands
     internal static CommandRejection Transfer(WorldMutation world, TransferEquipmentCommand command, EquipmentRulebook rules,
         List<DomainEvent> events)
     {
-        if (!world.EquipmentInitialized || !world.AllEquipment.TryGetValue(command.EquipmentId, out var item) ||
+        if (!world.EquipmentInitialized || !world.AllEquipment.TryGetValue(command.EquipmentId, out var item) || item.PendingArmamentCredit is not null ||
             !rules.Items.ContainsKey(item.DefinitionId)) return CommandRejection.InvalidTask;
         if (item.LegacyTreasureId is not null && item.InventoryForceId != command.IssuerId) return CommandRejection.InvalidTask;
         if (item.InventoryForceId != command.IssuerId && (item.OfficerId is not int previous ||

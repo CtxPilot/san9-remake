@@ -25,8 +25,12 @@ public sealed class ForceEquipmentEditorPersistenceTests
     public void EquipmentEditorPreviewAndSavePreserveInstanceState()
     {
         var basis = G01ScenarioTests.Fixture();
-        var scenario = basis with { Information = basis.Information with { Equipment = EquipmentPreset.Basic() } };
+        var named = new EquipmentDefinition("named", EquipmentSlot.MainHand, EquipmentRarity.Rare, new(2, 0, 0, 0), default);
+        var scenario = basis with { Information = basis.Information with { Equipment = EquipmentPreset.Basic().Add(named) } };
         var session = GameSession.Start(scenario, 42);
+        var original = session.Capture();
+        session = GameSession.Restore(scenario, original with { World = original.World with
+            { Equipment = [new EquipmentInstance(0, "named", 1, null, true)] } });
         var item = session.Snapshot.Equipment.First(e => e.OfficerId == 1 && e.Equipped);
         var operation = new WorldEditOperation(WorldEditorKind.Equipment, [])
         { EquipmentEdits = [new(item.Id, item.OfficerId, null, false, item.Level, item.Experience)] };

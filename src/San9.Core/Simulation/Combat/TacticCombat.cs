@@ -208,8 +208,11 @@ internal static class TacticCombat
             StrengthNumerator = unit.Detachments.IsEmpty ? 0 :
                 (ulong)(unit.Detachments.GetValueOrDefault(p.Officer.Id)?.Soldiers ?? 0) * (ulong)unit.Detachments.Count,
             StrengthDenominator = unit.Detachments.IsEmpty ? 0 : unit.Soldiers,
-            DamageModifierBasisPoints = MixedTroopCombat.Adjust(world, new(unit.Id, false),
-                new(target.UnitId ?? target.SettlementId!.Value, target.UnitId is null), 10000, military, p.Officer.Id)
+            DamageModifierBasisPoints = EquipmentCombat.Adjust(world, new(unit.Id, false),
+                new(target.UnitId ?? target.SettlementId!.Value, target.UnitId is null),
+                MixedTroopCombat.Adjust(world, new(unit.Id, false),
+                    new(target.UnitId ?? target.SettlementId!.Value, target.UnitId is null), 10000, military, p.Officer.Id),
+                p.Officer.Id, tactic: true, ranged: p.Tactic.IsRangedAttack)
         }).ToArray();
         var sniping = TacticSniping.Select(world, new(unit.Id, false), primary.Tactic, target,
             participants.Select(p => p.Officer.Id), effect, military);
@@ -271,6 +274,7 @@ internal static class TacticCombat
         int? owner = victim.IsSettlement ? world.Settlements[victim.Id].OwnerId : victim.Owner(world);
         uint adjusted = source.IsSettlement ? MixedTroopCombat.Adjust(world, source, victim, damage.Calculated, military,
             rangedSource: tactic.IsRangedAttack) : damage.Calculated;
+        if (source.IsSettlement) adjusted = EquipmentCombat.Adjust(world, source, victim, adjusted, tactic: true, ranged: tactic.IsRangedAttack);
         uint calculated = MilitaryCombat.FinalDamage(world, source, owner, adjusted, uint.MaxValue);
         MilitaryCombat.ApplyDamage(world, source, victim, adjusted, military, events, tactic.Id, calculated);
         bool targetLost = MilitaryCombat.IsDefeated(world, victim);

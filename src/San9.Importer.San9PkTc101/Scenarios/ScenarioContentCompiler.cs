@@ -230,6 +230,7 @@ public static class ScenarioContentCompiler
         snapshot = LegacyHistoricalPeerageEvidence.Apply(snapshot, catalog, header.ScenarioId <= 9);
         snapshot = HistoricalPeerageContent.Apply(snapshot, header.ScenarioId <= 9);
         snapshot = CuratedFormationEvidence.Apply(snapshot, catalog);
+        snapshot = FeaturedEquipmentPreset.Apply(snapshot);
         snapshot.Validate(); catalog.Validate(); return (snapshot, catalog);
     }
 }

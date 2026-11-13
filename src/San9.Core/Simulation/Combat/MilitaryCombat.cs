@@ -58,15 +58,20 @@ internal static class MilitaryCombat
         {
             bool rangedAttack = military.FacilityAttack(world.Settlements[source.Id]).Attack?.IsRangedAttack == true;
             uint adjusted = MixedTroopCombat.Adjust(world, source, target, amount, military, rangedSource: rangedAttack);
+            adjusted = EquipmentCombat.Adjust(world, source, target, adjusted, ranged: rangedAttack);
             return (adjusted, rangedAttack ? adjusted : null);
         }
-        if (!world.Units.TryGetValue(source.Id, out var unit) || unit.Detachments.IsEmpty ||
-            military.Map.IsWater(unit.Position)) return (amount, null);
+        if (!world.Units.TryGetValue(source.Id, out var unit)) return (amount, null);
+        if (unit.Detachments.IsEmpty || military.Map.IsWater(unit.Position))
+            return (EquipmentCombat.Adjust(world, source, target, amount,
+                ranged: military.Formation(unit).Attack?.IsRangedAttack == true), null);
         ulong melee = 0, ranged = 0;
         foreach (var (officerId, contribution) in DetachmentAllocation.Resize(unit.Detachments, amount))
         {
+            bool isRanged = military.TroopTypes[contribution.TroopTypeId].IsRangedAttack;
             uint adjusted = MixedTroopCombat.Adjust(world, source, target, contribution.Soldiers, military, officerId, tactic: false);
-            if (military.TroopTypes[contribution.TroopTypeId].IsRangedAttack) ranged += adjusted;
+            adjusted = EquipmentCombat.Adjust(world, source, target, adjusted, officerId, ranged: isRanged);
+            if (isRanged) ranged += adjusted;
             else melee += adjusted;
         }
         ulong total = melee + ranged;
@@ -477,8 +482,8 @@ internal static class MilitaryCombat
             MilitaryRulebook.WoundedCapacity, world.Companion.ReduceBattleWounded ? 13 : 10);
         uint meleeLoss = rangedDamage is uint rangedPart ? damage - Math.Min(damage, rangedPart) : ranged ? 0 : damage;
         var detachments = unit.Detachments.IsEmpty || meleeLoss == 0 ? unit.Detachments : DetachmentAllocation.ApplyMeleeLoss(unit, meleeLoss);
-        if (!detachments.IsEmpty && rangedDamage is not null && damage > meleeLoss)
-            detachments = DetachmentAllocation.Resize(detachments, loss.RemainingSoldiers);
+        if (!detachments.IsEmpty && damage > meleeLoss)
+            detachments = DetachmentAllocation.ResizeForCombatLoss(detachments, loss.RemainingSoldiers);
         world.Replace(unit with { Soldiers = loss.RemainingSoldiers, Wounded = unit.Wounded + loss.AddedWounded, Morale = unit.Morale - morale, Detachments = detachments });
         events.Add(new BattleDamageEvent(world.Clock, source.Id, unit.Id, null, damage, loss.AddedWounded, loss.Dead, 0, morale, source.IsSettlement)
         { TacticId = tacticId, IsTacticExchange = isTacticExchange, ContinuesSiege = continuesSiege, CalculatedSoldierLoss = calculatedSoldierLoss, Source = BattleObjectContext.Capture(world, source), Target = BattleObjectContext.Capture(unit) });

@@ -36,20 +36,18 @@ public sealed class EquipmentProductionTests
     }
 
     [Fact]
-    public void ProductionRequiresResearchAndFundsAndRejectsDuplicateOrder()
+    public void OrdinaryOfficerEquipmentCannotBeManufactured()
     {
         var command = new StartEquipmentProductionCommand(Guid.NewGuid(), 1, 0, 1, "spear");
         Assert.Equal(CommandRejection.InvalidTask, Engine(researched: false).Execute(new("player"), command).Submission.Rejection);
-        Assert.Equal(CommandRejection.InsufficientFunds, Engine(funds: 100).Execute(new("player"), command).Submission.Rejection);
+        Assert.Equal(CommandRejection.InvalidTask, Engine(funds: 100).Execute(new("player"), command).Submission.Rejection);
         var engine = Engine();
-        Assert.True(engine.Execute(new("player"), command).Submission.Accepted);
-        Assert.Equal(800u, engine.Snapshot.Corps.Single().Treasury.Money);
-        var next = command with { CommandId = Guid.NewGuid(), Sequence = engine.Snapshot.Simulation.NextSequence };
-        Assert.Equal(CommandRejection.InvalidTask, engine.Execute(new("player"), next).Submission.Rejection);
+        Assert.Equal(CommandRejection.InvalidTask, engine.Execute(new("player"), command).Submission.Rejection);
+        Assert.Equal(1000u, engine.Snapshot.Corps.Single().Treasury.Money);
     }
 
     [Fact]
-    public void EquipmentResearchWorksWithoutMixedTroopMode()
+    public void ObsoleteOrdinaryEquipmentResearchIsUnavailable()
     {
         var state = WorldState.Restore(Engine(researched: false).CaptureStableState());
         var world = state.BeginMutation(equipment: Catalog);
@@ -57,47 +55,30 @@ public sealed class EquipmentProductionTests
         { ResearchProjects = [new("forge", 100, 30, [])] });
         var rules = new SimulationRules { Equipment = Catalog, Military = military };
         Assert.False(world.Simulation.NewGame.MixedTroopsEnabled);
-        Assert.Equal(CommandRejection.None, MilitaryResearch.Start(world,
+        Assert.Equal(CommandRejection.InvalidTask, MilitaryResearch.Start(world,
             new StartResearchCommand(Guid.NewGuid(), 1, 0, 1, "forge"), rules, []));
-        for (int i = 0; i < 30; i++) MilitaryResearch.AdvanceDay(world, military, []);
-        Assert.Contains("forge", world.Forces[1].CompletedResearch);
-        Assert.Equal(CommandRejection.None, EquipmentProduction.Start(world,
+        Assert.DoesNotContain("forge", world.Forces[1].CompletedResearch);
+        Assert.Equal(CommandRejection.InvalidTask, EquipmentProduction.Start(world,
             new StartEquipmentProductionCommand(Guid.NewGuid(), 1, 1, 1, "spear"), Catalog, []));
     }
 
     [Fact]
-    public void ThirtyDaysProduceIndependentInventoryInstanceAcrossRestore()
+    public void LegacyOrdinaryProductionCannotCompleteIntoOfficerInventory()
     {
-        var engine = Engine();
-        Assert.True(engine.Execute(new("player"), new StartEquipmentProductionCommand(Guid.NewGuid(), 1, 0, 1, "spear")).Submission.Accepted);
-        var world = WorldState.Restore(engine.CaptureStableState());
-        var first = world.BeginMutation(equipment: Catalog);
-        for (int i = 0; i < 15; i++) EquipmentProduction.AdvanceDay(first, Catalog, []);
-        world.Commit(first);
-        world = WorldState.Restore(world.CreateSnapshot());
-        var second = world.BeginMutation(equipment: Catalog);
-        for (int i = 0; i < 15; i++) EquipmentProduction.AdvanceDay(second, Catalog, []);
-        Assert.Null(second.Forces[1].EquipmentProduction);
-        var item = Assert.Single(second.AllEquipment.Values);
-        Assert.Equal(1, item.InventoryForceId);
-        Assert.False(item.Equipped);
-        Assert.Equal("spear", item.DefinitionId);
-        world.Commit(second);
-        var completed = new SimulationEngine(world, new SimulationRules { Equipment = Catalog });
-        Assert.True(completed.Execute(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), 1,
-            completed.Snapshot.Simulation.NextSequence, 1, EquipmentSlot.MainHand, item.Id)).Submission.Accepted);
-        Assert.Equal(52, completed.GetAbilities(completed.Snapshot)[1].War);
-        Assert.True(completed.Execute(new("player"), new TransferEquipmentCommand(Guid.NewGuid(), 1,
-            completed.Snapshot.Simulation.NextSequence, item.Id, null)).Submission.Accepted);
-        Assert.Equal(50, completed.GetAbilities(completed.Snapshot)[1].War);
+        var world = WorldState.Restore(Engine().CaptureStableState()).BeginMutation(equipment: Catalog);
+        world.Replace(world.Forces[1] with { EquipmentProduction = new("spear", 1, 1) });
+        List<DomainEvent> events = [];
+        EquipmentProduction.AdvanceDay(world, Catalog, events);
+        Assert.Null(world.Forces[1].EquipmentProduction);
+        Assert.Empty(world.AllEquipment);
+        Assert.Single(events.OfType<EquipmentProductionCancelledEvent>());
     }
 
     [Fact]
     public void OwnershipChangeCancelsProduction()
     {
-        var engine = Engine();
-        Assert.True(engine.Execute(new("player"), new StartEquipmentProductionCommand(Guid.NewGuid(), 1, 0, 1, "spear")).Submission.Accepted);
-        var world = WorldState.Restore(engine.CaptureStableState()).BeginMutation(equipment: Catalog);
+        var world = WorldState.Restore(Engine().CaptureStableState()).BeginMutation(equipment: Catalog);
+        world.Replace(world.Forces[1] with { EquipmentProduction = new("spear", 1, 30) });
         List<DomainEvent> events = [];
         MilitaryResearch.CancelAt(world, 1, events);
         Assert.Null(world.Forces[1].EquipmentProduction);

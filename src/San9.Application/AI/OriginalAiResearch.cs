@@ -31,8 +31,10 @@ internal static class OriginalAiResearch
         int Demand(ResearchProjectDefinition candidate)
         {
             int score = 0;
-            if (equipment is not null && equipment.Items.Values.Any(item => item.ResearchProjectId is string research && DependsOn(research, candidate.Id)))
+            if (equipment is not null && equipment.Items.Values.Any(item => !item.IsOrdinaryArmament && item.ResearchProjectId is string research && DependsOn(research, candidate.Id)))
                 score += personnel.Length * 2;
+            if (military.Armaments.Values.Any(item => item.ResearchProjectId is string research && DependsOn(research, candidate.Id)))
+                score += fieldUnits.Length * 2 + personnel.Length;
             foreach (var type in military.TroopTypes.Values)
             foreach (var level in type.LevelResearchProjects.Where(pair => DependsOn(pair.Value, candidate.Id)))
             {

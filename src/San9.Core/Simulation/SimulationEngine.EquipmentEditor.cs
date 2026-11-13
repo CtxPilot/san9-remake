@@ -20,7 +20,7 @@ public sealed partial class SimulationEngine
             var targets = new HashSet<(int Officer, EquipmentSlot Slot)>();
             foreach (var edit in edits.OrderBy(e => e.Id))
             {
-                if (!world.AllEquipment.TryGetValue(edit.Id, out var original) || !_rules.Equipment.Items.TryGetValue(original.DefinitionId, out var definition) ||
+                if (!world.AllEquipment.TryGetValue(edit.Id, out var original) || original.PendingArmamentCredit is not null || !_rules.Equipment.Items.TryGetValue(original.DefinitionId, out var definition) ||
                     edit.OfficerId is not null && edit.InventoryForceId is not null ||
                     edit.OfficerId is int personId && (!world.Officers.TryGetValue(personId, out var person) || !person.IsVisible) ||
                     edit.InventoryForceId is int forceId && (!world.Forces.TryGetValue(forceId, out var force) || force.IsEliminated) ||
@@ -37,7 +37,8 @@ public sealed partial class SimulationEngine
                 }
                 var current = world.AllEquipment[edit.Id];
                 var next = current with { OfficerId = edit.OfficerId, InventoryForceId = edit.InventoryForceId,
-                    Equipped = false, IsLost = moved ? false : current.IsLost, EquipOnService = moved ? null : current.EquipOnService,
+                    Equipped = false, IsLost = moved ? false : current.IsLost, SearchPlaceId = moved ? null : current.SearchPlaceId,
+                    EquipOnService = moved ? null : current.EquipOnService,
                     Level = edit.Level, Experience = edit.Experience };
                 world.SetEquipment(next);
                 if (!EquipmentRules.ValidInventory(world.AllEquipment.Values, _rules.Equipment.Items))

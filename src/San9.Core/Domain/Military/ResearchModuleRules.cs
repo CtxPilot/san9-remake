@@ -12,9 +12,15 @@ public static class ResearchModuleRules
                 project.Prerequisites.Any(parent => DependsOn(parent, target, visited));
         }
         bool Uses(IEnumerable<string> roots) => roots.Any(root => DependsOn(root, projectId, []));
-        bool equipmentUse = Uses(equipment.Items.Values.SelectMany(item => new[] { item.ResearchProjectId, item.PurchaseResearchProjectId }).OfType<string>());
+        bool equipmentUse = Uses(equipment.Items.Values.Where(item => !item.IsOrdinaryArmament)
+            .SelectMany(item => new[] { item.ResearchProjectId, item.PurchaseResearchProjectId }).OfType<string>());
+        bool obsoleteUse = Uses(equipment.Items.Values.Where(item => item.IsOrdinaryArmament)
+            .SelectMany(item => new[] { item.ResearchProjectId, item.PurchaseResearchProjectId }).OfType<string>());
         bool militaryUse = Uses(military.TroopTypes.Values.SelectMany(type => type.LevelResearchProjects.Values)
-            .Concat(military.NavalTraining.Values.Select(t => t.ResearchProjectId).OfType<string>()));
+            .Concat(military.NavalTraining.Values.Select(t => t.ResearchProjectId).OfType<string>())
+            .Concat(military.SiegeEquipment.Values.Select(item => item.ResearchProjectId))
+            .Concat(military.Armaments.Values.Select(item => item.ResearchProjectId).OfType<string>()));
+        if (obsoleteUse && !militaryUse && !equipmentUse) return false;
         if (settings.MixedTroopsEnabled && (militaryUse || !equipmentUse)) return true;
         return settings.EquipmentDevelopmentEnabled != false && equipmentUse;
     }

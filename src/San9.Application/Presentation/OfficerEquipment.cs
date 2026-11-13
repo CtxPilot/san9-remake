@@ -6,7 +6,11 @@ namespace San9.Application.Presentation;
 
 public sealed record OfficerEquipmentItem(long Id, string Name, EquipmentSlot Slot, EquipmentRarity Rarity,
     int Level, int Experience, bool Equipped, bool InInventory, bool IsTreasure, string Effect,
-    bool CanEquip, string? UnavailableReason, int Grade, string Requirements);
+    bool CanEquip, string? UnavailableReason, int Grade, string Requirements)
+{
+    public EquipmentOrigin? Origin { get; init; }
+    public string DefinitionId { get; init; } = "";
+}
 public sealed record OfficerEquipmentSlot(EquipmentSlot Slot, string Name, OfficerEquipmentItem[] Items);
 public sealed record OfficerEquipmentData(bool CanManage, OfficerEquipmentSlot[] Slots);
 
@@ -52,6 +56,13 @@ public static class OfficerEquipment
             Add("政治", (long)b.Politics + (long)g.Politics * n);
             if (definition.TacticId is int tactic) effects.Add(view.Information.Tactics.FirstOrDefault(t => t.Id == tactic)?.Name ?? $"兵法 {tactic}");
             if (definition.EscapeMount) effects.Add("安然撤退");
+            if (definition.CombatEffects is { } combat)
+            {
+                if (combat.AttackPercent > 0) effects.Add($"部队造成伤害+{combat.AttackPercent}%");
+                if (combat.DefensePercent > 0) effects.Add($"部队受到伤害-{combat.DefensePercent}%");
+                if (combat.MartialTacticPercent > 0) effects.Add($"武力兵法伤害+{combat.MartialTacticPercent}%");
+                if (combat.RangedDefensePercent > 0) effects.Add($"远程受伤-{combat.RangedDefensePercent}%");
+            }
             return effects.Count == 0 ? "无附加效果" : string.Join("、", effects);
         }
         OfficerEquipmentItem Item(EquipmentInstance instance)
@@ -77,8 +88,10 @@ public static class OfficerEquipment
             bool allowed = own && incompatibility is null && unmet is null && session.Validate(new("player"), new ConfigureEquipmentCommand(Guid.NewGuid(), player!.Value,
                 world.Simulation.NextSequence, officerId, definition.Slot, instance.Id)).Accepted;
             return new(instance.Id, Name(definition), definition.Slot, definition.Rarity, instance.Level, instance.Experience,
-                instance.Equipped, inventory, instance.LegacyTreasureId is not null, Effect(definition, instance.Level), allowed,
-                unmet ?? incompatibility ?? (!allowed ? "当前无法操作此装备。" : null), definition.Grade, requirements);
+                instance.Equipped, inventory, instance.LegacyTreasureId is not null,
+                instance.PendingArmamentCredit is int credit ? $"入仕后转为军械余额 {credit}" : Effect(definition, instance.Level), allowed,
+                instance.PendingArmamentCredit is not null ? "入仕后转换，暂不可装备。" : unmet ?? incompatibility ?? (!allowed ? "当前无法操作此装备。" : null), definition.Grade, requirements)
+                { Origin = definition.Origin, DefinitionId = definition.Id };
         }
         var visible = world.Equipment.Where(e => e.OfficerId == officerId || own && e.InventoryForceId == player)
             .Select(Item).OrderByDescending(e => e.Equipped).ThenBy(e => e.Name, StringComparer.Ordinal).ThenBy(e => e.Id).ToArray();

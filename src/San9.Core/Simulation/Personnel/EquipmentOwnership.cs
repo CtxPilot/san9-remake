@@ -16,6 +16,12 @@ internal static class EquipmentOwnership
         if (recipient is int id && (!world.Forces.TryGetValue(id, out var force) || force.IsEliminated)) recipient = null;
         foreach (var item in world.AllEquipment.Values.Where(e => e.OfficerId == previous.Id && e.LegacyTreasureId is null).OrderBy(e => e.Id).ToArray())
         {
+            if (item.PendingArmamentCredit is not null && recipient is int creditOwner)
+            {
+                world.ConvertPendingArmament(item, creditOwner);
+                events.Add(new EquipmentOwnershipResolvedEvent(world.Clock, item.Id, previous.OwnerId, previous.Id, recipient));
+                continue;
+            }
             world.SetEquipment(recipient is int forceId ? EquipmentRules.MoveToInventory(item, forceId) :
                 item with { OfficerId = null, InventoryForceId = null, Equipped = false, IsLost = true, EquipOnService = null });
             events.Add(new EquipmentOwnershipResolvedEvent(world.Clock, item.Id, previous.OwnerId, previous.Id, recipient));

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using San9.Core.Domain;
 
 namespace San9.Core.Simulation;
@@ -110,6 +111,8 @@ public sealed partial class SimulationEngine
         ArgumentNullException.ThrowIfNull(rules.OfficerGrowth);
         rules.OfficerGrowth.Validate();
         ValidateContent(world, rules.Treasures, rules.Governance, rules.Equipment);
+        if (world.CreateSnapshot().Equipment.Any(item => item.SearchPlaceId is int place && !rules.Personnel.Places.ContainsKey(place)))
+            throw new ArgumentException("Unknown equipment search place.");
         rules.Terminal?.Validate(world.CreateSnapshot().Settlements.Where(s => s.Kind == SettlementKind.City).Select(s => s.Id).ToHashSet());
         _world = world;
         _rules = rules;
@@ -280,6 +283,7 @@ public sealed partial class SimulationEngine
         GameClock? arrival = null;
         long? journeyDays = null;
         int? governor = null;
+        ImmutableArray<ArmamentResupplyLine> armamentResupply = [];
         var result = Evaluate(context, command, commit: false, events =>
         {
             var task = events.OfType<TaskStartedEvent>().FirstOrDefault()?.Task;
@@ -287,8 +291,9 @@ public sealed partial class SimulationEngine
             journeyDays = task is null ? null : PersonnelJourneyTiming.InitialDays(task);
             governor = events.OfType<CorpsCreatedEvent>().FirstOrDefault()?.LeaderId ??
                 events.OfType<CorpsChangedEvent>().FirstOrDefault()?.LeaderId;
+            armamentResupply = events.OfType<UnitArmamentsResuppliedEvent>().FirstOrDefault()?.Lines ?? [];
         });
-        return new(result.Submission.Rejection, arrival, governor) { JourneyDays = journeyDays };
+        return new(result.Submission.Rejection, arrival, governor) { JourneyDays = journeyDays, ArmamentResupply = armamentResupply };
     }
 
     public AllianceFormationCandidates GetAllianceCandidates()
@@ -589,6 +594,22 @@ public sealed partial class SimulationEngine
                 case PurchaseEquipmentCommand purchase:
                     var purchaseRejection = EquipmentProduction.Purchase(mutation, purchase, _rules.Equipment, events);
                     if (purchaseRejection != CommandRejection.None) return Reject(purchaseRejection);
+                    break;
+                case PurchaseArmamentCommand armamentPurchase:
+                    var armamentPurchaseRejection = ArmamentPurchase.Execute(mutation, armamentPurchase, _rules.Military, events);
+                    if (armamentPurchaseRejection != CommandRejection.None) return Reject(armamentPurchaseRejection);
+                    break;
+                case StartArmamentProductionCommand armamentProduction:
+                    var armamentProductionRejection = ArmamentProduction.Start(mutation, armamentProduction, _rules.Military, events);
+                    if (armamentProductionRejection != CommandRejection.None) return Reject(armamentProductionRejection);
+                    break;
+                case ResupplyUnitArmamentsCommand resupply:
+                    var resupplyRejection = ArmamentResupply.Execute(mutation, resupply, _rules.Military, events);
+                    if (resupplyRejection != CommandRejection.None) return Reject(resupplyRejection);
+                    break;
+                case ConfigureUnitArmamentCommand configureArmament:
+                    var configureArmamentRejection = ArmamentResupply.Configure(mutation, configureArmament, _rules.Military, events);
+                    if (configureArmamentRejection != CommandRejection.None) return Reject(configureArmamentRejection);
                     break;
                 case BurnCommand burn:
                     var burnRejection = BurnStrategies.Start(mutation, context, burn, _rules, events);

@@ -208,6 +208,10 @@ internal sealed partial class WorldMutation : IWorldQuery
     internal ImmutableDictionary<long, EquipmentInstance> AllEquipment { get; private set; }
     internal bool EquipmentInitialized => _owner.EquipmentInitialized;
     private readonly EquipmentRulebook _equipmentRules;
+    internal IEnumerable<EquipmentCombatEffects> EquipmentCombatEffects(int officerId) => AllEquipment.Values
+        .Where(item => item.Equipped && item.OfficerId == officerId)
+        .Select(item => _equipmentRules.Items[item.DefinitionId].CombatEffects)
+        .OfType<EquipmentCombatEffects>();
     private ImmutableDictionary<int, OfficerAbilities>? _equipmentBonuses;
     private string? _equipmentExchange;
     internal void BeginEquipmentExchange(BattleSource source, BattleSource target) =>
@@ -264,6 +268,17 @@ internal sealed partial class WorldMutation : IWorldQuery
         LeadershipChanged(firstOfficer: previous?.OfficerId, secondOfficer: item.OfficerId);
         AllEquipment = AllEquipment.SetItem(item.Id, item);
         if (sealChanged) RefreshForceTrust(previousSealOwner, ForceTrust.SealOwner(this, _economy));
+    }
+    internal void ConvertPendingArmament(EquipmentInstance pending, int forceId)
+    {
+        if (pending.PendingArmamentCredit is not int credit || !AllEquipment.ContainsKey(pending.Id) ||
+            !AllForces.TryGetValue(forceId, out var owner) || owner.IsEliminated)
+            throw new InvalidOperationException("Invalid pending armament conversion.");
+        Replace(owner with { ArmamentMigrationCredit = checked((owner.ArmamentMigrationCredit ?? 0) + credit) });
+        AllEquipment = AllEquipment.Remove(pending.Id);
+        _equipmentBonuses = null;
+        if (pending.OfficerId is int officer)
+            foreach (var effects in _treasureEffects.Values) effects.Remove(officer);
     }
     internal ImmutableDictionary<(int FirstId, int SecondId), ForceRelation> AllRelations { get; private set; }
 
@@ -445,10 +460,25 @@ internal sealed partial class WorldMutation : IWorldQuery
         if (previous.UnitId is int oldUnitId && (value.UnitId != oldUnitId || !value.IsServing) &&
             Units.TryGetValue(oldUnitId, out var oldUnit) && oldUnit.Detachments.ContainsKey(value.Id))
         {
+            var oldForce = AllForces[oldUnit.OwnerId];
+            var returned = oldForce.ArmamentInventory ?? ImmutableDictionary<string, uint>.Empty;
+            var reserve = oldForce.ArmamentReserve ?? ImmutableDictionary<string, ulong>.Empty;
+            foreach (var issue in new[] { oldUnit.Detachments[value.Id].Weapon, oldUnit.Detachments[value.Id].Armor })
+                if (issue is not null) (returned, reserve) = ArmamentInventory.ReturnWithReserve(returned, reserve, issue);
+            if (oldUnit.Detachments[value.Id].Weapon is not null || oldUnit.Detachments[value.Id].Armor is not null)
+                Replace(oldForce with { ArmamentInventory = returned.IsEmpty ? null : returned, ArmamentReserve = reserve.IsEmpty ? null : reserve });
             var remaining = oldUnit.Detachments.Remove(value.Id);
             Replace(oldUnit with { Detachments = DetachmentAllocation.Resize(remaining, oldUnit.Soldiers) });
         }
         Officers = value.IsDormant ? Officers.Remove(value.Id) : Officers.SetItem(value.Id, value);
+        if (value.IsServing && value.OwnerId is int servingForce)
+        {
+            foreach (var pending in AllEquipment.Values.Where(item => item.OfficerId == value.Id && item.PendingArmamentCredit is not null)
+                         .OrderBy(item => item.Id).ToArray())
+            {
+                ConvertPendingArmament(pending, servingForce);
+            }
+        }
         if (previous.IsServing && !value.IsServing)
             foreach (var equipment in AllEquipment.Values.Where(item => item.OfficerId == value.Id && item.Equipped).ToArray())
                 SetEquipment(equipment with { Equipped = false });
@@ -501,7 +531,9 @@ internal sealed partial class WorldMutation : IWorldQuery
         var previous = Units[value.Id];
         if (!value.Detachments.IsEmpty && previous.Soldiers != value.Soldiers &&
             ReferenceEquals(previous.Detachments, value.Detachments))
-            value = value with { Detachments = DetachmentAllocation.Resize(value.Detachments, value.Soldiers) };
+            value = value with { Detachments = value.Soldiers < previous.Soldiers
+                ? DetachmentAllocation.ResizeForCombatLoss(value.Detachments, value.Soldiers)
+                : DetachmentAllocation.Resize(value.Detachments, value.Soldiers) };
         if (previous.OwnerId != value.OwnerId || previous.CorpsId != value.CorpsId || previous.ServicePlaceId != value.ServicePlaceId ||
             previous.IsEmbedded != value.IsEmbedded || TransportDestination(previous) != TransportDestination(value))
             GovernanceConsistent = false;

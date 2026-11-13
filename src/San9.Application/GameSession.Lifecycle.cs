@@ -13,6 +13,7 @@ public sealed partial class GameSession
     {
         _definition = definition;
         _simulation = simulation;
+        _initializedSearchEquipment = EquipmentMigration.SearchKeys(definition.Content);
         _lastXunStartDay = simulation.Snapshot.Clock.DayNumber;
         _originalAi = OriginalAiState.Create(definition.Content);
         _initialEvents = simulation.InitialEvents;
@@ -113,6 +114,7 @@ public sealed partial class GameSession
         session._originalAi = snapshot.OriginalAi;
         session.PlayerForceController = snapshot.PlayerForceController;
         session.InitialPlayerForceIds = snapshot.InitialPlayerForceIds;
+        session._initializedSearchEquipment = snapshot.InitializedSearchEquipment ?? [];
         session.HasUnsavedChanges = false;
         return session;
     }

@@ -5,6 +5,30 @@ namespace San9.Application.AI;
 
 internal static class MixedDeploymentSelection
 {
+    internal static ImmutableDictionary<int, DetachmentState> EquipArmaments(
+        ImmutableDictionary<int, DetachmentState> detachments, MilitaryRulebook rules, ForceState force)
+    {
+        var stock = force.ArmamentInventory ?? ImmutableDictionary<string, uint>.Empty;
+        var result = detachments.ToBuilder();
+        foreach (int officer in detachments.Keys.Order())
+        {
+            var detachment = result[officer];
+            foreach (var slot in Enum.GetValues<ArmamentSlot>())
+            {
+                var choice = rules.Armaments.Values.Where(item => item.Slot == slot && item.Supports(detachment.TroopTypeId) &&
+                        stock.GetValueOrDefault(item.Id) > 0 &&
+                        (item.ResearchProjectId is null || force.CompletedResearch.Contains(item.ResearchProjectId)))
+                    .OrderByDescending(item => slot == ArmamentSlot.Weapon ? item.AttackBonus : item.DefenseBonus)
+                    .ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();
+                if (choice is null) continue;
+                var issued = ArmamentInventory.Issue(stock, choice, detachment.TroopTypeId, detachment.Soldiers);
+                stock = issued.Inventory;
+                detachment = slot == ArmamentSlot.Weapon ? detachment with { Weapon = issued.Allocation } : detachment with { Armor = issued.Allocation };
+            }
+            result[officer] = detachment;
+        }
+        return result.ToImmutable();
+    }
     internal static (ImmutableDictionary<int, FormationPosition> Positions, ImmutableDictionary<int, DetachmentState> Detachments)
         EnsureFrontLine(FormationRule formation, ImmutableDictionary<int, FormationPosition> positions,
             ImmutableDictionary<int, DetachmentState> detachments, MilitaryRulebook rules, ForceState force)

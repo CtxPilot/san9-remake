@@ -253,6 +253,8 @@ public sealed record ScenarioInformationState(CorpsState[] Corps, TreasureState[
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record MilitaryRulesDefinition
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ImmutableArray<ArmamentDefinition>? Armaments { get; init; }
     public ImmutableArray<TroopTypeDefinition> TroopTypes { get; init; } = [];
     public ImmutableArray<NavalTrainingDefinition> NavalTraining { get; init; } = [];
     public ImmutableArray<SiegeEquipmentDefinition> SiegeEquipment { get; init; } = [];
@@ -282,6 +284,7 @@ public sealed record MilitaryRulesDefinition
 
     public static MilitaryRulesDefinition From(MilitaryDefinition value) => new()
     {
+        Armaments = value.Armaments,
         TroopTypes = value.TroopTypes,
         NavalTraining = value.NavalTraining,
         SiegeEquipment = value.SiegeEquipment,
@@ -313,6 +316,7 @@ public sealed record MilitaryRulesDefinition
     public MilitaryDefinition Compile(MilitaryGeographyDefinition geography, ImmutableArray<BattlefieldPlace> places) =>
         new(geography.Width, geography.Height, geography.TerrainIds, Terrains, Formations, places)
         {
+            Armaments = Armaments,
             TroopTypes = TroopTypes,
             NavalTraining = NavalTraining,
             SiegeEquipment = SiegeEquipment,
@@ -406,6 +410,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
     ForceInitialState[] Forces, SettlementInitialState[] Settlements)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ScenarioAppearanceEvidence[]? AppearanceEvidence { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public EquipmentInstance[]? InitialEquipment { get; init; }
     public const int CurrentSchemaVersion = 5;
     [JsonRequired] public required GameClock? ThreeVisitsStarted { get; init; }
     [JsonRequired] public required bool UnitDefectionsEnabled { get; init; }
@@ -436,6 +441,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
         return new(CurrentSchemaVersion, value.ScenarioId, value.Year, value.Month, value.Day, value.PlayerForceId, value.Forces, value.Settlements)
         {
             AppearanceEvidence = value.AppearanceEvidence,
+            InitialEquipment = value.InitialEquipment,
             ThreeVisitsStarted = value.ThreeVisitsStarted,
             UnitDefectionsEnabled = value.UnitDefectionsEnabled,
             SettlementDefectionsEnabled = value.SettlementDefectionsEnabled,
@@ -473,6 +479,7 @@ public sealed record ScenarioDocument(int SchemaVersion, string ScenarioId, int 
             new(geography.RegionNameKeys), new(geography.RegionCityIds))
         {
             AppearanceEvidence = AppearanceEvidence,
+            InitialEquipment = InitialEquipment,
             ThreeVisitsStarted = ThreeVisitsStarted,
             UnitDefectionsEnabled = UnitDefectionsEnabled,
             SettlementDefectionsEnabled = SettlementDefectionsEnabled,

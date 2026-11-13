@@ -1,10 +1,45 @@
 using San9.Core.Domain;
 using San9.Core.Simulation;
+using System.Collections.Immutable;
 
 namespace San9.Core.Tests;
 
 public sealed class DemobilizationTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AbsorptionReturnsRemainingArmamentsExactlyOnceAndKeepsThemAfterRestore(bool full)
+    {
+        var force = new ForceState(1, 0) { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", full ? uint.MaxValue : 20) };
+        var world = WorldState.Create(new(190, 1, 1), 42, [force],
+            [new(1, 1, 100, 100, 100, 50, 0, 0, 100, 0, 100)],
+            [new(11, 1, null, new(70, 70, 70, 70), false) { UnitId = 0 }],
+            units: [new(0, 1, new(2, 2), 80)
+            {
+                Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11,
+                    new DetachmentState(0, 1, 80) { Weapon = new("spear", 50, 100, 20), Armor = new("armor", 100, 100, 20) })
+            }], corps: [new CorpsState(1, 1, null, new(1000, 1000)) { IsRoot = true }]);
+        var geography = new PersonnelRulebook([new(1, new(2, 2))]);
+        var military = new MilitaryRulebook(new(8, 3, [.. Enumerable.Repeat(0, 24)],
+            [new(0, 1, null)], [], [new(1, new(2, 2), new(1, 1))]));
+        var mutation = world.BeginMutation(); List<DomainEvent> events = [];
+
+        MilitaryMovement.Absorb(mutation, mutation.Units[0], 1, new([]), geography, military, events);
+
+        Assert.Empty(mutation.Units);
+        Assert.Single(events.OfType<UnitAbsorbedEvent>());
+        Assert.Equal(full ? uint.MaxValue : 60u, mutation.Forces[1].ArmamentInventory!["spear"]);
+        Assert.Equal(full ? 40ul : 0ul, mutation.Forces[1].ArmamentReserve?.GetValueOrDefault("spear") ?? 0);
+        Assert.Equal(80u, mutation.Forces[1].ArmamentInventory!["armor"]);
+        mutation.SetSimulation(mutation.Simulation with { Boundary = SimulationBoundary.Stable });
+        world.Commit(mutation);
+        var restored = WorldState.Restore(world.CreateSnapshot()).CreateSnapshot();
+        Assert.Equal(full ? uint.MaxValue : 60u, restored.Forces.Single().ArmamentInventory!["spear"]);
+        Assert.Equal(full ? 40ul : 0ul, restored.Forces.Single().ArmamentReserve?.GetValueOrDefault("spear") ?? 0);
+        Assert.Equal(80u, restored.Forces.Single().ArmamentInventory!["armor"]);
+    }
+
     [Fact]
     public void ReturnedPopulationSurvivesGrowthAndSaveRestoreAboveGrowthLimit()
     {

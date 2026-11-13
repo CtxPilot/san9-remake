@@ -33,7 +33,7 @@ internal static class SunMarriage
         if (settlement is int destination && (!world.Settlements.TryGetValue(destination, out var place) ||
             place.IsDestroyed || !place.CanHostPersons || place.OwnerId != recipient || place.Durability <= 0)) return false;
         if (settlement is null && unit is null) return false;
-        UnitState? preparedFieldUnit = null;
+        PersonnelTransitions.PreparedFieldJoin? preparedFieldUnit = null;
         if (unit is int fieldUnit && (rules.Military is null ||
             !PersonnelTransitions.PrepareMixedFieldJoin(world, bride.Id, fieldUnit, rules.Military, out preparedFieldUnit))) return false;
         bool grants = world.Simulation.Controls.Any(c => c.ForceId == recipient && c.Kind == ControllerKind.Player);

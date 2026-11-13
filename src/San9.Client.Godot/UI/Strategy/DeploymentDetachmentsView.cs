@@ -43,16 +43,24 @@ public partial class DeploymentDetachmentsView : ModalView, IModalInputRouter
         }
         void Button(string title, Rect2 rect, Action action) => _body.AddChild(CommandWindow.CreateActionButton(Textures, title, "edit", rect, action));
         Label($"兵力合计 {_detachments.Values.Sum(d => (long)d.Soldiers)} / {Draft.Soldiers}　装备费用 {Draft.Rules.DetachmentEquipmentCost(_detachments.Values)}", new(248, 158, 520, 28));
-        Label("武将", new(256, 200, 100, 26)); Label("兵种", new(400, 200, 170, 26)); Label("兵力", new(620, 200, 112, 26));
+        Label("武将", new(248, 200, 85, 26)); Label("兵种", new(342, 200, 115, 26)); Label("兵力", new(458, 200, 70, 26));
+        if (!Draft.Rules.Armaments.IsEmpty) { Label("武器", new(540, 200, 90, 26)); Label("防具", new(644, 200, 90, 26)); }
         int index = 0;
         foreach (int officer in Draft.Members)
         {
             int y = 232 + index++ * 48;
             var detachment = _detachments[officer];
-            Label(Texts.Resolve(Draft.View.Officers.Single(p => p.Id == officer).NameKey), new(256, y, 112, 32));
+            Label(Texts.Resolve(Draft.View.Officers.Single(p => p.Id == officer).NameKey), new(248, y, 88, 32));
             string type = Draft.Rules.TroopTypes[detachment.TroopTypeId].Name;
-            Button($"{type}　{detachment.Level}级", new(390, y, 176, 40), () => SelectType(officer));
-            Button(detachment.Soldiers.ToString(), new(606, y, 136, 40), () => SelectSoldiers(officer));
+            Button($"{type}{detachment.Level}级", new(338, y, 116, 40), () => SelectType(officer));
+            Button(detachment.Soldiers.ToString(), new(458, y, 76, 40), () => SelectSoldiers(officer));
+            if (!Draft.Rules.Armaments.IsEmpty)
+            {
+                string Name(ArmamentAllocation? allocation) => allocation is not null && Draft.Rules.Armaments.TryGetValue(allocation.DefinitionId, out var definition)
+                    ? $"{definition.Name} {allocation.IssuedSets}" : "基础";
+                Button(Name(detachment.Weapon), new(538, y, 98, 40), () => SelectArmament(officer, ArmamentSlot.Weapon));
+                Button(Name(detachment.Armor), new(640, y, 98, 40), () => SelectArmament(officer, ArmamentSlot.Armor));
+            }
         }
         if (Draft.NavalFormationId is not null)
             Button(_naval is int naval ? Draft.Rules.NavalTraining[naval].Name : "水军训练", new(256, 478, 192, 40), SelectNaval);
@@ -70,14 +78,45 @@ public partial class DeploymentDetachmentsView : ModalView, IModalInputRouter
             .Where(level => t.LevelResearchProjects.All(p => p.Key > level || Draft.Force.CompletedResearch.Contains(p.Value)))
             .Select(level => (Type: t, Level: level))).ToArray();
         OpenCatalog("选择兵种", choices.Select((c, i) => new CatalogRow(i, [$"{c.Type.Name}　{c.Level}级",
-            c.Type.EquipmentCostPerThousand.GetValueOrDefault(c.Level), "每千人费用"])).ToArray(), id =>
-        { var c = choices[id]; _detachments = _detachments.SetItem(officer, _detachments[officer] with { TroopTypeId = c.Type.Id, Level = c.Level }); CloseChild(); });
+            Draft.Rules.Armaments.IsEmpty ? c.Type.EquipmentCostPerThousand.GetValueOrDefault(c.Level) : 0,
+            Draft.Rules.Armaments.IsEmpty ? "每千人费用" : "基础军械"])).ToArray(), id =>
+        { var c = choices[id]; _detachments = _detachments.SetItem(officer, _detachments[officer] with { TroopTypeId = c.Type.Id, Level = c.Level, Weapon = null, Armor = null }); CloseChild(); });
     }
 
     private void SelectSoldiers(int officer)
     {
         OpenChild(new NumberInputDialog { State = new(1, Draft.Soldiers, _detachments[officer].Soldiers), Textures = Textures,
-            Confirmed = value => { _detachments = _detachments.SetItem(officer, _detachments[officer] with { Soldiers = value }); CloseChild(); }, Closed = CloseChild });
+            Confirmed = value => { _detachments = _detachments.SetItem(officer, _detachments[officer] with { Soldiers = value, Weapon = null, Armor = null }); CloseChild(); }, Closed = CloseChild });
+    }
+
+    private void SelectArmament(int officer, ArmamentSlot slot)
+    {
+        var current = _detachments[officer];
+        uint Available(string id)
+        {
+            ulong reserved = 0;
+            foreach (var (member, detachment) in _detachments)
+            {
+                if (detachment.Weapon is { } weapon && weapon.DefinitionId == id && !(member == officer && slot == ArmamentSlot.Weapon)) reserved += weapon.IssuedSets;
+                if (detachment.Armor is { } armor && armor.DefinitionId == id && !(member == officer && slot == ArmamentSlot.Armor)) reserved += armor.IssuedSets;
+            }
+            uint stock = Draft.Force.ArmamentInventory?.GetValueOrDefault(id) ?? 0;
+            return reserved >= stock ? 0 : stock - (uint)reserved;
+        }
+        var choices = Draft.Rules.Armaments.Values.Where(item => item.Slot == slot && item.Supports(current.TroopTypeId) && Available(item.Id) > 0)
+            .OrderBy(item => item.Id, StringComparer.Ordinal).ToArray();
+        CatalogPage[] pages = [new("选择", [new("name", "名称", 22, CatalogAlignment.Left),
+            new("stock", "库存", 12, CatalogAlignment.Right), new("coverage", "可配人数", 16, CatalogAlignment.Right)])];
+        var rows = new[] { new CatalogRow(0, ["基础军械", "—", "—"]) }.Concat(choices.Select((item, index) =>
+            new CatalogRow(index + 1, [item.Name, Available(item.Id), Math.Min(current.Soldiers, Available(item.Id))]))).ToArray();
+        OpenChild(new CatalogView { Title = slot == ArmamentSlot.Weapon ? "选择武器" : "选择防具", CloseTitle = "中止",
+            Pages = pages, ReadRows = _ => rows, Textures = Textures, Service = Service, Activated = index =>
+            {
+                ArmamentAllocation? selection = index == 0 ? null : new(choices[index - 1].Id,
+                    Math.Min(current.Soldiers, Available(choices[index - 1].Id)), current.Soldiers, 0);
+                _detachments = _detachments.SetItem(officer, slot == ArmamentSlot.Weapon ? current with { Weapon = selection } : current with { Armor = selection });
+                CloseChild();
+            }, Closed = CloseChild });
     }
 
     private void SelectNaval()

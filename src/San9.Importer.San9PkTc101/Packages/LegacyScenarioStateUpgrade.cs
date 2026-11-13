@@ -79,6 +79,7 @@ public static class LegacyScenarioStateUpgrade
         military = military with
         {
             TroopTypes = MixedTroopPreset.TroopTypes([0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]),
+            Armaments = ArmamentPreset.Basic(),
             NavalTraining = MixedTroopPreset.NavalTraining(31, 32, 33, 34),
             SiegeEquipment = MixedTroopPreset.SiegeEquipment(8, 9, 10, 11),
             MixedTroopCombat = MixedTroopPreset.Combat(),
@@ -106,6 +107,7 @@ public static class LegacyScenarioStateUpgrade
             { Formations = catalogItems.Concat(extra).ToArray(),
               Equipment = LegacyEquipmentMigration.Convert(result.Information.Treasures, result.Information.TreasureStates, EquipmentPreset.Basic()).Definitions } };
         result = PersonalPeeragePreset.UpgradeLegacy(result);
+        result = FeaturedEquipmentPreset.Apply(result);
         result.Validate();
         return result;
     }

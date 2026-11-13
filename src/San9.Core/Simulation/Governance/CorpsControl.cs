@@ -84,6 +84,10 @@ public static class CorpsControl
             StartFormationTeachingCommand teaching => ControlsPlace(teaching.SettlementId),
             StartEquipmentProductionCommand production => ControlsPlace(production.SettlementId),
             PurchaseEquipmentCommand purchase => ControlsPlace(purchase.SettlementId),
+            PurchaseArmamentCommand armamentPurchase => ControlsPlace(armamentPurchase.SettlementId),
+            StartArmamentProductionCommand armamentProduction => ControlsPlace(armamentProduction.SettlementId),
+            ResupplyUnitArmamentsCommand resupply => ControlsUnit(resupply.UnitId),
+            ConfigureUnitArmamentCommand armament => ControlsUnit(armament.UnitId),
             ConfigureEquipmentCommand equipment => world.Officers.FirstOrDefault(p => p.Id == equipment.OfficerId)?.UnitId is int assignedUnit
                 ? ControlsUnit(assignedUnit) : OwnPerson(equipment.OfficerId),
             TransferEquipmentCommand transfer => (transfer.OfficerId is null || OwnPerson(transfer.OfficerId.Value)) &&

@@ -6,6 +6,7 @@ namespace San9.Core.Simulation;
 /// <summary>Owns personnel changes and the cancellation of missions that refer to the changed person.</summary>
 internal static class PersonnelTransitions
 {
+    internal sealed record PreparedFieldJoin(UnitState Unit, ImmutableDictionary<string, uint> ReturnedArmaments);
     internal static OfficerState BeginStatus(OfficerState person, OfficerStatus status, int year) => person with
     {
         Status = status, StatusStartYear = year, OfficeId = null, TacticCooldown = 0,
@@ -14,7 +15,7 @@ internal static class PersonnelTransitions
 
     internal static void RelocateAllegiance(WorldMutation world, int personId, int recipient, int loyalty,
         int? settlementId, int? unitId, SimulationRules rules, List<DomainEvent> events, string reason, bool afterDailyCommands,
-        UnitState? preparedFieldUnit = null)
+        PreparedFieldJoin? preparedFieldUnit = null)
     {
         if ((settlementId is null) == (unitId is null)) throw new ArgumentException("Expected one personnel destination.");
         var person = world.Officers[personId];
@@ -35,7 +36,16 @@ internal static class PersonnelTransitions
         }
         int? previousCorps = PersonnelLocations.Corps(world, person);
         TransferAllegiance(world, personId, recipient, loyalty, geographicPlace, reason, rules.Personnel, events, afterDailyCommands);
-        if (preparedFieldUnit is not null) world.Replace(preparedFieldUnit);
+        if (preparedFieldUnit is not null)
+        {
+            var force = world.Forces[recipient];
+            var inventory = force.ArmamentInventory ?? ImmutableDictionary<string, uint>.Empty;
+            var reserve = force.ArmamentReserve ?? ImmutableDictionary<string, ulong>.Empty;
+            foreach (var (id, count) in preparedFieldUnit.ReturnedArmaments)
+                (inventory, reserve) = ArmamentInventory.ReturnWithReserve(inventory, reserve, new(id, count, count, 0));
+            world.Replace(force with { ArmamentInventory = inventory.IsEmpty ? null : inventory, ArmamentReserve = reserve.IsEmpty ? null : reserve });
+            world.Replace(preparedFieldUnit.Unit);
+        }
         world.Replace(world.Officers[personId] with { SettlementId = settlementId, UnitId = unitId, RegionId = null });
         if (person.UnitId is int previousUnit && world.Units.ContainsKey(previousUnit) &&
             !world.Officers.Values.Any(p => p.UnitId == previousUnit && p.IsServing))
@@ -49,7 +59,7 @@ internal static class PersonnelTransitions
     }
 
     internal static bool PrepareMixedFieldJoin(WorldMutation world, int personId, int unitId,
-        MilitaryRulebook military, out UnitState? prepared)
+        MilitaryRulebook military, out PreparedFieldJoin? prepared)
     {
         prepared = null;
         var unit = world.Units[unitId];
@@ -70,8 +80,43 @@ internal static class PersonnelTransitions
         if (choice.IsEmpty) return false;
         uint soldiers = unit.Soldiers / (uint)(unit.Detachments.Count + 1);
         var remaining = DetachmentAllocation.Resize(unit.Detachments, unit.Soldiers - soldiers);
-        prepared = unit with { MemberPositions = unit.MemberPositions.SetItem(personId, position),
-            Detachments = remaining.Add(personId, choice[personId] with { Soldiers = soldiers }) };
+        var newcomer = choice[personId] with { Soldiers = soldiers };
+        var returned = ImmutableDictionary<string, uint>.Empty;
+        foreach (var (officerId, old) in unit.Detachments.OrderBy(pair => pair.Key))
+        foreach (var slot in Enum.GetValues<ArmamentSlot>())
+        {
+            var issue = slot == ArmamentSlot.Weapon ? old.Weapon : old.Armor;
+            if (issue is null) continue;
+            if (!issue.IsValid || old.Soldiers == 0 || issue.RemainingSets > old.Soldiers ||
+                !military.Armaments.TryGetValue(issue.DefinitionId, out var definition) || definition.Slot != slot) return false;
+            var current = remaining[officerId];
+            uint kept = (uint)((ulong)issue.RemainingSets * current.Soldiers / old.Soldiers);
+            uint excess = issue.RemainingSets - kept;
+            var retained = kept == 0 ? null : new ArmamentAllocation(issue.DefinitionId, kept, current.Soldiers, 0);
+            remaining = remaining.SetItem(officerId, slot == ArmamentSlot.Weapon ? current with { Weapon = retained } : current with { Armor = retained });
+            var existing = slot == ArmamentSlot.Weapon ? newcomer.Weapon : newcomer.Armor;
+            if (definition.Supports(newcomer.TroopTypeId) && (existing is null || existing.DefinitionId == issue.DefinitionId))
+            {
+                uint assigned = Math.Min(excess, newcomer.Soldiers - (existing?.RemainingSets ?? 0));
+                if (assigned > 0)
+                {
+                    var allocation = new ArmamentAllocation(issue.DefinitionId, (existing?.RemainingSets ?? 0) + assigned, newcomer.Soldiers, 0);
+                    newcomer = slot == ArmamentSlot.Weapon ? newcomer with { Weapon = allocation } : newcomer with { Armor = allocation };
+                    excess -= assigned;
+                }
+            }
+            if (excess > 0)
+            {
+                ulong count = (ulong)returned.GetValueOrDefault(issue.DefinitionId) + excess;
+                var owner = world.Forces[unit.OwnerId];
+                ulong room = uint.MaxValue - (owner.ArmamentInventory?.GetValueOrDefault(issue.DefinitionId) ?? 0);
+                ulong overflow = count > room ? count - room : 0;
+                if (count > uint.MaxValue || overflow > ulong.MaxValue - (owner.ArmamentReserve?.GetValueOrDefault(issue.DefinitionId) ?? 0)) return false;
+                returned = returned.SetItem(issue.DefinitionId, (uint)count);
+            }
+        }
+        prepared = new(unit with { MemberPositions = unit.MemberPositions.SetItem(personId, position),
+            Detachments = remaining.Add(personId, newcomer) }, returned);
         return true;
     }
 

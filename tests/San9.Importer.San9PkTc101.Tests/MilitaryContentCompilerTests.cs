@@ -46,6 +46,8 @@ public sealed class MilitaryContentCompilerTests
         tactics[31] = tactics[31] with { AffectsFacilitiesCode = 1 };
         tactics[33] = tactics[33] with { CompatibleArrayTypeMaskHigh = 1 << 5 };
         var definition = MilitaryContentCompiler.Compile(squares, terrains, formations, places, [], buildings, tactics, places.ToDictionary(p => p.Id, _ => System.Collections.Immutable.ImmutableArray<int>.Empty));
+        Assert.Equal(7, definition.Armaments!.Value.Length);
+        Assert.Contains(definition.Armaments.Value, item => item.Name == "铁矛");
         Assert.Equal(27, definition.UnformedFormationId);
         Assert.Equal(20, definition.BasicNavalFormationId);
         Assert.Equal(new FormationVision(15, 360), definition.Formations.Single(f => f.Id == 0).Vision);
@@ -129,7 +131,9 @@ public sealed class MilitaryContentCompilerTests
                 : [new(1, BattleRank.Front), new(0, BattleRank.Middle), new(1, BattleRank.Middle), new(2, BattleRank.Middle), new(1, BattleRank.Rear)], formation.Positions);
         }
         var rules = new MilitaryRulebook(definition);
-        Assert.Equal(61, rules.DetachmentEquipmentCost([new(0, 1, 1001), new(1, 2, 1000)]));
+        Assert.Equal(0, rules.DetachmentEquipmentCost([new(0, 1, 1001), new(1, 2, 1000)]));
+        Assert.Equal(61, new MilitaryRulebook(definition with { Armaments = null })
+            .DetachmentEquipmentCost([new(0, 1, 1001), new(1, 2, 1000)]));
         Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 33, 34 }, definition.Tactics.Where(t => t.CanRescuePrisoners).Select(t => t.Id));
         Assert.Equal(new[] { 6, 7, 8, 9, 10, 11, 31, 32 }, definition.Tactics.Where(t => t.SnipingProficiencyCategory == 3).Select(t => t.Id));
         Assert.All(definition.Tactics.Where(t => t.SnipingProficiencyCategory is not null), t => Assert.Equal(3, t.SnipingProficiencyCategory));

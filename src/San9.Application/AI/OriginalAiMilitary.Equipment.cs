@@ -175,7 +175,10 @@ internal sealed partial class OriginalAiMilitary
             ? DetachmentAllocation.CreateDefault(people.Select(p => p.Id), tactics, soldiers, Force, rules)
             : ImmutableDictionary<int, DetachmentState>.Empty;
         if (!detachments.IsEmpty)
+        {
             (positions, detachments) = MixedDeploymentSelection.EnsureFrontLine(formation, positions, detachments, rules, Force);
+            detachments = MixedDeploymentSelection.EquipArmaments(detachments, rules, Force);
+        }
         int? navalTraining = World.Simulation.NewGame.MixedTroopsEnabled && pair.Naval is not null
             ? rules.NavalTraining.Values.Where(t => t.ResearchProjectId is null || Force.CompletedResearch.Contains(t.ResearchProjectId))
                 .OrderBy(t => t.DeploymentCost).ThenByDescending(t => t.Id).Select(t => (int?)t.Id).FirstOrDefault()

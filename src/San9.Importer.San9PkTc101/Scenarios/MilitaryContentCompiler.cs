@@ -95,6 +95,7 @@ public static class MilitaryContentCompiler
                             : throw new InvalidDataException("Missing formation member position.")).ToImmutableArray() }).ToImmutableArray(), places)
         {
             TroopTypes = MixedTroopPreset.TroopTypes([0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]),
+            Armaments = ArmamentPreset.Basic(),
             NavalTraining = MixedTroopPreset.NavalTraining(31, 32, 33, 34),
             SiegeEquipment = MixedTroopPreset.SiegeEquipment(8, 9, 10, 11),
             MixedTroopCombat = MixedTroopPreset.Combat(),

@@ -69,6 +69,14 @@ internal static class MilitaryMovement
             rules.Formations.Values.Any(formation => formation.TravelMode == TravelMode.Water) &&
             !rules.NavalTraining.Values.Any(training => training.ResearchProjectId is null)))
             throw new ArgumentException("Mixed troop rules are missing required content.");
+        if (world.Forces.Any(force => force.ArmamentInventory?.Keys.Any(id => rules is null || !rules.Armaments.ContainsKey(id)) == true ||
+            force.ArmamentReserve?.Keys.Any(id => rules is null || !rules.Armaments.ContainsKey(id)) == true ||
+            force.ArmamentProduction is { } production && (rules is null || force.IsDormant || force.IsEliminated ||
+                !rules.Armaments.TryGetValue(production.DefinitionId, out var item) || item.ProductionDays is not int days ||
+                production.DaysRemaining > days || item.ResearchProjectId is string project && !force.CompletedResearch.Contains(project) ||
+                !world.Settlements.Any(place => place.Id == production.SettlementId && place.OwnerId == force.Id &&
+                    !place.IsDormant && !place.IsDestroyed && place.CanHostPersons))))
+            throw new ArgumentException("Invalid force armament references.");
         if (rules is not null)
         foreach (var force in world.Forces)
         {
@@ -122,7 +130,9 @@ internal static class MilitaryMovement
                 throw new ArgumentException("Missing mixed troop unit configuration.");
             if (!unit.Detachments.IsEmpty && (unit.Detachments.Any(pair =>
                     !world.Officers.Any(p => p.Id == pair.Key && p.IsServing && p.UnitId == unit.Id) ||
-                    !rules.TroopTypes.TryGetValue(pair.Value.TroopTypeId, out var troop) || pair.Value.Level > troop.MaximumLevel) ||
+                    !rules.TroopTypes.TryGetValue(pair.Value.TroopTypeId, out var troop) || pair.Value.Level > troop.MaximumLevel ||
+                    !ValidArmament(pair.Value.Weapon, ArmamentSlot.Weapon, pair.Value.TroopTypeId, rules) ||
+                    !ValidArmament(pair.Value.Armor, ArmamentSlot.Armor, pair.Value.TroopTypeId, rules)) ||
                 world.Officers.Any(p => p.IsServing && p.UnitId == unit.Id && !unit.Detachments.ContainsKey(p.Id))))
                 throw new ArgumentException("Invalid unit detachment members or troop definitions.");
             if (unit.NavalTrainingId is int training && !rules.NavalTraining.ContainsKey(training))
@@ -143,6 +153,10 @@ internal static class MilitaryMovement
                 throw new ArgumentException("Invalid constructed facility state.");
         }
     }
+
+    private static bool ValidArmament(ArmamentAllocation? allocation, ArmamentSlot slot, int troopTypeId, MilitaryRulebook rules) =>
+        allocation is null || allocation.IsValid && rules.Armaments.TryGetValue(allocation.DefinitionId, out var definition) &&
+        definition.Slot == slot && definition.Supports(troopTypeId);
 
     internal static CommandRejection Transport(WorldMutation world, TransportUnitCommand command, MilitaryRulebook? rules,
         GovernanceRulebook governance, TreasureRulebook treasures, List<DomainEvent> events)
@@ -174,8 +188,20 @@ internal static class MilitaryMovement
     internal static CommandRejection ApplyDeployment(WorldMutation world, DeployUnitCommand command,
         GovernanceRulebook governance, List<DomainEvent> events, DeploymentPreparation prepared, uint cargoMoney = 0, uint cargoFood = 0)
     {
-        var (formation, navalId, start, account, deploymentCost) = prepared;
+        var (formation, navalId, start, account, deploymentCost, consumption) = prepared;
         var home = world.Settlements[command.SettlementId];
+        if (!consumption.IsEmpty)
+        {
+            var force = world.Forces[command.IssuerId];
+            var inventory = force.ArmamentInventory ?? ImmutableDictionary<string, uint>.Empty;
+            foreach (var (definitionId, count) in consumption)
+            {
+                uint available = inventory.GetValueOrDefault(definitionId);
+                if (count > available) return CommandRejection.InvalidTask;
+                inventory = count == available ? inventory.Remove(definitionId) : inventory.SetItem(definitionId, available - count);
+            }
+            world.Replace(force with { ArmamentInventory = inventory.IsEmpty ? null : inventory });
+        }
         int id = (int)world.Simulation.NextUnitId;
         int? commander = LeadershipMaintenance.SelectUnitCommander(world, command.OfficerIds, governance);
         var unit = new UnitState(id, home.OwnerId!.Value, start, command.Soldiers)
@@ -210,7 +236,7 @@ internal static class MilitaryMovement
     }
 
     internal sealed record DeploymentPreparation(FormationRule Formation, int? NavalId,
-        WorldPosition Start, ResourceAccount Account, long Cost);
+        WorldPosition Start, ResourceAccount Account, long Cost, ImmutableDictionary<string, uint> ArmamentConsumption);
 
     internal static CommandRejection PrepareDeployment(WorldMutation world, DeployUnitCommand command,
         MilitaryRulebook? rules, GovernanceRulebook governance, TreasureRulebook treasures, UnitPurpose purpose, uint cargoMoney, uint cargoFood,
@@ -275,6 +301,19 @@ internal static class MilitaryMovement
                     !world.Forces[command.IssuerId].CompletedResearch.Contains(research.Value))) ||
             command.Detachments.Values.Aggregate(0UL, (sum, d) => sum + d.Soldiers) != command.Soldiers))
             return CommandRejection.InvalidTask;
+        var needed = new Dictionary<string, ulong>(StringComparer.Ordinal);
+        foreach (var detachment in command.Detachments.Values)
+        foreach (var (allocation, slot) in new[] { (detachment.Weapon, ArmamentSlot.Weapon), (detachment.Armor, ArmamentSlot.Armor) })
+        {
+            if (allocation is null) continue;
+            if (!ValidArmament(allocation, slot, detachment.TroopTypeId, rules) || allocation.IssuedSets == 0 ||
+                allocation.InitialSoldiers != detachment.Soldiers || allocation.Casualties != 0)
+                return CommandRejection.InvalidTask;
+            needed[allocation.DefinitionId] = needed.GetValueOrDefault(allocation.DefinitionId) + allocation.IssuedSets;
+        }
+        var stock = world.Forces[command.IssuerId].ArmamentInventory;
+        if (needed.Any(pair => pair.Value > uint.MaxValue || pair.Value + (plan?.ReservedArmament(pair.Key) ?? 0) >
+            (stock?.GetValueOrDefault(pair.Key) ?? 0))) return CommandRejection.InvalidTask;
         deploymentCost += rules.DetachmentEquipmentCost(command.Detachments.Values);
         foreach (var (person, tacticId) in command.Tactics)
             if (tacticId is int tactic && (!rules.Tactics.TryGetValue(tactic, out var definition) || !definition.Selectable ||
@@ -308,7 +347,8 @@ internal static class MilitaryMovement
             !travel.Map.FindRoute(start.Value, via, travel.Shape, travel.Mode, occupancy).Reachable))
             return CommandRejection.NoDestination;
         if (world.Simulation.NextUnitId > int.MaxValue - (long)(plan?.Count ?? 0)) return CommandRejection.ResourceOverflow;
-        prepared = new(formation, navalId, start.Value, account, deploymentCost);
+        prepared = new(formation, navalId, start.Value, account, deploymentCost,
+            needed.ToImmutableDictionary(pair => pair.Key, pair => (uint)pair.Value, StringComparer.Ordinal));
         return CommandRejection.None;
     }
 
@@ -463,6 +503,13 @@ internal static class MilitaryMovement
                 u.EffectiveOrderClass == UnitOrderClass.Military)).ToArray() : [];
         var affected = new[] { sourceCorps, previousCorps }.Concat(followers.Select(u => u.CorpsId ?? root)).Distinct().ToArray();
         if (!CanAbsorb(world, unit, home, returnHome, transfer, followers.Select(u => u.Id).ToHashSet(), affected))
+        {
+            UnitOrderChanges.Report(world, unit.Id, unit.Order, "absorption-blocked", events);
+            return;
+        }
+        var force = world.Forces[unit.OwnerId];
+        if (!ArmamentInventory.CanReturnWithReserve(force.ArmamentInventory ?? ImmutableDictionary<string, uint>.Empty,
+                force.ArmamentReserve ?? ImmutableDictionary<string, ulong>.Empty, unit.Detachments.Values))
         {
             UnitOrderChanges.Report(world, unit.Id, unit.Order, "absorption-blocked", events);
             return;

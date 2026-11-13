@@ -99,10 +99,24 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
     [JsonRequired] public OfficerInitialState[] Officers { get; init; } = [];
     [JsonRequired] public San9.Core.Domain.UnitState[] Units { get; init; } = [];
     [JsonRequired] public InformationDefinitions Information { get; init; } = InformationDefinitions.Empty;
+    /// <summary>Independent, scenario-authored equipment instances; legacy treasures are migrated separately.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public San9.Core.Domain.EquipmentInstance[]? InitialEquipment { get; init; }
     public void Validate() => Validate(null);
 
     public void Validate(ScenarioValidationContext? context)
     {
+        if (InitialEquipment is { } initialEquipment)
+        {
+            var migrated = LegacyEquipmentMigration.Convert(Information.Treasures, Information.TreasureStates, Information.Equipment);
+            var definitions = migrated.Definitions.ToDictionary(item => item.Id, StringComparer.Ordinal);
+            if (initialEquipment.Any(item => item is null || item.LegacyTreasureId is not null ||
+                    item.SearchPlaceId is int place && !Settlements.Any(s => s.Id == place) && !UnbuiltPlaces.Any(p => p.Id == place) ||
+                    item.OfficerId is int officer && !Officers.Any(o => o.State.Id == officer) ||
+                    item.InventoryForceId is int force && !Forces.Any(f => f.Id == force)) ||
+                !San9.Core.Domain.EquipmentRules.ValidInventory(migrated.Instances.Concat(initialEquipment), definitions))
+                throw new InvalidDataException("Invalid initial independent equipment.");
+        }
         if (AppearanceEvidence is { } evidence && evidence.Any(e => e is null || e.OfficerId < 0 || e.LeaderId < 0 ||
             e.SettlementId is < 0 || e.Year <= 0 || string.IsNullOrWhiteSpace(e.SourceScenarioId) ||
             !Officers.Any(o => o.State.Id == e.OfficerId) || !Officers.Any(o => o.State.Id == e.LeaderId) ||

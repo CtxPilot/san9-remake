@@ -7,8 +7,10 @@ namespace San9.Core.Tests;
 public sealed class SearchOutcomeTests
 {
     private static SimulationEngine Engine(bool person, bool item, bool automatic = false, int politics = 500, ulong seed = 190,
-        bool probeGrowth = false, ulong fundsSeed = 52, bool secondSearcher = false)
+        bool probeGrowth = false, ulong fundsSeed = 52, bool secondSearcher = false, bool featured = false)
     {
+        var equipment = new EquipmentRulebook(featured ? [new EquipmentDefinition("featured-spear", EquipmentSlot.MainHand,
+            EquipmentRarity.Precious, new(2, 0, 0, 0), new(1, 0, 0, 0)) { Name = "玄纹长戟" }] : []);
         var world = WorldState.Create(new(190, 1, 1), seed,
             [new(1, 0) { LeaderId = 1 }],
             [new(1, 1, 0, 100, 100, 0, 0, 0, 100, 0, 100)],
@@ -18,7 +20,8 @@ public sealed class SearchOutcomeTests
                  RegionId = 30, ForceLoyalties = ImmutableDictionary<int, int>.Empty.Add(1, 40) },
              .. secondSearcher ? new OfficerState[] { new(4,1,1,new(50,50,politics,50),false) } : []],
             treasures: item ? [new(10, null, TreasureDiscovery.Buried, 30)] : [],
-            controls: [new("player", 1, automatic ? ControllerKind.Automatic : ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }]);
+            controls: [new("player", 1, automatic ? ControllerKind.Automatic : ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }],
+            equipment: featured ? [new EquipmentInstance(100, "featured-spear", null, null, false) { IsLost = true, SearchPlaceId = 30 }] : null);
         if (probeGrowth)
         {
             var mutation = world.BeginMutation();
@@ -26,8 +29,24 @@ public sealed class SearchOutcomeTests
                 [new("personnel-politics-growth", 52), new("personnel-search-funds", fundsSeed)] });
             world.Commit(mutation);
         }
-        return new(world, EconomyRulebook.Empty, new([new(1, new(0, 0)), new(30, new(300, 0))]),
-            item ? new([new(10, new(5, 0, 0, 0), 0)]) : TreasureRulebook.Empty);
+        return new(world, new SimulationRules { Personnel = new([new(1, new(0, 0)), new(30, new(300, 0))]),
+            Treasures = item ? new([new(10, new(5, 0, 0, 0), 0)], equipment) : TreasureRulebook.Empty, Equipment = equipment });
+    }
+
+    [Fact]
+    public void SearchDiscoversIndependentEquipmentOnceAndDoesNotEquipItAutomatically()
+    {
+        var engine = Engine(false, false, featured: true);
+        var result = Search(engine);
+        Assert.Equal(SearchResultKind.Equipment, result.Result);
+        Assert.Equal(100, result.EquipmentId);
+        var found = Assert.Single(engine.Snapshot.Equipment);
+        Assert.Equal(1, found.OfficerId);
+        Assert.False(found.IsLost);
+        Assert.False(found.Equipped);
+        Assert.Null(found.SearchPlaceId);
+        var restored = WorldState.Restore(engine.CaptureStableState());
+        Assert.Equal(found, Assert.Single(restored.CreateSnapshot().Equipment));
     }
 
     [Fact]

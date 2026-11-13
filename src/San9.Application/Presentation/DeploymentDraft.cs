@@ -54,13 +54,19 @@ public sealed partial class DeploymentDraft
                 var updated = defaults.ToBuilder();
                 foreach (int member in Members)
                     if (_detachments.TryGetValue(member, out var previous)) updated[member] = previous;
-                _detachments = DetachmentAllocation.Resize(updated.ToImmutable(), Soldiers);
+                _detachments = ClearChangedArmament(DetachmentAllocation.Resize(updated.ToImmutable(), Soldiers));
             }
             else if (!_detachments.IsEmpty && _detachments.Values.Aggregate(0UL, (sum, d) => sum + d.Soldiers) != Soldiers)
-                _detachments = DetachmentAllocation.Resize(_detachments, Soldiers);
+                _detachments = ClearChangedArmament(DetachmentAllocation.Resize(_detachments, Soldiers));
             return _detachments;
         }
     }
+    private static ImmutableDictionary<int, DetachmentState> ClearChangedArmament(ImmutableDictionary<int, DetachmentState> detachments) =>
+        detachments.ToImmutableDictionary(pair => pair.Key, pair => pair.Value with
+        {
+            Weapon = pair.Value.Weapon?.InitialSoldiers == pair.Value.Soldiers ? pair.Value.Weapon : null,
+            Armor = pair.Value.Armor?.InitialSoldiers == pair.Value.Soldiers ? pair.Value.Armor : null
+        });
     public bool SetDetachments(ImmutableDictionary<int, DetachmentState> value)
     {
         if (!View.World.Simulation.NewGame.MixedTroopsEnabled || value.Count != Members.Length ||

@@ -40,11 +40,13 @@ public sealed class GiftSessionTests
     [Fact]
     public void OfficerEquipmentShowsNineSlotsInventoryAndAppliesSelection()
     {
-        var content = Content();
+        var basis = Content();
+        var named = new EquipmentDefinition("named-spear", EquipmentSlot.MainHand, EquipmentRarity.Rare, new(2, 0, 0, 0), default) { Name = "名枪" };
+        var content = basis with { Information = basis.Information with { Equipment = basis.Information.Equipment.Add(named) } };
         var session = GameSession.Start(content, 42);
         var saved = session.Capture();
         session = GameSession.Restore(content, saved with { World = saved.World with
-        { Equipment = [.. saved.World.Equipment, new EquipmentInstance(500, "basic-spear", null, 1, false)] } });
+        { Equipment = [.. saved.World.Equipment, new EquipmentInstance(500, "named-spear", null, 1, false)] } });
         var texts = new San9.Content.Text.TextCatalog(San9.Content.Text.TextCatalog.CurrentSchemaVersion,
             new Dictionary<string, string> { ["treasure"] = "名马" });
         var data = San9.Application.Presentation.OfficerEquipment.Read(session, texts, 11);

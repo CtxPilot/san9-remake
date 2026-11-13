@@ -7,9 +7,9 @@ namespace San9.Application;
 
 public static class SessionProtocol
 {
-    public const string RulesVersion = "san9-core-g10-v270";
+    public const string RulesVersion = "san9-core-g10-v271";
     public const int SaveFormatVersion = 137;
-    public const int LogFormatVersion = 180;
+    public const int LogFormatVersion = 181;
 }
 
 /// <summary>Non-authoritative load diagnostics; never included in saves or deterministic hashes.</summary>
@@ -72,6 +72,8 @@ public sealed record SessionSnapshot(WorldSnapshot World, ImmutableArray<Session
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? PersonalPeerageInitialized { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? InitialEquipmentIssued { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public bool? ArmamentMigrationInitialized { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public ImmutableArray<string>? InitializedSearchEquipment { get; init; }
     [JsonRequired] public San9.Content.Scenarios.SessionDefinitions Definitions { get; init; } = San9.Content.Scenarios.SessionDefinitions.Empty;
     [JsonRequired] public ImmutableArray<DeploymentPreset> DeploymentPresets { get; init; } = [];
     [JsonRequired] public ImmutableList<ChronicleFact> History { get; init; } = [];

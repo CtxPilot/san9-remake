@@ -22,6 +22,8 @@ internal static class OriginalAiEquipment
             var definition = rules.Items[item.DefinitionId]; var b = definition.BaseBonuses; var g = definition.BonusPerLevel;
             long score = (long)b.War + b.Intelligence + b.Politics + b.Leadership +
                 ((long)g.War + g.Intelligence + g.Politics + g.Leadership) * (item.Level - 1);
+            if (definition.CombatEffects is { } combat)
+                score += combat.AttackPercent + combat.DefensePercent + combat.MartialTacticPercent + combat.RangedDefensePercent;
             return score + (definition.TacticId is null ? 0 : 10) + (definition.EscapeMount ? 10 : 0);
         }
         foreach (int officer in officers)
@@ -32,7 +34,8 @@ internal static class OriginalAiEquipment
             var current = world.Equipment.FirstOrDefault(item => item.OfficerId == officer && item.Equipped && rules.Items[item.DefinitionId].Slot == slot);
             long currentScore = current is null ? -1 : Score(current);
             foreach (var item in world.Equipment.Where(item => (item.OfficerId == officer || item.InventoryForceId == seat.ForceId) &&
-                         !item.Equipped && rules.Items[item.DefinitionId].Slot == slot && Score(item) > currentScore)
+                         !item.Equipped && item.PendingArmamentCredit is null && !rules.Items[item.DefinitionId].IsOrdinaryArmament &&
+                         rules.Items[item.DefinitionId].Slot == slot && Score(item) > currentScore)
                      .OrderByDescending(Score).ThenBy(item => item.Id))
             {
                 long sequence = engine.Snapshot.Simulation.NextSequence;
@@ -44,7 +47,7 @@ internal static class OriginalAiEquipment
             }
         }
         var snapshot = engine.Snapshot;
-        if (snapshot.Simulation.NewGame.EquipmentDevelopmentEnabled == false) return;
+        if (snapshot.Simulation.NewGame.EquipmentDevelopmentEnabled == false || rules.Items.Values.All(item => item.IsOrdinaryArmament || item.LegacyTreasureId is not null || item.Rarity != EquipmentRarity.Ordinary)) return;
         var force = snapshot.Forces.Single(f => f.Id == seat.ForceId);
         root = snapshot.Corps.First(c => c.Id == root.Id);
         var place = snapshot.Settlements.Where(p => p.OwnerId == force.Id && !p.IsDormant && !p.IsDestroyed && p.CanHostPersons &&

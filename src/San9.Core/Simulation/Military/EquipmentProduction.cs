@@ -17,7 +17,7 @@ internal static class EquipmentProduction
         List<DomainEvent> events)
     {
         if (world.Simulation.NewGame.EquipmentDevelopmentEnabled == false || !world.EquipmentInitialized || string.IsNullOrWhiteSpace(command.DefinitionId) ||
-            !rules.Items.TryGetValue(command.DefinitionId, out var item) || item.PurchaseCost is not int cost ||
+            !rules.Items.TryGetValue(command.DefinitionId, out var item) || item.IsOrdinaryArmament || item.PurchaseCost is not int cost ||
             item.LegacyTreasureId is not null || item.Rarity != EquipmentRarity.Ordinary ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsDormant || force.IsEliminated ||
             item.PurchaseResearchProjectId is string project && !force.CompletedResearch.Contains(project) ||
@@ -36,7 +36,7 @@ internal static class EquipmentProduction
         List<DomainEvent> events)
     {
         if (world.Simulation.NewGame.EquipmentDevelopmentEnabled == false || !world.EquipmentInitialized || string.IsNullOrWhiteSpace(command.DefinitionId) ||
-            !rules.Items.TryGetValue(command.DefinitionId, out var item) || item.ResearchProjectId is not string project ||
+            !rules.Items.TryGetValue(command.DefinitionId, out var item) || item.IsOrdinaryArmament || item.ResearchProjectId is not string project ||
             !world.Forces.TryGetValue(command.IssuerId, out var force) || force.IsDormant || force.IsEliminated ||
             force.EquipmentProduction is not null || !force.CompletedResearch.Contains(project) ||
             !world.Settlements.TryGetValue(command.SettlementId, out var place) || place.OwnerId != force.Id ||
@@ -77,7 +77,7 @@ internal static class EquipmentProduction
             var progress = force.EquipmentProduction!;
             if (force.IsEliminated || !world.Settlements.TryGetValue(progress.SettlementId, out var place) ||
                 place.OwnerId != force.Id || place.IsDestroyed || place.IsDormant || !place.CanHostPersons ||
-                !rules.Items.TryGetValue(progress.DefinitionId, out var definition) || definition.ResearchProjectId is null ||
+                !rules.Items.TryGetValue(progress.DefinitionId, out var definition) || definition.IsOrdinaryArmament || definition.ResearchProjectId is null ||
                 !force.CompletedResearch.Contains(definition.ResearchProjectId) || world.AllEquipment.ContainsKey(long.MaxValue))
             {
                 Cancel(world, force, events);

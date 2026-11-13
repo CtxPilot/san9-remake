@@ -22,6 +22,20 @@ internal static class WorldInvariants
         if (titles.Any(id => id < 0) || titles.Distinct().Count() != titles.Length) throw new ArgumentException("Invalid country title ownership.");
         foreach (var force in state.AllForces.Values)
         {
+            if (force.ArmamentMigrationCredit is < 0 || force.ArmamentInventory is { } stock &&
+                stock.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value == 0) ||
+                force.ArmamentReserve is { } reserve && reserve.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value == 0))
+                throw new ArgumentException("Invalid armament inventory.");
+            if (force.ArmamentEscrowSuccessorId is int successor &&
+                (!force.IsEliminated || successor == force.Id ||
+                 !state.AllForces.TryGetValue(successor, out var beneficiary) || beneficiary.IsEliminated || beneficiary.IsDormant ||
+                 (force.ArmamentInventory is null || force.ArmamentInventory.IsEmpty) &&
+                 (force.ArmamentReserve is null || force.ArmamentReserve.IsEmpty) && (force.ArmamentMigrationCredit ?? 0) == 0))
+                throw new ArgumentException("Invalid armament escrow successor.");
+            if (force.ArmamentProduction is { } armamentProduction &&
+                (string.IsNullOrWhiteSpace(armamentProduction.DefinitionId) || armamentProduction.SettlementId < 0 ||
+                 armamentProduction.Batches == 0 || armamentProduction.DaysRemaining <= 0))
+                throw new ArgumentException("Invalid armament production.");
             if (!force.IsEliminated && state.AllCorps.Values.Count(c => c.OwnerId == force.Id && c.IsRoot) != 1)
                 throw new ArgumentException("Each surviving force must have exactly one root corps.");
             if (force.Origin is { } origin)

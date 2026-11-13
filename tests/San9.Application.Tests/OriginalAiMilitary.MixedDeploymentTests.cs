@@ -7,6 +7,44 @@ namespace San9.Application.Tests;
 public sealed partial class OriginalAiMilitaryTests
 {
     [Fact]
+    public void AiEquipsOnlyCompatibleAvailableArmamentsWithoutDuplicatingStock()
+    {
+        var definition = Fixture().Military!;
+        var rules = new MilitaryRulebook(definition with
+        {
+            TroopTypes = [new(10, "弓", 1, ImmutableDictionary<int, int>.Empty), new(20, "枪", 1, ImmutableDictionary<int, int>.Empty)],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [20], 10, 0, 100, null),
+                new("armor", "皮甲", ArmamentSlot.Armor, [], 0, 8, 100, null)]
+        });
+        var force = new ForceState(1, 0) { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 400).Add("armor", 500) };
+        var detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(2, new(20, 1, 700)).Add(1, new(10, 1, 400));
+        var equipped = MixedDeploymentSelection.EquipArmaments(detachments, rules, force);
+        Assert.Null(equipped[1].Weapon);
+        Assert.Equal(400u, equipped[1].Armor!.IssuedSets);
+        Assert.Equal(400u, equipped[2].Weapon!.IssuedSets);
+        Assert.Equal(100u, equipped[2].Armor!.IssuedSets);
+        Assert.Equal(500u, force.ArmamentInventory!["armor"]);
+    }
+
+    [Fact]
+    public void AiDeploymentDoesNotUseUnresearchedArmamentsEvenWhenTheyAreStronger()
+    {
+        var definition = Fixture().Military!;
+        var rules = new MilitaryRulebook(definition with
+        {
+            TroopTypes = [new(20, "枪", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("advanced", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [20], 10, 0, 100, null),
+                new("halberd", "铁戟", ArmamentSlot.Weapon, [20], 20, 0, 100, "advanced")]
+        });
+        var force = new ForceState(1, 0) { ArmamentInventory = ImmutableDictionary<string, uint>.Empty.Add("spear", 500).Add("halberd", 500) };
+        var detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(1, new(20, 1, 500));
+        Assert.Equal("spear", MixedDeploymentSelection.EquipArmaments(detachments, rules, force)[1].Weapon!.DefinitionId);
+        Assert.Equal("halberd", MixedDeploymentSelection.EquipArmaments(detachments, rules,
+            force with { CompletedResearch = force.CompletedResearch.Add("advanced") })[1].Weapon!.DefinitionId);
+    }
+
+    [Fact]
     public void MixedDeploymentMovesMeleeToFrontAndKeepsSoldiersAndTactics()
     {
         var definition = Fixture().Military!;

@@ -43,10 +43,9 @@ internal sealed partial class MapCommandAvailability(StrategySnapshot view)
         if (command is not ("sortie" or "build" or "transport") && view.IsSettlementEngaged(id)) return "engaged";
         if (command == "demolish") return null;
         if (command == "formation-teaching") return view.MilitaryRules is not null && view.World.Simulation.NewGame.FormationTrainingEnabled ? null : "unavailable";
-        if (command == "equipment-purchase") return view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false && view.Rules.Equipment.Items.Values.Any(item => item.PurchaseCost is not null) ? null : "unavailable";
-        if (command == "equipment-production" && view.World.Simulation.NewGame.EquipmentDevelopmentEnabled == false) return "unavailable";
-        if (command is "research" or "equipment-production") return view.MilitaryRules is not null && (view.World.Simulation.NewGame.MixedTroopsEnabled ||
-            view.World.Simulation.NewGame.EquipmentDevelopmentEnabled != false && view.Rules.Equipment.Items.Values.Any(item => item.ResearchProjectId is not null)) ? null : "unavailable";
+        bool armamentsAvailable = view.World.Simulation.NewGame.MixedTroopsEnabled && view.MilitaryRules?.Armaments.IsEmpty == false;
+        if (command is "equipment-purchase" or "equipment-production") return armamentsAvailable ? null : "unavailable";
+        if (command == "research") return view.MilitaryRules is not null && view.World.Simulation.NewGame.MixedTroopsEnabled ? null : "unavailable";
         if (command == "move" && !OtherHomes(home).Any()) return "no-move-destination";
         if (command == "transport" && !OtherHomes(home, directOnly: false).Any()) return "no-other-facility";
         if (command == "build" && !BuildableTypes().Any()) return "no-construction-site";

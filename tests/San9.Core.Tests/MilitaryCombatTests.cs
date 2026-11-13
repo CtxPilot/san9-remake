@@ -120,6 +120,51 @@ public sealed class MilitaryCombatTests
     }
 
     [Fact]
+    public void FeatureWeaponChangesNormalCombatWithoutMixedTroops()
+    {
+        var weapon = new EquipmentDefinition("special-weapon", EquipmentSlot.MainHand, EquipmentRarity.Precious, default, default)
+            { CombatEffects = new(AttackPercent: 10) };
+        var world = World(defenders: 10000).BeginMutation(equipment: new EquipmentRulebook([weapon]));
+        var source = new BattleSource(0, false);
+        var target = new BattleSource(2, true);
+        uint before = MilitaryCombat.NormalDamage(world, source, target, Rules());
+        world.SetEquipment(new(101, weapon.Id, 11, null, true));
+        uint after = MilitaryCombat.NormalDamage(world, source, target, Rules());
+        Assert.True(before > 0);
+        Assert.Equal((uint)((ulong)before * 110 / 100), after);
+    }
+
+    [Fact]
+    public void EquippedEffectsApplyToOrdinaryAndMartialDamageWithRangedDefenseAndMixedWeights()
+    {
+        var weapon = new EquipmentDefinition("special-weapon", EquipmentSlot.MainHand, EquipmentRarity.Precious, default, default)
+            { CombatEffects = new(AttackPercent: 10, MartialTacticPercent: 5) };
+        var armor = new EquipmentDefinition("special-armor", EquipmentSlot.Armor, EquipmentRarity.Precious, default, default)
+            { CombatEffects = new(DefensePercent: 8, RangedDefensePercent: 5) };
+        var rules = new EquipmentRulebook([weapon, armor]);
+        var world = World().BeginMutation(equipment: rules);
+        world.AddUnit(new(1, 2, new(36, 7), 10000) { FormationId = 7, Morale = 90,
+            MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty.Add(22, new(0, BattleRank.Front)) });
+        world.Replace(world.Officers[22] with { SettlementId = null, UnitId = 1 });
+        world.SetEquipment(new(101, weapon.Id, 11, null, true));
+        world.SetEquipment(new(102, armor.Id, 22, null, true));
+        var attacker = new BattleSource(0, false);
+        var defender = new BattleSource(1, false);
+
+        Assert.Equal(10120u, EquipmentCombat.Adjust(world, attacker, defender, 10000));
+        Assert.Equal(9570u, EquipmentCombat.Adjust(world, attacker, defender, 10000, ranged: true));
+        Assert.Equal(10580u, EquipmentCombat.Adjust(world, attacker, defender, 10000, 11, tactic: true));
+        world.SetEquipment(world.AllEquipment[101] with { Equipped = false });
+        Assert.Equal(9200u, EquipmentCombat.Adjust(world, attacker, defender, 10000));
+
+        world.SetEquipment(world.AllEquipment[101] with { Equipped = true });
+        world.Replace(world.Officers[12] with { SettlementId = null, UnitId = 0 });
+        world.Replace(world.Units[0] with { Detachments = ImmutableDictionary<int, DetachmentState>.Empty
+            .Add(11, new(0, 1, 2500)).Add(12, new(0, 1, 7500)) });
+        Assert.Equal(9430u, EquipmentCombat.Adjust(world, attacker, defender, 10000));
+    }
+
+    [Fact]
     public void ShieldCoverReducesDeclaredRangedFacilityDamage()
     {
         var baseline = Rules();
@@ -137,6 +182,38 @@ public sealed class MilitaryCombatTests
     }
 
     [Fact]
+    public void ArmamentsAffectLandCombatOnlyWhenMixedTroopModuleIsEnabled()
+    {
+        var baseline = Rules();
+        var rules = new MilitaryRulebook(new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [baseline.Formations[7]], baseline.Places.Values.OrderBy(place => place.Id).ToImmutableArray())
+        {
+            TroopTypes = [new(1, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [1], 20, 0, 100, null),
+                new("armor", "皮甲", ArmamentSlot.Armor, [], 0, 10, 100, null)]
+        });
+        var world = World().BeginMutation();
+        world.SetSimulation(world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = true } });
+        world.Replace(world.Units[0] with { Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11,
+            new(1, 1, 10000) { Weapon = new("spear", 5000, 10000, 0) }) });
+        world.AddUnit(new(1, 2, new(36, 7), 10000)
+        {
+            FormationId = 7, Morale = 90,
+            MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty.Add(22, new(0, BattleRank.Front)),
+            Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(22,
+                new(1, 1, 10000) { Armor = new("armor", 10000, 10000, 0) })
+        });
+        Assert.Equal(99u, MixedTroopCombat.Adjust(world, new(0, false), new(1, false), 100, rules, 11));
+        world.Replace(world.Units[0] with { Detachments = world.Units[0].Detachments.SetItem(11,
+            world.Units[0].Detachments[11] with { Weapon = new("spear", 250, 10000, 0) }) });
+        world.Replace(world.Units[1] with { Detachments = world.Units[1].Detachments.SetItem(22,
+            world.Units[1].Detachments[22] with { Armor = null }) });
+        Assert.Equal(1005u, MixedTroopCombat.Adjust(world, new(0, false), new(1, false), 1000, rules, 11));
+        world.SetSimulation(world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = false } });
+        Assert.Equal(100u, MixedTroopCombat.Adjust(world, new(0, false), new(1, false), 100, rules, 11));
+    }
+
+    [Fact]
     public void MixedOrdinaryLossUsesFrontForMeleeAndProportionForRanged()
     {
         var world = World().BeginMutation();
@@ -145,12 +222,15 @@ public sealed class MilitaryCombatTests
             MemberPositions = new Dictionary<int, FormationPosition>
             { [11] = new(0, BattleRank.Front), [12] = new(0, BattleRank.Rear) }.ToImmutableDictionary(),
             Detachments = new Dictionary<int, DetachmentState>
-            { [11] = new(1, 1, 2000), [12] = new(2, 1, 8000) }.ToImmutableDictionary()
+            { [11] = new(1, 1, 2000) { Weapon = new("spear", 1000, 2000, 0) },
+                [12] = new(2, 1, 8000) { Armor = new("armor", 4000, 8000, 0) } }.ToImmutableDictionary()
         };
         world.Replace(unit);
         MilitaryCombat.ApplyUnitLoss(world, unit, 4000, 0, Profile, new(2, true), [], rangedDamage: 2000);
         Assert.Equal(0u, world.Units[0].Detachments[11].Soldiers);
         Assert.Equal(6000u, world.Units[0].Detachments[12].Soldiers);
+        Assert.Equal(0u, world.Units[0].Detachments[11].Weapon!.RemainingSets);
+        Assert.Equal(3000u, world.Units[0].Detachments[12].Armor!.RemainingSets);
         Assert.Equal(6000u, world.Units[0].Soldiers);
     }
 
