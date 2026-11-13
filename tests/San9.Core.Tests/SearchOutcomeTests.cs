@@ -10,7 +10,9 @@ public sealed class SearchOutcomeTests
         bool probeGrowth = false, ulong fundsSeed = 52, bool secondSearcher = false, bool featured = false)
     {
         var equipment = new EquipmentRulebook(featured ? [new EquipmentDefinition("featured-spear", EquipmentSlot.MainHand,
-            EquipmentRarity.Precious, new(2, 0, 0, 0), new(1, 0, 0, 0)) { Name = "玄纹长戟" }] : []);
+            EquipmentRarity.Precious, new(2, 0, 0, 0), new(1, 0, 0, 0)) { Name = "玄纹长戟" },
+            .. item ? new[] { new EquipmentDefinition("legacy-10", EquipmentSlot.Treasure, EquipmentRarity.Precious,
+                new(5, 0, 0, 0), default) { LegacyTreasureId = 10 } } : []] : []);
         var world = WorldState.Create(new(190, 1, 1), seed,
             [new(1, 0) { LeaderId = 1 }],
             [new(1, 1, 0, 100, 100, 0, 0, 0, 100, 0, 100)],
@@ -21,7 +23,8 @@ public sealed class SearchOutcomeTests
              .. secondSearcher ? new OfficerState[] { new(4,1,1,new(50,50,politics,50),false) } : []],
             treasures: item ? [new(10, null, TreasureDiscovery.Buried, 30)] : [],
             controls: [new("player", 1, automatic ? ControllerKind.Automatic : ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }],
-            equipment: featured ? [new EquipmentInstance(100, "featured-spear", null, null, false) { IsLost = true, SearchPlaceId = 30 }] : null);
+            equipment: featured ? [new EquipmentInstance(100, "featured-spear", null, null, false) { IsLost = true, SearchPlaceId = 30 },
+                .. item ? new[] { new EquipmentInstance(10, "legacy-10", null, null, false) { LegacyTreasureId = 10 } } : []] : null);
         if (probeGrowth)
         {
             var mutation = world.BeginMutation();
@@ -48,6 +51,18 @@ public sealed class SearchOutcomeTests
         Assert.Null(found.SearchPlaceId);
         var restored = WorldState.Restore(engine.CaptureStableState());
         Assert.Equal(found, Assert.Single(restored.CreateSnapshot().Equipment));
+    }
+
+    [Fact]
+    public void AutomaticSearchCanDiscoverIndependentEquipmentWithoutDiscoveringLegacyTreasure()
+    {
+        var engine = Engine(false, true, automatic: true, featured: true);
+        var result = Search(engine);
+        Assert.Equal(SearchResultKind.Equipment, result.Result);
+        Assert.Equal(100, result.EquipmentId);
+        Assert.Equal(1, engine.Snapshot.Equipment.Single(item => item.Id == 100).OfficerId);
+        Assert.Equal(TreasureDiscovery.Buried, Assert.Single(engine.Snapshot.Treasures).Discovery);
+        Assert.Equal(1, engine.Snapshot.Officers.Single(o => o.Id == 2).ServiceMeritFor(1));
     }
 
     [Fact]

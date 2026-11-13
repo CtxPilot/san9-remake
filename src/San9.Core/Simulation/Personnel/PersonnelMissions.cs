@@ -501,10 +501,10 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
     {
         int destination = task.Journey!.DestinationPlaceId;
         int? corpsId = PersonnelLocations.TaskHome(world, task).CorpsId;
-        if (Direct(world, task))
         {
-            var items = world.Treasures.Values.Where(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
-                t.DiscoveryRegionId == destination && treasures.Items.ContainsKey(t.Id)).OrderBy(t => t.Id).ToArray();
+            bool direct = Direct(world, task);
+            var items = direct ? world.Treasures.Values.Where(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
+                t.DiscoveryRegionId == destination && treasures.Items.ContainsKey(t.Id)).OrderBy(t => t.Id).ToArray() : [];
             var equipment = world.AllEquipment.Values.Where(item => item.IsLost && item.SearchPlaceId == destination &&
                 simulationRules.Equipment.Items.ContainsKey(item.DefinitionId)).OrderBy(item => item.Id).ToArray();
             int count = checked(items.Length + equipment.Length);
