@@ -25,6 +25,12 @@ public static class CuratedFormationEvidence
                 (422, "张辽", "文远") when scenario.Year >= 216 => new(30, 600, FormationEvidenceKind.ExperienceInference,
                     "《三国志·张辽传》：https://ctext.org/text.pl?if=gb&node=602710&remap=gb",
                     "记载合肥募士出击；依据其战斗经历推定掌握钩行，史书并未记载此阵或据此证明步骑协同。"),
+                (324, "曹仁", "子孝") when scenario.Year >= 210 => new(28, 600, FormationEvidenceKind.ExperienceInference,
+                    "《三国志·曹仁传》：https://www.shidianguji.com/zh/book/LS0004/chapter/1j7fnutukl9o8_33",
+                    "记载曹仁驻守江陵、抵御周瑜；依据防守经历推定掌握偃月，史书并未记载其使用此阵。"),
+                (113, "甘宁", "兴霸") when scenario.Year >= 210 => new(29, 600, FormationEvidenceKind.ExperienceInference,
+                    "《三国志·甘宁传》：https://ctext.org/text.pl?if=gb&node=604280&remap=gb",
+                    "记载其部众携带弓弩并参与战斗；据此推定掌握利于弓弩的衡轭，史书并未记载其使用此阵。"),
                 _ => null
             };
             return record is null || scenario.Military?.Formations.Any(f => f.Id == record.FormationId && f.TravelMode == TravelMode.Land) != true
