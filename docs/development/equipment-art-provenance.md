@@ -31,6 +31,20 @@
 | `src/San9.Client.Godot/assets/equipment/silun-che.png` | 四轮车，独立设计的手推车 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/tong-chui.png` | 铜锤，独立设计的铜头锤 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/tie-suo.png` | 铁锁，独立设计的铁链 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/fei-dao.png` | 飞刀，独立设计的短刃 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/duan-ji.png` | 短戟，独立设计的短柄戟 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/shou-ji.png` | 手戟，独立设计的一对手持短戟 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/xiu-jian.png` | 袖箭，独立设计的小型弩具 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/yangyouji-gong.png` | 养由基弓，独立设计的深色复合弓 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/liguang-gong.png` | 李广弓，独立设计的浅色复合弓 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/sunzi-bingfa.png` | 孙子兵法，独立设计的金色竹简 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/bingfa-ershisi.png` | 兵法二十四篇，独立设计的展开竹简 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/liu-tao.png` | 六韬，独立设计的浅色简册 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/san-lue.png` | 三略，独立设计的三卷竹简 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/sima-fa.png` | 司马法，独立设计的绿色系绳竹简 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/wu-zi.png` | 吴子，独立设计的黑绳竹简 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/sunbin-bingfa.png` | 孙膑兵法，独立设计的扇形竹简 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/weigongzi-bingfa.png` | 魏公子兵法，独立设计的蓝绳竹简 | 已接入；待实机检查 |
 
 玄纹长戟生成提示词：
 
@@ -61,5 +75,13 @@
 铁鞭、铁蒺藜骨朵、流星锤和眉尖刀图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求带环形凸纹的铁棒、带短突起的锤头、链与铁重物、细长刀头的长兵器，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
 
 大宛马、四轮车、铜锤和铁锁图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求枣色马、四轮手推车、铜头锤与铁链，均使用暗色底、无人物文字或游戏标识。四轮车初稿只清晰显示三个车轮，因此重新生成了可辨认四轮的版本。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
+
+飞刀、短戟、手戟和袖箭图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求短刃、短柄戟、一对手戟和小型弩具，均使用暗色底、无人物文字或游戏标识。袖箭初稿包含现代弹簧，故重新生成无弹簧版本。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
+
+养由基弓与李广弓图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求深色与浅色古代复合弓，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
+
+孙子兵法、兵法二十四篇、六韬和三略图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求金色束简、展开竹简、浅色简册及三卷竹简，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
+
+司马法、吴子、孙膑兵法和魏公子兵法图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求绿色系绳展开竹简、黑绳束简、扇形竹简和蓝绳竹简，均使用暗色底、无人物文字或游戏标识。造型为独立游戏设计，不声称复原历史实物或参考作品造型。
 
 其他旧名物和未配置图标的模组物品目前无对应图标，界面缺图时隐藏图像；旧名物逐件图标仍待制作。

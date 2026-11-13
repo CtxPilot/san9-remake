@@ -212,3 +212,11 @@ tests/San9.Importer.San9PkTc101.Tests/MilitaryContentCompilerTests.cs
 同日补充的铁鞭、铁蒺藜骨朵、流星锤和眉尖刀图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
 
 同日补充的大宛马、四轮车、铜锤和铁锁图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
+
+同日补充的飞刀、短戟、手戟和袖箭图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
+
+同日补充的养由基弓与李广弓图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
+
+同日补充的孙子兵法、兵法二十四篇、六韬和三略图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
+
+同日补充的司马法、吴子、孙膑兵法和魏公子兵法图标由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。

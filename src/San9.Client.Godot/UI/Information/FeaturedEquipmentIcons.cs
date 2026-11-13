@@ -69,6 +69,20 @@ internal static class FeaturedEquipmentIcons
             ("legacy-treasure:21", "眉尖刀") => "res://assets/equipment/meijian-dao.png",
             ("legacy-treasure:22", "铜锤" or "銅錘") => "res://assets/equipment/tong-chui.png",
             ("legacy-treasure:23", "铁锁" or "鐵鎖") => "res://assets/equipment/tie-suo.png",
+            ("legacy-treasure:24", "飞刀" or "飛刀") => "res://assets/equipment/fei-dao.png",
+            ("legacy-treasure:25", "短戟") => "res://assets/equipment/duan-ji.png",
+            ("legacy-treasure:26", "手戟") => "res://assets/equipment/shou-ji.png",
+            ("legacy-treasure:27", "袖箭") => "res://assets/equipment/xiu-jian.png",
+            ("legacy-treasure:28", "养由基弓" or "養由基弓") => "res://assets/equipment/yangyouji-gong.png",
+            ("legacy-treasure:29", "李广弓" or "李廣弓") => "res://assets/equipment/liguang-gong.png",
+            ("legacy-treasure:30", "孙子兵法" or "孫子兵法") => "res://assets/equipment/sunzi-bingfa.png",
+            ("legacy-treasure:31", "兵法二十四篇") => "res://assets/equipment/bingfa-ershisi.png",
+            ("legacy-treasure:32", "六韬" or "六韜") => "res://assets/equipment/liu-tao.png",
+            ("legacy-treasure:33", "三略") => "res://assets/equipment/san-lue.png",
+            ("legacy-treasure:34", "司马法" or "司馬法") => "res://assets/equipment/sima-fa.png",
+            ("legacy-treasure:35", "吴子" or "吳子") => "res://assets/equipment/wu-zi.png",
+            ("legacy-treasure:36", "孙膑兵法" or "孫臏兵法") => "res://assets/equipment/sunbin-bingfa.png",
+            ("legacy-treasure:37", "魏公子兵法") => "res://assets/equipment/weigongzi-bingfa.png",
             _ => null
         };
         return path is not null && ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
