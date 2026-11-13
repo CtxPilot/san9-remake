@@ -198,3 +198,5 @@ tests/San9.Importer.San9PkTc101.Tests/MilitaryContentCompilerTests.cs
 后续新增赤兔马、方天画戟和流星镖图标均由内置 imagegen 根据文字生成，未使用参考游戏画面作为输入；提示词要点及实机检查状态见[图标来源记录](../../development/equipment-art-provenance.md)。本次提交仅包含项目代码、规格、测试和自制图像，不包含本机转换包、原版资源或隔离存档。授权情况和项目整体权利风险不变。
 
 2026-11-13 补充的青龙偃月刀、蛇矛图标同样由文字生成，依据演义名物作游戏化构图，未输入参考游戏画面；不将其造型视为汉末实物复原。相关图像来源及验收范围见[图标来源记录](../../development/equipment-art-provenance.md)。
+
+2026-11-13 补充的的卢、绝影图标由文字生成，未输入参考游戏画面；马匹的毛色与马具是项目的视觉设计，不作为历史个体的复原。图标来源与实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。上述素材来源记录不构成对原作品改编的授权，目前仍无已知权利人授权。
