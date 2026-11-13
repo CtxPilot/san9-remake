@@ -65,6 +65,9 @@ public sealed partial class SimulationEngine
             items = world.Treasures.Values.Where(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
                     t.DiscoveryRegionId is not null && _rules.Treasures.Items.ContainsKey(t.Id))
                 .GroupBy(t => t.DiscoveryRegionId!.Value).ToDictionary(g => g.Key, g => g.Count());
+            foreach (var group in world.AllEquipment.Values.Where(item => item.IsLost && item.SearchPlaceId is not null &&
+                         _rules.Equipment.Items.ContainsKey(item.DefinitionId)).GroupBy(item => item.SearchPlaceId!.Value))
+                items[group.Key] = checked(items.GetValueOrDefault(group.Key) + group.Count());
         }
         var result = ImmutableDictionary.CreateBuilder<(int Actor, int Target), PersonnelAdvicePreview>();
         foreach (var (actor, target) in pairs)
@@ -136,6 +139,8 @@ public sealed partial class SimulationEngine
             int people = world.Officers.Values.Count(p => p.Status == OfficerStatus.Undiscovered && (p.SettlementId ?? p.RegionId) == targetId);
             int items = world.Treasures.Values.Count(t => t.Discovery == TreasureDiscovery.Buried && t.HolderId is null &&
                 t.DiscoveryRegionId == targetId && _rules.Treasures.Items.ContainsKey(t.Id));
+            items = checked(items + world.AllEquipment.Values.Count(item => item.IsLost && item.SearchPlaceId == targetId &&
+                _rules.Equipment.Items.ContainsKey(item.DefinitionId)));
             var search = EvaluateSearchAdvice(world, forceId, officerId, targetId, people, items);
             advice = search.Advice;
             searchAdvice = search.SearchAdvice;

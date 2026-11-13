@@ -7,20 +7,21 @@ namespace San9.Core.Tests;
 public sealed class SearchOutcomeTests
 {
     private static SimulationEngine Engine(bool person, bool item, bool automatic = false, int politics = 500, ulong seed = 190,
-        bool probeGrowth = false, ulong fundsSeed = 52, bool secondSearcher = false, bool featured = false)
+        bool probeGrowth = false, ulong fundsSeed = 52, bool secondSearcher = false, bool featured = false, bool adviser = false)
     {
         var equipment = new EquipmentRulebook(featured ? [new EquipmentDefinition("featured-spear", EquipmentSlot.MainHand,
             EquipmentRarity.Precious, new(2, 0, 0, 0), new(1, 0, 0, 0)) { Name = "玄纹长戟" },
             .. item ? new[] { new EquipmentDefinition("legacy-10", EquipmentSlot.Treasure, EquipmentRarity.Precious,
                 new(5, 0, 0, 0), default) { LegacyTreasureId = 10 } } : []] : []);
         var world = WorldState.Create(new(190, 1, 1), seed,
-            [new(1, 0) { LeaderId = 1 }],
+            [new(1, 0) { LeaderId = 1, AdviserId = adviser ? 5 : null }],
             [new(1, 1, 0, 100, 100, 0, 0, 0, 100, 0, 100)],
             [new(1, 1, 1, new(50, 50, 50, 50), false) { Status = OfficerStatus.Ruler },
              new(2, 1, 1, new(50, 50, politics, 50), false),
              new(3, null, null, new(50, 50, 50, 50), false) { Status = person ? OfficerStatus.Undiscovered : OfficerStatus.Dead,
                  RegionId = 30, ForceLoyalties = ImmutableDictionary<int, int>.Empty.Add(1, 40) },
-             .. secondSearcher ? new OfficerState[] { new(4,1,1,new(50,50,politics,50),false) } : []],
+             .. secondSearcher ? new OfficerState[] { new(4,1,1,new(50,50,politics,50),false) } : [],
+             .. adviser ? new OfficerState[] { new(5,1,1,new(50,100,50,50),false) { Status = OfficerStatus.Strategist } } : []],
             treasures: item ? [new(10, null, TreasureDiscovery.Buried, 30)] : [],
             controls: [new("player", 1, automatic ? ControllerKind.Automatic : ControllerKind.Player)], corps: [new San9.Core.Domain.CorpsState(1, 1, 1, new(10000, 10000)) { IsRoot = true }],
             equipment: featured ? [new EquipmentInstance(100, "featured-spear", null, null, false) { IsLost = true, SearchPlaceId = 30 },
@@ -63,6 +64,18 @@ public sealed class SearchOutcomeTests
         Assert.Equal(1, engine.Snapshot.Equipment.Single(item => item.Id == 100).OfficerId);
         Assert.Equal(TreasureDiscovery.Buried, Assert.Single(engine.Snapshot.Treasures).Discovery);
         Assert.Equal(1, engine.Snapshot.Officers.Single(o => o.Id == 2).ServiceMeritFor(1));
+    }
+
+    [Fact]
+    public void SearchAdviceCountsIndependentEquipmentInSingleAndBatchQueriesWithoutMutatingWorld()
+    {
+        var engine = Engine(false, false, featured: true, adviser: true);
+        var before = engine.CaptureStableState();
+        var single = engine.GetPersonnelJourney(1, 2, 30, PersonnelJourneyKind.Search).Advice;
+        var batch = engine.GetPersonnelAdvice(1, PersonnelJourneyKind.Search, [(2, 30)])[(2, 30)].Advice;
+        Assert.Equal(AdviserOpinion.Favorable, single.Opinion);
+        Assert.Equal(single, batch);
+        San9.Tests.StateAssert.Equal(before, engine.CaptureStableState());
     }
 
     [Fact]
