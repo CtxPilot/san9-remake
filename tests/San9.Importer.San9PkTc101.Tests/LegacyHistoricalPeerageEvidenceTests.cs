@@ -7,6 +7,32 @@ namespace San9.Importer.San9PkTc101.Tests;
 
 public sealed class LegacyHistoricalPeerageEvidenceTests
 {
+    [Theory]
+    [InlineData(324, "曹仁", "子孝", "安平亭侯")]
+    [InlineData(319, "曹洪", "子廉", "国明亭侯")]
+    [InlineData(446, "程昱", "仲德", "安国亭侯")]
+    public void DocumentedMarquisesRespectIdentityDatesAndExistingContent(int id, string name, string courtesy, string title)
+    {
+        var person = new OfficerInitialState("name", new OfficerState(id, 1, 1, new(50, 50, 50, 50), false)) { CourtesyNameKey = "courtesy" };
+        var scenario = new ScenarioInitialState(ScenarioInitialState.CurrentSchemaVersion, "fixture", 215, 1, 1, null, [], [], [], []) { Officers = [person] };
+        var texts = new TextCatalog(TextCatalog.CurrentSchemaVersion, new() { ["name"] = name, ["courtesy"] = courtesy });
+        var evidence = LegacyHistoricalPeerageEvidence.Apply(scenario, texts, true).Officers[0].InitialPersonalPeerage!;
+        Assert.Equal(new PersonalPeerage(PersonalPeerageGrade.VillageMarquis, title), evidence.Peerage);
+        Assert.Equal(PersonalPeerageEvidenceKind.Historical, evidence.Kind);
+        Assert.False(evidence.Applies(new(213, 12, 30)));
+        Assert.True(evidence.Applies(new(214, 1, 1)));
+        Assert.True(evidence.Applies(new(219, 12, 30)));
+        Assert.False(evidence.Applies(new(220, 1, 1)));
+        Assert.Null(LegacyHistoricalPeerageEvidence.Apply(scenario, texts, false).Officers[0].InitialPersonalPeerage);
+        var custom = evidence with { Peerage = new(PersonalPeerageGrade.DistrictMarquis, "自定义乡侯") };
+        var existing = scenario with { Officers = [person with { InitialPersonalPeerage = custom }] };
+        Assert.Equal(custom, LegacyHistoricalPeerageEvidence.Apply(existing, texts, true).Officers[0].InitialPersonalPeerage);
+        var history = scenario with { Officers = [person with { InitialPersonalPeerageHistory = [custom] }] };
+        Assert.Equal(custom, Assert.Single(LegacyHistoricalPeerageEvidence.Apply(history, texts, true).Officers[0].InitialPersonalPeerageHistory!));
+        texts.Entries["courtesy"] = "他字";
+        Assert.Null(LegacyHistoricalPeerageEvidence.Apply(scenario, texts, true).Officers[0].InitialPersonalPeerage);
+    }
+
     [Fact]
     public void XuHuangTitleUsesOnlyVerifiedIdentityAndConservativeYears()
     {

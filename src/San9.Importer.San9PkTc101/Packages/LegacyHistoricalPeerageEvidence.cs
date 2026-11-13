@@ -62,6 +62,18 @@ public static class LegacyHistoricalPeerageEvidence
             }
             PersonalPeerageEvidence? evidence = (officer.State.Id, name, courtesyName) switch
             {
+                (324, "曹仁", "子孝") => new(new(PersonalPeerageGrade.VillageMarquis, "安平亭侯"),
+                    new(214, 1, 1), new(219, 12, 30), PersonalPeerageEvidenceKind.Historical,
+                    "《三国志·曹仁传》记载转封安平亭侯及曹丕即王位后进封：https://www.shidianguji.com/zh/book/LS0004/chapter/1j7fnutukl9o8_33；" +
+                    "建安十八年劝进名单载该爵号，保守取次年至进封前的完整年度。"),
+                (319, "曹洪", "子廉") => new(new(PersonalPeerageGrade.VillageMarquis, "国明亭侯"),
+                    new(214, 1, 1), new(219, 12, 30), PersonalPeerageEvidenceKind.Historical,
+                    "《全三国文·曹洪》记载封国明亭侯及曹丕即位后进封：https://ctext.org/wiki.pl?chapter=540602&if=gb；" +
+                    "建安十八年劝进名单载该爵号，保守取次年至进封前的完整年度。"),
+                (446, "程昱", "仲德") => new(new(PersonalPeerageGrade.VillageMarquis, "安国亭侯"),
+                    new(214, 1, 1), new(219, 12, 30), PersonalPeerageEvidenceKind.Historical,
+                    "《三国志·程昱传》记载封安国亭侯及曹丕践阼后进封：https://www.shidianguji.com/book/HY2495/chapter/1mbddkg4a0wtm；" +
+                    "建安十八年劝进名单载该爵号，保守取次年至进封前的完整年度。"),
                 (279, "徐晃", "公明") => new(new(PersonalPeerageGrade.VillageMarquis, "都亭侯"),
                     new(201, 1, 1), new(219, 12, 30), PersonalPeerageEvidenceKind.Historical,
                     "《三国志·徐晃传》记载封都亭侯及曹丕即王位后进封：https://ctext.org/text.pl?if=gb&node=602739；" +

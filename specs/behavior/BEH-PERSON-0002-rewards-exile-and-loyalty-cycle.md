@@ -37,6 +37,8 @@
 
 [《三国志·徐晃传》](https://ctext.org/text.pl?if=gb&node=602739&remap=gb&show=parallel)记载徐晃封都亭侯、曹丕即魏王位后进封；以故市之战及进封的次序为依据，记录保守采用 201～219 年，受封及进封年份不假定具体日期。
 
+建安十八年的[劝进名单](https://forum.freemdict.com/uploads/short-url/8tA7jppmE20wZ5KvACL3nhabci4.pdf)记载曹仁为安平亭侯、曹洪为国明亭侯、程昱为安国亭侯；各自的后续转封见[曹仁传](https://www.shidianguji.com/zh/book/LS0004/chapter/1j7fnutukl9o8_33)、[《全三国文·曹洪》](https://ctext.org/wiki.pl?chapter=540602&if=gb)和[程昱传](https://www.shidianguji.com/book/HY2495/chapter/1mbddkg4a0wtm)。三条初始记录均保守采用 214～219 年，留空 213 年及 220 年，不推定具体日期。
+
 各制度时期可完整覆盖六级爵位的名额、爵俸与授爵忠诚奖励，并可配置撤爵忠诚惩罚；省略时使用默认值。命令、AI、封爵列表及财政预测和旬结算按同一势力和当前年份读取规则，已持有爵位不会在制度切换时被撤销。开局势力预览使用相同规则与初始爵位证据。
 
 ## 原作基线
