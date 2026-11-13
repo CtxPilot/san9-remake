@@ -214,6 +214,41 @@ public sealed class MilitaryCombatTests
     }
 
     [Fact]
+    public void OrdinaryCombatUsesIssuedWeaponsAndArmorAndStopsWhenModuleIsDisabled()
+    {
+        var baseline = Rules();
+        var rules = new MilitaryRulebook(new MilitaryDefinition(8, 3, Enumerable.Repeat(0, 24).ToImmutableArray(),
+            [new(0, 1, null)], [baseline.Formations[7]], baseline.Places.Values.OrderBy(place => place.Id).ToImmutableArray())
+        {
+            TroopTypes = [new(1, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [1], 20, 0, 100, null),
+                new("armor", "皮甲", ArmamentSlot.Armor, [], 0, 10, 100, null)]
+        });
+        var world = World().BeginMutation();
+        world.SetSimulation(world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = true } });
+        world.Replace(world.Units[0] with { Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(11, new(1, 1, 10000)) });
+        world.AddUnit(new(1, 2, new(36, 7), 10000)
+        {
+            FormationId = 7, Morale = 90,
+            MemberPositions = ImmutableDictionary<int, FormationPosition>.Empty.Add(22, new(0, BattleRank.Front)),
+            Detachments = ImmutableDictionary<int, DetachmentState>.Empty.Add(22, new(1, 1, 10000))
+        });
+        var attacker = new BattleSource(0, false);
+        var defender = new BattleSource(1, false);
+        uint original = MilitaryCombat.NormalDamage(world, attacker, defender, rules);
+        Assert.True(original > 0);
+        world.Replace(world.Units[0] with { Detachments = world.Units[0].Detachments.SetItem(11,
+            world.Units[0].Detachments[11] with { Weapon = new("spear", 10000, 10000, 0) }) });
+        uint armed = MilitaryCombat.NormalDamage(world, attacker, defender, rules);
+        Assert.Equal((uint)((ulong)original * 120 / 100), armed);
+        world.Replace(world.Units[1] with { Detachments = world.Units[1].Detachments.SetItem(22,
+            world.Units[1].Detachments[22] with { Armor = new("armor", 10000, 10000, 0) }) });
+        Assert.Equal((uint)((ulong)armed * 90 / 100), MilitaryCombat.NormalDamage(world, attacker, defender, rules));
+        world.SetSimulation(world.Simulation with { NewGame = world.Simulation.NewGame with { MixedTroopsEnabled = false } });
+        Assert.Equal(original, MilitaryCombat.NormalDamage(world, attacker, defender, rules));
+    }
+
+    [Fact]
     public void MixedOrdinaryLossUsesFrontForMeleeAndProportionForRanged()
     {
         var world = World().BeginMutation();
