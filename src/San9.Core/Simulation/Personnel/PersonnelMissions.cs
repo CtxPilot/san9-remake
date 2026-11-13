@@ -350,7 +350,8 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
         else if (task.SearchEncounter is MerchantInvestmentEncounter merchant)
             MerchantInvestment.Resolve(world, task, simulationRules, merchant, new(MerchantInvestmentChoice.Decline, 0), events);
         else if (task.SearchEncounter is CommunitySearchEncounter community)
-            CommunitySearch.Resolve(world, task, simulationRules, community, CommunitySearchChoice.Decline, events);
+            CommunitySearch.Resolve(world, task, simulationRules, community,
+                rules.SearchEvents[community.EventId] is EquipmentGiftSearchEventDefinition ? CommunitySearchChoice.Accept : CommunitySearchChoice.Decline, events);
         else if (task.SearchEncounter is ConflictSearchEncounter conflict)
             SearchConflicts.Resolve(world, task, simulationRules, conflict,
                 SearchConflicts.Options(world, task, (ConflictSearchEventDefinition)rules.SearchEvents[conflict.EventId])[0].Choice, events);
@@ -363,7 +364,7 @@ internal sealed class PersonnelMissionRule(SimulationRules simulationRules, stri
             if (Direct(world, task) && ThreeVisits.Search(world, task, simulationRules.ThreeVisits, rules, economy, events)) return null;
             if (Direct(world, task) && ShanyangGong.Eligible(world, task, simulationRules))
                 return task with { SearchEncounter = new ShanyangGongEncounter() };
-            if (Direct(world, task) && SearchEvents.Prepare(world, task, simulationRules, events, out var special))
+            if (SearchEvents.Prepare(world, task, simulationRules, events, out var special, onlyEquipmentGifts: !Direct(world, task)))
             {
                 if (special is not null) return task with { SearchEncounter = special };
                 PersonnelReturns.Start(world, task, rules, events, true);

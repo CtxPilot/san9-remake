@@ -113,6 +113,10 @@ public sealed partial class SimulationEngine
         ValidateContent(world, rules.Treasures, rules.Governance, rules.Equipment);
         if (world.CreateSnapshot().Equipment.Any(item => item.SearchPlaceId is int place && !rules.Personnel.Places.ContainsKey(place)))
             throw new ArgumentException("Unknown equipment search place.");
+        var giftEvents = rules.Personnel.SearchEvents.Values.OfType<EquipmentGiftSearchEventDefinition>().ToArray();
+        if (world.CreateSnapshot().Equipment.Any(item => item.EventGiftKey is string key && !giftEvents.Any(gift =>
+                gift.EquipmentInstanceId == item.Id && gift.EquipmentDefinitionId == item.DefinitionId && gift.ConsumptionKey.Value == key)))
+            throw new ArgumentException("Unknown equipment gift event reference.");
         rules.Terminal?.Validate(world.CreateSnapshot().Settlements.Where(s => s.Kind == SettlementKind.City).Select(s => s.Id).ToHashSet());
         _world = world;
         _rules = rules;
@@ -441,7 +445,8 @@ public sealed partial class SimulationEngine
         {
             OfferedSoldiers = d is CivicSearchEventDefinition { Activity: CivicSearchKind.Volunteers } volunteers
                 ? CommunitySearch.VolunteerSoldiers(world, task, volunteers) : 0,
-            OfferedMoney = d is CivicSearchEventDefinition civic ? civic.BaseMoneyReward : 0
+            OfferedMoney = d is CivicSearchEventDefinition civic ? civic.BaseMoneyReward : 0,
+            EquipmentDefinitionId = d is EquipmentGiftSearchEventDefinition gift ? gift.EquipmentDefinitionId : null
         };
     }
 

@@ -40,7 +40,8 @@ public sealed class FeaturedEquipmentPresetTests
         Assert.Equal(a.InitialEquipment, b.InitialEquipment);
         Assert.Equal(40, a.InitialEquipment!.Length);
         Assert.Equal(11, a.InitialEquipment[0].Id);
-        Assert.All(a.InitialEquipment, item =>
+        Assert.Equal(4, a.SearchEvents.OfType<EquipmentGiftSearchEventDefinition>().Count());
+        Assert.All(a.InitialEquipment.Where(item => item.SearchPlaceId is not null), item =>
         {
             Assert.True(item.IsLost);
             Assert.Contains(item.SearchPlaceId, new int?[] { 3, 7 });

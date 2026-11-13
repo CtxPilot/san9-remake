@@ -163,7 +163,10 @@ internal sealed partial class OriginalAiPersonnel(SimulationEngine engine, Scena
                 var availableSearchPlaces = engine.GetSearchPlaces(Owner);
                 var personTargets = availableSearchPlaces.Where(undiscoveredPlaces.Contains).ToArray();
                 if (personTargets.Length != 0) return Search(limit, personTargets);
-                if (!World.Equipment.Any(item => item.IsLost && item.SearchPlaceId is not null)) return Search(limit, []);
+                bool undiscoveredGift = content.SearchEvents.OfType<EquipmentGiftSearchEventDefinition>().Any(gift =>
+                    !World.Simulation.ConsumedEventKeys.Contains(gift.ConsumptionKey) && World.Equipment.Any(item => item.Id == gift.EquipmentInstanceId &&
+                        item.DefinitionId == gift.EquipmentDefinitionId && item.EventGiftKey == gift.ConsumptionKey.Value && item.IsLost && item.SearchPlaceId is null));
+                if (!undiscoveredGift && !World.Equipment.Any(item => item.IsLost && item.SearchPlaceId is not null)) return Search(limit, []);
                 // Explore owned cities in a stable rotation without consulting hidden item locations.
                 var cities = Places.Where(place => place.Kind == SettlementKind.City && availableSearchPlaces.Contains(place.Id))
                     .Select(place => place.Id).Order().ToArray();

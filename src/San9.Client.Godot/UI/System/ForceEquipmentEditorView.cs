@@ -78,7 +78,7 @@ public partial class ForceEquipmentEditorView : ModalView, IModalInputRouter
         {
             var d = Session.EquipmentDefinitions[item.DefinitionId];
             string holder = item.OfficerId is int p ? Person(p) : item.InventoryForceId is int f ? Force(f) + "库存" : "—";
-            string status = item.SearchPlaceId is not null ? "未发现" : item.IsLost ? "遗失" : item.LegacyTreasureId is int treasure && world.Treasures.Single(t => t.Id == treasure).Discovery != TreasureDiscovery.Discovered
+            string status = item.SearchPlaceId is not null || item.EventGiftKey is not null ? "未发现" : item.IsLost ? "遗失" : item.LegacyTreasureId is int treasure && world.Treasures.Single(t => t.Id == treasure).Discovery != TreasureDiscovery.Discovered
                 ? "未发现" : item.Equipped ? "已装备" : "未装备";
             return new CatalogRow(index, [ItemName(d), OfficerEquipment.SlotName(d.Slot), d.Grade, item.Level, item.Experience, holder, status]);
         }).ToArray();

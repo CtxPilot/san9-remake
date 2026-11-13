@@ -66,9 +66,19 @@ public static class FeaturedEquipmentPreset
         if (cities.Length == 0) throw new InvalidDataException("No active city for featured equipment.");
         long last = scenario.Information.TreasureStates.Select(t => (long)t.Id)
             .Concat((scenario.InitialEquipment ?? []).Select(item => item.Id)).DefaultIfEmpty(-1).Max();
+        var eventItems = new HashSet<string>(StringComparer.Ordinal)
+            { "featured-shuanghu-fu", "featured-feishi-suo", "featured-jianglue-pian", "featured-guwen-jing" };
         var initial = definitions.Select((definition, index) => new EquipmentInstance(checked(last + 1 + index), definition.Id, null, null, false)
-            { IsLost = true, SearchPlaceId = cities[index % cities.Length] }).ToArray();
+            { IsLost = true, SearchPlaceId = eventItems.Contains(definition.Id) ? null : cities[index % cities.Length],
+                EventGiftKey = eventItems.Contains(definition.Id) ? $"equipment-gift.{definition.Id}" : null }).ToArray();
+        var gifts = initial.Select((item, index) => (item, index)).Where(pair => eventItems.Contains(pair.item.DefinitionId))
+            .Select(pair => new EquipmentGiftSearchEventDefinition(cities[pair.index % cities.Length], pair.item.Id,
+                pair.item.DefinitionId, new($"equipment-gift.{pair.item.DefinitionId}"))
+            {
+                Id = $"equipment-gift.{pair.item.DefinitionId}", Priority = -40, Consumption = San9.Core.Simulation.EventConsumption.OnSuccess,
+                ChanceAbility = CommunityAbility.Politics, ChanceDivisor = 5
+            }).ToArray();
         return scenario with { Information = scenario.Information with { Equipment = scenario.Information.Equipment.AddRange(definitions) },
-            InitialEquipment = (scenario.InitialEquipment ?? []).Concat(initial).ToArray() };
+            InitialEquipment = (scenario.InitialEquipment ?? []).Concat(initial).ToArray(), SearchEvents = scenario.SearchEvents.AddRange(gifts) };
     }
 }

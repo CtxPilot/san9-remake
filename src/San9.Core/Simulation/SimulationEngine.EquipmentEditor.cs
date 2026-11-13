@@ -38,6 +38,7 @@ public sealed partial class SimulationEngine
                 var current = world.AllEquipment[edit.Id];
                 var next = current with { OfficerId = edit.OfficerId, InventoryForceId = edit.InventoryForceId,
                     Equipped = false, IsLost = moved ? false : current.IsLost, SearchPlaceId = moved ? null : current.SearchPlaceId,
+                    EventGiftKey = moved ? null : current.EventGiftKey,
                     EquipOnService = moved ? null : current.EquipOnService,
                     Level = edit.Level, Experience = edit.Experience };
                 world.SetEquipment(next);

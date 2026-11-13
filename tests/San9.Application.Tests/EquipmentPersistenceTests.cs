@@ -12,6 +12,32 @@ namespace San9.Application.Tests;
 public sealed class EquipmentPersistenceTests
 {
     [Fact]
+    public void EventRewardMigrationPreservesOwnershipAndRejectsIdentityConflicts()
+    {
+        var basis = G01ScenarioTests.Fixture();
+        var definition = new EquipmentDefinition("gift", EquipmentSlot.Treasure, EquipmentRarity.Rare, default, default) { Name = "玉佩" };
+        var hidden = new EquipmentInstance(20, definition.Id, null, null, false) { IsLost = true, EventGiftKey = "gift.1" };
+        var gift = new EquipmentGiftSearchEventDefinition(basis.Settlements[0].Id, hidden.Id, definition.Id, new("gift.1"))
+            { Id = "gift-event", Consumption = EventConsumption.OnSuccess };
+        var content = basis with { Information = basis.Information with { Equipment = [definition] }, InitialEquipment = [hidden], SearchEvents = [gift] };
+        var original = GameSession.Start(basis, 42).Capture();
+        var rules = new EquipmentRulebook([definition]);
+        var migrated = EquipmentMigration.Initialize(original, content, rules);
+        Assert.Contains(hidden, migrated.World.Equipment);
+        Assert.Contains("20:gift", migrated.InitializedSearchEquipment!.Value);
+        var claimed = hidden with { OfficerId = 1, IsLost = false, EventGiftKey = null };
+        var saved = migrated with { World = migrated.World with { Equipment = [claimed] } };
+        Assert.Equal(claimed, Assert.Single(EquipmentMigration.Initialize(saved, content, rules).World.Equipment));
+        var previousSearchItem = hidden with { EventGiftKey = null, SearchPlaceId = basis.Settlements[0].Id };
+        var priorSave = original with { InitializedSearchEquipment = ["20:gift"], World = original.World with { Equipment = [previousSearchItem] } };
+        Assert.Equal(previousSearchItem, Assert.Single(EquipmentMigration.Initialize(priorSave, content, rules).World.Equipment));
+        var removed = migrated with { World = migrated.World with { Equipment = [] } };
+        Assert.Empty(EquipmentMigration.Initialize(removed, content, rules).World.Equipment);
+        var conflict = original with { World = original.World with { Equipment = [new EquipmentInstance(20, "other", null, 1, false)] } };
+        Assert.Throws<InvalidDataException>(() => EquipmentMigration.Initialize(conflict, content, rules));
+    }
+
+    [Fact]
     public void OldSaveAddsSearchItemsOnceWithoutOverwritingExistingInstanceIds()
     {
         var basis = G01ScenarioTests.Fixture();

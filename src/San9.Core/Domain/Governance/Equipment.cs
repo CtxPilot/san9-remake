@@ -73,6 +73,9 @@ public sealed record EquipmentInstance(long Id, string DefinitionId, int? Office
     /// <summary>Authored search location for an undiscovered independent item; null for an ordinary lost item.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public int? SearchPlaceId { get; init; }
+    /// <summary>Unclaimed authored event reward; cleared whenever the item changes hands.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? EventGiftKey { get; init; }
     /// <summary>Value of an ordinary item awaiting conversion when its holder enters service.</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public int? PendingArmamentCredit { get; init; }
@@ -85,6 +88,7 @@ public sealed record EquipmentInstance(long Id, string DefinitionId, int? Office
     public ImmutableSortedSet<string>? ExperienceExchanges { get; init; }
     [System.Text.Json.Serialization.JsonIgnore] public bool IsValid => Id >= 0 && !string.IsNullOrWhiteSpace(DefinitionId) &&
         LegacyTreasureId is not < 0 && (SearchPlaceId is null || SearchPlaceId >= 0 && IsLost && LegacyTreasureId is null && PendingArmamentCredit is null) &&
+        (EventGiftKey is null || !string.IsNullOrWhiteSpace(EventGiftKey) && IsLost && SearchPlaceId is null && LegacyTreasureId is null && PendingArmamentCredit is null) &&
         (PendingArmamentCredit is null || PendingArmamentCredit >= 0 && LegacyTreasureId is null && !Equipped && EquipOnService != true) &&
         (LastExperienceExchange is null || !string.IsNullOrWhiteSpace(LastExperienceExchange)) &&
         (ExperienceExchanges is null || ExperienceExchanges.Count > 0 && ExperienceExchanges.All(value => !string.IsNullOrWhiteSpace(value))) &&
@@ -177,13 +181,13 @@ public static class EquipmentRules
     public static EquipmentInstance MoveToOfficer(EquipmentInstance item, int officerId)
     {
         if (!item.IsValid || officerId < 0) throw new ArgumentException("Invalid equipment transfer.");
-        return item with { OfficerId = officerId, InventoryForceId = null, Equipped = false, IsLost = false, SearchPlaceId = null, EquipOnService = null };
+        return item with { OfficerId = officerId, InventoryForceId = null, Equipped = false, IsLost = false, SearchPlaceId = null, EventGiftKey = null, EquipOnService = null };
     }
 
     public static EquipmentInstance MoveToInventory(EquipmentInstance item, int forceId)
     {
         if (!item.IsValid || forceId < 0) throw new ArgumentException("Invalid equipment transfer.");
-        return item with { OfficerId = null, InventoryForceId = forceId, Equipped = false, IsLost = false, SearchPlaceId = null, EquipOnService = null };
+        return item with { OfficerId = null, InventoryForceId = forceId, Equipped = false, IsLost = false, SearchPlaceId = null, EventGiftKey = null, EquipOnService = null };
     }
 
     public static OfficerAbilities Bonuses(IEnumerable<EquipmentInstance> items,

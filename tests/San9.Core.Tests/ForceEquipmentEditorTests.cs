@@ -81,4 +81,38 @@ public sealed class ForceEquipmentEditorTests
         Assert.True(engine.Snapshot.Equipment.Single().Equipped);
         _ = new SimulationEngine(WorldState.Restore(engine.CaptureStableState()), rules);
     }
+
+    [Fact]
+    public void EditingAnUnclaimedGiftClearsItsEventIdentityOnlyWhenMoved()
+    {
+        var source = Engine().CaptureStableState() with
+        {
+            Equipment = [new EquipmentInstance(4, "blade", null, null, false) { IsLost = true, EventGiftKey = "gift.1" }]
+        };
+        var gift = new EquipmentGiftSearchEventDefinition(1, 4, "blade", new("gift.1"))
+            { Id = "gift", Consumption = EventConsumption.OnSuccess, ChanceAbility = CommunityAbility.Politics };
+        var rules = new SimulationRules { Equipment = new EquipmentRulebook([
+            new("blade", EquipmentSlot.MainHand, EquipmentRarity.Rare, default, default)]),
+            Personnel = new PersonnelRulebook([new(1, new(0, 0)), new(2, new(0, 0))], searchEvents: [gift]) };
+        var engine = new SimulationEngine(WorldState.Restore(source), rules);
+        engine.EditEquipment([new(4, null, null, false, 2, 0)]);
+        Assert.Equal("gift.1", Assert.Single(engine.Snapshot.Equipment).EventGiftKey);
+        engine.EditEquipment([new(4, null, 1, false, 2, 0)]);
+        var moved = Assert.Single(engine.Snapshot.Equipment);
+        Assert.Null(moved.EventGiftKey);
+        Assert.False(moved.IsLost);
+        Assert.Equal(1, moved.InventoryForceId);
+    }
+
+    [Fact]
+    public void LoadingRejectsUnmatchedEquipmentGiftMarker()
+    {
+        var source = Engine().CaptureStableState() with
+        {
+            Equipment = [new EquipmentInstance(4, "blade", null, null, false) { IsLost = true, EventGiftKey = "missing" }]
+        };
+        var rules = new SimulationRules { Equipment = new EquipmentRulebook([
+            new("blade", EquipmentSlot.MainHand, EquipmentRarity.Rare, default, default)]) };
+        Assert.Throws<ArgumentException>(() => new SimulationEngine(WorldState.Restore(source), rules));
+    }
 }

@@ -19,7 +19,13 @@ internal static class EquipmentMigration
                 { Equipment = UnequipNonServing(migrated.Instances.Concat(content.InitialEquipment ?? []), snapshot.World.Officers), EquipmentInitialized = true } };
         }
         var previousKeys = snapshot.InitializedSearchEquipment ?? [];
-        var pending = (content.InitialEquipment ?? []).Where(item => item.SearchPlaceId is not null && !previousKeys.Contains(SearchKey(item))).OrderBy(item => item.Id).ToArray();
+        var eventRewards = content.SearchEvents.OfType<EquipmentGiftSearchEventDefinition>().ToDictionary(gift => gift.EquipmentInstanceId);
+        foreach (var gift in eventRewards.Values)
+            if (snapshot.World.Equipment.FirstOrDefault(item => item.Id == gift.EquipmentInstanceId) is { } occupied &&
+                occupied.DefinitionId != gift.EquipmentDefinitionId)
+                throw new InvalidDataException($"Equipment gift instance ID conflicts with saved equipment: {gift.EquipmentInstanceId}.");
+        var pending = (content.InitialEquipment ?? []).Where(item => (item.SearchPlaceId is not null || eventRewards.ContainsKey(item.Id)) &&
+            !previousKeys.Contains(SearchKey(item))).OrderBy(item => item.Id).ToArray();
         if (pending.Length > 0)
         {
             var equipment = snapshot.World.Equipment.ToList();
@@ -81,6 +87,10 @@ internal static class EquipmentMigration
     }
 
     private static string SearchKey(EquipmentInstance item) => $"{item.Id.ToString(CultureInfo.InvariantCulture)}:{item.DefinitionId}";
-    internal static ImmutableArray<string> SearchKeys(ScenarioInitialState content) => (content.InitialEquipment ?? [])
-        .Where(item => item.SearchPlaceId is not null).Select(SearchKey).Order(StringComparer.Ordinal).ToImmutableArray();
+    internal static ImmutableArray<string> SearchKeys(ScenarioInitialState content)
+    {
+        var eventIds = content.SearchEvents.OfType<EquipmentGiftSearchEventDefinition>().Select(gift => gift.EquipmentInstanceId).ToHashSet();
+        return (content.InitialEquipment ?? []).Where(item => item.SearchPlaceId is not null || eventIds.Contains(item.Id))
+            .Select(SearchKey).Order(StringComparer.Ordinal).ToImmutableArray();
+    }
 }

@@ -242,6 +242,49 @@ public sealed record ScenarioInitialState(int SchemaVersion, string ScenarioId, 
                 if (memorial.Sites.Any(s => s.RewardTacticIds.Any(t => !tactics.Contains(t)) ||
                     s.RequiredTreasureId is int treasure && !Information.Treasures.Any(t => t.Id == treasure)))
                     throw new InvalidDataException("Unknown commemoration reward or treasure.");
+            var equipmentGifts = SearchEvents.OfType<San9.Core.Domain.EquipmentGiftSearchEventDefinition>().ToArray();
+            var otherWorldKeys = new HashSet<string>(StringComparer.Ordinal);
+            void AddWorldKey(San9.Core.Simulation.PersistentEventKey? key)
+            {
+                if (key is { } value) otherWorldKeys.Add(value.Value);
+            }
+            foreach (var entry in SearchEvents)
+            {
+                switch (entry)
+                {
+                    case San9.Core.Domain.HealingSearchEventDefinition e: AddWorldKey(e.ConsumptionKey); break;
+                    case San9.Core.Domain.BeastSearchEventDefinition e:
+                        foreach (var site in e.Sites) AddWorldKey(site.ConsumptionKey); break;
+                    case San9.Core.Domain.ScholarReturnSearchEventDefinition e: AddWorldKey(e.ConsumptionKey); break;
+                    case San9.Core.Domain.ImperialCeremonySearchEventDefinition e: AddWorldKey(e.ConsumptionKey); break;
+                    case San9.Core.Domain.TreasureMonumentSearchEventDefinition e: AddWorldKey(e.ConsumptionKey); break;
+                    case San9.Core.Domain.ForceActivationSearchEventDefinition e: AddWorldKey(e.ConsumptionKey); break;
+                    case San9.Core.Domain.CommemorationSearchEventDefinition e:
+                        foreach (var site in e.Sites) AddWorldKey(site.ConsumptionKey); break;
+                    case San9.Core.Domain.WomenVisitSearchEventDefinition e:
+                        foreach (var site in e.Sites) AddWorldKey(site.RequiredWorldKey); break;
+                    case San9.Core.Domain.ScholarPunishmentSearchEventDefinition e:
+                        foreach (var site in e.Sites) AddWorldKey(site.WithdrawalKey); break;
+                }
+            }
+            AddWorldKey(HanzhongKing?.ConsumptionKey); AddWorldKey(FiveTigers?.ConsumptionKey);
+            AddWorldKey(ExpeditionMemorial?.ConsumptionKey); AddWorldKey(SunMarriage?.ConsumptionKey);
+            AddWorldKey(ShanyangGong?.ConsumptionKey); AddWorldKey(RedCliffs?.ConsumptionKey);
+            AddWorldKey(Guandu?.ConsumptionKey); AddWorldKey(QiaoMarriage?.ConsumptionKey);
+            AddWorldKey(ChainedPlot?.StartedKey); AddWorldKey(ChainedPlot?.CompletedKey);
+            AddWorldKey(ThreeVisits?.StartedKey); AddWorldKey(ThreeVisits?.FirstVisitKey); AddWorldKey(ThreeVisits?.CompletedKey);
+            if (equipmentGifts.Select(g => g.EquipmentInstanceId).Distinct().Count() != equipmentGifts.Length ||
+                equipmentGifts.Select(g => g.ConsumptionKey).Distinct().Count() != equipmentGifts.Length ||
+                equipmentGifts.Any(g => otherWorldKeys.Contains(g.ConsumptionKey.Value)) ||
+                equipmentGifts.Any(g => !Information.Equipment.Any(definition => definition.Id == g.EquipmentDefinitionId &&
+                    definition.LegacyTreasureId is null && !definition.IsOrdinaryArmament)) ||
+                equipmentGifts.Any(g => !(InitialEquipment ?? []).Any(item => item.Id == g.EquipmentInstanceId &&
+                    item.DefinitionId == g.EquipmentDefinitionId &&
+                    item.EventGiftKey == g.ConsumptionKey.Value &&
+                    item.IsLost && item.SearchPlaceId is null && item.LegacyTreasureId is null && item.PendingArmamentCredit is null)) ||
+                (InitialEquipment ?? []).Any(item => item.EventGiftKey is not null &&
+                    !equipmentGifts.Any(g => g.EquipmentInstanceId == item.Id && g.ConsumptionKey.Value == item.EventGiftKey)))
+                throw new InvalidDataException("Invalid or conflicting equipment gift reward.");
             foreach (var conflict in SearchEvents.OfType<San9.Core.Domain.ConflictSearchEventDefinition>()) conflict.ValidateReferences(ids, tactics);
             foreach (var bookReturn in SearchEvents.OfType<San9.Core.Domain.MysticBookReturnSearchEventDefinition>())
                 if (!ids.Contains(bookReturn.MysticOfficerId) || !Information.Treasures.Any(t => t.Id == bookReturn.TreasureId) ||
