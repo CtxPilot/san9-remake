@@ -32,7 +32,8 @@ internal static class OriginalAiArmament
                 if ((slot == ArmamentSlot.Weapon ? detachment.Weapon : detachment.Armor) is not null || detachment.Soldiers == 0) continue;
                 var owner = engine.Snapshot.Forces.Single(item => item.Id == seat.ForceId);
                 var issueChoice = rules.Armaments.Values.Where(item => item.Slot == slot && item.Supports(detachment.TroopTypeId) &&
-                        (owner.ArmamentInventory?.GetValueOrDefault(item.Id) ?? 0) > 0 &&
+                        ((owner.ArmamentInventory?.GetValueOrDefault(item.Id) ?? 0) > 0 ||
+                         (owner.ArmamentReserve?.GetValueOrDefault(item.Id) ?? 0) > 0) &&
                         (item.ResearchProjectId is null || owner.CompletedResearch.Contains(item.ResearchProjectId)))
                     .OrderByDescending(item => slot == ArmamentSlot.Weapon ? item.AttackBonus : item.DefenseBonus)
                     .ThenBy(item => item.Id, StringComparer.Ordinal).FirstOrDefault();

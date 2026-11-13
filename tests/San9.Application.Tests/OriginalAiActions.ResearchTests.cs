@@ -14,6 +14,37 @@ namespace San9.Application.Tests;
 public sealed partial class OriginalAiActionsTests
 {
     [Fact]
+    public void AiCanEquipFromArmamentReserveWhenInventoryIsEmpty()
+    {
+        var basis = Fixture();
+        var content = basis with { Military = basis.Military! with
+        {
+            TroopTypes = [new(100, "枪兵", 1, ImmutableDictionary<int, int>.Empty)],
+            ResearchProjects = [new("basic", 100, 30, [])],
+            Armaments = [new("spear", "铁矛", ArmamentSlot.Weapon, [100], 8, 0, 100, null)]
+        } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42, settings: new NewGameSettings { MixedTroopsEnabled = true }).CreateSnapshot();
+        initial = initial with
+        {
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 },
+            Forces = initial.Forces.Select(force => force.Id == 2 ? force with
+                { ArmamentReserve = ImmutableDictionary<string, ulong>.Empty.Add("spear", 500) } : force).ToArray(),
+            Units = initial.Units.Select(unit => unit.Id == 20 ? unit with { Position = new(37, 7) } : unit).ToArray()
+        };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiArmament.Manage(engine, definition.MilitaryRules, seat, events);
+
+        var configured = Assert.Single(events.OfType<UnitArmamentConfiguredEvent>());
+        Assert.Equal(500u, configured.IssuedSets);
+        Assert.Equal(500u, engine.Snapshot.Units.Single(unit => unit.Id == 20).Detachments[9].Weapon!.RemainingSets);
+        Assert.Null(engine.Snapshot.Forces.Single(force => force.Id == 2).ArmamentReserve);
+    }
+
+    [Fact]
     public void AiCanResupplyUnitAfterTenIneligibleUnits()
     {
         var basis = Fixture();
