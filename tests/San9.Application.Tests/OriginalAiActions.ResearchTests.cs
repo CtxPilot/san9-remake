@@ -320,6 +320,55 @@ public sealed partial class OriginalAiActionsTests
     }
 
     [Fact]
+    public void AiEquipsItsRulerAndTransfersSpareFeaturedEquipmentToAnotherOfficer()
+    {
+        var basis = Fixture();
+        var strong = new EquipmentDefinition("strong-feature", EquipmentSlot.MainHand, EquipmentRarity.Precious,
+            new(8, 0, 0, 0), default) { Name = "强剑" };
+        var spare = strong with { Id = "spare-feature", Name = "长剑", BaseBonuses = new(4, 0, 0, 0) };
+        var content = basis with { Information = basis.Information with { Equipment = [strong, spare] } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42).CreateSnapshot();
+        initial = initial with { Equipment = [.. initial.Equipment, new EquipmentInstance(500, strong.Id, 2, null, false),
+            new EquipmentInstance(501, spare.Id, 2, null, false)],
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 } };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiEquipment.Manage(engine, definition.Rules.Equipment, seat, events);
+
+        Assert.True(engine.Snapshot.Equipment.Single(item => item.Id == 500).Equipped);
+        var transferred = engine.Snapshot.Equipment.Single(item => item.Id == 501);
+        Assert.Equal(4, transferred.OfficerId);
+        Assert.True(transferred.Equipped);
+        Assert.Contains(events, e => e is EquipmentTransferredEvent { EquipmentId: 501, PreviousOfficerId: 2, OfficerId: 4 });
+    }
+
+    [Fact]
+    public void AiDoesNotTransferFeaturedEquipmentWhenNoOfficerMeetsItsRequirement()
+    {
+        var basis = Fixture();
+        var item = new EquipmentDefinition("demanding-feature", EquipmentSlot.MainHand, EquipmentRarity.Precious,
+            new(4, 0, 0, 0), default) { MinimumAbilities = new(100, 0, 0, 0) };
+        var content = basis with { Information = basis.Information with { Equipment = [item] } };
+        var definition = new ScenarioSessionDefinition(content);
+        var seat = new ControlSeat("ai:2", 2, ControllerKind.Automatic);
+        var initial = definition.CreateWorld(42).CreateSnapshot();
+        initial = initial with { Equipment = [.. initial.Equipment, new EquipmentInstance(501, item.Id, 2, null, false)],
+            Simulation = initial.Simulation with { Boundary = SimulationBoundary.Stable, Controls = [seat], ActiveControl = 0 } };
+        var engine = GameSession.EngineFactory(content)(WorldState.Restore(initial));
+        List<DomainEvent> events = [];
+
+        OriginalAiEquipment.Manage(engine, definition.Rules.Equipment, seat, events);
+
+        var held = engine.Snapshot.Equipment.Single(value => value.Id == 501);
+        Assert.Equal(2, held.OfficerId);
+        Assert.False(held.Equipped);
+        Assert.DoesNotContain(events, e => e is EquipmentTransferredEvent { EquipmentId: 501 });
+    }
+
+    [Fact]
     public void AiDoesNotBuyOrdinaryOfficerEquipment()
     {
         var source = Fixture();

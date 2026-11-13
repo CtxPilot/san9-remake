@@ -31,13 +31,29 @@ internal static class OriginalAiEquipment
         {
             if (actions >= 32) break;
             var world = engine.Snapshot;
+            var rulerId = world.Forces.Single(force => force.Id == seat.ForceId).LeaderId;
             var current = world.Equipment.FirstOrDefault(item => item.OfficerId == officer && item.Equipped && rules.Items[item.DefinitionId].Slot == slot);
             long currentScore = current is null ? -1 : Score(current);
-            foreach (var item in world.Equipment.Where(item => (item.OfficerId == officer || item.InventoryForceId == seat.ForceId) &&
+            foreach (var item in world.Equipment.Where(item => (item.OfficerId == officer || item.InventoryForceId == seat.ForceId ||
+                         item.OfficerId == rulerId && rulerId is not null && item.LegacyTreasureId is null) &&
                          !item.Equipped && item.PendingArmamentCredit is null && !rules.Items[item.DefinitionId].IsOrdinaryArmament &&
                          rules.Items[item.DefinitionId].Slot == slot && Score(item) > currentScore)
                      .OrderByDescending(Score).ThenBy(item => item.Id))
             {
+                if (item.OfficerId is int holder && holder != officer)
+                {
+                    var person = world.Officers.Single(p => p.Id == officer);
+                    if (actions >= 31 || person.UnitId is not null || !EquipmentRules.MeetsRequirements(rules.Items[item.DefinitionId], person.BaseAbilities)) continue;
+                    var proposed = world.Equipment.Select(value => value.Id == item.Id ? EquipmentRules.MoveToOfficer(value, officer) : value);
+                    if (EquipmentRules.Equip(proposed, rules.Items, officer, item.Id) is null) continue;
+                    long transferSequence = engine.Snapshot.Simulation.NextSequence;
+                    var transfer = new TransferEquipmentCommand(SimulationIdentity.Command(transferSequence, seat.ForceId), seat.ForceId, transferSequence, item.Id, officer);
+                    if (!engine.Validate(context, transfer).Accepted) continue;
+                    var moved = engine.Execute(context, transfer);
+                    if (!moved.Submission.Accepted) continue;
+                    events.AddRange(moved.Events);
+                    actions++;
+                }
                 long sequence = engine.Snapshot.Simulation.NextSequence;
                 var command = new ConfigureEquipmentCommand(SimulationIdentity.Command(sequence, seat.ForceId), seat.ForceId, sequence, officer, slot, item.Id);
                 if (!engine.Validate(context, command).Accepted) continue;
