@@ -125,6 +125,7 @@ internal static class PrisonerReturnDiplomacy
                 world.Replace(force with { BaseTrust = Math.Min(1000, force.BaseTrust + 2) });
             }
             DiplomacySettlement.Grow(world, task.OfficerId, events);
+            OfficerServiceMerit.Credit(world, task.OfficerId, task.ForceId, 1, "prisoner-return-accepted", events);
         }
         else ForceRelations.Change(world, task.ForceId, mission.TargetForceId, -5, null, events);
         events.Add(new PrisonerReturnResolvedEvent(world.Clock, task.Id, mission.PrisonerId, offer, accepted,

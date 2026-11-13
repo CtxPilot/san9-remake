@@ -108,6 +108,8 @@ public sealed class PrisonerReturnTests
         EventAssert.Equal(result.Events, restored.Execute(new("first"), final).Events);
         var resolved = Assert.Single(result.Events.OfType<PrisonerReturnResolvedEvent>());
         Assert.True(resolved.Accepted);
+        Assert.Contains(result.Events, e => e is OfficerServiceMeritChangedEvent
+            { OfficerId: 12, ForceId: 1, Current: 1, Reason: "prisoner-return-accepted" });
         Assert.Equal(100u, resolved.Received);
         Assert.Equal(400u, resolved.Spent);
         Assert.Single(result.Events.OfType<ResourceChangedEvent>(), e => e.Reason == "prisoner-compensation" && e.Actual == -500);
@@ -128,6 +130,7 @@ public sealed class PrisonerReturnTests
         var result = engine.Execute(new("first"), new RespondDailyTaskCommand(Guid.NewGuid(), 1, 2, prompt.TaskId, 1, true));
         Assert.True(result.Submission.Accepted);
         Assert.Contains(result.Events, e => e is TaskCancelledEvent cancelled && cancelled.TaskId == prompt.TaskId);
+        Assert.DoesNotContain(result.Events, e => e is OfficerServiceMeritChangedEvent);
         Assert.DoesNotContain(result.Events, e => e is PrisonerReturnResolvedEvent or PrisonerRecoveredEvent);
         Assert.DoesNotContain(result.Events, e => e is ResourceChangedEvent resource && resource.Reason == "prisoner-compensation");
     }
