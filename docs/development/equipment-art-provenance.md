@@ -14,6 +14,8 @@
 | `src/San9.Client.Godot/assets/equipment/dilu.png` | 的卢，独立设计的灰马 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/jueying.png` | 绝影，独立设计的深骝马 | 已接入；待实机检查 |
 | `src/San9.Client.Godot/assets/equipment/zhaohuang-feidian.png` | 爪黄飞电，独立设计的浅金色马 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/yitian-jian.png` | 倚天剑，独立设计的铁剑 | 已接入；待实机检查 |
+| `src/San9.Client.Godot/assets/equipment/qinggang-jian.png` | 青釭剑，独立设计的青灰色剑 | 已接入；待实机检查 |
 
 玄纹长戟生成提示词：
 
@@ -34,5 +36,7 @@
 的卢和绝影图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求白额灰马与黑鬃深骝马、简洁马具、暗色底、无骑手文字或游戏标识。马匹毛色和马具为游戏中的视觉设计，不视为可考的个体复原。
 
 爪黄飞电图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词要求浅金色马、浅色下肢、简洁马具、暗色底、无骑手和游戏标识。毛色与马具是游戏中的视觉设计，不作为历史个体或汉末马具的复原。
+
+倚天剑与青釭剑图标生成于 2026-11-13，使用内置 imagegen，未输入参考图片；提示词分别要求铁质双刃直剑和青灰色双刃直剑、简洁铜饰、暗色底、无人物文字或游戏标识。图像是独立的游戏化设计，不声称复原历史实物或参考作品造型。
 
 其他旧名物和未配置图标的模组物品目前无对应图标，界面缺图时隐藏图像；旧名物逐件图标仍待制作。

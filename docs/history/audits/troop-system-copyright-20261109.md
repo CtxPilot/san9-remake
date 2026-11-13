@@ -202,3 +202,5 @@ tests/San9.Importer.San9PkTc101.Tests/MilitaryContentCompilerTests.cs
 2026-11-13 补充的的卢、绝影图标由文字生成，未输入参考游戏画面；马匹的毛色与马具是项目的视觉设计，不作为历史个体的复原。图标来源与实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。上述素材来源记录不构成对原作品改编的授权，目前仍无已知权利人授权。
 
 同日补充的爪黄飞电图标也由文字生成，未输入参考游戏画面；毛色及马具为视觉设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
+
+同日补充的倚天剑、青釭剑图标分别由文字生成，未输入参考游戏画面；图像为独立设计，来源和实机验收状态见[图标来源记录](../../development/equipment-art-provenance.md)。原作品授权情况不变。
